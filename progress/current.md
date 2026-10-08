@@ -15,7 +15,7 @@ Solo la Fase A (T1-T15 de `specs/F-132-estado-desde-rac/tasks.md`); la B espera 
 D7 del humano tras el contraste (hasta el 2026-10-22). La foto de F-067 sigue
 construyéndose igual: ni DROP, ni TRUNCATE, ni DELETE sobre sus dos tablas.
 
-- **Tarea en curso**: T10 (premisa falsa fuera del diccionario). Hechas: T1-T9. Diccionario v46. `init.sh` de arranque sobre 4d25fcb: VERDE (7.133 passed, 228 skipped, 46 min 57 s).
+- **Tarea en curso**: T11 (azure-apps). Hechas: T1-T10. Diccionario v46. `init.sh` de arranque sobre 4d25fcb: VERDE (7.133 passed, 228 skipped, 46 min 57 s).
 - **Entorno**: `init.sh` de arranque lanzado sobre 4d25fcb en el árbol principal;
   para no ensuciarlo (el barrido de dataclasses de F-006 ve módulos nuevos de
   `domain/` si aparecen con la suite corriendo, como pasó en F-085), el trabajo se
@@ -45,6 +45,11 @@ construyéndose igual: ni DROP, ni TRUNCATE, ni DELETE sobre sus dos tablas.
   - La agregación y el formato del informe viven en el dominio (`contrastar`,
     `formatear_contraste`, `discrepancias`), como `formatear_recuentos`; el
     comando solo lee y convierte filas.
+  - T10 corrige además tres textos que la spec no lista y que la premisa o la
+    vista vieja dejaban falsos, SOLO en comentarios o docstrings (ni una línea
+    ejecutable): la cabecera de `01_documentos.sql` («la da la foto diaria»),
+    el docstring de `compras_reset_sql.py` («la única vista que las lee») y el
+    de `reset-compras` en `main.py` («historia que no existe en Sigrid»).
 
 
 ## 2026-10-08 · F-132 · SPEC ESCRITA (spec-author), `pending` a la espera de aprobación · la antigüedad del estado desde `rac`

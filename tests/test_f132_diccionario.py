@@ -14,6 +14,7 @@ Ningún test toca red ni BBDD: se lee el YAML y los documentos del árbol.
 
 from __future__ import annotations
 
+import re
 import unicodedata
 from functools import lru_cache
 from pathlib import Path
@@ -271,3 +272,78 @@ def test_f132_r20_p24_espera_documento_procesos() -> None:
     assert "ventana" not in respuesta.split("deshech")[0], (
         "el cambio se da con su fecha y hora, no como una ventana entre fotos"
     )
+
+
+# ===========================================================================
+# R21, R22 · la premisa falsa fuera del diccionario
+# ===========================================================================
+
+#: Las frases con que el repositorio afirmaba que Sigrid no guarda cuándo
+#: cambia el estado de un documento (F-067, F-066), ya planas: minúsculas, sin
+#: tildes, con los saltos de línea y las marcas de comentario plegados.
+FRASES_PREMISA = (
+    "la fecha del cambio de estado no existe en sigrid",
+    "la fecha del cambio de estado no esta en sigrid",
+    "la fecha en que un documento cambia de estado no esta en sigrid",
+    "sigrid no guarda cuando cambio el estado",
+    "sigrid no guarda cuando cambia el estado",
+    "historia que no existe en sigrid",
+    "historia de estados que no existe en sigrid",
+    "ni esta tabla ni ninguna otra guardan",
+    "lo unico del datamart que sabe cuando",
+    "en sigrid esa fecha no existe",
+    "no hay copia en sigrid",
+    "la foto diaria que no existe en sigrid",
+)
+
+#: Lo VIGENTE del repositorio (R22). Fuera: `progress/`, `specs/`, `tests/` (que
+#: citan las frases para prohibirlas) y la historia de versiones de
+#: `00_global.yaml`, que cuenta lo que se creía entonces.
+_PATRONES_VIGENTES = (
+    "main.py", "README*", "etl_sigrid/**/*.py", "etl_sigrid/**/*.sql",
+    "config/**/*.yaml", "config/**/*.py", "docs/**/*.md",
+)
+
+
+def _plano_codigo(texto: str) -> str:
+    sin_marcas = re.sub(r"\n[ \t]*(?:#+|--|//|>)?[ \t]*", " ", texto)
+    return _plano(sin_marcas.replace("*", ""))
+
+
+def _vigente(ruta: Path) -> str:
+    texto = ruta.read_text(encoding="utf-8")
+    if ruta.name == "00_global.yaml":
+        texto = texto.split("\nversion:", 1)[1]
+    return _plano_codigo(texto)
+
+
+def test_f132_r22_ningun_texto_vigente_afirma_que_sigrid_no_guarda_el_cuando() -> None:
+    rutas = sorted({r for patron in _PATRONES_VIGENTES for r in RAIZ.glob(patron)})
+    assert any(r.name == "ARCHITECTURE.md" for r in rutas)
+    hallazgos = []
+    for ruta in rutas:
+        texto = _vigente(ruta)  # una vez por fichero: normalizar cuesta
+        hallazgos += [
+            f"{ruta.relative_to(RAIZ).as_posix()}: «{frase}»"
+            for frase in FRASES_PREMISA
+            if frase in texto
+        ]
+    assert hallazgos == [], "\n".join(hallazgos)
+
+
+def test_f132_r21_tables_sigrid_c3_la_antiguedad_sale_de_rac() -> None:
+    texto = _plano_codigo((RAIZ / "config" / "tables_sigrid.yaml").read_text(encoding="utf-8"))
+    bloque = texto.split("lo que sigrid no guarda", 1)[1][:3000]
+    assert "f-132" in bloque and "compras.v_estado_documentos" in bloque
+    assert "respaldo" in bloque
+
+
+def test_f132_r21_architecture_la_antiguedad_sale_de_rac() -> None:
+    texto = _plano_codigo((RAIZ / "docs" / "ARCHITECTURE.md").read_text(encoding="utf-8"))
+    assert "f-132" in texto and "13_estado_documentos.sql" in texto
+    assert "contraste-estados" in texto and "respaldo" in texto
+
+
+def test_f132_r21_readme_compras_la_antiguedad_sale_de_rac() -> None:
+    texto = _plano_codigo((RAIZ / "README_COMPRAS_C1_C2.md").read_text(encoding="utf-8"))
+    assert "f-132" in texto and "rac" in texto and "respaldo" in texto

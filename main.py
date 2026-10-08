@@ -4932,8 +4932,8 @@ def reset_compras() -> None:
 
     F-067 (decisión del 2026-10-06): ya no borra el esquema entero. Borra sus
     vistas, tablas y funciones y CONSERVA `compras.historial_estados` y
-    `compras.historial_estados_fotos`, la historia de estados que no existe en
-    Sigrid y no se puede recuperar. El SQL vive en
+    `compras.historial_estados_fotos`, la foto diaria de estados, que no se
+    puede recuperar (desde F-132, respaldo de `rac` en contraste). El SQL vive en
     `etl_sigrid/infrastructure/postgres/compras_reset_sql.py`.
     """
     pg = _get_pg()

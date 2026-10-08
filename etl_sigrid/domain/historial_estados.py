@@ -3,10 +3,13 @@
 La FOTO DIARIA de estados de contratos y facturas (F-067) y la fecha de Delphi.
 
 POR QUÉ EXISTE. Compras quiere «los contratos que llevan más de tres semanas
-enviados y sin firmar», y la fecha del cambio de estado NO EXISTE en Sigrid:
-`concam` audita 1,5 M de cambios y ni uno del campo `est`, y `confir` no tiene
-ni una firma de contrato. Decisión del humano (2026-09-06): construirla aquí,
-como una foto diaria, que empieza a contar el día que se despliega.
+enviados y sin firmar». Se montó (decisión del humano, 2026-09-06) creyendo que
+Sigrid no fechaba el cambio de estado —`concam` audita 1,5 M de cambios y ni
+uno del campo `est`, y `confir` no tiene ni una firma de contrato—, como una
+foto diaria que empieza a contar el día que se despliega. F-085 lo desmintió:
+`rac` guarda cada paso con su estado de origen y de destino, al segundo. Desde
+F-132 la antigüedad del estado sale de `rac` (`domain/estado_documentos.py`) y
+esta foto es el RESPALDO mientras dura el contraste.
 
 POR TRAMOS Y NO UNA FILA POR DÍA. Es la misma foto sin repetir lo que no
 cambia: un tramo es (documento, estado, desde, hasta) y la foto de cualquier
