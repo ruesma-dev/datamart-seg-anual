@@ -70,6 +70,8 @@ FICHEROS_COMPRAS = [
     "11_historial_estados.sql",
     # F-085: el historial de procesos de `rac`, detrás de la foto.
     "12_documento_procesos.sql",
+    # F-132: la vista del estado desde `rac`, detrás de `12` (su CASCADE la tira).
+    "13_estado_documentos.sql",
 ]
 
 

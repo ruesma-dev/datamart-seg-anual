@@ -284,3 +284,27 @@ def test_f132_r11_el_sql_remite_a_su_oraculo_del_dominio() -> None:
     cabecera = _texto(RUTA_VISTA).split("DROP VIEW", 1)[0]
     assert "etl_sigrid/domain/estado_documentos.py" in cabecera
     assert "tests/test_f132_sql.py" in cabecera
+
+
+# ===========================================================================
+# R10 · el sub-paso de `build_compras`, el último
+# ===========================================================================
+
+
+def test_f132_r10_compras_acaba_en_la_vista_detras_de_documento_procesos() -> None:
+    from etl_sigrid.application.steps import build_compras_step
+
+    subs = build_compras_step.SUB_PASOS
+    assert [s.sql_file for s in subs][-3:] == [
+        "11_historial_estados.sql", "12_documento_procesos.sql", "13_estado_documentos.sql",
+    ]
+    ultimo = subs[-1]
+    assert ultimo.name == "estado_documentos"
+    # Es una vista: no se cuentan filas (contarlas la recorrería entera).
+    assert ultimo.target_schema is None and ultimo.target_table is None
+
+
+def test_f132_r10_el_docstring_del_paso_nombra_el_13() -> None:
+    from etl_sigrid.application.steps import build_compras_step
+
+    assert "13_estado_documentos.sql" in (build_compras_step.__doc__ or "")

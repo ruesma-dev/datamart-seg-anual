@@ -52,8 +52,10 @@ FICHEROS_COMPRAS = [
     "10_necesidades.sql",
     # F-067: la foto diaria de estados (sus tablas no se reconstruyen).
     "11_historial_estados.sql",
-    # F-085: el historial de procesos de `rac`, el último, detrás de la foto.
+    # F-085: el historial de procesos de `rac`, detrás de la foto.
     "12_documento_procesos.sql",
+    # F-132: la vista del estado desde `rac`, la última (el CASCADE de `12` la tira).
+    "13_estado_documentos.sql",
 ]
 
 #: Lo que cada sub-paso nuevo declara como objeto a contar.
