@@ -133,6 +133,9 @@ QUIEN_PUEDE_NOMBRARLAS = {
     "infrastructure/postgres/sql/compras/11_historial_estados.sql",
     # `reset-compras`: el que las PROTEGE (importa `TABLAS_PERSISTENTES`).
     "infrastructure/postgres/compras_reset_sql.py",
+    # F-132: el contraste foto <-> `rac`, que las LEE con SELECT de solo
+    # lectura (`tests/test_f132_contraste.py` fija que no escribe).
+    "infrastructure/postgres/contraste_estados_sql.py",
 }
 
 
