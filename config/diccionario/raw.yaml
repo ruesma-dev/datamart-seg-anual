@@ -1608,7 +1608,7 @@ objetos:
 
       **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `rac`, y se localiza con `grep -n "^| rac " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
 
-      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid, con el mismo filtro: lo que cambio ayer en Sigrid esta aqui esta manana. No tiene columna de ultima modificacion.
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid, sin filtro: lo que cambio ayer en Sigrid esta aqui esta manana. No tiene columna de ultima modificacion.
 
       **No se traen** 1 columnas de binario o texto ilimitado: el texto libre del paso, que lleva correos pegados con datos de terceros (D3 de F-085). Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
     grano: Una fila por paso de proceso de un documento, identificada por `ide`.

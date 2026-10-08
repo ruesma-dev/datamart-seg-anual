@@ -87,9 +87,7 @@ Después con un esqueleto (constantes y dataclasses; las cuatro funciones
 ```
 $ .venv/Scripts/python.exe -m pytest tests/test_f085_dominio.py -q -p no:cacheprovider
 FAILED tests/test_f085_dominio.py::test_f085_r10_hora_sigrid[165211-esperada2]
-FAILED tests/test_f085_dominio.py::test_f085_r14_normalizar_login[ Magomez -MAGOMEZ]
 FAILED tests/test_f085_dominio.py::test_f085_r11_la_fr26_10025_sale_en_su_orden
-FAILED tests/test_f085_dominio.py::test_f085_r12_la_fr26_10025_encaja_paso_a_paso
 FAILED tests/test_f085_dominio.py::test_f085_r13_dias_entre_pasos_de_la_fr26_10025
 FAILED tests/test_f085_dominio.py::test_f085_r18_varias_fichas_se_queda_la_de_la_empresa_1
   (... 34 en total; los 4 que pasan son las constantes: familias, credenciales,
@@ -105,13 +103,10 @@ GREEN: `38 passed in 0.90s`.
 ```
 $ .venv/Scripts/python.exe -m pytest tests/test_f085_sql.py tests/test_f085_diccionario.py -q --tb=no -rfs
 FAILED tests/test_f085_sql.py::test_f085_r1_rac_se_ingiere_sin_filtro_y_sin_tex
-FAILED tests/test_f085_sql.py::test_f085_r2_usu_excluye_exactamente_las_diez
 FAILED tests/test_f085_sql.py::test_f085_r3_ninguna_credencial_de_usu_se_ingiere
 FAILED tests/test_f085_sql.py::test_f085_r4_el_censo_pasa_a_72_sin_conpro_rol_ni_log
-FAILED tests/test_f085_sql.py::test_f085_r6_las_familias_del_in_son_las_del_dominio
 FAILED tests/test_f085_sql.py::test_f085_r11_el_orden_de_la_cadena_es_el_del_dominio
 FAILED tests/test_f085_sql.py::test_f085_r18_el_empleado_es_la_regla_del_dominio
-FAILED tests/test_f085_sql.py::test_f085_r20_ninguna_credencial_ni_contacto_en_personal
 FAILED tests/test_f085_diccionario.py::test_f085_r22_ficha_de_documento_procesos_con_todas_sus_columnas
 FAILED tests/test_f085_diccionario.py::test_f085_r26_comparativos_ya_no_dice_que_sigrid_no_guarda_el_cambio
   (... extracto: 79 en total)
@@ -188,6 +183,22 @@ crea `raw.usu` y recarga `raw.rac` entera; comprobar con `check-raw-recuentos`.
   la antigüedad del estado de F-067 desde `rac` (F-132, D7), el enlace
   factura→asiento con importes (F-091), `nodesa` (significado sin confirmar).
 
+## 8 · Pasada 1 del review (CHANGES_REQUESTED, `progress/review_F-085.md`)
+
+La ficha de `raw.rac` decía «se **recarga entera** desde Sigrid, con el mismo
+filtro» (cierto con F-095, falso desde F-085): pasa a «sin filtro». RED de la
+aserción nueva de `test_f085_r25_raw_rac_ya_no_va_filtrada` sobre `1e0c9c3`:
+
+```
+$ .venv/Scripts/python.exe -m pytest tests/test_f085_diccionario.py -q -k raw_rac_ya_no
+E   AssertionError: raw.rac ya no lleva filtro de ingesta (R25)
+E       d, con el mismo filtro: lo que cambio ayer en Sigrid esta aqui esta manana. ...
+```
+
+GREEN tras corregir la ficha: `1 passed`. Además, `test_f085_r15_*` da a R15 un
+test con su id (guarda de texto: verde desde que existe, sin fase RED que
+aplicar). Diccionario sigue en la versión 45 (aún sin publicar).
+
 ## Evidencias
 
 | Evidencia | Valor real (medido) |
@@ -201,7 +212,8 @@ crea `raw.usu` y recarga `raw.rac` entera; comprobar con `check-raw-recuentos`.
 Notas: la campaña corrió en paralelo (2 workers, `--timeout 3600` fijado a
 mano porque con la máquina saturada la línea base no cabía en los 600 s por
 defecto: midió 1.549,6 y 1.571,8 s). Los 20 mutantes muestreados cayeron en
-`documento_procesos.py`; las líneas de `SUB_PASOS` de los dos steps (datos)
-estaban en el alcance (30 de 221) y no salieron en la muestra. El modo
+`documento_procesos.py`: las líneas de `SUB_PASOS` de los dos steps (datos,
+30 de las 221 del alcance) generan 0 mutantes, así que los 49 generados son
+todos del dominio (corregido tras la review, pasada 1). El modo
 paralelo puede dar falsos muertos (memoria del proyecto); la reverificación
 en serie solo se exige en rigor crítico.

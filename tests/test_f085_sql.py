@@ -413,3 +413,19 @@ def test_f085_r17_personal_acaba_en_usuarios_sigrid() -> None:
     ultimo = build_personal_step.SUB_PASOS[-1]
     assert ultimo.sql_file == "06_usuarios_sigrid.sql"
     assert (ultimo.target_schema, ultimo.target_table) == ("personal", "usuarios_sigrid")
+
+
+# ===========================================================================
+# R15 · la regla vive UNA vez, en el dominio, y el SQL la cita
+# ===========================================================================
+
+
+def test_f085_r15_los_dos_sql_remiten_a_su_oraculo_del_dominio() -> None:
+    """Los literales los fijan los tests `r6`, `r11`, `r14` y `r18` contra las
+    constantes del dominio; aquí, que cada SQL dice de dónde salen, para que
+    quien lo toque sepa qué oráculo mover con él."""
+    procesos = _texto(RUTA_PROCESOS)
+    usuarios = _texto(RUTA_USUARIOS)
+    assert "domain/documento_procesos.py" in procesos and "FAMILIAS" in procesos
+    assert "LOS LITERALES SON LOS DEL DOMINIO" in procesos
+    assert "empleado_de_usuario" in usuarios and "EMPRESA_PREFERENTE" in usuarios

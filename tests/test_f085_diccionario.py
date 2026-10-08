@@ -154,6 +154,9 @@ def test_f085_r25_ficha_de_raw_usu() -> None:
 def test_f085_r25_raw_rac_ya_no_va_filtrada() -> None:
     texto = _ficha("raw", "rac")["descripcion"]
     assert "ESTA FILTRADA" not in texto
+    # Review F-085 pasada 1: «Como se carga» decia «con el mismo filtro», cierto
+    # con F-095 y falso desde F-085. Es lo que lee el MCP antes de contar pasos.
+    assert "mismo filtro" not in texto, "raw.rac ya no lleva filtro de ingesta (R25)"
     for dato in ("F-085", "2.517.791", "asiide <> 0", "`usu`", "login",
                  "compras.documento_procesos", "retenciones.apuntes_contables"):
         assert dato in texto, f"la ficha de raw.rac no dice «{dato}»"
