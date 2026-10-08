@@ -15,6 +15,7 @@ Encadena los archivos SQL en orden:
     09_comparativos_detalle.sql - sus líneas, el objetivo y las firmas (F-038)
     10_necesidades.sql - el documento de necesidades de compra, el DPC (F-067)
     11_historial_estados.sql - la FOTO DIARIA de estados (F-067), PERSISTENTE
+    12_documento_procesos.sql - el historial de PROCESOS de `rac` (F-085)
 
 Lee de `raw.*` y, como `03_views.sql`, de `maestro.v_obra_fichas` (de
 `build_maestros`, que corre antes en `run-all`). No necesita `stg` ni `mart`.
@@ -29,9 +30,14 @@ master 0 —las versiones que dan la base— están congeladas (F-038, design §
 (`historial_estados` e `historial_estados_fotos`) NO se reconstruyen. Son la
 historia de estados de contratos y facturas, que no existe en Sigrid; el SQL
 las crea con `CREATE TABLE IF NOT EXISTS`, nunca las borra ni las vacía, y
-cada noche les añade la foto de la ingesta. Va el último porque no depende de
-nada del esquema; si un sub-paso anterior falla, esa noche no hay foto y se ve
-en `historial_estados_fotos` (un hueco), no se pierde lo ya guardado.
+cada noche les añade la foto de la ingesta. No depende de nada del esquema; si
+un sub-paso anterior falla, esa noche no hay foto y se ve en
+`historial_estados_fotos` (un hueco), no se pierde lo ya guardado.
+
+`12` (F-085) va DETRÁS de `11` a propósito: es el más caro de los dos (~1 M de
+pasos de `raw.rac` con dos ventanas por documento) y no lo necesita nadie del
+esquema, así que si fallara, la foto de esa noche ya está tomada. Lee `raw.rac`,
+`raw.con`, `raw.usu` y la función `fn_estado_documento` de `00_setup.sql`.
 
 POR QUÉ EXISTE ESTE FICHERO (F-047, absorbe F-044). `build-compras` ejecutaba
 su SQL **en línea dentro del comando**, sin step, y por eso **no dejaba fila en
@@ -166,6 +172,15 @@ SUB_PASOS: tuple[_SubStep, ...] = (
         sql_file="11_historial_estados.sql",
         target_schema="compras",
         target_table="historial_estados",
+    ),
+    # F-085: el historial de PROCESOS de `rac` (quién hizo qué paso, desde qué
+    # estado, a cuál y cuándo). DETRÁS de la foto: si este falla, la foto de
+    # la noche ya está tomada. Cuenta su única tabla (~1,01 M de pasos).
+    _SubStep(
+        name="documento_procesos",
+        sql_file="12_documento_procesos.sql",
+        target_schema="compras",
+        target_table="documento_procesos",
     ),
 )
 

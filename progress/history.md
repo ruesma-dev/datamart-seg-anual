@@ -1607,3 +1607,38 @@ QUEDA: despliegue (la primera nocturna toma la LÍNEA BASE; «más de tres seman
 responde a los 21 días), MCP, comprobaciones, carta a Compras y la pregunta de la
 penalización. Riesgo aceptado de la spec: un documento ausente una noche pierde su
 antigüedad al reaparecer.
+
+## F-085 · Quién aprobó qué y cuándo: el historial de procesos de `rac` · 2026-10-08
+
+Rama `feature/F-085-quien-aprobo-que-y-cuando`. `sdd=true`, rigor `estandar`. APROBADA
+en pasada 2 (`progress/review_F-085.md`; la 1 pidió quitar «con el mismo filtro» de la
+ficha de `raw.rac`, su test y una frase del informe). Spec en
+`specs/F-085-quien-aprobo-que-y-cuando/`, mediciones en `progress/spec_F-085.md`,
+informe en `progress/impl_F-085.md`. Nace de la captura de la ventana «Procesos» de
+Sigrid que mandó Carmen Calle el 2026-10-07 (factura FR26/10025).
+
+Hallazgo: la ventana «Procesos» es `rac` (2,52 M pasos desde 2008, con estado
+origen→destino, login, fecha y hora), que se ingería filtrada por `asiide <> 0` y
+tiraba justo las aprobaciones. Cubre facturas 99,94 %, contratos 97,1 %, comparativos
+97,0 % y obras 72,2 % (el resto no salió del estado inicial). `dbo.log` deja de hacer
+falta para esta pregunta (ope 5 = proceso, 3 = guardar, 30 = deshacer, 24 = firma
+digital) y `confir` DOCVAL son peticiones de firma nunca firmadas. Y desmiente la
+premisa de F-067: `rac` ES la historia de estados (último paso = estado actual en
+>99,9 %), lo que lleva a F-132.
+
+Decisiones del humano (2026-10-07): D1 `raw.rac` sin filtro · D2 familias 15/44/46/42 ·
+D3 `tex` excluida · D4 `usu` sin credenciales, login y nombre en `compras`, DNI y
+empleado solo en `personal` · D5 `dbo.log` en F-105 · D6 `confir` sin cambios · D7
+F-067 aparte (F-132) · D8 sin `conpro` ni `rol`.
+
+Hecho: `raw.rac` entera; `raw.usu` con diez columnas excluidas (credenciales, DNI vacío,
+correo, textos); censo 71 → 72; `compras.documento_procesos` (un paso por fila, sub-paso
+`12` de `build_compras`); `personal.usuarios_sigrid` (login, empleado, DNI; sub-paso `06`
+de `build_personal`); diccionario v45; ARCHITECTURE y `azure-apps` (`e08a3bb`, sin push).
+
+Verificado: `init.sh` 7.133 passed, cobertura 100 % de líneas cambiadas; mutación 20/20.
+
+QUEDA (humano): T12-T14 en el Postgres local/dev (FR26/10025 con sus cuatro pasos y
+nombre, coberturas, retenciones idénticas antes y después, tiempos; vigilar
+`usu.delO`), y el despliegue con +4 a +7 min sobre una nocturna que ya va 38 min por
+encima de las 4 h.

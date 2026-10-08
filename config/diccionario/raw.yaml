@@ -2,7 +2,7 @@
 #
 # Fichas del esquema `raw`: la copia de Sigrid, tabla a tabla.
 #
-# **A NIVEL DE OBJETO, NO DE COLUMNA** (DA-2 de la spec). Son 71 tablas con
+# **A NIVEL DE OBJETO, NO DE COLUMNA** (DA-2 de la spec). Son 72 tablas con
 # cientos de campos de cuatro letras cuyo diccionario completo —tipos, indices y
 # referencias— vive en `azure-apps/sigrid_tablas.md`. Cada ficha remite alli con
 # el `grep` de su bloque. Lo que SI se documenta aqui es lo que ese documento no
@@ -1487,6 +1487,28 @@ objetos:
     refresco: nocturno
     columnas: {}
 
+  usu:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es la ficha de usuarios de Sigrid en bruto. El login y el nombre de quien hizo cada paso ya estan en `compras.documento_procesos`, y el usuario con su empleado y su DNI en `personal.usuarios_sigrid`.
+    descripcion: >-
+      **USUARIOS DE SIGRID** (F-085; 233 filas el 2026-10-07): una fila por usuario, con su login (`cod`), su nombre (`res`), su codigo de empleado (`codemp`), si esta desactivado (`tipdes`) y sus roles, delegaciones y obras permitidas en texto. No cuelga de `con`: `cod` y `res` son campos propios de esta tabla. Es lo que traduce a persona los logins de `rac`, `confir` y del resto de Sigrid, y esa traduccion ya esta hecha en `compras.documento_procesos` (login y nombre) y en `personal.usuarios_sigrid` (empleado y DNI). Entro en la ingesta por decision del humano del 2026-10-07 (D4 de F-085: «luego querre saber quien lo ha hecho por nombre»).
+
+      **SIN CREDENCIALES, SIN DNI Y SIN CORREO**, y por eso es legible por el rol del MCP como el resto de `raw`: el login y el nombre ya se publican en `compras`. El DNI de la ficha de usuario esta vacio en las 233 filas; el de la persona sale de su ficha de empleado y se publica solo en `personal.usuarios_sigrid`. La lista de credenciales vive una vez en `etl_sigrid/domain/documento_procesos.py` y un test falla si alguna deja de estar excluida.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `usu`, y se localiza con `grep -n "^| usu " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana. No tiene columna de ultima modificacion.
+
+      **No se traen** 10 columnas: la contraseña (`cla`), la firma digital (`fir`), la politica de la clave (`feccla`, `diascla`), los identificadores de seguridad y de certificado (`sid`, `cerid`), el DNI vacio (`dni`), el correo (`ele`) y los dos textos libres (`com`, `resdes`). Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+    grano: Una fila por usuario de Sigrid, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
   cua:
     tipo: tabla
     capa: origen
@@ -1574,22 +1596,22 @@ objetos:
     capa: origen
     consumo_recomendado: false
     motivo_no_consumo: >-
-      Es el log en bruto del circuito de cada documento, y FILTRADO: solo estan los pasos que generaron asiento. El enlace ya resuelto --de que obra es cada apunte de retencion-- esta en `retenciones.apuntes_contables`.
+      Es el registro de procesos en bruto, con estados en numero y sin traducir. Quien hizo cada paso de facturas, contratos, comparativos y obras, ya traducido, esta en `compras.documento_procesos`; el enlace de cada apunte de retencion con su obra, en `retenciones.apuntes_contables`.
     descripcion: >-
-      **CONTABILIZACION DE DOCUMENTOS** (F-095): el log del circuito de aprobacion de cualquier documento. `conide` es el documento, `asiide` el asiento que genero el paso, `res` el nombre del paso, y `fec` + `usu` cuando y quien lo lanzo. Es **el unico enlace documento -> asiento**: ni `apu` ni `asi` tienen columna de documento.
+      **EL REGISTRO DE PROCESOS DE SIGRID** (la ventana «Procesos» del documento; F-095 y F-085): una fila por paso de cualquier documento. `conide` es el documento, `res` el nombre del proceso, `est1` y `est2` el estado de origen y de destino, `fec` + `hor` cuando y `usu` quien lo lanzo, y `asiide` el asiento que genero el paso, si lo genero. Es **el unico enlace documento -> asiento**: ni `apu` ni `asi` tienen columna de documento.
 
-      **ESTA FILTRADA: solo las filas con `asiide <> 0`** (decision H4 del humano, 2026-09-22, acordada con F-091): 755.086 de 2.505.089 filas en Sigrid. Las demas son pasos que no contabilizan (comprobar, aprobar) y aqui **no estan**: contar pasos del circuito sobre esta tabla da un numero falso. Con asiento hay exactamente 1 fila por factura (165.845 de 166.009, medido en F-091).
+      **SE TRAE ENTERA DESDE F-085 (decision D1 del humano del 2026-10-07)**: 2.517.791 filas el 2026-10-07 (desde 2008). Entre 2026-09-24 y el despliegue de F-085 solo tenia las filas con `asiide <> 0` (decision H4 de F-095: 755.086 de 2.505.089), y por eso faltaban los pasos de comprobar y aprobar. Hoy la mayoria de filas NO tienen asiento (solo el paso de contabilizar lo tiene): quien busque el enlace documento -> asiento tiene que filtrar `asiide <> 0`, como hace `retenciones.apuntes_contables`, que la agrega por `asiide` (`MIN(conide)`), nunca uniendo fila a fila. Con asiento hay exactamente 1 fila por factura (165.845 de 166.009, medido en F-091).
 
-      **Para que**: desde 2016 el alta de retencion no lleva centro de coste en el apunte; sin `rac` las altas de retencion con obra caen del 97,2 % al 10,8 % del importe. `retenciones.apuntes_contables` la usa agregada por `asiide` (`MIN(conide)`), nunca uniendo fila a fila.
+      **Para que**: el historial de procesos de facturas, contratos, comparativos y obras se publica traducido en `compras.documento_procesos` (estados por la pareja tipo-estado, login y nombre, orden y dias entre pasos). Y desde 2016 el alta de retencion no lleva centro de coste en el apunte; sin `rac` las altas de retencion con obra caen del 97,2 % al 10,8 % del importe.
 
-      **Dato personal**: `usu` es el login de quien contabilizo, y `raw` es legible por el rol del MCP.
+      **Dato personal**: `usu` es el LOGIN de quien lanzo el paso, y `raw` es legible por el rol del MCP. El nombre de la persona esta en `raw.usu` y en `compras.documento_procesos.nombre_usuario`.
 
       **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `rac`, y se localiza con `grep -n "^| rac " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
 
-      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid, con el mismo filtro: lo que cambio ayer en Sigrid esta aqui esta manana. No tiene columna de ultima modificacion.
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid, sin filtro: lo que cambio ayer en Sigrid esta aqui esta manana. No tiene columna de ultima modificacion.
 
-      **No se traen** 1 columnas de binario o texto ilimitado: el texto libre del paso. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
-    grano: Una fila por paso del circuito que genero asiento, identificada por `ide`.
+      **No se traen** 1 columnas de binario o texto ilimitado: el texto libre del paso, que lleva correos pegados con datos de terceros (D3 de F-085). Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+    grano: Una fila por paso de proceso de un documento, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
     refresco: nocturno
@@ -1688,7 +1710,7 @@ objetos:
 
       Responde quien aprobo un comparativo, con que rol y cuando. **No** responde dos cosas, y las dos son un hecho del origen y no un hueco de la ingesta: los **contratos** no pasan por este circuito --no hay una sola firma de contrato-- y las 3.436 firmas de factura vienen **sin fecha**.
 
-      Y tampoco responde --ninguna tabla de Sigrid lo hace-- cuando **cambio de estado** un contrato o una factura: la tabla de auditoria de Sigrid registra 1,5 millones de cambios de forma de pago y de fecha de factura desde 2017, y ni uno solo del campo de estado. Ese historico lo construye F-067 como foto diaria sobre `raw`, y empieza a contar el dia que se despliegue.
+      Tampoco responde cuando **cambio de estado** un contrato o una factura, pero eso SI esta en Sigrid (corregido por F-085 el 2026-10-07; aqui se decia que ninguna tabla lo guardaba): la tabla de auditoria registra 1,5 millones de cambios de forma de pago y de fecha de factura y ni uno del campo de estado, pero cada paso de proceso, con su estado de origen y de destino, quien y cuando, esta en `rac`, y traducido en `compras.documento_procesos`. La aprobacion de una FACTURA esta alli y no aqui: sus firmas de este circuito no tienen fecha.
 
       **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `confir`, y se localiza con `grep -n "^| confir " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
 

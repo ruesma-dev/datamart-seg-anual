@@ -298,7 +298,7 @@ def test_f107_r2_el_censo_sube_a_70() -> None:
     from tests.test_f066_ingesta_raw import TOTAL_TABLAS as TOTAL_F066
     from tests.test_f074_ingesta_censo import TOTAL_TABLAS as TOTAL_F074
 
-    # F-095 suma `rac` y el censo pasa a 71: lo que este test fija es que `caa`
+    # F-095 suma `rac` (71) y F-085 `usu` (72): lo que este test fija es que `caa`
     # sigue contada, no que nadie mas pueda entrar despues.
     assert len(_tablas()) == TOTAL_F066 == TOTAL_F074 >= TOTAL_TABLAS
 
@@ -311,7 +311,7 @@ def test_f107_r2_la_ficha_de_raw_caa_dice_de_donde_salen_codigo_y_nombre() -> No
 
 
 def test_f107_r2_las_cabeceras_cuentan_70() -> None:
-    # F-095 las sube a 71: aqui se fija que no bajen de las 70 de F-107.
+    # F-095 las sube a 71 y F-085 a 72: aqui se fija que no bajen de las 70 de F-107.
     raw = (DIR_DICCIONARIO / "raw.yaml").read_text(encoding="utf-8")
     hallazgo = re.search(r"[Ss]on (\d+) tablas", raw)
     assert hallazgo and int(hallazgo.group(1)) >= TOTAL_TABLAS
@@ -445,7 +445,7 @@ def test_f107_r4_la_version_sube_a_30() -> None:
 def test_f107_r4_la_arquitectura_cuenta_70_tablas_y_caa() -> None:
     texto = DOC_ARQUITECTURA.read_text(encoding="utf-8")
     hallazgo = re.search(r"(\d+) tablas", texto)
-    assert hallazgo and int(hallazgo.group(1)) >= TOTAL_TABLAS, "F-095: 71"
+    assert hallazgo and int(hallazgo.group(1)) >= TOTAL_TABLAS, "F-095: 71; F-085: 72"
     assert "F-107" in texto and "`caa`" in texto
 
 
@@ -456,7 +456,7 @@ def test_f107_r4_azure_apps_recoge_lo_nuevo() -> None:
     for termino in ("maestro.cuentas_analiticas", "centro_coste_contrapartida_id",
                     "cuenta_analitica_contrapartida_id", "F-107"):
         assert termino in texto, f"azure-apps no dice «{termino}» (R4)"
-    # F-095 sube el censo a 71: aqui se fija que no baje de las 70 de F-107.
+    # F-095 sube el censo a 71 y F-085 a 72: aqui se fija que no baje de las 70 de F-107.
     hallazgo = re.search(r"\*\*(\d+) tablas\*\*", texto)
     assert hallazgo and int(hallazgo.group(1)) >= TOTAL_TABLAS
 
