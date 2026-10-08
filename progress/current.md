@@ -15,7 +15,7 @@ Solo la Fase A (T1-T15 de `specs/F-132-estado-desde-rac/tasks.md`); la B espera 
 D7 del humano tras el contraste (hasta el 2026-10-22). La foto de F-067 sigue
 construyéndose igual: ni DROP, ni TRUNCATE, ni DELETE sobre sus dos tablas.
 
-- **Tarea en curso**: T1 (dominio, RED primero).
+- **Tarea en curso**: T2 (clasificar_cambio y clasificar_no_visto). Hechas: T1.
 - **Entorno**: `init.sh` de arranque lanzado sobre 4d25fcb en el árbol principal;
   para no ensuciarlo (el barrido de dataclasses de F-006 ve módulos nuevos de
   `domain/` si aparecen con la suite corriendo, como pasó en F-085), el trabajo se
