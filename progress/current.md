@@ -10,6 +10,147 @@
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
 
+## 2026-10-08 · F-085 · CERRADA (`done`, APROBADO en pasada 2) · quién aprobó qué y cuándo (`rac`) · SIN DESPLEGAR
+
+> Cerrada el 2026-10-08 (`progress/review_F-085.md`, `init.sh` 7.133 passed). Resumen
+> en `progress/history.md`. **Rama sin integrar en `main`**: merge y despliegue, por
+> orden del humano. **MANUAL pendiente del humano**, en orden: T12-T14 de
+> `progress/impl_F-085.md` §6 en el Postgres LOCAL/dev (FR26/10025 con sus 4 pasos y
+> nombre; coberturas y 233/210/~204 en `personal.usuarios_sigrid`; retenciones
+> idénticas antes y después; `check-raw-recuentos`; tiempos; vigilar `usu.delO`).
+> Después, despliegue: imagen y job, nocturna (o build a mano), `publicar-diccionario`
+> v45, reiniciar el MCP. Coste: +4 a +7 min sobre una nocturna que ya va 38 min por
+> encima de las 4 h. Siguiente en la cola: **F-132** (estado desde `rac`, prioridad 11).
+
+### Implementación (historia)
+
+`status` → `in_progress`. Tareas de `specs/F-085-quien-aprobo-que-y-cuando/tasks.md`:
+T1-T11 de código y documentos, T12-T14 MANUAL (humano), T15 informe, T16 init.
+
+**Review pasada 1 (CHANGES_REQUESTED) atendida**: ficha de `raw.rac` sin «con el
+mismo filtro», aserción que lo vigila en `test_f085_r25_*` (RED pegado en
+`impl_F-085.md` §8), frase de «Evidencias» sobre `SUB_PASOS` corregida (0 mutantes)
+y test `r15` con su id (commit `0f7b79f`). `bash harness/init.sh` sobre `0f7b79f`:
+**VERDE**, 7.133 passed, 228 skipped (18 min 4 s), cobertura 100 % (74/74), impl 219/220.
+Pendiente de la pasada 2.
+
+**Estado**: implementación TERMINADA, pendiente del reviewer. T1-T11, T15 y T16 hechas (`init.sh` final VERDE sobre `1ced67b`: 7.132 passed, cobertura 100 %); T12-T14 son MANUAL del humano (comandos en `progress/impl_F-085.md` §6). Mutación: 20/20 muertos (`progress/mutacion_F-085.md`) (T9, la ficha de `personal.usuarios_sigrid`, entró con su SQL en el commit de T7). T1 hecha (RED: `progress/impl_F-085.md`).
+
+**Incidencias de entorno (no de la spec)**:
+- `bash harness/init.sh` de arranque, 1.ª vez: ROJO por
+  `test_f006_el_barrido_ve_todos_los_modulos_que_declaran_dataclasses`, causado
+  por el propio implementer (creó `domain/documento_procesos.py` mientras la suite
+  corría: el barrido de dataclasses lo vio en el fuente sin haberlo importado).
+  Ese test pasa aislado (177 passed). Fichero retirado y `init.sh` relanzado sobre
+  el árbol limpio.
+- La máquina está SATURADA (campañas de mutación y suites de otros proyectos en
+  paralelo): la suite va a ~1 % por minuto. Para no ensuciar la verificación de
+  arranque, el trabajo se hace en un worktree aparte (rama temporal
+  `trabajo/F-085` desde 08f14cb) y se lleva a `feature/F-085-...` por fast-forward
+  cuando el `init.sh` de arranque termine. Ningún commit va a `dev` ni a `main`.
+- `init.sh` de arranque, 2.ª vez, árbol limpio en 08f14cb: **VERDE**, 6.984 passed
+  y 226 skipped en 4.324,88 s (1 h 12 min, máquina cargada).
+
+**Diccionario del árbol tras F-085: 207 objetos, 1619 columnas, 98 de consumo**
+(versión 45; sin publicar).
+
+**Desviaciones respecto a la spec** (justificadas):
+- La ficha de `raw.usu` entra en T4 y no en T10: sin ella, en cuanto `usu` está en
+  `tables_sigrid.yaml` fallan las biyecciones ficha <-> tabla de F-006/F-066.
+- `specs/F-006-mcp-azure/design_detalle.md` gana su enmienda de inventario
+  (205 -> 207 objetos): lo exige `test_f006_r24_el_diseno_declara_el_recuento_real_de_objetos`.
+- La ficha de `compras.documento_procesos` entra con su SQL (T5), no en T8: la puerta
+  de cobertura exige ficha o pendiente, y la lista de pendientes no puede crecer.
+  Igual con `personal.usuarios_sigrid` en T7.
+- `R-SIGRID-CON` (00_global) declara `rac.fec`, `rac.res`, `usu.cod` y `usu.res`: el
+  barrido de F-006 deriva de nuestro SQL los campos propios de cada tabla de `raw`.
+- SQL de `12`: `encaja_con_anterior` usa `IS NOT DISTINCT FROM` (no `=`) para que
+  sea falso y no nulo si un estado viniera nulo, igual que el `==` del dominio;
+  `dias_desde_anterior` redondea `EXTRACT(EPOCH ...)::NUMERIC / 86400` (aritmética
+  exacta, como el `Decimal` del oráculo); `make_time` con casts a `INT` explícitos.
+  Mismo resultado que el design §5 con los datos medidos (`est1`/`est2` nunca nulos).
+- T6 toca además `tests/test_f080_pipeline.py` (su lista de ficheros de compras, como
+  la de `test_f047_steps.py`) y quita de la docstring del dominio la mención al
+  fichero de F-067: `test_f067_r8_veto_*` prohíbe nombrar sus tablas fuera de su lista.
+- SQL de `06`: el empleado se resuelve con un CTE `empleados` AGRUPADO por código
+  (una fila por código, `COUNT(*) = 1` o la única de la empresa 1) unido por
+  `LEFT JOIN`, en vez del `LEFT JOIN LATERAL` del design §6: misma regla y mismo
+  «nunca multiplica», pero lee `raw.con` UNA vez y no una por usuario (233
+  barridos de una tabla de millones de filas). Índice único `UPPER(login)` (R20) e
+  índice por `empleado_id` en `00_setup.sql`.
+- T7 toca además `tests/test_f101_cabecera_parte.py` (su lista de sub-pasos de
+  personal) y el recuento de `CREATE TABLE IF NOT EXISTS` de `test_f057_r27` (4 -> 5).
+- T10 corrige además la ficha de `raw.confir`, que afirmaba que «ninguna tabla de
+  Sigrid» guarda el cambio de estado (misma afirmación falsa que R26 corrige en
+  `compras`); conserva «cambio de estado», que fija `test_f066_r14_*`.
+- NO se tocan (D7, son de F-067 y van con F-132): la ficha de `compras.contratos`
+  (l. ~220, «Sigrid no guarda cuando cambio el estado»), las de
+  `historial_estados*`/`v_estado_documentos` y la fila de F-067 en azure-apps.
+  En `docs/ARCHITECTURE.md` el titular del punto de F-067 lleva solo una nota de
+  que su premisa la corrige F-085.
+- `tests/test_f067_diccionario.py::test_f067_r27_la_version_sube_a_44` fijaba la
+  versión EXACTA (== 44): pasa a `>= 44`, como hacen las demás features.
+- azure-apps: commit local `e08a3bb` (solo `datamart_seg_anual.md`), sin push.
+- La suite COMPLETA destapó lo que las verificaciones por tarea no veían:
+  `test_f073_pipeline` (otra lista de sub-pasos de compras), `test_f108` (lista
+  aprobada de claves alternativas: se añade `personal.usuarios_sigrid` `[[login]]`,
+  que pide el design §7, y se QUITA `(documento_id, orden)` de `documento_procesos`,
+  que no pedía), `test_f006_stg_trampas` (un «22 de 233» en un `nulo_significa`) y
+  `test_f006_contexto` (los recuentos del diccionario en este fichero).
+  Suite completa sin cobertura tras el ajuste: 7.132 passed, 228 skipped, 18 min 57 s.
+
+## 2026-10-07 · F-085: spec escrita (spec-author) y APROBADA por el humano con D4 cambiada
+
+**Enmienda tras la aprobación (2026-10-07)**: D1-D8 decididas; **D4 cambia**: se ingiere
+`usu` sin credenciales (`cla`, `fir`, `feccla`, `diascla`, `sid`, `cerid`; además `dni`
+vacío, correo y textos), censo 71 → 72; `compras.documento_procesos` publica login Y
+nombre (93,0 % de las filas, casando el login en mayúsculas); DNI y empleado solo en
+`personal.usuarios_sigrid`. Spec, `acceptance` y `progress/spec_F-085.md` §8 enmendados.
+D7: el líder ficha la feature que saca la antigüedad del estado de `rac`. El `status`
+lo cambia el líder.
+
+**Líder (2026-10-07)**: F-085 → `spec_ready`. Fichada **F-132** (antigüedad del
+estado desde `rac`, foto de F-067 retirada tras 1-2 semanas de contraste; prioridad
+11, detrás de F-085). D5: `dbo.log` en F-105, sin cambiar su prioridad. Siguiente:
+implementer de F-085.
+
+Rama `feature/F-085-quien-aprobo-que-y-cuando`. Spec en
+`specs/F-085-quien-aprobo-que-y-cuando/` y mediciones en
+`progress/spec_F-085.md` (solo lectura: Sigrid por `sigrid-api`, Azure por el
+MCP). `status` `spec_ready` desde la aprobación; el `acceptance` se REESCRIBIÓ (ver abajo).
+
+**El hallazgo**: la ventana «Procesos» de la captura de Carmen Calle es `rac`.
+Sin filtro tiene 2.517.791 pasos con proceso, estado origen→destino, login,
+fecha y hora; la FR26/10025 da exactamente las cuatro filas de la captura. Cubre
+facturas 99,94 %, contratos 97,1 %, comparativos 97,0 % y obras 72,2 % (el
+resto no ha salido del estado inicial). `dbo.log` deja de hacer falta (ope 5 =
+ejecutar proceso, 3 = modificación, 30 = deshacer, 24 = firma digital) y
+`confir` DOCVAL (facturas) son peticiones de firma nunca firmadas.
+
+**Propuesta**: quitar el filtro `asiide <> 0` de `raw.rac` (F-095 ya filtra en
+SQL) y publicar `compras.documento_procesos`, una fila por paso. Censo sigue en
+71 tablas.
+
+**Decisiones que debe validar el humano** (recomendación en design §8): D1
+quitar el filtro · D2 solo las cuatro familias · D3 `tex` excluida (hay correos
+pegados con datos de terceros) · D4 login, sin nombre · D5 `dbo.log` a F-105 ·
+D6 `confir` sin cambios · D7 F-067 no se toca · D8 sin `conpro` ni `rol`.
+
+**Para el líder (F-067, no tocado)**: la premisa «la fecha del cambio de estado
+no existe en Sigrid» es FALSA: el último paso de `rac` coincide con `con.est` en
+el 99,96 % de facturas y 99,99 % de contratos, con fecha exacta desde 2008. Los
+809 contratos en EPF tienen fecha de envío exacta (785 > 21 días). Proponer una
+feature para que `v_estado_documentos` salga de `rac`. Detalle:
+`progress/spec_F-085.md` §2.
+
+**Aviso de ventana**: la nocturna del 07-10 duró **4 h 37 min 44 s**, ya por
+encima de las 4 h de referencia (la ficha decía 19 min de margen). F-085 suma
+~3 min de ingesta.
+
+**`acceptance` ajustado**: el criterio 3 («si se ingiere `dbo.log`… 19 min de
+margen») contradecía la medición en sus dos premisas; ahora: `rac` sin filtro,
+FR26/10025 reproducida, `dbo.log` a F-105.
+
 ## 2026-10-07 · ESTADO AL CERRAR LA SESIÓN (leer primero)
 
 **En producción** (imagen del job `r20261007-0850`, desde `main` 540d1ee;
@@ -30,8 +171,10 @@ diccionario **v44**, 204 objetos, publicado el 07-10 07:04 UTC; MCP
   repasar las cifras de T19 (`progress/impl_F-067.md` §6) en solo lectura.
 
 **Pendiente del humano:**
-- **Reconectar Microsoft 365** (sesión caducada el 06-10) y pedir al líder que pase
-  al backlog los últimos correos de Juan Romero.
+- ~~Reconectar Microsoft 365 y pasar al backlog los correos de Juan~~ HECHO el
+  07-10 (sección siguiente). Queda contestar a Juan con la priorización (la pide
+  al final de su correo de comparativos) y decirle que la cabecera del DPC ya se
+  publica (`compras.necesidades`, F-067).
 - Avisar a Juan Romero y Elena Díaz de F-123 (filtrar por `MASTER_INICIAL` da 0 filas;
   la herramienta de Juan hay que regenerarla).
 - Escribir a Compras (y a Juan) sobre F-067: qué se responde ya, que la antigüedad del
@@ -47,10 +190,35 @@ diccionario **v44**, 204 objetos, publicado el 07-10 07:04 UTC; MCP
 - Red del puesto: el 06-10 una red bloqueaba el 5432 hacia Azure con la IP ya en el
   firewall; se arregló cambiando de red (memoria «IP del puesto y firewall»).
 
-**Cola** (prioridad): F-037 tesorería (2) · F-085 quién aprobó qué y cuándo (3) ·
-F-111 spec lista, falta aprobarla (4) · F-121 recurso principal del auxiliar (5) ·
-F-114 (6) · F-106 (7) · F-104 (8) · F-055 ejes del proveedor, con «proveedor por
-actividad» movido desde F-067 (9) · F-096 y F-122 (10) · F-036 oficio y categoría (11).
+**Cola** (prioridad, reordenada el 07-10 con los correos de Juan delante, por
+decisión del humano; el resto de abiertas, +8 sin cambiar su orden): F-129 objetivo
+contra la oferta de referencia (2) · F-128 importes de cabecera de factura (3) ·
+F-127 mayor analítico (4) · F-092 catálogo de productos, ampliada (5) · F-126 cuenta
+analítica de cada línea (6) · F-131 cantidades del DPC (7) · F-130 condiciones y
+texto de la oferta (8) · F-090 adjuntos, ampliada a comparativos y ofertas (9) ·
+F-037 tesorería (10) · F-085 (11) · F-111 spec lista, falta aprobarla (12) · F-121 (13).
+
+## 2026-10-07 · Backlog: los correos de Juan Romero del 06-10
+
+Cuatro correos «Datamart: …» del 06-10 (los de partes, dedicación y portal son de
+otros proyectos). Reparto y orden aprobados por el humano el 07-10 («si, esta ok»),
+fichados en la rama `chore/backlog-correos-juan-2026-10-06`:
+- **F-129** (nueva, crítica): el objetivo del comparativo contra la oferta de
+  referencia del propio comparativo (oficina técnica o planificado ABC); es la
+  respuesta de Negocio a la regla D4 de F-038 (casa el 29 %). Lleva el aviso de que
+  el concurso se hace en Excel (`n_ofertas_reales`/`ahorro_concurso`).
+- **F-128** (nueva): importes de cabecera de la factura y `dcfrec`, para cuadrar
+  retenciones contra el mayor.
+- **F-127** (nueva, crítica): mayor analítico (`apa`) y saldos; deuda del 24-09.
+  Ojo con datos personales en las CP.
+- **F-092** (ampliada, pasa a sdd): maestro de artículos por empresa, árbol de
+  naturalezas y vínculo con la cuenta analítica.
+- **F-126** (nueva): cuenta analítica de cada línea de compra y control contra catálogo.
+- **F-131** (nueva): cantidades del DPC por línea (la cabecera ya está, F-067).
+- **F-130** (nueva): condiciones (`dco`, `dcorec`) y texto de comparativo y oferta.
+- **F-090** (ampliada): índice de gráficos asociados de comparativos y ofertas.
+
+Nada medido en Sigrid al fichar: lo mide cada spec.
 
 ## 2026-10-07 · F-067 · CERRADA (`done`, APROBADO en pasada 2) · Compras por el MCP (con F-125) · DESPLEGADA el 07-10 (`r20261007-0850`)
 

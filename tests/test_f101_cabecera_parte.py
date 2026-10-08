@@ -56,6 +56,8 @@ FICHEROS_PERSONAL = [
     "03_partes.sql",
     "04_recursos_tipos_hora.sql",
     "05_views.sql",
+    # F-085: los usuarios de Sigrid, al final.
+    "06_usuarios_sigrid.sql",
 ]
 
 COLUMNAS_PARTES = (
@@ -532,6 +534,7 @@ def test_f101_r26_step_seis_sub_pasos_en_orden() -> None:
     assert [s.sql_file for s in subs] == FICHEROS_PERSONAL
     assert [s.name for s in subs] == [
         "setup", "recursos", "partes_lineas", "partes", "recursos_tipos_hora", "views",
+        "usuarios_sigrid",
     ]
     por_nombre = {s.name: s for s in subs}
     for nombre in ("partes", "recursos_tipos_hora"):
@@ -571,8 +574,9 @@ def test_f101_r26_step_encadena_los_seis_y_cuenta_cuatro(
     assert pg.contados == [
         ("personal", "recursos"), ("personal", "partes_lineas"),
         ("personal", "partes"), ("personal", "recursos_tipos_hora"),
+        ("personal", "usuarios_sigrid"),
     ]
-    assert resultado.rows_processed == 12
+    assert resultado.rows_processed == 15
 
 
 def test_f101_r26_personal_sigue_sin_dependientes() -> None:

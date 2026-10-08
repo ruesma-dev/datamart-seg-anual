@@ -2532,7 +2532,8 @@ objetos:
         significado: >-
           Fecha de alta del comparativo en Sigrid (`con.fec`), informada al 100
           %. Es la fecha de CREACION del documento; no es la del cambio de
-          estado (eso no se guarda) ni la de aprobacion (`fecha_aprobacion`).
+          estado (cada paso, con su fecha y hora, esta en
+          `compras.documento_procesos`) ni la de aprobacion (`fecha_aprobacion`).
         agregacion: no_sumable
       obra_id:
         significado: >-
@@ -2710,9 +2711,10 @@ objetos:
           Dir. Compras). Desde el alta tarda de media 19,8 dias.
         nulo_significa: >-
           El comparativo no esta en un estado final de firma (EN ELABORACION,
-          PROPUESTO, RECHAZADO...): para esos estados la fecha de aprobacion NO
-          EXISTE, y Sigrid no guarda cuando cambio el estado. No es un dato
-          que falte, es un dato que no hay.
+          PROPUESTO, RECHAZADO...): para esos estados la fecha de APROBACION NO
+          EXISTE. No es un dato que falte, es un dato que no hay. Cuando paso
+          el comparativo a su estado actual, y quien lo hizo, si se sabe: es el
+          paso con `es_ultimo` en `compras.documento_procesos` (F-085).
         agregacion: no_sumable
       aprobado_por:
         significado: >-
@@ -3248,8 +3250,12 @@ objetos:
       repiten escalon). Para «quien firmo como JG» toma la ultima FIRMADA de
       ese escalon por `fecha` y `hora`; para quien APROBO el comparativo, usa
       `compras.comparativos.aprobado_por`. El campo `ord` (orden obligatorio)
-      de Sigrid vale 0 siempre y no se publica: el orden lo da la fecha. El
-      circuito entre familias (`deffir`, `dbo.log`) es F-085.
+      de Sigrid vale 0 siempre y no se publica: el orden lo da la fecha. Los
+      PROCESOS del comparativo --validar, aprobacion del jefe de grupo,
+      adjudicacion, rechazos-- con su estado de origen y de destino, quien y
+      cuando, estan en `compras.documento_procesos` (F-085), igual que los de
+      facturas, contratos y obras: las firmas de aqui son el detalle escalon a
+      escalon, con las PENDIENTES.
     grano: >-
       Una fila por firma de `raw.confir` de un comparativo (`conide` en
       `raw.com`). `firma_id` es clave primaria declarada.
@@ -3702,3 +3708,182 @@ objetos:
     ejemplos_preguntas:
       - Cual es el documento de planificacion de compras de la obra X
       - Cuantas lineas tiene la planificacion de compras de cada obra
+
+  documento_procesos:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **QUIEN HIZO QUE PASO DE CADA DOCUMENTO, DESDE QUE ESTADO, A CUAL Y
+      CUANDO** (F-085): el historial de PROCESOS de facturas, contratos,
+      comparativos y obras, una fila por paso de la ventana «Procesos» de
+      Sigrid (`raw.rac`): el proceso («Comprobar factura», «Aprobar factura»,
+      «Enviar para la firma», «Adjudicacion compras»...), el estado de ORIGEN y
+      el de DESTINO ya traducidos, el login y el nombre de quien lo lanzo, la
+      fecha y la hora al segundo (hora local de Madrid, la de pantalla) y, en
+      el paso de contabilizar, el asiento. ~1,01 M filas el 2026-10-07; cubre
+      desde 2008.
+
+      **COBERTURA, medida el 2026-10-07**: facturas 166.840 de 166.936
+      (99,94 %), contratos 18.539 de 19.093 (97,1 %), comparativos 19.822 de
+      20.426 (97,0 %) y obras 666 de 923 (72,2 %). Los documentos que faltan
+      **no han salido de su estado inicial** (facturas en REC o RECGG,
+      contratos en PFP, comparativos y obras sin procesar): no tienen pasos
+      porque nadie los ha procesado, no porque falte el dato.
+
+      **ES LA HISTORIA NETA, NO LA BRUTA**: en Sigrid «Deshacer proceso» BORRA
+      el paso, asi que aqui esta el camino que el documento recorrio de
+      verdad. Una aprobacion deshecha no aparece. La historia bruta (altas,
+      modificaciones, pasos deshechos) y la marca de firma digital estan en
+      `dbo.log`, que no se ingiere (F-105).
+
+      **EL ESTADO ACTUAL ES EL DESTINO DEL ULTIMO PASO** (`es_ultimo`): coincide
+      con el estado del documento en el 99,96 % de las facturas, el 99,99 % de
+      los contratos, el 99,98 % de los comparativos y el 100 % de las obras.
+      `encaja_con_anterior` falso marca un cambio de estado hecho fuera de un
+      proceso (el 2,2 % de las facturas tiene alguno): la cadena tiene un salto,
+      no un error del ETL.
+
+      **QUIEN**: `usuario` es el LOGIN de Sigrid (`jmvargas`) y
+      `nombre_usuario` el nombre de su ficha de usuario, casado sin distinguir
+      mayusculas ni espacios. Hay nombre en el **93,0 % de las filas**: el resto
+      son logins sin ficha de usuario en Sigrid (usuarios antiguos o de
+      sistema), y entonces `nombre_usuario` es nulo pero `usuario` sigue ahi.
+      **El DNI y el empleado NO estan aqui**: estan solo en
+      `personal.usuarios_sigrid`, el esquema autorizado para datos personales,
+      que casa con `usuario` por el login.
+
+      **LA APROBACION DE UNA FACTURA ESTA AQUI, NO EN EL CIRCUITO DE FIRMAS
+      (`confir`)**: sus 3.474 filas DOCVAL de factura no tienen ninguna firma
+      y el 97,4 % de esas facturas ya esta aprobada para pago por proceso. Las
+      firmas del comparativo escalon a escalon, con las PENDIENTES, la
+      propuesta y el importe, estan en `compras.comparativo_firmas`.
+
+      Une con `compras.facturas`, `compras.contratos` y `compras.comparativos`
+      por `documento_id`, **filtrando antes `familia`**: el mismo documento no
+      es de dos familias, pero un `documento_id` de obra no esta en ninguna de
+      esas tablas.
+    grano: >-
+      Una fila por paso de `raw.rac` de un documento de las familias FACTURA
+      (15), CONTRATO (44), COMPARATIVO (46) u OBRA (42). `paso_id` es clave
+      primaria declarada; `(documento_id, orden)` tambien es unica, porque
+      `orden` numera los pasos de cada documento.
+    clave_negocio: [paso_id]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      paso_id:
+        significado: Identificador del paso en Sigrid (`rac.ide`).
+        agregacion: no_sumable
+      documento_id:
+        significado: >-
+          El documento (`rac.conide`, `con.ide`): el `factura_id`,
+          `contrato_id` o `comparativo_id` de las tablas de `compras`, o la obra.
+        agregacion: no_sumable
+      tipo_documento_codigo:
+        significado: Tipo de documento de Sigrid (`con.tip`) - 15, 44, 46 o 42.
+        valores: [15, 44, 46, 42]
+        agregacion: no_sumable
+      familia:
+        significado: Familia del documento, el nombre de `tipo_documento_codigo`.
+        valores: [FACTURA, CONTRATO, COMPARATIVO, OBRA]
+      codigo_documento:
+        significado: Codigo del documento tal y como se ve en Sigrid (`FR26/10025`).
+      proceso_id:
+        significado: >-
+          El proceso del catalogo de Sigrid (`rac.conproide`).
+        nulo_significa: >-
+          Proceso fuera del catalogo (el 8,6 % de los pasos de Sigrid, sobre
+          todo de efectos): su nombre viene igual en `proceso`.
+        agregacion: no_sumable
+      proceso:
+        significado: >-
+          Nombre del proceso tal y como lo muestra Sigrid («Comprobar factura»,
+          «Aprobar factura», «Enviar para la firma»...). El rol con que se
+          aprobo sale de este nombre y del estado destino, no de otra columna.
+      estado_origen_id:
+        significado: Estado del documento ANTES del paso (`rac.est1`), numero por tipo.
+        agregacion: no_sumable
+      estado_origen_codigo:
+        significado: Codigo del estado de origen (`conest.cod`), traducido por la pareja tipo-estado.
+        nulo_significa: El estado no esta en el catalogo de estados de su tipo (3 casos).
+      estado_origen:
+        significado: Nombre del estado de origen (`conest.res`).
+        nulo_significa: El estado no esta en el catalogo de estados de su tipo.
+      estado_destino_id:
+        significado: Estado del documento DESPUES del paso (`rac.est2`), numero por tipo.
+        agregacion: no_sumable
+      estado_destino_codigo:
+        significado: >-
+          Codigo del estado de destino (APJO, APRJG, EPF...), traducido por la
+          pareja tipo-estado. El del paso con `es_ultimo` es el estado actual.
+        nulo_significa: El estado no esta en el catalogo de estados de su tipo (4 casos).
+      estado_destino:
+        significado: Nombre del estado de destino (`conest.res`).
+        nulo_significa: El estado no esta en el catalogo de estados de su tipo.
+      usuario:
+        significado: >-
+          LOGIN de Sigrid de quien lanzo el paso (`rac.usu`), tal cual. Es el
+          mismo login de `compras.comparativo_firmas.usuario` y de
+          `personal.usuarios_sigrid.login` (casar en mayusculas y sin espacios).
+      nombre_usuario:
+        significado: >-
+          Nombre de la ficha de usuario de Sigrid de ese login (`usu.res`).
+          DATO PERSONAL autorizado (D4, 2026-10-07).
+        nulo_significa: >-
+          El login no tiene ficha de usuario en Sigrid (7 % de las filas):
+          quien fue lo dice `usuario`.
+      fecha:
+        significado: Fecha del paso (`rac.fec`), ya tipada.
+        nulo_significa: Sigrid no tiene fecha para el paso.
+        agregacion: no_sumable
+      hora:
+        significado: Hora del paso (`rac.hor`), hora local de Madrid, al segundo.
+        nulo_significa: Sigrid no tiene hora para el paso (2 de 2,5 M).
+        agregacion: no_sumable
+      momento:
+        significado: Fecha y hora del paso juntas, hora local de Madrid.
+        nulo_significa: Falta la fecha o la hora.
+        agregacion: no_sumable
+      asiento_id:
+        significado: >-
+          El asiento contable que genero el paso (`rac.asiide`): solo lo tiene
+          el de contabilizar.
+        nulo_significa: El paso no contabiliza (comprobar, aprobar, firmar...).
+        agregacion: no_sumable
+      orden:
+        significado: >-
+          Posicion del paso en la cadena de su documento, desde 1, por fecha,
+          hora y `paso_id`.
+        agregacion: no_sumable
+      es_ultimo:
+        significado: >-
+          Verdadero en el ultimo paso del documento: su estado destino es el
+          estado actual del documento (99,96 % de las facturas).
+      encaja_con_anterior:
+        significado: >-
+          Verdadero si el estado de origen es el destino del paso anterior;
+          falso si hay un salto (un cambio de estado fuera de un proceso).
+        nulo_significa: Es el primer paso del documento.
+      dias_desde_anterior:
+        significado: Dias, con dos decimales, desde el paso anterior del mismo documento.
+        nulo_significa: Es el primer paso o falta la fecha u hora de alguno de los dos.
+        agregacion: promedio
+    relaciones:
+      - de: documento_id
+        a: compras.facturas.factura_id
+        cardinalidad: "N:1"
+        porque: Los pasos de una factura, filtrando antes `familia = 'FACTURA'`.
+      - de: documento_id
+        a: compras.contratos.contrato_id
+        cardinalidad: "N:1"
+        porque: Los pasos de un contrato, filtrando antes `familia = 'CONTRATO'`.
+      - de: documento_id
+        a: compras.comparativos.comparativo_id
+        cardinalidad: "N:1"
+        porque: Los pasos de un comparativo, filtrando antes `familia = 'COMPARATIVO'`.
+    ejemplos_preguntas:
+      - Quien aprobo la factura X y cuando
+      - Que facturas aprobo Fulano este mes
+      - Cuanto tarda un contrato desde que se envia a la firma hasta que se firma
+      - Por que estados paso el comparativo C y quien lanzo cada paso

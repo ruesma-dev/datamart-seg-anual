@@ -68,6 +68,8 @@ FICHEROS_COMPRAS = [
     "10_necesidades.sql",
     # F-067: la foto diaria de estados, la última (sus tablas no se reconstruyen).
     "11_historial_estados.sql",
+    # F-085: el historial de procesos de `rac`, detrás de la foto.
+    "12_documento_procesos.sql",
 ]
 
 

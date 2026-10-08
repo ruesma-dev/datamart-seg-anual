@@ -50,8 +50,10 @@ FICHEROS_COMPRAS = [
     "09_comparativos_detalle.sql",
     # F-067: el documento de necesidades de compra (DPC).
     "10_necesidades.sql",
-    # F-067: la foto diaria de estados, la última (sus tablas no se reconstruyen).
+    # F-067: la foto diaria de estados (sus tablas no se reconstruyen).
     "11_historial_estados.sql",
+    # F-085: el historial de procesos de `rac`, el último, detrás de la foto.
+    "12_documento_procesos.sql",
 ]
 
 #: Lo que cada sub-paso nuevo declara como objeto a contar.

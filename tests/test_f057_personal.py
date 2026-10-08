@@ -54,6 +54,8 @@ FICHEROS_PERSONAL = [
     "03_partes.sql",
     "04_recursos_tipos_hora.sql",
     "05_views.sql",
+    # F-085: los usuarios de Sigrid con su persona.
+    "06_usuarios_sigrid.sql",
 ]
 
 
@@ -165,8 +167,9 @@ def test_f057_r27_ddl_idempotente() -> None:
     assert "DROP TABLE" not in setup.upper(), (
         "el DDL de personal no puede dropear sus tablas: perderia los GRANT (R27)"
     )
-    # F-101 anade `partes` y `recursos_tipos_hora`: cuatro tablas, ninguna se dropea.
-    assert setup.upper().count("CREATE TABLE IF NOT EXISTS") == 4
+    # F-101 anade `partes` y `recursos_tipos_hora` y F-085 `usuarios_sigrid`:
+    # cinco tablas, ninguna se dropea.
+    assert setup.upper().count("CREATE TABLE IF NOT EXISTS") == 5
     assert "CREATE OR REPLACE FUNCTION personal.fn_fecha" in _compacto(_sql(RUTA_SETUP))
 
     for ruta, tabla in ((RUTA_RECURSOS, "recursos"), (RUTA_PARTES, "partes_lineas")):
@@ -701,8 +704,9 @@ def test_f057_r24_el_step_encadena_sus_cuatro_sql(monkeypatch: pytest.MonkeyPatc
     assert pg.contados == [
         ("personal", "recursos"), ("personal", "partes_lineas"),
         ("personal", "partes"), ("personal", "recursos_tipos_hora"),
+        ("personal", "usuarios_sigrid"),
     ]
-    assert resultado.rows_processed == 28
+    assert resultado.rows_processed == 35
 
 
 def test_f057_r24_un_sub_paso_a_medio_configurar_no_cuenta_filas(

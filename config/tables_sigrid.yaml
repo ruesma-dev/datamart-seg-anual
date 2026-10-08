@@ -675,6 +675,37 @@ tables:
     # fecha, cantidad e importe por linea. Sin ella no se puede responder
     # "horas por obra", que es lo que F-057 tiene que construir.
 
+  - source_table: usu
+    target_table: usu
+    id_column: ide
+    incremental_column: null   # medido 2026-10-07 contra sigrid_tablas.md: `usu` no tiene tiemod
+    where: null
+    exclude_columns:
+      - cla       # CREDENCIAL: la contrasena (225 informadas)
+      - fir       # CREDENCIAL: el codigo de firma digital (133 informadas)
+      - feccla    # CREDENCIAL: fecha de cambio de la clave (politica de la clave)
+      - diascla   # CREDENCIAL: dias para cambiar la clave (politica de la clave)
+      - sid       # CREDENCIAL: Security ID (vacio hoy)
+      - cerid     # CREDENCIAL: certificado digital (vacio hoy)
+      - dni       # DNI vacio en las 233 filas; el de la persona sale de `raw.emp`
+      - ele       # correo electronico: contacto no autorizado (vacio hoy)
+      - com       # texto libre: comentario (Texto ilimitado)
+      - resdes    # texto libre: comentario de desactivacion
+    # USUARIOS DE SIGRID (F-085, D4 del humano del 2026-10-07: «luego querre
+    # saber quien lo ha hecho por nombre»). 233 filas, 24 columnas. Traduce a
+    # persona el login de `rac.usu` (y de `confir.usu`): `cod` es el login,
+    # `res` el nombre y `codemp` el codigo de empleado. Lo publica
+    # `compras.documento_procesos` (login y nombre) y `personal.usuarios_sigrid`
+    # (empleado y DNI, solo en el esquema autorizado para datos personales).
+    #
+    # POR QUE ESTAS DIEZ EXCLUSIONES: las seis primeras son credenciales o
+    # metadatos de credencial y NUNCA entran; viven una vez en
+    # `etl_sigrid/domain/documento_procesos.py::COLUMNAS_CREDENCIALES_USU` y
+    # `tests/test_f085_sql.py` falla si alguna deja de estar aqui. `dni` esta
+    # vacio y el correo y los textos libres no hacen falta. Asi `raw.usu` queda
+    # legible por el rol del MCP como el resto de `raw`, sin nada sensible.
+    # Coste: 233 filas, menos de un segundo de ingesta.
+
   # ===========================================================================
   # MODULO CONTABILIDAD (F-066, tanda K) -- la otra version de la verdad
   #
@@ -749,22 +780,32 @@ tables:
     target_table: rac
     id_column: ide
     incremental_column: null   # como `apu`: no tiene tiemod
-    where: "asiide <> 0"
+    where: null
     exclude_columns:
-      - tex    # texto libre del paso (Texto ilimitado)
-    # CONTABILIZACION DE DOCUMENTOS (F-095, H4 del humano del 2026-09-22): el
-    # log del circuito de cada documento; `conide` es el documento y `asiide`
-    # el asiento que genero el paso. Es el unico enlace documento -> asiento.
+      - tex    # texto libre del paso (Texto ilimitado): D3 de F-085, lleva
+               # correos pegados con datos de terceros
+    # EL REGISTRO DE PROCESOS DE SIGRID (la ventana «Procesos» del documento):
+    # una fila por paso, con el proceso, el estado de origen (`est1`) y de
+    # destino (`est2`), el login (`usu`), la fecha (`fec`) y la hora (`hor`).
+    # `conide` es el documento y `asiide` el asiento que genero el paso, si lo
+    # genero: es el unico enlace documento -> asiento (F-095, F-091).
     #
-    # POR QUE FILTRADA: de 2.505.089 filas solo 755.086 tienen `asiide <> 0`
-    # (las demas son pasos que no contabilizan) y solo esas sirven, a F-095 y
-    # a F-091, cuyo enlace factura -> asiento es precisamente la fila con
-    # asiento (1 por factura, 165.845 de 166.009). Acordado con F-091 en H4.
-    # Coste estimado sobre la nocturna del 2026-09-22: ~1 min y 90-120 MB.
+    # YA NO VA FILTRADA (F-085, D1 del humano del 2026-10-07). Entro con F-095
+    # (H4, 2026-09-22) con `where: asiide <> 0`: de 2.505.089 filas solo
+    # 755.086 tenian asiento. Pero ese filtro tiraba justo los pasos de
+    # comprobar y aprobar, que son la respuesta a «quien aprobo que y cuando»
+    # (`compras.documento_procesos`). Medido el 2026-10-07: 2.517.791 filas,
+    # 758.927 con asiento. Coste estimado sin filtro y sin `tex`: 3 a 4 min de
+    # ingesta (+2 a 3 min sobre los 75 s de anoche) y ~375 MB (+260 MB), a
+    # 14.154 filas/s por la pasarela.
     #
-    # PARA QUE (F-095): desde 2016 el alta de retencion NO lleva `cenide` en el
-    # apunte; sin `rac` las altas con obra caen del 97,2 % al 10,8 % del
-    # importe. `check-raw-recuentos` ya aplica este `where` al contar en Sigrid.
+    # QUIEN DEPENDIA DEL FILTRO: `retenciones/03_apuntes_contables.sql` ya
+    # filtra `asiide <> 0 AND conide <> 0` en su propio SQL (CTE `rac_asiento`),
+    # asi que su resultado no cambia. Desde 2016 el alta de retencion no lleva
+    # `cenide` en el apunte; sin `rac` las altas con obra caen del 97,2 % al
+    # 10,8 % del importe. F-091 hara su enlace factura -> asiento con el mismo
+    # `WHERE asiide <> 0` en su SQL. `check-raw-recuentos` aplica el `where`
+    # declarado, asi que ahora cuenta la tabla entera.
 
   # ===========================================================================
   # MODULO COMPRAS/PROVEEDOR (F-066, tanda C3) -- ofertas, firmas, condiciones
@@ -781,15 +822,17 @@ tables:
   # todas y se evita ir descubriendolas de una en una a golpe de COPY roto--.
   # `dco` anade las ocho de documento, igual que `dca` y `dcf`.
   #
-  # LO QUE SIGRID NO GUARDA, medido dos veces el 2026-09-06 y escrito aqui para
-  # que nadie vuelva a buscarlo: no hay historico de cambios de estado de
-  # contratos ni de facturas. `concam` (1,5 M cambios) audita forma de pago y
-  # fecha de factura desde 2017, nunca el campo `est`; `confir` no tiene
-  # conceptos de contrato; `ctr` no tiene fechas de envio, recepcion ni firma.
-  # Lo que hay es el estado ACTUAL (con.est), su nombre por tipo (conest), el
-  # alta (con.fec) y la ultima modificacion (con.tiemod, ya en
-  # raw.con._source_tiemod). El historico lo construye F-067 como foto diaria
-  # sobre `raw`, y empieza a contar el dia que se despliegue.
+  # LO QUE SIGRID NO GUARDA, medido el 2026-09-06 y CORREGIDO POR F-085 el
+  # 2026-10-07. Aqui se decia que no habia historico de cambios de estado de
+  # contratos ni de facturas, y era FALSO: `concam` (1,5 M cambios) audita forma
+  # de pago y fecha de factura desde 2017 y nunca el campo `est`, pero el
+  # historial de estados SI esta en `rac`, el registro de procesos, desde 2008,
+  # al segundo y con usuario (`est1` -> `est2`, `fec`, `hor`, `usu`). Lo
+  # publica `compras.documento_procesos` (F-085). Sigue siendo cierto que
+  # `confir` no tiene conceptos de contrato y que `ctr` no tiene fechas de
+  # envio, recepcion ni firma: estan en los pasos de `rac`. La foto diaria de
+  # F-067 (`compras.historial_estados`) sigue construyendose; su relevo por
+  # `rac` es otra feature (F-132).
   #
   # LAS 19 CANDIDATAS QUE NO SE DAN DE ALTA porque tienen 0 FILAS en Sigrid,
   # contadas una a una el 2026-09-06: PFfir, logfirdoc, auxfam, act,

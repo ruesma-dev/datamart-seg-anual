@@ -225,7 +225,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 50,
+      "priority": 58,
       "branch": "feature/F-017-cierre-costes-indirectos"
     },
     {
@@ -237,7 +237,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 54,
+      "priority": 62,
       "branch": "feature/F-018-validacion-cierre-mensual"
     },
     {
@@ -249,7 +249,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 60,
+      "priority": 68,
       "branch": "feature/F-002-plan-vigente"
     },
     {
@@ -268,7 +268,7 @@
       ],
       "status": "pending",
       "sdd": false,
-      "priority": 62,
+      "priority": 70,
       "branch": "feature/F-012-auditoria-costes-azure"
     },
     {
@@ -293,7 +293,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 63,
+      "priority": 71,
       "branch": "feature/F-013-carga-excels-aux"
     },
     {
@@ -305,7 +305,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 64,
+      "priority": 72,
       "branch": "feature/F-010-carga-excels-auxiliares"
     },
     {
@@ -317,7 +317,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 65,
+      "priority": 73,
       "branch": "feature/F-007-disparo-manual-web"
     },
     {
@@ -330,7 +330,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 51,
+      "priority": 59,
       "branch": "feature/F-022-desempate-obrfasamb"
     },
     {
@@ -380,7 +380,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 55,
+      "priority": 63,
       "branch": "feature/F-028-puerta-stg-distingue-fallo"
     },
     {
@@ -404,7 +404,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 44,
+      "priority": 52,
       "branch": "feature/F-029-mutacion-fiable"
     },
     {
@@ -421,7 +421,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 52,
+      "priority": 60,
       "branch": "feature/F-030-reglas-negocio-compartidas"
     },
     {
@@ -439,7 +439,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 47,
+      "priority": 55,
       "branch": "feature/F-031-alerta-no-se-resuelve"
     },
     {
@@ -456,7 +456,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 66,
+      "priority": 74,
       "branch": "feature/F-032-limpieza-secretos-y-puesto"
     },
     {
@@ -473,7 +473,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 56,
+      "priority": 64,
       "branch": "feature/F-033-azure-apps-al-dia"
     },
     {
@@ -490,7 +490,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 58,
+      "priority": 66,
       "branch": "feature/F-026-rbac-propagacion"
     },
     {
@@ -546,7 +546,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 11,
+      "priority": 19,
       "branch": "feature/F-036-oficios"
     },
     {
@@ -559,7 +559,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 2,
+      "priority": 10,
       "branch": "feature/F-037-tesoreria"
     },
     {
@@ -602,7 +602,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 37,
+      "priority": 45,
       "branch": "feature/F-039-vistas-puente"
     },
     {
@@ -615,7 +615,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 40,
+      "priority": 48,
       "branch": "feature/F-040-ingresos"
     },
     {
@@ -633,7 +633,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "critico",
-      "priority": 33,
+      "priority": 41,
       "branch": "feature/F-041-mutacion-fiable"
     },
     {
@@ -666,7 +666,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 35,
+      "priority": 43,
       "branch": "feature/F-043-secreto-versionado"
     },
     {
@@ -698,7 +698,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 36,
+      "priority": 44,
       "branch": "feature/F-046-contraste-desgloses"
     },
     {
@@ -729,7 +729,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 39,
+      "priority": 47,
       "branch": "feature/F-048-guardian-secretos-poroso"
     },
     {
@@ -745,7 +745,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 41,
+      "priority": 49,
       "branch": "feature/F-049-sello-pendiente-mutacion"
     },
     {
@@ -761,7 +761,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 48,
+      "priority": 56,
       "branch": "feature/F-050-fases-duplicadas-sigrid"
     },
     {
@@ -797,7 +797,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 46,
+      "priority": 54,
       "branch": "feature/F-053-desempate-obras-duplicadas"
     },
     {
@@ -815,7 +815,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "documental",
-      "priority": 43,
+      "priority": 51,
       "branch": "feature/F-054-conocimiento-de-negocio"
     },
     {
@@ -833,7 +833,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 9,
+      "priority": 17,
       "branch": "feature/F-055-mundo-proveedor"
     },
     {
@@ -883,7 +883,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 38,
+      "priority": 46,
       "branch": "feature/F-058-estados-financieros"
     },
     {
@@ -896,7 +896,7 @@
         "Resuelto y escrito como se identifica al mismo tercero entre empresas distintas, que tienen subcuentas distintas",
         "Documentado en el diccionario que significa 'posicion' y 'pendiente' aqui, para que el MCP no lo confunda con lo que publica compras"
       ],
-      "priority": 49,
+      "priority": 57,
       "rigor": "estandar",
       "branch": "feature/F-060-posicion-terceros",
       "status": "pending",
@@ -913,7 +913,7 @@
         "Contrastado contra el coste de personal que hoy publica el seguimiento, con las diferencias explicadas",
         "Publicados los movimientos y el saldo de las cuentas analiticas de contrapartida de los recursos (peticion de Juan Romero del 24-09), con lo que queda por repartir a obra, y medido y declarado si el asiento de nominas entra o no en esas cuentas"
       ],
-      "priority": 53,
+      "priority": 61,
       "rigor": "critico",
       "branch": "feature/F-061-coste-personal-obra",
       "status": "pending",
@@ -929,7 +929,7 @@
         "Validado por Administracion contra al menos una declaracion real ya presentada",
         "Documentado que este objeto NO sustituye a la declaracion oficial y para que sirve exactamente"
       ],
-      "priority": 57,
+      "priority": 65,
       "rigor": "estandar",
       "branch": "feature/F-062-impuestos",
       "status": "pending",
@@ -945,7 +945,7 @@
         "Contrastado contra el total que la analitica reparte como GENERALES, con la diferencia cuantificada por ano Y EXPLICADA: que parte es gasto no repartido, que parte es diferencia de criterio y que parte no cuadra",
         "NO se cambia el criterio de reparto en esta feature. Si la diferencia sugiere que deberia cambiarse, se lleva a Negocio como propuesta con el numero delante"
       ],
-      "priority": 59,
+      "priority": 67,
       "rigor": "critico",
       "branch": "feature/F-063-generales-reparto",
       "status": "pending",
@@ -962,7 +962,7 @@
         "Distinguidos los apuntes manuales de los generados por documento, con su volumen",
         "El aviso que se pasa a F-058 dice que parte del gasto NO DEBE atribuirse a obra por ser estructura, y que parte falta por error"
       ],
-      "priority": 61,
+      "priority": 69,
       "rigor": "estandar",
       "branch": "feature/F-064-control-interno-contable",
       "status": "pending",
@@ -982,7 +982,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 31,
+      "priority": 39,
       "branch": "feature/F-065-creditos-cpu-tras-la-ventana"
     },
     {
@@ -1058,7 +1058,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 32,
+      "priority": 40,
       "branch": "feature/F-069-mejoras-arnes-review-f066"
     },
     {
@@ -1076,7 +1076,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 24,
+      "priority": 32,
       "branch": "feature/F-070-auditoria-calidad-diccionario"
     },
     {
@@ -1152,7 +1152,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 29,
+      "priority": 37,
       "branch": "feature/F-075-alcance-de-las-puertas"
     },
     {
@@ -1172,7 +1172,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 22,
+      "priority": 30,
       "branch": "feature/F-076-ambitos-certificacion"
     },
     {
@@ -1187,7 +1187,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 26,
+      "priority": 34,
       "branch": "feature/F-077-flag-reconstruir-todo-sin-test"
     },
     {
@@ -1284,7 +1284,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 27,
+      "priority": 35,
       "branch": "feature/F-082-supervivientes-f025"
     },
     {
@@ -1334,14 +1334,17 @@
       "title": "Quien aprobo que y cuando: el circuito de firma de confir y las 300.438 firmas digitales de dbo.log, las dos fuentes de la misma pregunta",
       "description": "**FUSION de la F-085 original y de la F-086, por decision del humano el 2026-09-16.** Nacieron separadas el mismo dia: F-085 de «quiero incorporar los estados del comparativo, contrato, facturas, y su estado de firmas» con el encargo «que afecte a todo, hay que estudiarlo, ya veremos como lo hacemos»; F-086 del encargo «mira las tablas de log una por una». Al medirlas se vio que **son dos fuentes para la misma pregunta —quien aprobo que documento y cuando— y que ninguna de las dos la responde sola**. De ahi el `sdd=true`: primero se estudia, despues se decide el modelo. ================ FUENTE A · `confir`, EL CIRCUITO FORMAL DE FIRMA. Medido contra Sigrid el 2026-09-16: **70.346 filas y 28 columnas** en el origen, 70.308 en `raw`, asi que la ingesta no se deja nada. `deffir` (Definicion firmas) tiene **17 filas** y parece el catalogo del circuito. **`PFfir` y `logfirdoc` tienen CERO filas**: existen en el diccionario de Sigrid y Ruesma NO las usa, asi que no entran. EL REPARTO, que es lo que obliga a estudiar antes de modelar: **comparativos (tip 46): 66.096 firmas, 59.646 con fecha (90,2 %)**; **facturas (tip 15): 3.454 firmas y CERO con fecha (0 %)**; **obras (tip 42): 796 firmas, 203 con fecha (25,5 %)**; **contratos (tip 44): NINGUNA**. ================ FUENTE B · `dbo.log`, EL LOG DE APLICACION, que es lo que la antigua F-086 encontro. **De las doce tablas de log, ONCE ESTAN VACIAS** (`logfav`, `logfirdoc`, `logmnt`, `logtmp`, `verifactulog`, `yetlog`, `atptfewslog`, `faceb2bwslog`, `facewslog`, `faeptwslog`, `geacamwslog`); barrido ademas todo lo que suena a auditoria por INFORMATION_SCHEMA —`%log%`, `%aud%`, `%cam%`, `%hist%`, `%trace%`, 25 tablas— y **no hay otra candidata**. **`dbo.log` tiene 8.472.098 filas y cubre de 2008-11-22 a hoy.** Catorce columnas: `ide`, `emp`, `ori`, **`ope`** (que se hizo), **`fec`**/**`hor`** (cuando), **`usu`** (quien), **`tab`**, **`tip`**, **`cod`** (que documento), **`res`** (el literal), `tex`, `est`, `err`. **5.175.371 filas son de `con`**: **1.618.199 de FACTURA (15)**, 803.173 del EFECTO (25), **183.621 del COMPARATIVO (46)**, 171.465 de OBRA (42) y **149.010 del CONTRATO (44)**. La **operacion 24** son **300.438 filas en facturas** y su `res` dice el rol: «Aprobar factura : FIRMA DIGITAL» 291.126, «**ERROR al validar FIRMA DIGITAL**» 4.493, «Gerencia Mascaro» 1.353, «Administracion» 1.039, «Jefe Grupo Aldara» 896, «Inesco» 873, «Ruesma» 274, «maquinaria» 194, «Jefe Fabrica» 40, «Pasar directamente a DG» 3. **Esos roles encajan uno a uno con los estados del tipo 15 que publico F-083.** Cobertura: **152.627 facturas distintas (92,0 % de las 165.866 publicadas) y 183 usuarios**. ================ POR QUE LA FUSION, y es el argumento de fondo: **cada fuente cubre lo que la otra no**. Para el COMPARATIVO manda `confir`, con 66.096 firmas y el 90,2 % fechadas. Para la FACTURA `confir` es inservible —3.454 firmas sin una sola fecha— y `dbo.log` responde con 300.438 aprobaciones firmadas. Para el CONTRATO **`confir` no tiene NADA** y `dbo.log` trae 149.010 registros. Modelarlas por separado obligaria al consumidor a saber a cual preguntar segun el tipo de documento, que es justo el conocimiento que el datamart existe para no exigir. Palabras del humano: **«que afecte a todo»**. ================ LO QUE HAY QUE ESTUDIAR ANTES DE MODELAR, que es el trabajo de verdad. **SOBRE `confir`**: (1) **que distingue `fir`, `firok` y `est`**, que suenan los tres a «esta firmado»; (2) **si `rol` y `ord` describen un circuito con pasos ordenados** o son independientes; (3) **que son las 17 filas de `deffir`**; (4) **por que las 3.454 firmas de factura no tienen fecha**: si la firma existe y no se sella, o si son firmas PENDIENTES que aun no se han producido, que son cosas muy distintas —y `dbo.log` puede desempatarlo, que es otra razon para fusionar—; (5) **si `estfin` es un estado FINAL por documento** que resuma el circuito, que seria lo que de verdad quiere Negocio; (6) **que son `puntot`, `pun`, `propu` y `totimp`**, que podrian ser un sistema de puntos de aprobacion por importe. **SOBRE `dbo.log`**: (7) **NO HAY CATALOGO DE `ope`** —busque tablas `%ope%` y `%acc%` y ninguna lo traduce—, asi que las nueve operaciones de factura —5 (892.152), 24 (300.438), 3 (238.695), 1 (160.152), 30 (25.011), 2, 8, 9, 6— hay que **inferirlas por su `res`**, y esa inferencia es conocimiento de negocio que **va al diccionario, no a un comentario**. La 1 parece el alta; **la 5 y la 3 llegan con `res` VACIO y son las dos mas frecuentes**, o sea las que peor se entienden. (8) **`log.est` NO es el estado del documento**: vale 1, 2 y 0 y se comporta como el resultado de la operacion. El estado sigue siendo `con.est`, el de F-083 y F-084. Publicarlo sin decir esto sembraria la confusion que F-083 vino a quitar. (9) **El rastro dice QUE ACCION se hizo, no A QUE ESTADO se paso**: casar accion con estado es el diseno de verdad. ================ INGESTA: `confir` ya se ingiere. **`dbo.log` NO**: no esta entre las 68 tablas de `config/tables_sigrid.yaml`, y con 8,47 M de filas seria **la mayor del `raw`**, asi que tiene que ir **FILTRADA** —por `tab` y probablemente por `tip`— con **el filtro declarado**, porque un filtro silencioso es una tabla que miente por omision. **Ojo a la ventana nocturna**: va por ~3 h 41 min contra las 4 h de referencia, con 19 min de margen. ================ LO QUE SE ESPERA PODER RESPONDER: quien firmo un comparativo y cuando; en que paso del circuito esta uno sin cerrar; cuanto tarda de media en firmarse; quien tiene firmas pendientes; y **quien aprobo una factura, cuando y con que rol**. La spec decide el grano —una fila por firma, un resumen por documento, o los dos— y **tiene que declarar la cobertura de cada familia por cada fuente**, porque publicar las 3.454 firmas de factura sin decir que ninguna tiene fecha seria un dato que miente por omision. ================ FRONTERAS: **F-084** publica el estado del contrato y solo puede aproximar la antiguedad con `con.tiemod`; con los 149.010 registros de contrato de `dbo.log` se sabra ademas **quien y cuando**. **F-067** declara que la fecha de cambio de estado no existe en Sigrid: `dbo.log` **es la respuesta mas cercana que existe** y F-067 tiene que actualizar esa afirmacion. F-067 nombra el circuito de firma dentro de su alcance; cuando esta feature exista, **lo consume y no lo reconstruye**. Las fichas lo declaran. ================================================================ **PEDIDA EXPLICITAMENTE POR NEGOCIO EL 2026-09-18**, en la CUARTA devolucion de un usuario sobre el datamart en uso: un correo de **Juan Romero** (Dir. Administracion y Control de Costes) que revisa «a fondo que datos de una factura de proveedor se pueden consultar hoy». Su **peticion numero 2 de cuatro, por orden de valor**, es literalmente esta feature: «**Publicar las firmas de `raw.confir`: quien aprobo y cuando**». Y en su lista de lo NO accesible: «Como llego la factura a su estado. El estado actual lo tenemos; **el historico no existe en ningun objeto**. Las firmas parecen estar en `raw.confir` (**70.385 filas**), sin publicar». Su recuento coincide con el nuestro —70.346 medidas el 16-09, 70.385 hoy: la tabla crece—, y **confirma desde fuera el diagnostico de esta ficha**. Por eso sube a **prioridad 8**. **OJO AL MATIZ QUE LA FICHA YA TRAE Y QUE EL CORREO NO SABE**: para la FACTURA, `confir` **no responde lo que el pide**. Sus 3.454 firmas de factura **no tienen ni una fecha**, asi que «quien aprobo y cuando» sale de **`dbo.log`** —300.438 aprobaciones firmadas, 152.627 facturas distintas, 92,0 % de cobertura— y no de `confir`. `confir` es la buena para el COMPARATIVO. Esa es exactamente la razon por la que el humano mando fusionar F-086 aqui, y hay que decirselo a Juan al entregar, porque si recibe «las firmas de confir» tal cual las pide, **para facturas recibira una tabla sin fechas**.",
       "acceptance": [
-        "Definida en detalle por specs/F-085-quien-aprobo-que-y-cuando/ (sdd=true), con una fase de estudio en SOLO LECTURA que responda las NUEVE preguntas abiertas de la ficha -las seis de confir y las tres de dbo.log, en especial que son las operaciones 5 y 3, las dos mas frecuentes y las unicas sin res- antes de fijar el modelo",
-        "El modelo cubre las cuatro familias (comparativo, factura, contrato y obra) y declara, por cada una, DE QUE FUENTE sale y con QUE COBERTURA, con las cifras medidas",
-        "Si se ingiere dbo.log, se hace FILTRADA y el filtro queda declarado, con el coste medido contra la ventana nocturna, que hoy tiene 19 min de margen"
+        "Definida en detalle por specs/F-085-quien-aprobo-que-y-cuando/ (sdd=true), con una fase de estudio en SOLO LECTURA que responda las NUEVE preguntas abiertas de la ficha -las seis de confir y las tres de dbo.log, en especial que son las operaciones 5 y 3- antes de fijar el modelo. HECHO el 2026-10-07 en progress/spec_F-085.md: la 5 es ejecutar un proceso y la 3 una modificacion, y la fuente que responde es `rac`, no confir ni dbo.log",
+        "El modelo cubre las cuatro familias (comparativo, factura, contrato y obra) desde UNA fuente, `rac` (el registro de procesos de Sigrid), y su ficha declara la cobertura medida de cada una: facturas 99,94 %, contratos 97,1 %, comparativos 97,0 % y obras 72,2 % (el resto, documentos que no han salido de su estado inicial), y por que confir (DOCVAL sin una firma) y dbo.log no son la fuente",
+        "`raw.rac` se ingiere SIN el filtro `asiide <> 0` y sin `tex`, con el coste medido contra la nocturna real (4 h 37 min 44 s el 2026-10-07, ya por encima de las 4 h de referencia), y retenciones.apuntes_contables da el mismo resultado que antes",
+        "La factura FR26/10025 da en compras.documento_procesos los cuatro pasos de la ventana Procesos de Sigrid (jmvargas, jmvargas, ialvarez, jmsanchez) con su estado de origen y destino, al segundo",
+        "D4 del humano (2026-10-07): se ingiere `usu` SIN credenciales (cla, fir, feccla, diascla, sid, cerid) y el censo pasa a 72 tablas; compras.documento_procesos publica el login Y el nombre del usuario con su cobertura declarada (137 de 192 logins, 93,0 % de las filas; los no resueltos con nombre NULL); el DNI y el enlace al empleado van SOLO en personal.usuarios_sigrid",
+        "dbo.log NO se ingiere en esta feature: la firma digital, el alta, las modificaciones y los pasos deshechos quedan para F-105"
       ],
-      "status": "pending",
+      "status": "done",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 3,
+      "priority": 11,
       "branch": "feature/F-085-quien-aprobo-que-y-cuando"
     },
     {
@@ -1362,7 +1365,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "critico",
-      "priority": 25,
+      "priority": 33,
       "branch": "feature/F-087-rol-propio-de-power-bi"
     },
     {
@@ -1381,7 +1384,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 28,
+      "priority": 36,
       "branch": "feature/F-088-guardian-de-recuentos-y-la-guarda-que-falta"
     },
     {
@@ -1400,13 +1403,13 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 18,
+      "priority": 26,
       "branch": "feature/F-089-el-mcp-cachea-el-diccionario"
     },
     {
       "id": "F-090",
-      "title": "El documento adjunto de la factura: el identificador del repositorio que permite contrastar el PDF del proveedor contra lo registrado en Sigrid",
-      "description": "Nace el 2026-09-18 de la **CUARTA devolucion de un usuario de Negocio** sobre el datamart en uso: un correo de **Juan Romero** (Dir. Administracion y Control de Costes) que revisa «a fondo que datos de una factura de proveedor se pueden consultar hoy» y cierra con **cuatro peticiones por orden de valor**. Antes de ficharla se midio todo contra Sigrid: `progress/explore_peticiones_juan_2026-09-18.md`. **Lo que el correo confirma de paso, y conviene leerlo entero**: da por «accesible y bien resuelto» la cabecera con sus tres fechas separadas (F-083), el estado del circuito «bien advertido que no es el estado del efecto» (F-083), la cadena contrato -> albaran -> factura -> efecto con el estado de firma del contrato (F-084), el texto partido en comentarios con fecha, hora y autor (F-080) y las retenciones con su puente. Y lo prueba con uso real: sobre la obra **0696 (Kodak), 1.809 facturas y 22,7 M EUR**, el **99,1 %** de las lineas llega desde albaran, el **99,6 %** tiene partida y el **98,3 %** del importe cuelga de un contrato. Con eso localizo **41 facturas de 2026, 590.878 EUR, en las que el albaran traia partida y la factura la deja en blanco**. Es la primera vez que Negocio usa el datamart para encontrar un error de negocio. ================ **PETICION 3 DE JUAN, y a mi juicio la de mas valor de las cuatro aunque el la ponga tercera**, por lo que abre: «La ruta o el identificador del documento adjunto, para saltar al original desde `factura_id`. **Permitiria detectar de forma sistematica las discrepancias entre el documento fisico y lo registrado en Sigrid, que es justo lo que hoy no se puede automatizar**». Su diagnostico: «He barrido los 154 objetos del diccionario y sus 972 columnas: no hay ni el PDF, ni una ruta, ni un identificador para localizarlo. Es una limitacion de fondo: **sin el documento original no hay manera de contrastar lo que el proveedor factura de verdad —importes, cantidades, precios, conceptos— contra lo que quedo registrado**. Hoy esa comprobacion solo se puede hacer a mano y factura por factura.» **Tiene razon en el datamart, y por eso hacia falta mirar en SIGRID, que es donde si esta.** ================ **MEDIDO EL 2026-09-18: EXISTE.** Son **`gra` (285.735 filas)** y **`rcg` (286.150)**, y **ninguna de las dos se ingiere hoy**. **103.799 de las 166.009 facturas (62,5 %) tienen adjunto**, y **desde 2019 la cobertura es del 96,1 %** —cero antes de 2017, asi que es una practica que se implanto y se consolido—. **QUE GUARDA, y es la clave del diseno**: `gra.cod` es un **identificador de repositorio EXTERNO**, practicamente unico, de la forma `202609181420515461.jmbecedas` —sello temporal mas usuario—, y `gra.nom` el nombre del fichero, casi todo `.pdf`. **El binario NO esta en la base**: solo **71 filas de 285.735** lo llevan dentro. **LO QUE FALTA Y NO ESTA EN LA BASE: la raiz fisica del repositorio.** `sisapl` esta vacia, asi que **hay que pedirsela a Sistemas**; sin ella el identificador no se convierte en una ruta abrible. **Esa gestion es del humano, no de un agente**, y la feature se puede entregar igual publicando el identificador y el nombre: saltar al original es el paso siguiente. **DESCARTADAS CON CIFRA**, para que nadie las vuelva a mirar: `arc` **0 filas**; `dog` 58.340 filas pero **0 colgando de facturas**; `condog` 16 filas y **0 facturas**. ================ **LO QUE HABILITA, que es el argumento de la ficha**: con el identificador publicado, contrastar el PDF contra lo registrado deja de ser un trabajo manual factura a factura. No lo resuelve esta feature —hace falta leer el PDF—, pero **sin esto no se puede ni empezar**. Y el precedente esta hecho: con la cadena documental publicada, Juan encontro solo 41 facturas mal imputadas por 590.878 EUR.",
+      "title": "El documento adjunto de la factura y el índice de gráficos asociados de comparativos y ofertas: lo que permite contrastar el original contra lo registrado en Sigrid",
+      "description": "Nace el 2026-09-18 de la **CUARTA devolucion de un usuario de Negocio** sobre el datamart en uso: un correo de **Juan Romero** (Dir. Administracion y Control de Costes) que revisa «a fondo que datos de una factura de proveedor se pueden consultar hoy» y cierra con **cuatro peticiones por orden de valor**. Antes de ficharla se midio todo contra Sigrid: `progress/explore_peticiones_juan_2026-09-18.md`. **Lo que el correo confirma de paso, y conviene leerlo entero**: da por «accesible y bien resuelto» la cabecera con sus tres fechas separadas (F-083), el estado del circuito «bien advertido que no es el estado del efecto» (F-083), la cadena contrato -> albaran -> factura -> efecto con el estado de firma del contrato (F-084), el texto partido en comentarios con fecha, hora y autor (F-080) y las retenciones con su puente. Y lo prueba con uso real: sobre la obra **0696 (Kodak), 1.809 facturas y 22,7 M EUR**, el **99,1 %** de las lineas llega desde albaran, el **99,6 %** tiene partida y el **98,3 %** del importe cuelga de un contrato. Con eso localizo **41 facturas de 2026, 590.878 EUR, en las que el albaran traia partida y la factura la deja en blanco**. Es la primera vez que Negocio usa el datamart para encontrar un error de negocio. ================ **PETICION 3 DE JUAN, y a mi juicio la de mas valor de las cuatro aunque el la ponga tercera**, por lo que abre: «La ruta o el identificador del documento adjunto, para saltar al original desde `factura_id`. **Permitiria detectar de forma sistematica las discrepancias entre el documento fisico y lo registrado en Sigrid, que es justo lo que hoy no se puede automatizar**». Su diagnostico: «He barrido los 154 objetos del diccionario y sus 972 columnas: no hay ni el PDF, ni una ruta, ni un identificador para localizarlo. Es una limitacion de fondo: **sin el documento original no hay manera de contrastar lo que el proveedor factura de verdad —importes, cantidades, precios, conceptos— contra lo que quedo registrado**. Hoy esa comprobacion solo se puede hacer a mano y factura por factura.» **Tiene razon en el datamart, y por eso hacia falta mirar en SIGRID, que es donde si esta.** ================ **MEDIDO EL 2026-09-18: EXISTE.** Son **`gra` (285.735 filas)** y **`rcg` (286.150)**, y **ninguna de las dos se ingiere hoy**. **103.799 de las 166.009 facturas (62,5 %) tienen adjunto**, y **desde 2019 la cobertura es del 96,1 %** —cero antes de 2017, asi que es una practica que se implanto y se consolido—. **QUE GUARDA, y es la clave del diseno**: `gra.cod` es un **identificador de repositorio EXTERNO**, practicamente unico, de la forma `202609181420515461.jmbecedas` —sello temporal mas usuario—, y `gra.nom` el nombre del fichero, casi todo `.pdf`. **El binario NO esta en la base**: solo **71 filas de 285.735** lo llevan dentro. **LO QUE FALTA Y NO ESTA EN LA BASE: la raiz fisica del repositorio.** `sisapl` esta vacia, asi que **hay que pedirsela a Sistemas**; sin ella el identificador no se convierte en una ruta abrible. **Esa gestion es del humano, no de un agente**, y la feature se puede entregar igual publicando el identificador y el nombre: saltar al original es el paso siguiente. **DESCARTADAS CON CIFRA**, para que nadie las vuelva a mirar: `arc` **0 filas**; `dog` 58.340 filas pero **0 colgando de facturas**; `condog` 16 filas y **0 facturas**. ================ **LO QUE HABILITA, que es el argumento de la ficha**: con el identificador publicado, contrastar el PDF contra lo registrado deja de ser un trabajo manual factura a factura. No lo resuelve esta feature —hace falta leer el PDF—, pero **sin esto no se puede ni empezar**. Y el precedente esta hecho: con la cadena documental publicada, Juan encontro solo 41 facturas mal imputadas por 590.878 EUR. ================ AMPLIACIÓN DEL 2026-10-07 (correo de Juan Romero del 2026-10-06 sobre los comparativos de la 0720, punto 4a; aprobada por el humano). `gra` es la tabla de «Gráficos asociados» de cualquier documento, así que la misma ingesta sirve para COMPARATIVOS y OFERTAS: Juan pide el ÍNDICE (documento al que cuelga, nombre del fichero, tipo y fecha de alta), no el fichero. Motivo: el concurso real se hace en Excel y en Sigrid solo entran la adjudicataria y las ficticias (ver F-129); ese Excel a veces se adjunta en «Gráficos asociados» del comparativo o de la oferta, y con el índice se sabría qué comparativos tienen el concurso documentado.",
       "acceptance": [
         "compras.facturas -o un objeto propio, lo decide la implementacion- publica el identificador del documento adjunto (gra.cod) y el nombre del fichero (gra.nom), enlazados a factura_id",
         "Ingeridas gra y rcg, EXCLUYENDO las columnas de binario y texto pesado (ima, pul, tex, cam): el binario esta en la base en 71 filas de 285.735 y no aporta",
@@ -1414,12 +1417,13 @@
         "La ficha declara que el identificador NO es una ruta abrible mientras Sistemas no de la raiz del repositorio, y que esa gestion es del humano",
         "Se responde por el MCP: de una factura dada, que documento tiene adjunto; y cuantas facturas de un periodo no lo tienen",
         "El coste de la ingesta nueva esta medido contra la ventana nocturna, que hoy tiene 19 min de margen sobre las 4 h de referencia",
+        "(Ampliación 2026-10-07) El índice de gráficos asociados cubre también COMPARATIVOS y OFERTAS (documento, nombre del fichero, tipo, fecha de alta), con su cobertura medida, y se responde por el MCP qué comparativos de una obra tienen el concurso adjuntado",
         "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
       ],
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 19,
+      "priority": 9,
       "branch": "feature/F-090-documento-adjunto"
     },
     {
@@ -1438,13 +1442,13 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 21,
+      "priority": 29,
       "branch": "feature/F-091-factura-asiento"
     },
     {
       "id": "F-092",
-      "title": "El maestro de productos y el centro de coste en la cascada: dos peticiones baratas que no necesitan ingerir nada",
-      "description": "Nace el 2026-09-18 de la **CUARTA devolucion de un usuario de Negocio** sobre el datamart en uso: un correo de **Juan Romero** (Dir. Administracion y Control de Costes) que revisa «a fondo que datos de una factura de proveedor se pueden consultar hoy» y cierra con **cuatro peticiones por orden de valor**. Antes de ficharla se midio todo contra Sigrid: `progress/explore_peticiones_juan_2026-09-18.md`. **Lo que el correo confirma de paso, y conviene leerlo entero**: da por «accesible y bien resuelto» la cabecera con sus tres fechas separadas (F-083), el estado del circuito «bien advertido que no es el estado del efecto» (F-083), la cadena contrato -> albaran -> factura -> efecto con el estado de firma del contrato (F-084), el texto partido en comentarios con fecha, hora y autor (F-080) y las retenciones con su puente. Y lo prueba con uso real: sobre la obra **0696 (Kodak), 1.809 facturas y 22,7 M EUR**, el **99,1 %** de las lineas llega desde albaran, el **99,6 %** tiene partida y el **98,3 %** del importe cuelga de un contrato. Con eso localizo **41 facturas de 2026, 590.878 EUR, en las que el albaran traia partida y la factura la deja en blanco**. Es la primera vez que Negocio usa el datamart para encontrar un error de negocio. ================ **DOS PETICIONES DE JUAN QUE VAN JUNTAS PORQUE LAS DOS SON BARATAS Y NO EXIGEN INGESTA NUEVA.** ================ **(A) EL MAESTRO DE PRODUCTOS.** Juan: «el maestro de productos, que deja **`producto_id` sin nombre ni familia**». Medido el 2026-09-18: **`pro` tiene 55.179 filas y YA ESTA INGERIDO**. **Confirma la regla de oro (`R-SIGRID-CON`) una vez mas**: `pro` **no tiene `cod`, ni `res`, ni `nom`** — **el nombre sale de `con`**, informado al **99,97 % y con cero huerfanos**. Es la quinta vez que esta regla decide donde vive un campo que pareciamos buscar en la tabla hija. **LA FAMILIA QUE JUAN PIDE NO EXISTE, y hay que decirselo**: **`pro.famide` esta a 0 en las 55.179 filas** y **`auxfam` tiene 0 filas**. La clasificacion VIVA es **`pro.natide` -> `auxpronat`** (**98,97 %**, ya ingerida), con un aviso medido: **sus literales estan duplicados** —514 filas para 334 `res` distintos—, asi que agrupar por el literal junta cosas distintas y hay que agrupar por el identificador. **Las lineas casan**: `dcfpro` **997.435 de 1.094.551** con producto y `dcapro` **1.147.673 de 1.153.191**. ================ **(B) EL CENTRO DE COSTE COMO ULTIMO RECURSO EN LA CASCADA DE OBRA.** Juan: «**`maestro.centros_coste` no interviene en la cascada de obra**» y pide «aplicarlo como ultimo recurso». Es el puente que **F-073** construyo y que resolvio el caso de los 261 valores de `retenciones.movimientos`; hoy `compras.fact_compras_linea` resuelve la obra en cascada **sin usarlo**. **LO PRIMERO ES MEDIR CUANTO GANA**: sobre la obra 0696 el propio Juan mide que el **99,6 % de las lineas ya tiene partida**, asi que el margen es la cola. **Si el resultado es que recupera cuatro lineas, se dice y no se implementa**: anadir un escalon a una cascada que ya funciona tiene coste de mantenimiento y de comprension. La feature **mide primero y decide despues**, y ese orden es parte del contrato. **FRONTERA CON F-045**: alli el mismo puente resuelve las RETENCIONES; aqui, la cascada de `compras`. No se pisan, y las dos fichas lo dicen.",
+      "title": "El catálogo de productos (maestro por empresa, árbol de naturalezas y su vínculo con la cuenta analítica) y el centro de coste en la cascada",
+      "description": "Nace el 2026-09-18 de la **CUARTA devolucion de un usuario de Negocio** sobre el datamart en uso: un correo de **Juan Romero** (Dir. Administracion y Control de Costes) que revisa «a fondo que datos de una factura de proveedor se pueden consultar hoy» y cierra con **cuatro peticiones por orden de valor**. Antes de ficharla se midio todo contra Sigrid: `progress/explore_peticiones_juan_2026-09-18.md`. **Lo que el correo confirma de paso, y conviene leerlo entero**: da por «accesible y bien resuelto» la cabecera con sus tres fechas separadas (F-083), el estado del circuito «bien advertido que no es el estado del efecto» (F-083), la cadena contrato -> albaran -> factura -> efecto con el estado de firma del contrato (F-084), el texto partido en comentarios con fecha, hora y autor (F-080) y las retenciones con su puente. Y lo prueba con uso real: sobre la obra **0696 (Kodak), 1.809 facturas y 22,7 M EUR**, el **99,1 %** de las lineas llega desde albaran, el **99,6 %** tiene partida y el **98,3 %** del importe cuelga de un contrato. Con eso localizo **41 facturas de 2026, 590.878 EUR, en las que el albaran traia partida y la factura la deja en blanco**. Es la primera vez que Negocio usa el datamart para encontrar un error de negocio. ================ **DOS PETICIONES DE JUAN QUE VAN JUNTAS PORQUE LAS DOS SON BARATAS Y NO EXIGEN INGESTA NUEVA.** ================ **(A) EL MAESTRO DE PRODUCTOS.** Juan: «el maestro de productos, que deja **`producto_id` sin nombre ni familia**». Medido el 2026-09-18: **`pro` tiene 55.179 filas y YA ESTA INGERIDO**. **Confirma la regla de oro (`R-SIGRID-CON`) una vez mas**: `pro` **no tiene `cod`, ni `res`, ni `nom`** — **el nombre sale de `con`**, informado al **99,97 % y con cero huerfanos**. Es la quinta vez que esta regla decide donde vive un campo que pareciamos buscar en la tabla hija. **LA FAMILIA QUE JUAN PIDE NO EXISTE, y hay que decirselo**: **`pro.famide` esta a 0 en las 55.179 filas** y **`auxfam` tiene 0 filas**. La clasificacion VIVA es **`pro.natide` -> `auxpronat`** (**98,97 %**, ya ingerida), con un aviso medido: **sus literales estan duplicados** —514 filas para 334 `res` distintos—, asi que agrupar por el literal junta cosas distintas y hay que agrupar por el identificador. **Las lineas casan**: `dcfpro` **997.435 de 1.094.551** con producto y `dcapro` **1.147.673 de 1.153.191**. ================ **(B) EL CENTRO DE COSTE COMO ULTIMO RECURSO EN LA CASCADA DE OBRA.** Juan: «**`maestro.centros_coste` no interviene en la cascada de obra**» y pide «aplicarlo como ultimo recurso». Es el puente que **F-073** construyo y que resolvio el caso de los 261 valores de `retenciones.movimientos`; hoy `compras.fact_compras_linea` resuelve la obra en cascada **sin usarlo**. **LO PRIMERO ES MEDIR CUANTO GANA**: sobre la obra 0696 el propio Juan mide que el **99,6 % de las lineas ya tiene partida**, asi que el margen es la cola. **Si el resultado es que recupera cuatro lineas, se dice y no se implementa**: anadir un escalon a una cascada que ya funciona tiene coste de mantenimiento y de comprension. La feature **mide primero y decide despues**, y ese orden es parte del contrato. **FRONTERA CON F-045**: alli el mismo puente resuelve las RETENCIONES; aqui, la cascada de `compras`. No se pisan, y las dos fichas lo dicen. ================ AMPLIACIÓN DEL 2026-10-07 (correos de Juan Romero del 2026-10-06 «Datamart: publicar catálogo de productos, naturalezas y su vínculo analítico» y punto 4d del de comparativos de la 0720; el humano aprobó ampliar esta ficha en vez de abrir otra, y pasa a sdd=true). Juan pide publicar las TRES piezas del catálogo, porque en Sigrid el producto está vinculado con el árbol de naturalezas y con el árbol analítico de todas las obras: (1) MAESTRO DE ARTÍCULOS por empresa (el código solo es único dentro de cada empresa): código, descripción, unidad, clase, naturaleza, empresa y estado de alta/baja; (2) ÁRBOL DE NATURALEZAS completo con su jerarquía (padre, nivel, código y descripción); (3) el VÍNCULO con el árbol analítico: la cuenta analítica a la que carga cada producto o cada naturaleza, según dónde lo guarde Sigrid; basta el identificador para cruzar con `maestro.cuentas_analiticas` (F-107). Objetivo: ver a qué cuenta debería ir cada línea de compra según su producto y detectar las imputadas a otra (ese control vive en F-126). Hoy las líneas de contrato, comparativo, oferta y planificación solo traen el id del producto, y los GENÉRICOS (MA9999, SB9999, SM9999, QA9999, XA9999) concentran buena parte del importe. Lo medido el 18-09 sigue valiendo: el nombre sale de `con` (R-SIGRID-CON), no de `pro`; `auxfam` vacía; literales de `auxpronat` duplicados. FRONTERA con F-055: allí la actividad del PROVEEDOR (`conact` -> `auxpronat`); aquí la naturaleza del PRODUCTO. La parte (B), el centro de coste en la cascada, sigue igual.",
       "acceptance": [
         "compras.factura_lineas y compras.albaran_lineas publican el NOMBRE del producto, leido de `con` y no de `pro` (que no tiene ni cod ni res), con su cobertura medida",
         "Se publica la clasificacion viva `pro.natide` -> `auxpronat`, y la ficha declara con esas palabras que LA FAMILIA QUE PEDIA NEGOCIO NO EXISTE: pro.famide esta a 0 en las 55.179 filas y auxfam tiene 0 filas",
@@ -1452,12 +1456,16 @@
         "MEDIDO ANTES DE IMPLEMENTAR: cuantas lineas de compras.fact_compras_linea ganarian obra si maestro.centros_coste entrara como ultimo escalon de la cascada",
         "DECIDIDO CON ESA CIFRA: si el escalon recupera poco, NO se implementa y queda escrito por que; si recupera lo suficiente, se implementa sin cambiar el grano ni el resultado de las lineas que hoy ya resuelven",
         "Las fichas de F-092 y F-045 declaran la frontera: alli las retenciones, aqui la cascada de compras",
+        "(Ampliación 2026-10-07) Publicado el maestro de artículos POR EMPRESA (código, descripción, unidad, clase, naturaleza, empresa, alta/baja) con clave declarada que respete que el código solo es único dentro de su empresa",
+        "(Ampliación 2026-10-07) Publicado el árbol de naturalezas completo con su jerarquía (padre, nivel, código, descripción)",
+        "(Ampliación 2026-10-07) Medido dónde guarda Sigrid la cuenta analítica de cada producto o naturaleza y publicado ese vínculo cruzable con `maestro.cuentas_analiticas`, con su cobertura; la ficha avisa del peso de los productos genéricos (MA9999, SB9999, SM9999, QA9999, XA9999) en el importe, medido",
+        "(Ampliación 2026-10-07) Se responde por el MCP, sin explicarle nada: «¿qué producto es y a qué cuenta analítica carga por catálogo la línea X del contrato Y?»",
         "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
       ],
       "status": "pending",
-      "sdd": false,
+      "sdd": true,
       "rigor": "estandar",
-      "priority": 23,
+      "priority": 5,
       "branch": "feature/F-092-productos-y-centro-de-coste"
     },
     {
@@ -1477,7 +1485,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 16,
+      "priority": 24,
       "branch": "feature/F-093-obra-de-cabecera"
     },
     {
@@ -1525,7 +1533,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 10,
+      "priority": 18,
       "branch": "feature/F-096-plan-mensual-sin-tope"
     },
     {
@@ -1557,7 +1565,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 12,
+      "priority": 20,
       "branch": "feature/F-098-fases-por-ambito-y-controles"
     },
     {
@@ -1573,7 +1581,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 14,
+      "priority": 22,
       "branch": "feature/F-099-expedientes-obra"
     },
     {
@@ -1623,7 +1631,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 8,
+      "priority": 16,
       "branch": "feature/F-104-retenciones-cliente"
     },
     {
@@ -1640,7 +1648,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 13,
+      "priority": 21,
       "branch": "feature/F-105-log-sigrid-usuarios"
     },
     {
@@ -1656,7 +1664,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 7,
+      "priority": 15,
       "branch": "feature/F-106-obras-por-empresa"
     },
     {
@@ -1737,7 +1745,7 @@
       "status": "spec_ready",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 4,
+      "priority": 12,
       "branch": "feature/F-111-nombres-partida-por-ancestro"
     },
     {
@@ -1785,7 +1793,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 6,
+      "priority": 14,
       "branch": "feature/F-114-avisos-mcp-rescatados"
     },
     {
@@ -1803,7 +1811,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 69,
+      "priority": 77,
       "branch": "feature/F-117-obras-ciegas-en-master"
     },
     {
@@ -1835,7 +1843,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 30,
+      "priority": 38,
       "branch": "feature/F-119-cartera-de-obra"
     },
     {
@@ -1850,7 +1858,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 67,
+      "priority": 75,
       "branch": "feature/F-115-tiemod-inexistente"
     },
     {
@@ -1865,7 +1873,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 68,
+      "priority": 76,
       "branch": "feature/F-116-ingesta-descompuestos-error-por-version"
     },
     {
@@ -1898,7 +1906,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 5,
+      "priority": 13,
       "branch": "feature/F-121-recurso-principal-auxiliar"
     },
     {
@@ -1913,7 +1921,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 10,
+      "priority": 18,
       "branch": "feature/F-122-lineas-sin-rendimiento"
     },
     {
@@ -1936,6 +1944,128 @@
       "rigor": "estandar",
       "priority": 1,
       "branch": "feature/F-123-descompuestos-regla-origenes"
+    },
+    {
+      "id": "F-126",
+      "title": "La cuenta analítica de cada línea de albarán y factura, y el control de las compras imputadas a una cuenta distinta de la que les toca por catálogo",
+      "description": "Nace el 2026-10-07 de los correos de **Juan Romero** (Dir. Administración y Control de Costes) del 2026-10-06, cuatro peticiones seguidas sobre el datamart en uso; el humano aprobó el reparto y el orden el 2026-10-07. Correo «Datamart: mayor analítico y analítica de albaranes y facturas», punto 2 (nuevo). ================ LO QUE PIDE: `compras.albaran_lineas`, `compras.factura_lineas` y `compras.fact_compras_linea` traen obra, partida, centro de coste y producto, pero NO la cuenta analítica a la que cargan. Necesita la cuenta analítica de cada línea. Junto con el catálogo de productos y su vínculo con naturalezas y cuentas analíticas (F-092 ampliada), permitiría comprobar que cada compra va a la cuenta que le corresponde por catálogo; y junto con el mayor analítico (F-127), cuadrar el coste documental con el analítico. ================ A MEDIR: dónde guarda Sigrid la cuenta analítica de la línea (`dcapro`/`dcfpro`, o solo en el apunte analítico al contabilizar) y su cobertura. DEPENDE de F-092 (el «debería ir») para el control, y de F-127 para el cuadre documental-analítico; la columna por sí sola no depende de nada.",
+      "acceptance": [
+        "Medido en Sigrid dónde vive la cuenta analítica de cada línea de albarán y de factura, con su cobertura; si solo existe en el apunte analítico, dicho y medido el enlace",
+        "Las tres tablas de líneas publican la cuenta analítica AL FINAL, cruzable con `maestro.cuentas_analiticas`, sin cambiar el grano ni ninguna columna actual",
+        "Existe un control (vista o columna) que marca las líneas imputadas a una cuenta distinta de la que les corresponde por su producto o naturaleza según F-092, con las cifras medidas y sin decidir por Negocio cuáles son legítimas",
+        "Medido el cuadre del coste documental (líneas de compra) contra el analítico (F-127) por obra y cuenta, o declarado por qué no cuadra",
+        "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 6,
+      "branch": "feature/F-126-analitica-lineas-compra"
+    },
+    {
+      "id": "F-127",
+      "title": "El mayor analítico: los apuntes de la contabilidad analítica (apa) y sus saldos por cuenta analítica y mes, con las cuentas de contrapartida (CP) de los trabajadores",
+      "description": "Nace el 2026-10-07 de los correos de **Juan Romero** (Dir. Administración y Control de Costes) del 2026-10-06, cuatro peticiones seguidas sobre el datamart en uso; el humano aprobó el reparto y el orden el 2026-10-07. Correo «Datamart: mayor analítico y analítica de albaranes y facturas», punto 1, que es un RECORDATORIO: el 24-09 Juan pidió los movimientos y el saldo de las cuentas analíticas de contrapartida (CP) y se le dijo que quedaría cubierto al traer el mayor. Lo publicado después (F-056) es el mayor FINANCIERO (`contabilidad.mayor`), que no las cubre: las CP son cuentas analíticas y el mayor analítico (`apa`) sigue solo en `raw`. Es una DEUDA prometida. ================ LO QUE PIDE: una tabla equivalente a `contabilidad.mayor` para la analítica: apunte, fecha, empresa, centro de coste (y su obra vía `maestro.centros_coste`), cuenta analítica (cruzable con `maestro.cuentas_analiticas`, F-107), debe, haber, importe y el enlace al apunte financiero cuando lo tenga; y, como en la financiera, saldos por cuenta y mes. Para ver el saldo y los movimientos de las cuentas analíticas de obra, incluidas las CP de los trabajadores, y cruzarlos con lo imputado en los partes. ================ LO QUE YA SE SABE (F-056, F-061): `apa` está en `raw` (709.403 filas el 2026-09-06), `cenide` al 99,98 %, `apuide` al 88 %, `obride` a 0 (la obra sale por el centro de coste); con el puente el 98,8 % de sus filas y el 93,2 % del debe caen en una obra. F-061 dejó a medir si el movimiento de las CP está en `apa` o en otra tabla (`caaide`). AVISO DE JUAN (F-061): «el asiento de nóminas no entra en estas cuentas analíticas»: el saldo de una CP solo recoge los partes; la ficha debe decirlo. OJO, DATOS PERSONALES: las CP son por trabajador (`personal.recursos.cuenta_analitica_contrapartida_id`); si el nombre de la cuenta o el concepto llevan el nombre del trabajador, esa parte va al esquema `personal` (F-057, se da o se quita con un GRANT) y no a `contabilidad`. DESBLOQUEA F-061 (coste real de mano de obra) y el «cuadrar coste documental con el analítico» de F-126.",
+      "acceptance": [
+        "Medido en Sigrid dónde vive el mayor analítico (`apa` u otra) y su relación con el apunte financiero (`apu`), con volumen, cobertura de centro de coste, de cuenta analítica y de enlace al apunte",
+        "Publicada una tabla de movimientos analíticos (apunte, fecha, empresa, centro de coste, obra vía `maestro.centros_coste`, cuenta analítica cruzable con `maestro.cuentas_analiticas`, debe, haber, importe, apunte financiero) y una de saldos por cuenta analítica y mes, con su clave declarada",
+        "Decidido y escrito si alguna columna lleva datos personales y, si es así, en qué esquema va (`personal`, F-057) para poder retirarla con un GRANT",
+        "La ficha declara que el asiento de nóminas no entra en las cuentas analíticas CP (aviso de Juan, F-061), con la cifra medida, y la frontera con `contabilidad.mayor` (financiera) para que nadie sume una con la otra",
+        "Se responde por el MCP, sin explicarle nada: «saldo y movimientos de la cuenta CP del trabajador X en la obra Y» y su cruce con lo imputado en `personal.partes_lineas`",
+        "El coste de la carga nueva está medido contra la ventana nocturna",
+        "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "critico",
+      "priority": 4,
+      "branch": "feature/F-127-mayor-analitico"
+    },
+    {
+      "id": "F-128",
+      "title": "Los importes de cabecera de la factura de proveedor (base, IVA, retención, total y total a pagar) y su pestaña de recargos y retenciones (dcfrec), para cuadrar la retención practicada contra el mayor de retenciones",
+      "description": "Nace el 2026-10-07 de los correos de **Juan Romero** (Dir. Administración y Control de Costes) del 2026-10-06, cuatro peticiones seguidas sobre el datamart en uso; el humano aprobó el reparto y el orden el 2026-10-07. Correo «Datamart: importes de cabecera de factura para cuadrar retenciones». ================ LO QUE PIDE: en Sigrid la cabecera de la factura de proveedor tiene base imponible, IVA (si procede), retención, total factura y total a pagar (total factura − retención). La retención de cada factura es total factura − total a pagar, y Juan quiere contrastarla con el saldo del mayor de retenciones. Hoy no se puede: `compras.facturas` no publica ninguno de esos importes. El único cuadre es `retenciones.v_cuadre_proveedor` (F-095), saldo contable contra efectos de retención (_02); pero los efectos se dividen, se agrupan y se anulan, y ahí nacen los descuadres (efectos agrupados sin factura de origen). A 25-09 cuadraban 520 de 761 proveedores, con ~416.000 EUR de diferencia (8,78 M EUR en contabilidad frente a 8,36 M EUR en efectos). La cabecera de la factura es el dato original y serviría también para validar los propios efectos. Pide: (1) en `compras.facturas`, base imponible, IVA, retención, total documento y total a pagar; (2) la pestaña de recargos y retenciones de la factura (`dcfrec`): base, porcentaje y cuota de cada retención o recargo. ================ LO QUE HAY (comprobado el 2026-10-07): `dcf` se ingiere y `dcfrec` está en `raw` desde F-066; NO hace falta ingesta nueva. F-038 ya distinguió `dco.totdoc` (con IVA) de `dco.totbas` (sin IVA) en las ofertas: el mismo cuidado aquí. FRONTERAS: F-091 (factura -> asiento) tiene abierto el descuadre del 13,2 % entre el debe de los apuntes de 2025 y `dcf.totdoc`; F-095 es el cuadre contra efectos; F-130 reutiliza `dcfrec` para comparar condiciones oferta -> contrato -> factura.",
+      "acceptance": [
+        "Medido en Sigrid qué campos de `dcf` son la base, el IVA, la retención, el total y el total a pagar, y comprobado con el dato que retención = total − total a pagar (o explicado dónde no)",
+        "`compras.facturas` publica los cinco importes AL FINAL de la tabla, sin cambiar el grano ni ninguna columna actual, con ficha que diga cuál lleva IVA y cuál no",
+        "Publicada la pestaña de recargos y retenciones (`dcfrec`) enlazada a `factura_id`: tipo, base, porcentaje y cuota, con su clave declarada y su cobertura medida",
+        "Existe un cuadre por proveedor y obra de la retención practicada en factura contra el mayor de retenciones, con las cifras medidas y comparado con `retenciones.v_cuadre_proveedor` (520 de 761 proveedores cuadrando el 25-09)",
+        "Se responde por el MCP, sin explicarle nada: «¿qué facturas explican el descuadre de retenciones del proveedor X?»",
+        "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 3,
+      "branch": "feature/F-128-importes-cabecera-factura"
+    },
+    {
+      "id": "F-129",
+      "title": "El objetivo del comparativo se mide contra la oferta de referencia del propio comparativo (oficina técnica o planificado ABC), no contra el descompuesto: hoy casa el 29 %",
+      "description": "Nace el 2026-10-07 de los correos de **Juan Romero** (Dir. Administración y Control de Costes) del 2026-10-06, cuatro peticiones seguidas sobre el datamart en uso; el humano aprobó el reparto y el orden el 2026-10-07. Correo «Datamart: comparativos — análisis obra 0720 y lo que falta por publicar», puntos 2 y 3. ================ LO QUE JUAN HA SEGUIDO CON LO PUBLICADO, caso 0720 Residencia Promiris, comparativo de movimiento de tierras 0720.0_0002: master V0 (Estudios) -> oferta OFICINA TÉCNICA con medición y precio idénticos al céntimo en las 4 líneas valoradas (02.03.01, 02.03.02, 02.03.03 y 23.02), total 217.449,84 EUR; oficina técnica -> OBJETIVO a −10 % línea a línea, total 195.704,85 EUR; oferta adjudicada (RAFE DEMO, 189.928,28 EUR) = planificado actual del jefe de obra = contrato CTSB26/0462, mismas 14 líneas, y cada línea del planificado apunta a su línea de contrato. El resto de comparativos de coste directo de la 0720 aplican −6,31 % sobre la referencia, que es la mejora de CD del objetivo de compras de Dirección; movimiento de tierras es la excepción (−10 %). ================ CÓMO SE CONSTRUYE DE VERDAD (Juan): el comparativo se monta con la oferta ficticia OFICINA TÉCNICA, que sale del descompuesto del master V0, hasta que hay planificado ABC del jefe de obra, que pasa a ser la oferta de referencia. El OBJETIVO es un porcentaje de baja sobre la OFERTA DE REFERENCIA DEL PROPIO COMPARATIVO. Hoy `compras.comparativo_objetivo` / `comparativo_oferta_lineas` (F-038 Fase 2, regla D4 decidida por el humano el 2026-10-04 y ampliada el 05-10: «primero a y si no b») lo mide contra el descompuesto (primera ABC o Estudios) y casa en el 29 % (24.431 de ~84.100 líneas el 06-10). Juan propone medirlo contra la oferta de referencia; comparando totales en la 0720 casa en casi todos (excepciones: el estructurista y el depósito de agua). Es la respuesta de Negocio al pendiente «llevar a Negocio la regla del objetivo (D4 de F-038)» de `progress/current.md`. ================ PUNTO 3, EL CONCURSO SE HACE EN EXCEL: en Sigrid solo se mete la adjudicataria junto a las ficticias, así que `n_ofertas_reales` y `ahorro_concurso` NO miden la competencia real (en la 0720, 31 de 47 comparativos tienen una sola oferta real). Hoy las fichas lo presentan como si la midieran: es una cifra plausible y falsa. ================ POR QUÉ VA PRIMERO: corrige una cifra YA PUBLICADA y consumida por el MCP. La decisión de sustituir la regla D4 o publicar las dos es del humano en la spec, con las cifras delante.",
+      "acceptance": [
+        "Medido en solo lectura, global y por obra, cuántas líneas OBJETIVO casan contra la oferta de referencia del propio comparativo (OFICINA TÉCNICA o planificado ABC) frente al 29 % de la regla D4 vigente, y localizado en Sigrid cómo se sabe cuál es la oferta de referencia de cada comparativo",
+        "Reproducido el caso 0720.0_0002 (oficina técnica 217.449,84 EUR, objetivo 195.704,85 EUR a −10 %, adjudicada RAFE DEMO 189.928,28 EUR, contrato CTSB26/0462) y explicadas las excepciones de la 0720 (estructurista, depósito de agua)",
+        "Decidido por el humano en la spec, con esas cifras: la regla nueva sustituye a D4 de F-038 o se publican las dos bases con su nombre; la ficha de `compras.comparativo_objetivo` y `comparativo_oferta_lineas` dice cuál es cuál",
+        "Las fichas de `compras.comparativos` (y `00_global.yaml` si aplica) avisan de que el concurso se hace en Excel: `n_ofertas_reales` y `ahorro_concurso` no miden la competencia real, con la cifra de la 0720 (31 de 47 con una sola oferta real) o la global medida",
+        "Se responde por el MCP, sin explicarle nada: «¿cuál es el objetivo del comparativo 0720.0_0002 y contra qué oferta se calcula?»",
+        "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "critico",
+      "priority": 2,
+      "branch": "feature/F-129-objetivo-contra-oferta-referencia"
+    },
+    {
+      "id": "F-130",
+      "title": "Las condiciones y el texto de la oferta y del comparativo (forma de pago, recargos y retenciones de dcorec, cláusulas), y si pasan igual al contrato y a las facturas",
+      "description": "Nace el 2026-10-07 de los correos de **Juan Romero** (Dir. Administración y Control de Costes) del 2026-10-06, cuatro peticiones seguidas sobre el datamart en uso; el humano aprobó el reparto y el orden el 2026-10-07. Correo «Datamart: comparativos — análisis obra 0720 y lo que falta por publicar», puntos 4b y 4c. ================ LO QUE PIDE: (b) la pestaña Condiciones de la oferta: forma de pago de la cabecera (`dco`) y recargos/retenciones (`dcorec`). Están en `raw` (F-066) pero no en `compras.comparativo_ofertas`. Servirían para comprobar que las condiciones de la oferta pasan igual al contrato y a las facturas. (c) la ventana Texto del comparativo y de la oferta (cláusulas): hoy `compras.documento_texto` solo cubre facturas y contratos. ================ LO QUE HAY: el contrato ya publica su retención de garantía y su forma de pago (F-067, `compras.contratos`); `ctrrec` está en `raw`; el lado de la factura (`dcfrec`) lo publica F-128. DEPENDE de F-128 para la comparación con la factura.",
+      "acceptance": [
+        "`compras.comparativo_ofertas` publica la forma de pago de la oferta AL FINAL, sin cambiar el grano, y se publican sus recargos y retenciones (`dcorec`) enlazados a la oferta, con su cobertura medida",
+        "`compras.documento_texto` (o un objeto propio, lo decide la spec) cubre también el texto del comparativo y de la oferta, con el mismo grano que hoy tiene para facturas y contratos",
+        "Existe una comparación oferta adjudicada -> contrato -> facturas de forma de pago y porcentajes de retención, que marca las diferencias con las cifras medidas y sin decidir por Negocio cuáles son legítimas",
+        "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 8,
+      "branch": "feature/F-130-condiciones-y-texto-oferta"
+    },
+    {
+      "id": "F-131",
+      "title": "Las cantidades del documento de planificación de compras (DPC) por línea: llevado a comparativo, contratado, pendiente de comparativo y pendiente de contrato",
+      "description": "Nace el 2026-10-07 de los correos de **Juan Romero** (Dir. Administración y Control de Costes) del 2026-10-06, cuatro peticiones seguidas sobre el datamart en uso; el humano aprobó el reparto y el orden el 2026-10-07. Correo «Datamart: comparativos — análisis obra 0720 y lo que falta por publicar», punto 4e. ================ LO QUE PIDE: la cabecera del DPC (`dnc`: obra, fase, fecha, estado) y, en sus líneas, las cantidades que calcula Sigrid de llevado a comparativo, contratado, pendiente de comparativo y pendiente de contrato. Las líneas ya se publican como planificado del jefe de obra (`descompuestos.v_pbi_planif_jo`) sin esas cantidades. Se puede reconstruir algo cruzando con comparativos y contratos (en la 0720 salen 13,2 M EUR de planificado pendiente de llevar a comparativo), pero sin controlar cantidades parciales: no es fiable como dato del DPC. ================ LO QUE YA ESTÁ (Juan escribió antes del despliegue): LA CABECERA SE PUBLICA DESDE EL 2026-10-07 como `compras.necesidades` (F-067, 277 documentos, uno por obra; el estado no se publica porque los 277 están «En curso»), y `v_pbi_planif_jo` / `v_pbi_master_planif_jo` llevan `necesidad_id`. Falta SOLO lo de las cantidades. A MEDIR PRIMERO: si Sigrid las GUARDA (campos de `dncpro`) o las CALCULA al vuelo en la pantalla; si las calcula, hay que saber con qué regla antes de reproducirla, y si no se puede, la ficha lo dice.",
+      "acceptance": [
+        "Medido en Sigrid si las cuatro cantidades del DPC están guardadas (y en qué campos) o se calculan al abrir el documento; si se calculan, descrita la regla con el dato delante",
+        "Si están guardadas o la regla es reproducible: publicadas por línea de necesidad (al final de la vista o en un objeto propio, lo decide la spec), con su ficha y contrastadas en la 0720 contra la pantalla de Sigrid",
+        "Si no son reproducibles con fiabilidad: la ficha de `compras.necesidades` lo declara y explica por qué la reconstrucción por cruce (13,2 M EUR en la 0720) no es el dato del DPC",
+        "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 7,
+      "branch": "feature/F-131-cantidades-dpc"
+    },
+    {
+      "id": "F-132",
+      "title": "La antigüedad del estado de contratos y facturas sale de rac (desde 2008, al segundo y con usuario) y la foto diaria de F-067 se retira tras contrastarla",
+      "description": "Nace el 2026-10-07 de la decisión D7 de F-085, aprobada por el humano («es necesaria la foto diaria si aquí ya está quién hizo los cambios?»). F-067 (desplegada el 2026-10-07, imagen r20261007-0850) montó una FOTO DIARIA de estados (`compras.historial_estados`, `historial_estados_fotos`, línea base 2026-10-07 ~07:02 UTC) porque se daba por hecho que Sigrid no guarda cuándo cambia el estado de un documento: lo dicen `config/tables_sigrid.yaml` (bloque C3 de F-066), la ficha de `compras.historial_estados` y `docs/ARCHITECTURE.md`. LA SPEC DE F-085 LO DESMIENTE (progress/spec_F-085.md §2): `rac` es la historia neta de estados de cada documento, con `est1`->`est2`, usuario, fecha y hora desde 2008; el último paso coincide con `con.est` en el 99,96 % de las facturas, 99,99 % de los contratos y 99,98 % de los comparativos, y los documentos sin pasos están en su estado inicial. Ejemplo de lo que cambia: 809 contratos en EPF, 785 con más de 21 días, que `compras.v_estado_documentos` hoy presenta como «al menos 0 días» hasta el 2026-10-28. Lo único que solo ve la foto: un estado cambiado sin proceso y un paso deshecho (Sigrid borra el paso de `rac`; ~70 documentos). DEPENDE DE F-085 (`compras.documento_procesos` y `raw.rac` sin filtro).",
+      "acceptance": [
+        "`compras.v_estado_documentos.en_estado_desde` (y lo que dependa de la foto) sale del último paso de `rac` vía `compras.documento_procesos`, con la fecha exacta, y la foto queda como respaldo durante el contraste",
+        "Contraste de 1 a 2 semanas (lo fija el humano): cada cambio que detecta la foto está en `rac` o queda explicado (estado cambiado sin proceso, paso deshecho), con las cifras en progress/",
+        "Con el contraste delante, el humano decide retirar la foto; si se retira, se deja de construir sin perder la historia que haya que conservar (decisión del humano sobre la línea base del 2026-10-07)",
+        "Corregida la premisa falsa («Sigrid no guarda cuándo cambia el estado») en `config/tables_sigrid.yaml`, las fichas de `compras` (P23 de `00_global.yaml` pasa a respondible) y `docs/ARCHITECTURE.md`",
+        "Se responde por el MCP, sin explicarle nada: «¿qué contratos llevan más de tres semanas enviados sin firmar y desde cuándo?» con la fecha real del envío",
+        "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 11,
+      "branch": "feature/F-132-estado-desde-rac"
     }
   ]
 }

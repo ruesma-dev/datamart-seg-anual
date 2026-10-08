@@ -75,6 +75,9 @@ DECLARADAS = {
     # F-056 (2026-09-26): el plan de cuentas, por las dos vias de R7: el par
     # (empresa, codigo) y la clave legible.
     "contabilidad.plan_cuentas": (("empresa_id", "codigo_cuenta"), ("clave_cuenta",)),
+    # F-085 (2026-10-07, design §7 aprobado por el humano): el login del usuario
+    # de Sigrid, unico sin distinguir mayusculas (233 de 233, medido).
+    "personal.usuarios_sigrid": (("login",),),
 }
 
 #: Cuantas comprobaciones de clave alternativa hace `check-unicidad`: una por
