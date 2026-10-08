@@ -55,7 +55,7 @@ no en la nocturna.
 > imagen `r20261008-1204`, job comprobado. `ingest --table rac --full` SUCCESS
 > (2.518.253 filas, ~3 min de lectura + 69 s de firma) y `usu` (233; `delO` sin
 > problema). `build-compras` SUCCESS (516,7 s; `documento_procesos` 1.010.427 filas en
-> 40,2 s; la foto de F-067 tomó una observación más a las 10:19 UTC) · `build-personal`
+> 40,2 s; la foto de F-067 NO escribió nada: `raw.con` no era más nueva que la nocturna, R7 de F-067; corregido por F-132) · `build-personal`
 > SUCCESS (`usuarios_sigrid` 233) · `apply-grants` · `publicar-diccionario` **v45**
 > (207 objetos, 1.619 columnas) · `check-diccionario` OK · MCP reiniciado
 > (`--0000014`, Healthy, sirve la v45). **Verificado por el MCP**: la FR26/10025 da los
