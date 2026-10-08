@@ -18,7 +18,9 @@ T1-T11 de código y documentos, T12-T14 MANUAL (humano), T15 informe, T16 init.
 **Review pasada 1 (CHANGES_REQUESTED) atendida**: ficha de `raw.rac` sin «con el
 mismo filtro», aserción que lo vigila en `test_f085_r25_*` (RED pegado en
 `impl_F-085.md` §8), frase de «Evidencias» sobre `SUB_PASOS` corregida (0 mutantes)
-y test `r15` con su id. Pendiente de la pasada 2.
+y test `r15` con su id (commit `0f7b79f`). `bash harness/init.sh` sobre `0f7b79f`:
+**VERDE**, 7.133 passed, 228 skipped (18 min 4 s), cobertura 100 % (74/74), impl 219/220.
+Pendiente de la pasada 2.
 
 **Estado**: implementación TERMINADA, pendiente del reviewer. T1-T11, T15 y T16 hechas (`init.sh` final VERDE sobre `1ced67b`: 7.132 passed, cobertura 100 %); T12-T14 son MANUAL del humano (comandos en `progress/impl_F-085.md` §6). Mutación: 20/20 muertos (`progress/mutacion_F-085.md`) (T9, la ficha de `personal.usuarios_sigrid`, entró con su SQL en el commit de T7). T1 hecha (RED: `progress/impl_F-085.md`).
 
