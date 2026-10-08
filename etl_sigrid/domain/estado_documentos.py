@@ -28,7 +28,7 @@ LA REGLA LA EJECUTA SQL (`sql/compras/13_estado_documentos.sql`), y aquí está
 escrita **una sola vez** como oráculo puro: los literales —las familias, los
 estados iniciales y los tres orígenes— viven aquí y `tests/test_f132_sql.py`
 comprueba que el SQL lleva LOS MISMOS. Mismo patrón que
-`domain/documento_procesos.py` (F-085) y `domain/historial_estados.py` (F-067).
+`domain/documento_procesos.py` (F-085) y que el oráculo de la foto de F-067.
 
 Capa `domain`: sin un solo import de infraestructura ni de configuración.
 """
