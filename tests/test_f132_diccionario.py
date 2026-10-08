@@ -18,6 +18,8 @@ import unicodedata
 from functools import lru_cache
 from pathlib import Path
 
+import pytest
+
 from etl_sigrid.domain.estado_documentos import (
     FAMILIAS_ESTADO,
     ORIGENES_FECHA,
@@ -143,3 +145,73 @@ def test_f132_r18_vista_los_envios_antiguos_sin_cerrar() -> None:
 
 def test_f132_r18_vista_el_nombre_es_dato_personal() -> None:
     assert "dato personal" in _texto_columna(VISTA, "nombre_usuario")
+
+
+# ===========================================================================
+# R18 · las demás fichas de `compras`: la fecha del cambio sale de `rac`
+# ===========================================================================
+
+
+def test_f132_r18_contratos_la_antiguedad_sale_de_rac() -> None:
+    texto = _plano(_ficha("compras.contratos").descripcion)
+    assert "sigrid no guarda cuando cambio" not in texto
+    assert "foto diaria" not in texto
+    assert "compras.v_estado_documentos" in texto
+    assert "rac" in texto and "f-132" in texto
+
+
+def test_f132_r18_contratos_el_ejemplo_de_tres_semanas_da_la_fecha_del_envio() -> None:
+    ejemplos = [_plano(e) for e in _ficha("compras.contratos").ejemplos_preguntas]
+    tres_semanas = [e for e in ejemplos if "tres semanas" in e]
+    assert len(tres_semanas) == 1, tres_semanas
+    assert "despliegue" not in tres_semanas[0] and "foto" not in tres_semanas[0]
+    assert "desde cuando" in tres_semanas[0]
+    assert "compras.v_estado_documentos" in tres_semanas[0]
+
+
+@pytest.mark.parametrize(
+    "nombre", ["compras.historial_estados", "compras.historial_estados_fotos"]
+)
+def test_f132_r18_la_foto_es_el_respaldo_en_contraste(nombre: str) -> None:
+    texto = _plano(_ficha(nombre).descripcion)
+    assert "respaldo" in texto and "f-132" in texto
+    assert "contraste-estados" in texto
+    assert "compras.v_estado_documentos" in texto
+    for frase in ("lo unico del datamart que sabe", "esa fecha no existe",
+                  "no existe en sigrid", "no hay copia en sigrid"):
+        assert frase not in texto, frase
+
+
+def test_f132_r18_historial_lo_que_solo_ve_la_foto_es_el_deshacer() -> None:
+    texto = _plano(_ficha("compras.historial_estados").descripcion)
+    assert "deshacer" in texto or "deshech" in texto
+    # Lo que F-067 fija de la foto sigue siendo cierto y se mantiene.
+    assert "no se reconstruye" in texto
+    assert "la historia empieza el dia del despliegue" in texto
+
+
+def test_f132_r18_historial_el_cambio_de_estado_se_pregunta_a_la_vista() -> None:
+    ejemplos = " | ".join(_plano(e) for e in _ficha("compras.historial_estados").ejemplos_preguntas)
+    assert "cuando cambio de estado la factura x" not in ejemplos
+
+
+def test_f132_r18_fn_sigrid_tiempo_remite_a_la_vista_desde_rac() -> None:
+    texto = _plano(_ficha("compras.fn_sigrid_tiempo").descripcion)
+    assert "compras.v_estado_documentos" in texto
+    assert "rac" in texto and "f-132" in texto
+    assert "(f-067)" not in texto
+
+
+# ===========================================================================
+# R19 · la ficha de `raw.conest`
+# ===========================================================================
+
+
+def test_f132_r19_conest_ya_no_dice_que_nadie_guarde_el_cuando() -> None:
+    ficha = _ficha("raw.conest")
+    texto = _plano(f"{ficha.descripcion} {ficha.motivo_no_consumo or ''}")
+    assert "ni esta tabla ni ninguna otra guardan" not in texto
+    assert "aproximacion" not in texto
+    assert "tiemod" not in texto and "ultima modificacion" not in texto
+    assert "rac" in texto and "compras.v_estado_documentos" in texto
+    assert "lo resolvera f-067" not in texto

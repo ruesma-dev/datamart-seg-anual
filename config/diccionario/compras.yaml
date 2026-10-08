@@ -208,7 +208,7 @@ objetos:
       `importe_contrato`, que no existe. El importe comprometido esta en
       `compras.v_pbi_contrato_consumo.importe_contratado`.
 
-      **EL ESTADO (F-084, 2026-09-16) Y SU ANTIGUEDAD (F-067, 2026-10-06).**
+      **EL ESTADO (F-084, 2026-09-16) Y SU ANTIGUEDAD (F-132, 2026-10-08).**
 
       **SI se puede: en que estado esta cada contrato.** Desde F-084 esta
       tabla publica `estado`, `estado_codigo` y `estado_id`. «Que contratos
@@ -216,13 +216,13 @@ objetos:
       `estado_codigo = 'EPF'`: son **818**, de **567 proveedores** y **241
       obras**, medido el 2026-09-16.
 
-      **Y CUANTO LLEVA EN ESE ESTADO, desde F-067: en
-      `compras.v_estado_documentos`**, no aqui. Sigrid no guarda cuando cambio
-      el estado, asi que el datamart toma una FOTO DIARIA de estados desde el
-      dia del despliegue de F-067 (`compras.historial_estados`). La
-      antiguedad de lo que ya estaba en su estado ese dia es un MINIMO, y
-      «mas de tres semanas enviado» es una respuesta cierta en cuanto ese
-      minimo supera 21 dias; la vista lo explica. **NO uses
+      **Y DESDE CUANDO ESTA EN ESE ESTADO: en
+      `compras.v_estado_documentos`**, no aqui. La fecha sale de `rac`, la
+      ventana «Procesos» de Sigrid (`compras.documento_procesos`, F-085): el
+      ultimo paso del contrato da al segundo cuando entro en su estado actual
+      y quien lo dio; «enviado hace mas de tres semanas» es
+      `dias_en_estado > 21` con la fecha real del envio (F-132). La vista
+      explica los pocos casos sin fecha. **NO uses
       `fecha_ultima_modificacion` (`con.tiemod`) para la antiguedad: NO es la
       fecha del cambio de estado**, es la ultima modificacion del documento,
       y la firma no la mueve.
@@ -405,9 +405,9 @@ objetos:
       - Que contratos estan enviados y sin firmar
       - Cuantos contratos hay en cada estado, y cuantos sin firmar todavia
       - >-
-        Que contratos llevan mas de tres semanas enviados sin firmar (con
-        `compras.v_estado_documentos`: la antiguedad cuenta desde el despliegue
-        de la foto diaria)
+        Que contratos llevan mas de tres semanas enviados sin firmar y desde
+        cuando (con `compras.v_estado_documentos`: la fecha del envio sale de
+        `rac`)
       - Que forma de pago y que retencion de garantia tiene el contrato C
 
   contrato_lineas:
@@ -1718,7 +1718,7 @@ objetos:
       2026-10-06**: SQL Server convierte el mismo numero con la epoca
       1900-01-01 y da DOS DIAS MAS; la buena es esta. Y `con.tiemod` NO es la
       fecha del cambio de estado: la antiguedad del estado esta en
-      `compras.v_estado_documentos` (F-067).
+      `compras.v_estado_documentos`, que la saca de `rac` (F-132).
     grano: null
     clave_negocio: []
     paso_etl: build_compras
@@ -3377,18 +3377,22 @@ objetos:
     descripcion: >-
       La FOTO DIARIA de estados de contratos (tipo 44) y facturas (tipo 15),
       guardada POR TRAMOS: cada fila dice que un documento estuvo en un estado
-      desde una foto hasta otra (F-067). Es lo unico del datamart que sabe
-      CUANDO cambio de estado un documento, porque en Sigrid esa fecha NO
-      EXISTE: `concam` no audita el estado y `confir` no tiene firmas de
-      contrato. **ES HISTORIA QUE NO SE RECONSTRUYE**: el resto de `compras` se
-      rehace cada noche y esta tabla no; si se borrara, la historia volveria a
-      empezar de cero, porque no hay copia en Sigrid. Tampoco la borra `python
-      main.py reset-compras`, que vacia el resto del esquema y la conserva. **LA HISTORIA EMPIEZA EL
-      DIA DEL DESPLIEGUE** de F-067: lo anterior no esta. La primera foto es la
-      LINEA BASE (`es_linea_base`): «ya estaba en ese estado; desde cuando, no
-      se sabe». **La foto de un dia D** se reconstruye con `desde <= D AND (hasta
-      IS NULL OR hasta > D)`. Para el estado ACTUAL y los dias que lleva, usa
-      `compras.v_estado_documentos`, que ya hace la cuenta. Y NO uses
+      desde una foto hasta otra (F-067). **HOY ES UN RESPALDO EN CONTRASTE
+      (F-132)**: la fecha en que un documento cambio de estado la da `rac`, al
+      segundo y con usuario, y la publica `compras.v_estado_documentos`; esta
+      foto se sigue tomando mientras `python main.py contraste-estados` la
+      compara con `rac`, y el humano decidira si se retira. Lo unico que ve la
+      foto y `rac` no: el dia en que alguien DESHIZO un paso («Deshacer proceso»
+      borra el paso en Sigrid; la historia bruta esta en `dbo.log`, F-105).
+      **ES HISTORIA QUE NO SE RECONSTRUYE**: el resto de `compras` se rehace
+      cada noche y esta tabla no; si se borrara, la historia de la foto
+      volveria a empezar de cero. Tampoco la borra `python main.py
+      reset-compras`, que vacia el resto del esquema y la conserva. **LA
+      HISTORIA EMPIEZA EL DIA DEL DESPLIEGUE** de F-067: lo anterior no esta.
+      La primera foto es la LINEA BASE (`es_linea_base`). **La foto de un dia
+      D** se reconstruye con `desde <= D AND (hasta IS NULL OR hasta > D)`.
+      Para el estado ACTUAL y desde cuando, usa `compras.v_estado_documentos`.
+      Y NO uses
       `compras.contratos.fecha_ultima_modificacion` como fecha del cambio de
       estado: es la ultima modificacion del documento, que la firma no mueve.
     grano: >-
@@ -3459,9 +3463,8 @@ objetos:
           antes `tipo_documento_codigo` (44 a `compras.contratos.contrato_id`,
           15 a `compras.facturas.factura_id`).
     ejemplos_preguntas:
-      - Cuando cambio de estado la factura X y por que estados ha pasado
-      - Cuantos contratos han pasado a firmado esta semana
-      - En que estado estaba el contrato C el dia D
+      - En que estado vio la foto diaria el contrato C la noche D
+      - Que cambios de estado vio la foto que `rac` no explica
 
   historial_estados_fotos:
     tipo: tabla
@@ -3474,7 +3477,10 @@ objetos:
       despliegue) y si la historia tiene HUECOS (una noche sin fila es una
       noche en que la foto no se tomo, y el cambio de esos dias se vio con dos
       noches de ventana). **NO SE RECONSTRUYE**, como
-      `compras.historial_estados`, y `reset-compras` tambien la conserva.
+      `compras.historial_estados`, y `reset-compras` tambien la conserva. Como
+      ella, **hoy es un RESPALDO EN CONTRASTE (F-132)**: la fecha del cambio de
+      estado la da `rac` en `compras.v_estado_documentos`, y `python main.py
+      contraste-estados` recorre estas fotos para compararlas con `rac`.
     grano: Una fila por foto tomada. Clave `observado_en`.
     clave_negocio: [observado_en]
     paso_etl: build_compras
