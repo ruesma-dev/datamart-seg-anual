@@ -15,7 +15,7 @@ Solo la Fase A (T1-T15 de `specs/F-132-estado-desde-rac/tasks.md`); la B espera 
 D7 del humano tras el contraste (hasta el 2026-10-22). La foto de F-067 sigue
 construyéndose igual: ni DROP, ni TRUNCATE, ni DELETE sobre sus dos tablas.
 
-- **Tarea en curso**: T11 (azure-apps). Hechas: T1-T10. Diccionario v46. `init.sh` de arranque sobre 4d25fcb: VERDE (7.133 passed, 228 skipped, 46 min 57 s).
+- **Tarea en curso**: T12 (mutación). Hechas: T1-T11 (`azure-apps` 89f63d5, sin push). Diccionario v46. `init.sh` de arranque sobre 4d25fcb: VERDE (7.133 passed, 228 skipped, 46 min 57 s).
 - **Entorno**: `init.sh` de arranque lanzado sobre 4d25fcb en el árbol principal;
   para no ensuciarlo (el barrido de dataclasses de F-006 ve módulos nuevos de
   `domain/` si aparecen con la suite corriendo, como pasó en F-085), el trabajo se
