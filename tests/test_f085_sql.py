@@ -128,7 +128,7 @@ def test_f085_r2_el_comentario_de_usu_da_el_motivo_de_cada_exclusion() -> None:
 
 
 def test_f085_r4_el_censo_pasa_a_72_sin_conpro_rol_ni_log() -> None:
-    assert len(_tablas()) == 72
+    assert len(_tablas()) == 74  # +2 de F-090 (`rcg`, `gra`)
     assert "usu" in _tablas()
     for tabla in ("conpro", "rol", "log"):
         assert tabla not in _tablas(), f"`{tabla}` no se da de alta (D5, D8)"
