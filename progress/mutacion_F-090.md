@@ -1,14 +1,7 @@
 <!-- progress/mutacion_F-090.md -->
 # F-090 · Campaña de mutación
 
-Generado por `python -m harness.mutacion --feature F-090` el 2026-10-09 20:03.
-
-> ## ⚠ CAMPAÑA NO VÁLIDA
->
-> La línea base de cierre EXPIRÓ en C:/Users/pgris/AppData/Local/Temp/mutacion_F-090_t8k7oswg/wk_0: se agotaron los 600 s concedidos. Ojo, la suite NO falló y NO hay ningún test roto que buscar: se quedó sin tiempo, que es otra cosa. Aun así los números de esta campaña no valen, porque no se ha podido comprobar que la base siguiera verde al terminar.
-  Qué hacer: baja los workers (--workers N: cada worker corre una suite entera y todas compiten por la misma máquina) o sube el SUELO 'mutacion.timeout_por_mutante_s' de harness/rigor.json. No toques la suite.
->
-> **No cierres la feature con estos números.** Arregla la línea base y repite la campaña.
+Generado por `python -m harness.mutacion --feature F-090` el 2026-10-09 21:18.
 
 ## Alcance
 
@@ -30,14 +23,16 @@ Origen del diff: **rama** (`75389c5af065e84dcc9d8dccd7a70d4b74c480a8` .. `featur
 | Supervivientes | 0 |
 | Timeouts | 0 |
 | Sin veredicto (base rota) | 0 |
-| Tiempo total | 3567.5 s |
-| SHA de HEAD medido | `a2b873f1db1b112381266cd4074dade7b88d2ed8` |
-| Línea base (s) — `C:/Users/pgris/AppData/Local/Temp/mutacion_F-090_t8k7oswg/wk_0` | 534.9 |
-| Línea base (s) — `C:/Users/pgris/AppData/Local/Temp/mutacion_F-090_t8k7oswg/wk_1` | 530.8 |
-| Media por mutante evaluado (s) | 445.9 |
-| Timeout efectivo por mutante (s) | 1070 — derivado de la línea base × 2.0 |
-| Suelo configurado (s) | 120 |
-| Workers | 2 |
+| Tiempo total | 2427.0 s |
+| SHA de HEAD medido | `b88fdbbac3aae908033f2a3bc71132dd0d918943` |
+| Línea base (s) — `C:/Users/pgris/AppData/Local/Temp/mutacion_F-090_569ab_po/wk_0` | 708.2 |
+| Línea base (s) — `C:/Users/pgris/AppData/Local/Temp/mutacion_F-090_569ab_po/wk_1` | 714.3 |
+| Línea base (s) — `C:/Users/pgris/AppData/Local/Temp/mutacion_F-090_569ab_po/wk_2` | 722.6 |
+| Línea base (s) — `C:/Users/pgris/AppData/Local/Temp/mutacion_F-090_569ab_po/wk_3` | 709.2 |
+| Media por mutante evaluado (s) | 303.4 |
+| Timeout efectivo por mutante (s) | 1800 — fijado a mano con `--timeout`, sin derivar |
+| Suelo configurado (s) | 1800 |
+| Workers | 4 |
 | Muestreo | no: campaña completa |
 
 ## Supervivientes
