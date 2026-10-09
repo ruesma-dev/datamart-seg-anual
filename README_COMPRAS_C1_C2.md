@@ -50,12 +50,14 @@ python main.py inspect-albaranes-sin-facturar --obra 0707
 ```
 
 `build-compras` NO requiere stage: lee de raw directamente.
-Para reconstruir: `reset-compras` + `build-compras`. Desde F-067
-(2026-10-06) `reset-compras` **conserva la foto diaria de estados**
-(`compras.historial_estados` e `historial_estados_fotos`): borra el resto del
-esquema, no el esquema entero. Desde F-132 la antigüedad del estado sale de
-`rac` (`compras.v_estado_documentos`, al segundo y con usuario) y la foto es un
-respaldo mientras dura el contraste (`python main.py contraste-estados`).
+Para reconstruir: `reset-compras` + `build-compras`. `reset-compras` vacía el
+esquema (vistas, tablas y funciones) sin tirarlo. Desde F-132 la antigüedad del
+estado sale de `rac` (`compras.v_estado_documentos`, al segundo y con usuario).
+La foto diaria de estados de F-067 (`compras.historial_estados` e
+`historial_estados_fotos`), que `reset-compras` conservaba, se retiró en la
+Fase B de F-132 (2026-10-09): ya no se construye, y sus dos tablas se borran una
+vez, a mano, con `python main.py retirar-foto-estados --confirmar` (sin
+`--confirmar` solo dice qué borraría).
 
 ## Modelo
 

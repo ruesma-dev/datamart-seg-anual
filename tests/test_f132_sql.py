@@ -1,7 +1,7 @@
 # tests/test_f132_sql.py
 """
 F-132 · `compras.v_estado_documentos` desde `rac` (`13_estado_documentos.sql`)
-y lo que deja de hacer `11_historial_estados.sql`, sobre su TEXTO.
+sobre su TEXTO.
 
 Los SQL construyen objetos en un Postgres **compartido con producción**, así
 que aquí no se ejecutan: se leen. Mismo criterio que `tests/test_f085_sql.py`.
@@ -13,13 +13,12 @@ LO QUE ESTE FICHERO DEFIENDE:
 2. **Los literales del SQL son los del dominio** (R11,
    `domain/estado_documentos.py`): las familias, los estados iniciales y los
    tres orígenes.
-3. **La foto de F-067 no cambia ni una línea ejecutable** (R10): `11` solo
-   pierde la vista.
+3. La foto de F-067 (`11_historial_estados.sql`) ya no existe: la retiró la
+   Fase B (`tests/test_f132_retirada.py`).
 """
 
 from __future__ import annotations
 
-import hashlib
 import re
 from functools import cache
 from pathlib import Path
@@ -33,7 +32,6 @@ from etl_sigrid.domain.estado_documentos import (
 RAIZ = Path(__file__).resolve().parents[1]
 DIRECTORIO_SQL = RAIZ / "etl_sigrid" / "infrastructure" / "postgres" / "sql"
 RUTA_VISTA = DIRECTORIO_SQL / "compras" / "13_estado_documentos.sql"
-RUTA_FOTO = DIRECTORIO_SQL / "compras" / "11_historial_estados.sql"
 
 #: Lo que publica la vista, EN ORDEN (R2, D4 del humano).
 COLUMNAS_VISTA = (
@@ -53,13 +51,6 @@ COLUMNAS_VISTA = (
     "usuario",
     "nombre_usuario",
 )
-
-#: La huella de lo EJECUTABLE de `11_historial_estados.sql` (sin comentarios y
-#: con los blancos plegados) SIN la vista, medida sobre 4d25fcb antes de F-132:
-#: las dos tablas, el índice y el bloque `DO` de la foto. Si cambia, alguien
-#: ha tocado la foto, y la Fase A no lo hace (R10).
-HUELLA_FOTO = "dce136a1f998087e525dc3be77667194debb19ea7776dc920176d751111865f8"
-
 
 @cache
 def _texto(ruta: Path) -> str:
@@ -104,7 +95,7 @@ def _alias(elemento: str) -> str:
 
 
 # ===========================================================================
-# R10 · el fichero, su sitio y lo que deja de hacer `11`
+# R10 · el fichero y su sitio
 # ===========================================================================
 
 
@@ -129,22 +120,9 @@ def test_f132_r10_la_cabecera_dice_por_que_va_detras_de_12() -> None:
     assert "historia NETA" in cabecera
 
 
-def test_f132_r10_la_foto_ya_no_crea_la_vista() -> None:
-    assert "v_estado_documentos" not in _compacto(_texto(RUTA_FOTO))
-
-
-def test_f132_r10_la_foto_no_cambia_ni_una_linea_ejecutable() -> None:
-    huella = hashlib.sha256(_compacto(_texto(RUTA_FOTO)).encode()).hexdigest()
-    assert huella == HUELLA_FOTO
-
-
-def test_f132_r10_la_cabecera_de_la_foto_la_presenta_como_respaldo() -> None:
-    texto = _texto(RUTA_FOTO)
-    cabecera = re.sub(r"\s+", " ", texto[: texto.index("CREATE TABLE")])
-    assert "F-132" in cabecera
-    assert "RESPALDO" in cabecera
-    assert "La fecha en que un documento cambia de estado no está en Sigrid" not in cabecera
-    assert "QUE NO EXISTE EN SIGRID" not in cabecera
+# Los tres tests de `11_historial_estados.sql` de la Fase A (la foto ya no crea
+# la vista, su huella ejecutable y su cabecera de «respaldo») se RETIRAN con el
+# fichero: la Fase B de F-132 lo borró (2026-10-09, `tests/test_f132_retirada.py`).
 
 
 # ===========================================================================
@@ -296,7 +274,7 @@ def test_f132_r10_compras_acaba_en_la_vista_detras_de_documento_procesos() -> No
 
     subs = build_compras_step.SUB_PASOS
     assert [s.sql_file for s in subs][-3:] == [
-        "11_historial_estados.sql", "12_documento_procesos.sql", "13_estado_documentos.sql",
+        "10_necesidades.sql", "12_documento_procesos.sql", "13_estado_documentos.sql",
     ]
     ultimo = subs[-1]
     assert ultimo.name == "estado_documentos"

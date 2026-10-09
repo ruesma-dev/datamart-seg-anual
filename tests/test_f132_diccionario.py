@@ -170,30 +170,23 @@ def test_f132_r18_contratos_el_ejemplo_de_tres_semanas_da_la_fecha_del_envio() -
     assert "compras.v_estado_documentos" in tres_semanas[0]
 
 
+# Fase A fijaba aquí que las fichas de la foto la presentaban como RESPALDO en
+# contraste. La Fase B (rama BORRAR, 2026-10-09) retira la foto y sus fichas.
+
+
 @pytest.mark.parametrize(
     "nombre", ["compras.historial_estados", "compras.historial_estados_fotos"]
 )
-def test_f132_r18_la_foto_es_el_respaldo_en_contraste(nombre: str) -> None:
-    texto = _plano(_ficha(nombre).descripcion)
-    assert "respaldo" in texto and "f-132" in texto
-    assert "contraste-estados" in texto
-    assert "compras.v_estado_documentos" in texto
-    for frase in ("lo unico del datamart que sabe", "esa fecha no existe",
-                  "no existe en sigrid", "no hay copia en sigrid"):
-        assert frase not in texto, frase
+def test_f132_r26_las_fichas_de_la_foto_ya_no_estan(nombre: str) -> None:
+    assert nombre not in _diccionario().por_nombre
 
 
-def test_f132_r18_historial_lo_que_solo_ve_la_foto_es_el_deshacer() -> None:
-    texto = _plano(_ficha("compras.historial_estados").descripcion)
-    assert "deshacer" in texto or "deshech" in texto
-    # Lo que F-067 fija de la foto sigue siendo cierto y se mantiene.
-    assert "no se reconstruye" in texto
-    assert "la historia empieza el dia del despliegue" in texto
-
-
-def test_f132_r18_historial_el_cambio_de_estado_se_pregunta_a_la_vista() -> None:
-    ejemplos = " | ".join(_plano(e) for e in _ficha("compras.historial_estados").ejemplos_preguntas)
-    assert "cuando cambio de estado la factura x" not in ejemplos
+def test_f132_r28_ninguna_pregunta_espera_la_foto() -> None:
+    esperan = [
+        p["id"] for p in _global()["preguntas_aceptacion"]
+        if any(o.startswith("compras.historial_estados") for o in p["objetos_esperados"])
+    ]
+    assert esperan == []
 
 
 def test_f132_r18_fn_sigrid_tiempo_remite_a_la_vista_desde_rac() -> None:
@@ -331,22 +324,45 @@ def test_f132_r22_ningun_texto_vigente_afirma_que_sigrid_no_guarda_el_cuando() -
     assert hallazgos == [], "\n".join(hallazgos)
 
 
+# R21 y R28 · Fase B: los textos dicen que la foto se RETIRÓ, no que es un
+# respaldo en contraste (eso fue la Fase A).
+
+#: Lo que decían los textos durante la Fase A y ya es falso.
+FRASES_FASE_A = ("como respaldo", "respaldo en contraste", "mientras dura el contraste",
+                 "sigue construyendose", "conserva la foto")
+
+
 def test_f132_r21_tables_sigrid_c3_la_antiguedad_sale_de_rac() -> None:
     texto = _plano_codigo((RAIZ / "config" / "tables_sigrid.yaml").read_text(encoding="utf-8"))
     bloque = texto.split("lo que sigrid no guarda", 1)[1][:3000]
     assert "f-132" in bloque and "compras.v_estado_documentos" in bloque
-    assert "respaldo" in bloque
+    assert "se retiro" in bloque
+    for frase in FRASES_FASE_A:
+        assert frase not in bloque, frase
 
 
-def test_f132_r21_architecture_la_antiguedad_sale_de_rac() -> None:
+def test_f132_r28_architecture_describe_lo_que_queda() -> None:
     texto = _plano_codigo((RAIZ / "docs" / "ARCHITECTURE.md").read_text(encoding="utf-8"))
     assert "f-132" in texto and "13_estado_documentos.sql" in texto
-    assert "contraste-estados" in texto and "respaldo" in texto
+    assert "retirar-foto-estados --confirmar" in texto
+    assert "11_historial_estados.sql" in texto, "dice que existió y que ya no está"
+    for frase in FRASES_FASE_A:
+        assert frase not in texto, frase
 
 
 def test_f132_r21_readme_compras_la_antiguedad_sale_de_rac() -> None:
     texto = _plano_codigo((RAIZ / "README_COMPRAS_C1_C2.md").read_text(encoding="utf-8"))
-    assert "f-132" in texto and "rac" in texto and "respaldo" in texto
+    assert "f-132" in texto and "rac" in texto
+    assert "retirar-foto-estados --confirmar" in texto
+    for frase in FRASES_FASE_A:
+        assert frase not in texto, frase
+
+
+def test_f132_r28_la_version_sube_a_47_con_su_historia() -> None:
+    assert int(_diccionario().version) >= 47
+    texto = (DIR_DICCIONARIO / "00_global.yaml").read_text(encoding="utf-8")
+    historia = texto.split("\nversion:", 1)[0]
+    assert "# version 47 (F-132 Fase B, 2026-10-09)" in historia
 
 
 # ===========================================================================
@@ -363,6 +379,9 @@ def test_f132_r23_azure_apps_recoge_f132_y_f067_sin_la_premisa() -> None:
     texto = DOC_AZURE_APPS.read_text(encoding="utf-8")
     f132 = texto.split("(F-132, 2026-10-08)", 1)[1].split(_SECCION, 1)[0]
     assert "13_estado_documentos.sql" in f132 and "contraste-estados" in f132
+    # Fase B (R28): la foto se retira y lo dice, con el comando que la borra.
+    assert "retirar-foto-estados --confirmar" in f132
+    assert "versión 47" in f132
     for columna in COLUMNAS_VISTA:
         assert f"`{columna}`" in f132, columna
     f067 = texto.split("(F-067, 2026-10-06)", 1)[1].split(_SECCION, 1)[0]
