@@ -447,7 +447,11 @@ ESTADOS_BATERIA = ("respondible", "parcial", "bloqueada")
 #: Romero. P23 («más de tres semanas») es PARCIAL hasta 21 días después del
 #: desplegar la foto diaria; P24-P26 se responden ya. Quedan 21 respondibles,
 #: 3 parciales y 2 bloqueadas de 26.
-PARCIALES = {"P3", "P14", "P23"}
+#:
+#: F-132 (2026-10-08): P23 pasa a respondible: la fecha del envío sale de `rac`
+#: (`compras.v_estado_documentos`). Quedan 22 respondibles, 2 parciales y 2
+#: bloqueadas de 26.
+PARCIALES = {"P3", "P14"}
 BLOQUEADAS = {"P4", "P17"}
 
 
@@ -479,7 +483,7 @@ def test_f006_r41_bateria_el_recuento_honesto_es_trece_tres_y_dos() -> None:
 
     assert por_estado["parcial"] == PARCIALES
     assert por_estado["bloqueada"] == BLOQUEADAS
-    assert len(por_estado["respondible"]) == 21
+    assert len(por_estado["respondible"]) == 22
 
 
 def test_f006_r41_bateria_lo_no_respondible_dice_que_feature_lo_desbloquea() -> None:

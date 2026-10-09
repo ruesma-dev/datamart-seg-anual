@@ -3,7 +3,9 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **120 features**, 69 abiertas, 51 terminadas.
+Resumen: **122 features**, 71 abiertas, 51 terminadas.
+
+En curso: **F-132**.
 
 ## Trabajo abierto
 
@@ -18,7 +20,9 @@ Resumen: **120 features**, 69 abiertas, 51 terminadas.
 | F-130 | Las condiciones y el texto de la oferta y del comparativo (forma de pago, recargos y retenciones de dcorec, cláusulas), y si pasan igual al contrato y a las facturas | 8 | pendiente | estandar | `feature/F-130-condiciones-y-texto-oferta` |
 | F-090 | El documento adjunto de la factura y el índice de gráficos asociados de comparativos y ofertas: lo que permite contrastar el original contra lo registrado en Sigrid | 9 | pendiente | estandar | `feature/F-090-documento-adjunto` |
 | F-037 | Esquema tesoreria: el flujo de caja que hoy se tira | 10 | pendiente | critico | `feature/F-037-tesoreria` |
-| F-132 | La antigüedad del estado de contratos y facturas sale de rac (desde 2008, al segundo y con usuario) y la foto diaria de F-067 se retira tras contrastarla | 11 | pendiente | estandar | `feature/F-132-estado-desde-rac` |
+| F-132 | La antigüedad del estado de contratos y facturas sale de rac (desde 2008, al segundo y con usuario) y la foto diaria de F-067 se retira tras contrastarla | 11 | en curso | estandar | `feature/F-132-estado-desde-rac` |
+| F-133 | Los procesos de los ALBARANES (con proformas y notas) en el historial de procesos: quién los comprueba y contabiliza y cuándo | 11 | pendiente | estandar | `feature/F-133-procesos-albaranes` |
+| F-134 | Quién registró cada albarán, factura y contrato y cuándo: el empleado de la cabecera y la fecha y hora de alta | 11 | pendiente | estandar | `feature/F-134-empleado-alta-documento` |
 | F-111 | Los nombres de partida se resuelven por codigo en los niveles del arbol y en la dimension de costes indirectos: 10.593 filas con un escalon con el nombre de otra partida | 12 | spec lista | estandar | `feature/F-111-nombres-partida-por-ancestro` |
 | F-121 | El recurso principal de cada recurso auxiliar (campo extendido «Recurso asociado» de Sigrid): a que trabajador va cada vehiculo | 13 | pendiente | estandar | `feature/F-121-recurso-principal-auxiliar` |
 | F-114 | Rescatar dos peticiones de `mcp-bbdd` que solo vivian en la rama `dev`: la regla de las columnas `_raw` y el orden de magnitud de `stg.presupuesto` | 14 | pendiente | estandar | `feature/F-114-avisos-mcp-rescatados` |
@@ -193,9 +197,21 @@ Nacida el 2026-08-20 del analisis de dominio de F-006. Hacer el flujo de caja de
 
 ### F-132 · La antigüedad del estado de contratos y facturas sale de rac (desde 2008, al segundo y con usuario) y la foto diaria de F-067 se retira tras contrastarla
 
-estado **pendiente** · prioridad 11 · rigor `estandar` · SDD sí · rama `feature/F-132-estado-desde-rac`
+estado **en curso** · prioridad 11 · rigor `estandar` · SDD sí · rama `feature/F-132-estado-desde-rac`
 
 Nace el 2026-10-07 de la decisión D7 de F-085, aprobada por el humano («es necesaria la foto diaria si aquí ya está quién hizo los cambios?»). F-067 (desplegada el 2026-10-07, imagen r20261007-0850) montó una FOTO DIARIA de estados (`compras.historial_estados`, `historial_estados_fotos`, línea base 2026-10-07 ~07:02 UTC) porque se daba por hecho que Sigrid no guarda cuándo cambia el estado de un documento: lo dicen `config/tables_sigrid.yaml` (bloque C3 de F-066), la ficha de `compras.historial_estados` y `docs/ARCHITECTURE.md`. LA SPEC DE F-085 LO DESMIENTE (progress/spec_F-085.md §2): `rac` es la historia neta de estados de cada documento, con `est1`->`est2`, usuario, fecha y hora desde 2008; el último paso coincide con `con.est` en el 99,96 % de las facturas, 99,99 % de los contratos y 99,98 % de los comparativos, y los documentos sin pasos están en su estado inicial. Ejemplo de lo que cambia: 809 contratos en EPF, 785 con más de 21 días, que `compras.v_estado_documentos` hoy presenta como «al menos 0 días» hasta el 2026-10-28. Lo único que solo ve la foto: un estado cambiado sin proceso y un paso deshecho (Sigrid borra el paso de `rac`; ~70 documentos). DEPENDE DE F-085 (`compras.documento_procesos` y `raw.rac` sin filtro).
+
+### F-133 · Los procesos de los ALBARANES (con proformas y notas) en el historial de procesos: quién los comprueba y contabiliza y cuándo
+
+estado **pendiente** · prioridad 11 · rigor `estandar` · SDD no · rama `feature/F-133-procesos-albaranes`
+
+Nace el 2026-10-08 de un correo de **Juan Romero** (Dir. Administración y Control de Costes) pasado por el humano («apunta esta petición de Juan»): «Para poder medir la CARGA DE TRABAJO del departamento de Administración con datos de Sigrid, necesitaría dos cosas más en el datamart». Juan añade: «Si alguno de estos datos solo está en el log de Sigrid (lo que tenéis como F-105), dime y lo hablamos». PETICIÓN 1: «Hoy `compras.documento_procesos` solo recoge facturas, contratos, comparativos y obras. Los albaranes (incluidas proformas y notas) también pasan por los procesos de comprobar y contabilizar, así que te pediría incluirlos con el mismo detalle que las facturas: proceso, estado de origen y destino, usuario, fecha y hora.» ================ LO QUE YA SE SABE (comprobado al fichar, 2026-10-08): el dato ESTÁ en `rac` y YA se ingiere entero desde F-085 (desplegada el 2026-10-08): el tipo 14 (albarán) tiene 613.983 pasos de 305.813 documentos (`progress/spec_F-085.md` §1). F-085 lo dejó fuera solo por alcance (D2: «oferta, albarán y efecto no los ha pedido nadie; ampliar es tocar `FAMILIAS`»). Las proformas (serie PROF) y las notas (serie NTC) conviven con los albaranes en `dca` con el mismo `tip = 14` (F-093), así que entran solas. NO HACE FALTA `dbo.log` NI INGESTA NUEVA. Es añadir la familia ALBARAN al dominio y al SQL de `compras.documento_procesos` (`12_documento_procesos.sql`), con su ficha. A MEDIR: qué procesos y estados tiene el albarán, la cobertura, cuánto crece la tabla (~1,01 M -> ~1,6 M filas) y el sub-paso en la nocturna. OJO CON F-132: su vista de estados lee `documento_procesos` filtrando familias; añadir ALBARAN no debe cambiarla. Conviene hacerla DESPUÉS de cerrar F-132 o coordinar el orden de las ramas.
+
+### F-134 · Quién registró cada albarán, factura y contrato y cuándo: el empleado de la cabecera y la fecha y hora de alta
+
+estado **pendiente** · prioridad 11 · rigor `estandar` · SDD sí · rama `feature/F-134-empleado-alta-documento`
+
+Nace el 2026-10-08 de un correo de **Juan Romero** (Dir. Administración y Control de Costes) pasado por el humano («apunta esta petición de Juan»): «Para poder medir la CARGA DE TRABAJO del departamento de Administración con datos de Sigrid, necesitaría dos cosas más en el datamart». Juan añade: «Si alguno de estos datos solo está en el log de Sigrid (lo que tenéis como F-105), dime y lo hablamos». PETICIÓN 2: «Que se publique en la cabecera de albaranes (también proformas y notas), facturas y contratos el empleado/usuario asociado al documento, es decir, quien lo registró, junto con la fecha y hora de alta. Aunque en la práctica casi siempre coincida con quien lo comprueba, quiero tenerlo como dato propio del documento.» ================ LO QUE YA SE SABE (comprobado al fichar, 2026-10-08, en `azure-apps/sigrid_tablas.md` y `config/tables_sigrid.yaml`): `ctr`, `dca` y `dcf` tienen cada una `empide` («Empleado», índice a `emp`) y `hor` («Hora documento»), y las dos columnas YA SE INGIEREN (no están en `exclude_columns`). En la captura de Carmen Calle de la FR26/10025 la cabecera muestra «Empleado 29/0093478768 VARGAS VILLENA, JUAN MANUEL», que es `jmvargas`, el mismo que la comprueba en `rac`. LO QUE HAY QUE MEDIR ANTES DE PUBLICAR, porque es justo lo que pregunta Juan: (1) si `empide` es QUIEN REGISTRÓ el documento o un empleado asignado que se puede cambiar después; (2) si la fecha y hora de ALTA es `con.fec` + `hor` o si `hor` es la del documento del proveedor (F-132 midió que `con` no tiene hora de alta: «la fecha de alta es solo DÍA»); (3) contrastarlo con `dbo.log` operación 1 (alta), que guarda quién dio de alta y cuándo al segundo (`progress/spec_F-085.md` §3). Si el dato fiable solo está en `dbo.log`, se dice a Juan (lo pidió así) y esta feature espera a F-105 o la absorbe. DATOS PERSONALES: el empleado se publica como en `compras.documento_procesos` (login/nombre); el DNI solo en `personal` (D4 de F-085). Enlaza con `personal.usuarios_sigrid` (login <-> empleado).
 
 ### F-111 · Los nombres de partida se resuelven por codigo en los niveles del arbol y en la dimension de costes indirectos: 10.593 filas con un escalon con el nombre de otra partida
 

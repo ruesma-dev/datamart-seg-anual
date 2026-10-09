@@ -16,6 +16,7 @@ Encadena los archivos SQL en orden:
     10_necesidades.sql - el documento de necesidades de compra, el DPC (F-067)
     11_historial_estados.sql - la FOTO DIARIA de estados (F-067), PERSISTENTE
     12_documento_procesos.sql - el historial de PROCESOS de `rac` (F-085)
+    13_estado_documentos.sql - el estado actual y desde cuándo, de `rac` (F-132)
 
 Lee de `raw.*` y, como `03_views.sql`, de `maestro.v_obra_fichas` (de
 `build_maestros`, que corre antes en `run-all`). No necesita `stg` ni `mart`.
@@ -28,9 +29,10 @@ master 0 —las versiones que dan la base— están congeladas (F-038, design §
 
 `11` es distinto de todos los demás (F-067): sus dos tablas
 (`historial_estados` e `historial_estados_fotos`) NO se reconstruyen. Son la
-historia de estados de contratos y facturas, que no existe en Sigrid; el SQL
-las crea con `CREATE TABLE IF NOT EXISTS`, nunca las borra ni las vacía, y
-cada noche les añade la foto de la ingesta. No depende de nada del esquema; si
+foto diaria de estados de contratos y facturas, que desde F-132 es el RESPALDO
+de `rac` mientras dura el contraste (la antigüedad del estado la publica `13`);
+el SQL las crea con `CREATE TABLE IF NOT EXISTS`, nunca las borra ni las vacía,
+y cada noche les añade la foto de la ingesta. No depende de nada del esquema; si
 un sub-paso anterior falla, esa noche no hay foto y se ve en
 `historial_estados_fotos` (un hueco), no se pierde lo ya guardado.
 
@@ -38,6 +40,10 @@ un sub-paso anterior falla, esa noche no hay foto y se ve en
 pasos de `raw.rac` con dos ventanas por documento) y no lo necesita nadie del
 esquema, así que si fallara, la foto de esa noche ya está tomada. Lee `raw.rac`,
 `raw.con`, `raw.usu` y la función `fn_estado_documento` de `00_setup.sql`.
+
+`13` (F-132) va el ÚLTIMO porque la vista `compras.v_estado_documentos` lee
+`compras.documento_procesos`, y el `DROP TABLE ... CASCADE` de `12` se la lleva
+cada noche: `13` la vuelve a crear. Lee además las tres cabeceras (`01`, `08`).
 
 POR QUÉ EXISTE ESTE FICHERO (F-047, absorbe F-044). `build-compras` ejecutaba
 su SQL **en línea dentro del comando**, sin step, y por eso **no dejaba fila en
@@ -182,6 +188,12 @@ SUB_PASOS: tuple[_SubStep, ...] = (
         target_schema="compras",
         target_table="documento_procesos",
     ),
+    # F-132: `compras.v_estado_documentos`, el estado actual de contratos,
+    # facturas y comparativos y desde cuándo, sacado del último paso de `rac`.
+    # DETRÁS de `12`, cuyo `DROP ... CASCADE` tira la vista cada noche. Es una
+    # VISTA: no declara tabla destino y no se cuentan filas (contarlas la
+    # recorrería entera para nada).
+    _SubStep(name="estado_documentos", sql_file="13_estado_documentos.sql"),
 )
 
 

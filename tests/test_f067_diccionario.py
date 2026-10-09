@@ -9,8 +9,8 @@ fijan aquí son las que separan una respuesta cierta de una plausible y falsa:
   la necesidad al albarán (R22, R23);
 - el documento de necesidades es el DPC, uno por obra, y su estado no informa
   (R24);
-- la antigüedad del estado empieza el día del despliegue y en la línea base es
-  un MÍNIMO; el cambio ocurrió entre dos fotos (R10, R11);
+- la foto de estados empieza el día del despliegue (R11; la antigüedad del
+  estado sale de `rac` desde F-132, ver `test_f132_diccionario.py`);
 - `con.tiemod` NO es la fecha del cambio de estado (R14, D2) y la penalización
   no es un campo (R15).
 
@@ -176,20 +176,12 @@ def _ficha_entera(nombre: str) -> str:
     return _plano(" ".join(partes))
 
 
-def test_f067_r10_la_linea_base_es_un_minimo_y_21_dias_lo_hacen_cierto() -> None:
-    texto = _plano(_ficha("compras.v_estado_documentos").descripcion)
-    assert "minimo" in texto and "al menos n dias" in texto
-    assert "en cuanto ese minimo supera 21, «mas de tres semanas» es una respuesta cierta" in texto
-    assert "estado_codigo = 'epf'" in texto and "dias_en_estado > 21" in texto
+# R10 y la parte de R11 sobre la vista: RETIRADOS por F-132. La vista ya no
+# sale de la foto (no hay línea base, ni mínimo, ni «entre dos fotos»): la
+# fecha sale de `rac`, y su ficha la fija `tests/test_f132_diccionario.py`.
 
 
-def test_f067_r11_el_cambio_ocurrio_entre_dos_fotos_y_la_historia_empieza_al_desplegar() -> None:
-    texto = _plano(_ficha("compras.v_estado_documentos").descripcion)
-    assert (
-        "el cambio ocurrio entre `cambio_observado_tras` y `en_estado_desde`**, "
-        "no a una hora exacta" in texto
-    )
-    assert "la historia empieza el dia del despliegue" in texto
+def test_f067_r11_la_historia_de_la_foto_empieza_al_desplegar() -> None:
     assert "la historia empieza el dia del despliegue" in _plano(
         _ficha("compras.historial_estados").descripcion
     )
@@ -264,12 +256,9 @@ def test_f067_r27_la_version_sube_a_44() -> None:
     assert int(_diccionario().version) >= 44
 
 
-def test_f067_r27_p23_tres_semanas_parcial_hasta_21_dias_despues() -> None:
-    p23 = _pregunta("P23")
-    assert p23["estado"] == "parcial" and p23["bloqueada_por"] == "F-067"
-    assert "compras.v_estado_documentos" in p23["objetos_esperados"]
-    respuesta = _plano(p23["respuesta_correcta"])
-    assert "minimo" in respuesta and "dia del despliegue" in respuesta
+# P23 «parcial hasta 21 días después del despliegue»: RETIRADO por F-132. La
+# fecha del envío sale de `rac` y P23 ya es respondible; lo fija
+# `tests/test_f132_diccionario.py::test_f132_r20_p23_respondible_con_la_fecha_del_envio`.
 
 
 @pytest.mark.parametrize(

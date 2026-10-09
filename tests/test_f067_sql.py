@@ -133,6 +133,9 @@ QUIEN_PUEDE_NOMBRARLAS = {
     "infrastructure/postgres/sql/compras/11_historial_estados.sql",
     # `reset-compras`: el que las PROTEGE (importa `TABLAS_PERSISTENTES`).
     "infrastructure/postgres/compras_reset_sql.py",
+    # F-132: el contraste foto <-> `rac`, que las LEE con SELECT de solo
+    # lectura (`tests/test_f132_contraste.py` fija que no escribe).
+    "infrastructure/postgres/contraste_estados_sql.py",
 }
 
 
@@ -332,105 +335,13 @@ def test_f067_r8_foto_registra_los_contadores() -> None:
 
 
 # ===========================================================================
-# R9-R11 · `compras.v_estado_documentos`: el estado actual y su antigüedad
+# R9-R11 · `compras.v_estado_documentos`: RETIRADOS por F-132
 # ===========================================================================
-
-#: Lo que publica la vista, EN ORDEN (design §3). `CREATE OR REPLACE VIEW`
-#: solo admite columnas nuevas al final: este orden es contrato.
-COLUMNAS_VISTA = (
-    "documento_id",
-    "tipo_documento_codigo",
-    "tipo_documento",
-    "estado_id",
-    "estado_codigo",
-    "estado",
-    "en_estado_desde",
-    "cambio_observado_tras",
-    "antiguedad_es_minima",
-    "dias_en_estado",
-    "ultima_foto",
-)
-
-
-def _vista_estado() -> str:
-    ejecutable = _compacto(_texto(RUTA_HISTORIAL))
-    marca = "CREATE OR REPLACE VIEW compras.v_estado_documentos AS SELECT "
-    assert marca in ejecutable, "falta `compras.v_estado_documentos`"
-    inicio = ejecutable.index(marca)
-    return ejecutable[inicio : ejecutable.index(";", inicio)]
-
-
-def _proyeccion_vista() -> str:
-    vista = _vista_estado()
-    return vista[: vista.index(" FROM compras.historial_estados h")]
-
-
-def test_f067_r9_estado_documentos_va_despues_de_la_foto() -> None:
-    ejecutable = _compacto(_texto(RUTA_HISTORIAL))
-    assert ejecutable.index("END $$;") < ejecutable.index(
-        "CREATE OR REPLACE VIEW compras.v_estado_documentos"
-    )
-
-
-def test_f067_r9_estado_documentos_publica_sus_columnas_en_orden() -> None:
-    elementos = [e.strip() for e in re.split(r",(?![^()]*\))", _proyeccion_vista())]
-    alias = [
-        (re.search(r"\bAS (\w+)$", e) or re.search(r"\.(\w+)$", e)).group(1)
-        for e in elementos
-    ]
-    assert tuple(alias) == COLUMNAS_VISTA, alias
-
-
-def test_f067_r9_estado_documentos_solo_el_tramo_abierto() -> None:
-    vista = _vista_estado()
-    assert vista.endswith(" FROM compras.historial_estados h LEFT JOIN LATERAL "
-                          "compras.fn_estado_documento(h.tipo_documento_codigo, h.estado_id) "
-                          "est ON TRUE WHERE h.hasta IS NULL"), vista
-
-
-def test_f067_r9_estado_documentos_el_tipo_se_rotula_con_los_tipos_del_dominio() -> None:
-    contrato, factura = TIPOS_HISTORIAL
-    assert (
-        f"CASE h.tipo_documento_codigo WHEN {contrato} THEN 'CONTRATO' "
-        f"WHEN {factura} THEN 'FACTURA' END AS tipo_documento" in _proyeccion_vista()
-    )
-
-
-def test_f067_r9_estado_documentos_traduce_por_la_pareja_tipo_estado() -> None:
-    proyeccion = _proyeccion_vista()
-    assert "est.codigo_estado AS estado_codigo" in proyeccion
-    assert "est.nombre_estado AS estado" in proyeccion
-
-
-def test_f067_r10_estado_documentos_la_antiguedad_sale_de_la_foto_en_madrid() -> None:
-    proyeccion = _proyeccion_vista()
-    assert "(h.desde AT TIME ZONE 'Europe/Madrid') AS en_estado_desde" in proyeccion
-    assert (
-        "(h.observado_antes AT TIME ZONE 'Europe/Madrid') AS cambio_observado_tras"
-        in proyeccion
-    )
-    assert (
-        "((now() AT TIME ZONE 'Europe/Madrid')::date "
-        "- (h.desde AT TIME ZONE 'Europe/Madrid')::date) AS dias_en_estado" in proyeccion
-    ), "los días se calculan al consultar, con la fecha de Madrid: avanzan solos"
-    # Elemento EXACTO de la proyección y no subcadena: `NOT h.es_linea_base AS
-    # antiguedad_es_minima` contiene la cadena buena y sobrevivió a la campaña
-    # manual del SQL (M21) mientras el test buscaba con `in`.
-    elementos = [e.strip() for e in re.split(r",(?![^()]*\))", proyeccion)]
-    assert "h.es_linea_base AS antiguedad_es_minima" in elementos, elementos
-
-
-def test_f067_r10_estado_documentos_nunca_usa_tiemod() -> None:
-    """D2: `con.tiemod` no es la fecha del cambio de estado."""
-    assert "tiemod" not in _ejecutable_historial()
-    assert "fn_sigrid_tiempo" not in _ejecutable_historial()
-
-
-def test_f067_r11_estado_documentos_dice_de_cuando_es_la_ultima_foto() -> None:
-    assert (
-        "((SELECT max(f.observado_en) FROM compras.historial_estados_fotos f) "
-        "AT TIME ZONE 'Europe/Madrid') AS ultima_foto" in _proyeccion_vista()
-    )
+#
+# La vista ya no la crea este fichero ni sale de la foto: desde F-132 la crea
+# `13_estado_documentos.sql` a partir de `rac` (`compras.documento_procesos`).
+# Sus tests viven en `tests/test_f132_sql.py`, que además fija que `11` ya no
+# la crea y que lo ejecutable de la foto no ha cambiado ni una línea.
 
 
 # ===========================================================================

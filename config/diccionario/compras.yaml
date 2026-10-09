@@ -208,7 +208,7 @@ objetos:
       `importe_contrato`, que no existe. El importe comprometido esta en
       `compras.v_pbi_contrato_consumo.importe_contratado`.
 
-      **EL ESTADO (F-084, 2026-09-16) Y SU ANTIGUEDAD (F-067, 2026-10-06).**
+      **EL ESTADO (F-084, 2026-09-16) Y SU ANTIGUEDAD (F-132, 2026-10-08).**
 
       **SI se puede: en que estado esta cada contrato.** Desde F-084 esta
       tabla publica `estado`, `estado_codigo` y `estado_id`. «Que contratos
@@ -216,13 +216,13 @@ objetos:
       `estado_codigo = 'EPF'`: son **818**, de **567 proveedores** y **241
       obras**, medido el 2026-09-16.
 
-      **Y CUANTO LLEVA EN ESE ESTADO, desde F-067: en
-      `compras.v_estado_documentos`**, no aqui. Sigrid no guarda cuando cambio
-      el estado, asi que el datamart toma una FOTO DIARIA de estados desde el
-      dia del despliegue de F-067 (`compras.historial_estados`). La
-      antiguedad de lo que ya estaba en su estado ese dia es un MINIMO, y
-      «mas de tres semanas enviado» es una respuesta cierta en cuanto ese
-      minimo supera 21 dias; la vista lo explica. **NO uses
+      **Y DESDE CUANDO ESTA EN ESE ESTADO: en
+      `compras.v_estado_documentos`**, no aqui. La fecha sale de `rac`, la
+      ventana «Procesos» de Sigrid (`compras.documento_procesos`, F-085): el
+      ultimo paso del contrato da al segundo cuando entro en su estado actual
+      y quien lo dio; «enviado hace mas de tres semanas» es
+      `dias_en_estado > 21` con la fecha real del envio (F-132). La vista
+      explica los pocos casos sin fecha. **NO uses
       `fecha_ultima_modificacion` (`con.tiemod`) para la antiguedad: NO es la
       fecha del cambio de estado**, es la ultima modificacion del documento,
       y la firma no la mueve.
@@ -405,9 +405,9 @@ objetos:
       - Que contratos estan enviados y sin firmar
       - Cuantos contratos hay en cada estado, y cuantos sin firmar todavia
       - >-
-        Que contratos llevan mas de tres semanas enviados sin firmar (con
-        `compras.v_estado_documentos`: la antiguedad cuenta desde el despliegue
-        de la foto diaria)
+        Que contratos llevan mas de tres semanas enviados sin firmar y desde
+        cuando (con `compras.v_estado_documentos`: la fecha del envio sale de
+        `rac`)
       - Que forma de pago y que retencion de garantia tiene el contrato C
 
   contrato_lineas:
@@ -1718,7 +1718,7 @@ objetos:
       2026-10-06**: SQL Server convierte el mismo numero con la epoca
       1900-01-01 y da DOS DIAS MAS; la buena es esta. Y `con.tiemod` NO es la
       fecha del cambio de estado: la antiguedad del estado esta en
-      `compras.v_estado_documentos` (F-067).
+      `compras.v_estado_documentos`, que la saca de `rac` (F-132).
     grano: null
     clave_negocio: []
     paso_etl: build_compras
@@ -3377,18 +3377,22 @@ objetos:
     descripcion: >-
       La FOTO DIARIA de estados de contratos (tipo 44) y facturas (tipo 15),
       guardada POR TRAMOS: cada fila dice que un documento estuvo en un estado
-      desde una foto hasta otra (F-067). Es lo unico del datamart que sabe
-      CUANDO cambio de estado un documento, porque en Sigrid esa fecha NO
-      EXISTE: `concam` no audita el estado y `confir` no tiene firmas de
-      contrato. **ES HISTORIA QUE NO SE RECONSTRUYE**: el resto de `compras` se
-      rehace cada noche y esta tabla no; si se borrara, la historia volveria a
-      empezar de cero, porque no hay copia en Sigrid. Tampoco la borra `python
-      main.py reset-compras`, que vacia el resto del esquema y la conserva. **LA HISTORIA EMPIEZA EL
-      DIA DEL DESPLIEGUE** de F-067: lo anterior no esta. La primera foto es la
-      LINEA BASE (`es_linea_base`): «ya estaba en ese estado; desde cuando, no
-      se sabe». **La foto de un dia D** se reconstruye con `desde <= D AND (hasta
-      IS NULL OR hasta > D)`. Para el estado ACTUAL y los dias que lleva, usa
-      `compras.v_estado_documentos`, que ya hace la cuenta. Y NO uses
+      desde una foto hasta otra (F-067). **HOY ES UN RESPALDO EN CONTRASTE
+      (F-132)**: la fecha en que un documento cambio de estado la da `rac`, al
+      segundo y con usuario, y la publica `compras.v_estado_documentos`; esta
+      foto se sigue tomando mientras `python main.py contraste-estados` la
+      compara con `rac`, y el humano decidira si se retira. Lo unico que ve la
+      foto y `rac` no: el dia en que alguien DESHIZO un paso («Deshacer proceso»
+      borra el paso en Sigrid; la historia bruta esta en `dbo.log`, F-105).
+      **ES HISTORIA QUE NO SE RECONSTRUYE**: el resto de `compras` se rehace
+      cada noche y esta tabla no; si se borrara, la historia de la foto
+      volveria a empezar de cero. Tampoco la borra `python main.py
+      reset-compras`, que vacia el resto del esquema y la conserva. **LA
+      HISTORIA EMPIEZA EL DIA DEL DESPLIEGUE** de F-067: lo anterior no esta.
+      La primera foto es la LINEA BASE (`es_linea_base`). **La foto de un dia
+      D** se reconstruye con `desde <= D AND (hasta IS NULL OR hasta > D)`.
+      Para el estado ACTUAL y desde cuando, usa `compras.v_estado_documentos`.
+      Y NO uses
       `compras.contratos.fecha_ultima_modificacion` como fecha del cambio de
       estado: es la ultima modificacion del documento, que la firma no mueve.
     grano: >-
@@ -3459,9 +3463,8 @@ objetos:
           antes `tipo_documento_codigo` (44 a `compras.contratos.contrato_id`,
           15 a `compras.facturas.factura_id`).
     ejemplos_preguntas:
-      - Cuando cambio de estado la factura X y por que estados ha pasado
-      - Cuantos contratos han pasado a firmado esta semana
-      - En que estado estaba el contrato C el dia D
+      - En que estado vio la foto diaria el contrato C la noche D
+      - Que cambios de estado vio la foto que `rac` no explica
 
   historial_estados_fotos:
     tipo: tabla
@@ -3474,7 +3477,10 @@ objetos:
       despliegue) y si la historia tiene HUECOS (una noche sin fila es una
       noche en que la foto no se tomo, y el cambio de esos dias se vio con dos
       noches de ventana). **NO SE RECONSTRUYE**, como
-      `compras.historial_estados`, y `reset-compras` tambien la conserva.
+      `compras.historial_estados`, y `reset-compras` tambien la conserva. Como
+      ella, **hoy es un RESPALDO EN CONTRASTE (F-132)**: la fecha del cambio de
+      estado la da `rac` en `compras.v_estado_documentos`, y `python main.py
+      contraste-estados` recorre estas fotos para compararlas con `rac`.
     grano: Una fila por foto tomada. Clave `observado_en`.
     clave_negocio: [observado_en]
     paso_etl: build_compras
@@ -3527,96 +3533,135 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
-      El estado ACTUAL de cada contrato y cada factura y CUANTO LLEVA en el,
-      sacado de la foto diaria (`compras.historial_estados`, F-067). Es la
-      respuesta a «que contratos llevan mas de tres semanas enviados y sin
-      firmar»: `estado_codigo = 'EPF' AND tipo_documento = 'CONTRATO' AND
-      dias_en_estado > 21`. **LA HISTORIA EMPIEZA EL DIA DEL DESPLIEGUE**: lo
-      que estaba en su estado antes de la primera foto lleva
-      `antiguedad_es_minima` verdadero, y entonces `dias_en_estado` es un
-      MINIMO («lleva al menos N dias»), no la antiguedad exacta. **En cuanto
-      ese minimo supera 21, «mas de tres semanas» es una respuesta cierta**,
-      porque un minimo mayor que 21 ya es mas de tres semanas; por debajo, en la linea
-      base, no se sabe y hay que decirlo. **El cambio ocurrio entre
-      `cambio_observado_tras` y `en_estado_desde`**, no a una hora exacta: la
-      foto se toma una vez por noche. Los dias se calculan AL CONSULTAR, en
-      hora de Madrid; `ultima_foto` dice de cuando es la ultima foto, y si se
-      ha quedado atras la historia se ha parado. **NO uses
+      El estado ACTUAL de cada contrato, factura y comparativo y DESDE CUANDO
+      esta en el (F-132). La fecha sale de `rac`, la ventana «Procesos» de
+      Sigrid, via `compras.documento_procesos`: el ultimo paso del documento
+      fecha al segundo su estado actual en el 99,4 % de los casos, con quien lo
+      dio. `origen_fecha` dice de donde sale cada fecha: PASO (el ultimo paso
+      lleva al estado actual: fecha y hora exactas), ALTA (sin ningun paso y en
+      el estado inicial de su tipo: el dia de alta, sin hora) o
+      FUERA_DE_PROCESO (el estado cambio sin un paso, unos 75 documentos
+      historicos: SIN fecha, y `cambio_posterior_a` dice despues de cuando
+      cambio). **Es la historia NETA**: «Deshacer proceso» borra el paso en
+      Sigrid, asi que un documento devuelto a un estado deshaciendo cuenta
+      desde el paso que lo llevo alli la primera vez; la fecha del deshacer no
+      esta en el datamart (F-105). Es la respuesta a «que contratos llevan mas
+      de tres semanas enviados y sin firmar»: `tipo_documento = 'CONTRATO' AND
+      estado_codigo = 'EPF' AND dias_en_estado > 21`, con `en_estado_desde`
+      como fecha del envio. **Avisa de los envios antiguos sin cerrar**: el
+      2026-10-08 eran 785 de 809 contratos EPF, pero solo 23 enviados de 2025
+      en adelante; el resto son envios de 2008 a 2024 que nadie cerro en
+      Sigrid, y conviene separarlos por `en_estado_desde`. Los dias se calculan
+      AL CONSULTAR, en hora de Madrid. **NO uses
       `compras.contratos.fecha_ultima_modificacion` (`con.tiemod`) para esto**:
       es la ultima modificacion del documento y NO es la fecha del cambio de
       estado (la firma no la mueve).
     grano: >-
-      Una fila por documento de contrato o factura presente en la ultima foto:
-      su tramo abierto. Clave `documento_id`.
+      Una fila por documento de `compras.contratos`, `compras.facturas` y
+      `compras.comparativos`. Clave `documento_id`.
     clave_negocio: [documento_id]
     paso_etl: build_compras
     refresco: nocturno
     columnas:
       documento_id:
         significado: >-
-          El documento (`con.ide`): es el `contrato_id` de `compras.contratos`
-          o el `factura_id` de `compras.facturas`, segun `tipo_documento`.
+          El documento (`con.ide`): el `contrato_id` de `compras.contratos`, el
+          `factura_id` de `compras.facturas` o el `comparativo_id` de
+          `compras.comparativos`, segun `tipo_documento`.
         agregacion: no_sumable
       tipo_documento_codigo:
-        significado: Tipo de documento de Sigrid, 44 contrato o 15 factura.
+        significado: Tipo de documento de Sigrid (`con.tip`) - 44 contrato, 15 factura, 46 comparativo.
         agregacion: no_sumable
-        valores: [44, 15]
+        valores: [44, 15, 46]
       tipo_documento:
         significado: >-
-          CONTRATO o FACTURA. Filtra por aqui antes de unir con la cabecera:
-          los dos tipos comparten la columna `documento_id`.
-        valores: [CONTRATO, FACTURA]
+          CONTRATO, FACTURA o COMPARATIVO. Filtra por aqui antes de unir con la
+          cabecera: los tres tipos comparten la columna `documento_id`.
+        valores: [CONTRATO, FACTURA, COMPARATIVO]
+      codigo_documento:
+        significado: Codigo del documento tal y como se ve en Sigrid (`CTSB25/0002`, `FR26/10025`).
       estado_id:
         significado: >-
-          Codigo interno del estado (`con.est`); solo significa algo con su
-          tipo de documento. Para filtrar, usa `estado_codigo`.
+          Codigo interno del estado ACTUAL (`con.est`), el de la cabecera; solo
+          significa algo con su tipo de documento. Para filtrar, usa
+          `estado_codigo`.
         agregacion: no_sumable
         nulo_significa: El documento no tiene estado en Sigrid.
       estado_codigo:
         significado: >-
-          Mnemonico del estado, lo estable para filtrar: en contratos PFP, EPF
-          (enviado pendiente de firma), RFP, COMD, FIR, TER, RES; en facturas
-          los de `compras.facturas.estado_codigo`.
+          Mnemonico del estado actual, lo estable para filtrar: en contratos
+          PFP, EPF (enviado pendiente de firma), RFP, COMD, FIR, TER, RES; en
+          facturas y comparativos, los de `compras.facturas.estado_codigo` y
+          `compras.comparativos.estado_codigo`.
         nulo_significa: >-
           El estado no casa con el catalogo de su tipo, o el documento no tiene
           estado.
       estado:
         significado: >-
-          Nombre del estado, traducido por la pareja (tipo, estado) contra el
-          catalogo de Sigrid, igual que en `compras.contratos` y `compras.facturas`.
+          Nombre del estado actual, traducido por la pareja (tipo, estado)
+          contra el catalogo de Sigrid, igual que en las tres cabeceras.
         nulo_significa: Igual que en `estado_codigo`.
       en_estado_desde:
         significado: >-
-          Fecha y hora (Madrid) de la primera foto que vio el documento en este
-          estado. En la linea base es el dia del despliegue, no el del cambio.
-        agregacion: no_sumable
-      cambio_observado_tras:
-        significado: >-
-          Fecha y hora (Madrid) de la foto anterior: el cambio ocurrio entre
-          esta y `en_estado_desde`.
+          Desde cuando esta el documento en su estado actual, en hora de
+          Madrid. Con `origen_fecha` PASO, fecha y hora del ultimo paso (al
+          segundo; si el paso no tiene hora, su dia a las 00:00); con ALTA, el
+          dia de alta del documento a las 00:00 (Sigrid no guarda la hora del
+          alta).
         agregacion: no_sumable
         nulo_significa: >-
-          Linea base: el documento ya estaba en ese estado el dia del
-          despliegue y no se sabe desde cuando.
-      antiguedad_es_minima:
+          No hay fecha: `origen_fecha` FUERA_DE_PROCESO (mira
+          `cambio_posterior_a`), o ALTA de un documento sin fecha de alta.
+      origen_fecha:
         significado: >-
-          Verdadero si el tramo es de la LINEA BASE: `dias_en_estado` es
-          entonces un minimo («al menos N dias»). Falso: el cambio se vio, y los
-          dias son exactos con la ventana de una noche.
-        agregacion: no_sumable
+          De donde sale `en_estado_desde`. PASO: el destino del ultimo paso de
+          `rac` es el estado actual (el 99,4 %). ALTA: el documento no tiene
+          ningun paso y esta en el estado inicial de su tipo (factura 1 o 20,
+          contrato 1, comparativo 1, 11 o 100); la fecha es el dia de alta.
+          FUERA_DE_PROCESO: el estado cambio sin un paso de proceso; sin fecha.
+          Unos pocos FUERA_DE_PROCESO del ultimo dia pueden ser pasos dados
+          entre la carga de la cabecera y la de `rac`, y al dia siguiente son
+          PASO.
+        valores: [PASO, ALTA, FUERA_DE_PROCESO]
       dias_en_estado:
         significado: >-
-          Dias de calendario (Madrid) desde `en_estado_desde` hasta hoy. Un
-          MINIMO si `antiguedad_es_minima`. Se calcula al consultar.
+          Dias de calendario (Madrid) desde `en_estado_desde` hasta hoy. Se
+          calcula al consultar.
         unidad: dias
         agregacion: no_sumable
-      ultima_foto:
+        nulo_significa: Sin fecha (FUERA_DE_PROCESO, o ALTA sin fecha de alta).
+      cambio_posterior_a:
         significado: >-
-          Fecha y hora (Madrid) de la ultima foto tomada. Si no es de la ultima
-          noche, la foto se ha parado y `dias_en_estado` sigue contando sin
-          haber mirado si el estado cambio.
+          Solo en FUERA_DE_PROCESO: el momento del ultimo paso, la cota de
+          «el estado cambio despues de esta fecha». No es la fecha del cambio.
         agregacion: no_sumable
-        nulo_significa: Todavia no se ha tomado ninguna foto.
+        nulo_significa: >-
+          Fila PASO o ALTA (no hace falta cota), o FUERA_DE_PROCESO de un
+          documento sin ningun paso.
+      paso_id:
+        significado: >-
+          El paso de `compras.documento_procesos` que explica el estado (solo
+          con `origen_fecha` PASO): por `paso_id` se llega al paso entero
+          (estado de origen, fecha, hora) y por `documento_id` a su cadena.
+        agregacion: no_sumable
+        nulo_significa: Fila ALTA o FUERA_DE_PROCESO.
+      proceso:
+        significado: >-
+          Nombre del proceso de ese paso tal y como lo muestra Sigrid («Enviar
+          para la firma», «Aprobar factura»...).
+        nulo_significa: Fila ALTA o FUERA_DE_PROCESO.
+      usuario:
+        significado: >-
+          LOGIN de Sigrid de quien dio ese paso (`rac.usu`), el mismo de
+          `compras.documento_procesos.usuario`.
+        nulo_significa: Fila ALTA o FUERA_DE_PROCESO.
+      nombre_usuario:
+        significado: >-
+          Nombre de la ficha de usuario de Sigrid de ese login (`usu.res`).
+          DATO PERSONAL autorizado (D4 de F-085, 2026-10-07).
+        nulo_significa: >-
+          Fila ALTA o FUERA_DE_PROCESO, o el login no tiene ficha de usuario en
+          Sigrid.
     relaciones:
       - de: documento_id
         a: compras.contratos.contrato_id
@@ -3630,10 +3675,17 @@ objetos:
         porque: >-
           Para la cabecera de la factura (proveedor, fechas). Solo las filas de
           `tipo_documento` FACTURA; filtra antes.
+      - de: documento_id
+        a: compras.comparativos.comparativo_id
+        cardinalidad: "1:1"
+        porque: >-
+          Para la cabecera del comparativo. Solo las filas de `tipo_documento`
+          COMPARATIVO; filtra antes.
     ejemplos_preguntas:
-      - Que contratos llevan mas de tres semanas enviados sin firmar
-      - Cuanto lleva la factura X en su estado actual
+      - Que contratos llevan mas de tres semanas enviados sin firmar y desde cuando
+      - Cuanto lleva la factura X en su estado actual y quien la dejo asi
       - Que facturas llevan mas de un mes sin aprobar
+      - Que comparativos llevan mas de dos semanas pendientes de firma
 
   necesidades:
     tipo: tabla

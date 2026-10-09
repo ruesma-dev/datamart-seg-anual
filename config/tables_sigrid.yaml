@@ -830,9 +830,10 @@ tables:
   # al segundo y con usuario (`est1` -> `est2`, `fec`, `hor`, `usu`). Lo
   # publica `compras.documento_procesos` (F-085). Sigue siendo cierto que
   # `confir` no tiene conceptos de contrato y que `ctr` no tiene fechas de
-  # envio, recepcion ni firma: estan en los pasos de `rac`. La foto diaria de
-  # F-067 (`compras.historial_estados`) sigue construyendose; su relevo por
-  # `rac` es otra feature (F-132).
+  # envio, recepcion ni firma: estan en los pasos de `rac`. Desde F-132 la
+  # antiguedad del estado sale de `rac` (`compras.v_estado_documentos`), y la
+  # foto diaria de F-067 (`compras.historial_estados`) sigue construyendose
+  # como RESPALDO mientras dura el contraste (`contraste-estados`).
   #
   # LAS 19 CANDIDATAS QUE NO SE DAN DE ALTA porque tienen 0 FILAS en Sigrid,
   # contadas una a una el 2026-09-06: PFfir, logfirdoc, auxfam, act,

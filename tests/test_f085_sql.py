@@ -399,10 +399,12 @@ def test_f085_r6_compras_acaba_en_documento_procesos_detras_de_la_foto() -> None
     from etl_sigrid.application.steps import build_compras_step
 
     subs = build_compras_step.SUB_PASOS
-    assert [s.sql_file for s in subs[-2:]] == [
+    # Desde F-132 la vista `13_estado_documentos.sql` va detrás (lo fija
+    # `tests/test_f132_sql.py`): `12` es el último que cuenta filas.
+    assert [s.sql_file for s in subs[-3:-1]] == [
         "11_historial_estados.sql", "12_documento_procesos.sql",
     ]
-    assert (subs[-1].target_schema, subs[-1].target_table) == (
+    assert (subs[-2].target_schema, subs[-2].target_table) == (
         "compras", "documento_procesos",
     )
 

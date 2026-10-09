@@ -54,9 +54,12 @@ STEPS = {
             # F-067: la foto diaria de estados: no depende de nada del esquema
             # y no se reconstruye.
             "11_historial_estados.sql",
-            # F-085: el historial de procesos de `rac`, el ÚLTIMO, detrás de la
-            # foto: si falla, la foto de la noche ya está tomada.
+            # F-085: el historial de procesos de `rac`, detrás de la foto: si
+            # falla, la foto de la noche ya está tomada.
             "12_documento_procesos.sql",
+            # F-132: la vista del estado desde `rac`, la ÚLTIMA: el CASCADE de
+            # `12` la tira cada noche. Es una vista: no cuenta filas.
+            "13_estado_documentos.sql",
         ],
     ),
     "build_retenciones": (
@@ -171,14 +174,16 @@ def test_f038_r26_build_compras_cuenta_las_lineas_de_oferta_al_final(pg) -> None
 def test_f067_r8_build_compras_cuenta_la_historia_de_estados_al_final(pg) -> None:
     """El sub-paso `11` cuenta `compras.historial_estados`: los tramos de la
     foto diaria, que crecen cada noche con los cambios y nunca bajan. Si una
-    noche bajaran, alguien las ha borrado. Desde F-085 es el PENÚLTIMO: `12`
-    (el historial de procesos) va justo detrás, y la foto se toma antes."""
+    noche bajaran, alguien las ha borrado. Desde F-085 `12` (el historial de
+    procesos) va justo detrás, y desde F-132 `13` (la vista, que no cuenta
+    filas) detrás de `12`: la foto sigue siendo la última tabla que se cuenta
+    antes de `documento_procesos`."""
     doble = pg("build_compras", _PgFalso())
 
     _step("build_compras").run()
 
-    assert doble.ejecutados[-2:] == [
-        "11_historial_estados.sql", "12_documento_procesos.sql",
+    assert doble.ejecutados[-3:] == [
+        "11_historial_estados.sql", "12_documento_procesos.sql", "13_estado_documentos.sql",
     ]
     assert doble.contados[-2:] == [
         ("compras", "historial_estados"), ("compras", "documento_procesos"),
