@@ -400,12 +400,15 @@ def test_f085_r6_compras_acaba_en_documento_procesos() -> None:
 
     subs = build_compras_step.SUB_PASOS
     # Desde F-132 la vista `13_estado_documentos.sql` va detrás (lo fija
-    # `tests/test_f132_sql.py`): `12` es el último que cuenta filas. Delante
-    # iba la foto diaria de F-067 (`11`), que la Fase B de F-132 retiró.
-    assert [s.sql_file for s in subs[-3:-1]] == [
+    # `tests/test_f132_sql.py`). Delante iba la foto diaria de F-067 (`11`),
+    # que la Fase B de F-132 retiró. Y F-090 añade `14` (el índice de
+    # adjuntos, que también cuenta filas) al final, detrás de `13`.
+    ficheros = [s.sql_file for s in subs]
+    i = ficheros.index("10_necesidades.sql")
+    assert ficheros[i : i + 2] == [
         "10_necesidades.sql", "12_documento_procesos.sql",
     ]
-    assert (subs[-2].target_schema, subs[-2].target_table) == (
+    assert (subs[i + 1].target_schema, subs[i + 1].target_table) == (
         "compras", "documento_procesos",
     )
 

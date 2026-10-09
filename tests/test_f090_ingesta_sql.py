@@ -370,3 +370,40 @@ def test_f090_r18_cabecera_con_ruta_y_fuentes() -> None:
     )
     for dato in ("raw.rcg", "raw.gra", "raw.con", "raw.comprv", "ruesma_rep", "F-090"):
         assert dato in texto, f"la cabecera no cita «{dato}»"
+
+
+# ===========================================================================
+# C · El sub-paso de `build_compras`: R16
+# ===========================================================================
+
+
+def test_f090_r16_el_subpaso_va_detras_de_estado_documentos_y_cuenta_su_tabla() -> None:
+    from etl_sigrid.application.steps.build_compras_step import SUB_PASOS
+
+    nombres = [s.name for s in SUB_PASOS]
+    assert nombres.count("documento_adjuntos") == 1, "un solo sub-paso (R16)"
+    i = nombres.index("documento_adjuntos")
+    assert nombres[i - 1] == "estado_documentos", "va DETRÁS de `estado_documentos` (R16)"
+    sub = SUB_PASOS[i]
+    assert sub.sql_file == "14_documento_adjuntos.sql"
+    assert (sub.target_schema, sub.target_table) == ("compras", "documento_adjuntos"), (
+        "el sub-paso cuenta `compras.documento_adjuntos` (R16)"
+    )
+    assert (DIRECTORIO_COMPRAS / sub.sql_file).exists()
+
+
+def test_f090_r16_el_docstring_del_paso_nombra_el_sql() -> None:
+    from etl_sigrid.application.steps import build_compras_step
+
+    doc = build_compras_step.__doc__ or ""
+    assert "14_documento_adjuntos.sql" in doc, "el docstring del paso no lista `14` (R16)"
+    assert "F-090" in doc
+
+
+def test_f090_r16_todos_los_sql_de_compras_tienen_su_subpaso() -> None:
+    """Un SQL de `compras` sin sub-paso no se ejecuta nunca, y nada falla."""
+    from etl_sigrid.application.steps.build_compras_step import SUB_PASOS
+
+    en_pasos = {s.sql_file for s in SUB_PASOS}
+    en_disco = {r.name for r in DIRECTORIO_COMPRAS.glob("*.sql")}
+    assert en_disco == en_pasos, f"sin sub-paso: {sorted(en_disco - en_pasos)} (R16)"
