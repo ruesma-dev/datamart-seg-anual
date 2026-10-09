@@ -9,7 +9,20 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-08/09 · F-132 · FASE A IMPLEMENTADA (implementer), pendiente de review · `in_progress`
+## 2026-10-08/09 · F-132 · FASE A APROBADA (review a la primera) e integrada en `main` · `blocked` hasta el 2026-10-22
+
+> **BLOQUEADA por decisión del humano (2026-10-09)**, motivo: la FASE B (retirar o
+> conservar la foto, D7) espera al CONTRASTE de 14 noches, hasta el **2026-10-22**.
+> No es un fallo: es una espera con fecha. Al retomarla, el líder lanza
+> `python main.py contraste-estados` (solo lectura), pega la salida fechada en
+> `progress/contraste_F-132.md` y lleva al humano la decisión D7 con las cifras.
+> En la Fase B, además, las observaciones 1 y 3 de `progress/review_F-132.md`
+> (comentario de `fn_sigrid_tiempo` en `00_setup.sql`, líneas en blanco en `main.py`).
+>
+> Fase A: APROBADA (`progress/review_F-132.md`, `init.sh` 7.245 passed); merge a `main`
+> `79b2abf`, espejo `dev` `b1c66f2`. **Despliegue pendiente** (tras la nocturna del
+> 09-10): el humano construye la imagen, apunta el job y lanza `build-compras`; luego
+> el líder publica el diccionario v46, reinicia el MCP y lanza el primer contraste.
 
 Solo la Fase A (T1-T15 de `specs/F-132-estado-desde-rac/tasks.md`); la B espera a
 D7 del humano tras el contraste (hasta el 2026-10-22). La foto de F-067 sigue
