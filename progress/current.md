@@ -60,7 +60,13 @@
     `SET LOCAL lock_timeout = '30s'` + `DROP TABLE IF EXISTS` de las dos, sin
     `CASCADE`, en una transacción, y relee para comprobar (sale con 1 si queda alguna).
 
-## 2026-10-09 · F-132 · CERRADA (`done`): fases A y B APROBADAS · A desplegada, B SIN DESPLEGAR
+## 2026-10-09 · F-132 · CERRADA (`done`): fases A y B APROBADAS · LAS DOS DESPLEGADAS
+
+> **Fase B DESPLEGADA el 2026-10-09**: el humano construyó la imagen `r20261009-1522`,
+> apuntó el job (comprobado por el líder) y lanzó `retirar-foto-estados` (las dos tablas
+> ya «no existe»). El líder: `publicar-diccionario` **v47** (205 objetos, 1.608 columnas),
+> `check-diccionario` OK, MCP reiniciado (`--0000014`, Healthy).
+
 
 > **Cerrada el 2026-10-09.** Resumen en `progress/history.md`. El humano decidió borrar la
 > foto ya (D6 acortada a 2 noches, D7 = BORRAR). **MANUAL de la fase B, EN ESTE ORDEN y

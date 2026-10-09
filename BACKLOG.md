@@ -3,12 +3,13 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **122 features**, 70 abiertas, 52 terminadas.
+Resumen: **123 features**, 71 abiertas, 52 terminadas.
 
 ## Trabajo abierto
 
 | # | Feature | Prioridad | Estado | Rigor | Rama |
 |---|---|---|---|---|---|
+| F-135 | Restringir la información de PERSONAL de la contabilidad (nóminas, cuentas de trabajadores, embargos, cajas) a quien tenga el rol autorizado, en el mayor, en raw y en el futuro mayor analítico | 1 | pendiente | critico | `feature/F-135-restringir-personal-contabilidad` |
 | F-129 | El objetivo del comparativo se mide contra la oferta de referencia del propio comparativo (oficina técnica o planificado ABC), no contra el descompuesto: hoy casa el 29 % | 2 | pendiente | critico | `feature/F-129-objetivo-contra-oferta-referencia` |
 | F-128 | Los importes de cabecera de la factura de proveedor (base, IVA, retención, total y total a pagar) y su pestaña de recargos y retenciones (dcfrec), para cuadrar la retención practicada contra el mayor de retenciones | 3 | pendiente | estandar | `feature/F-128-importes-cabecera-factura` |
 | F-127 | El mayor analítico: los apuntes de la contabilidad analítica (apa) y sus saldos por cuenta analítica y mes, con las cuentas de contrapartida (CP) de los trabajadores | 4 | pendiente | critico | `feature/F-127-mayor-analitico` |
@@ -138,6 +139,12 @@ Resumen: **122 features**, 70 abiertas, 52 terminadas.
 | F-052 | La obra 0599 no esta en el datamart: 104.366 filas de presupuesto se caen por un arbol de partidas roto | 42 | critico |
 
 ## Detalle
+
+### F-135 · Restringir la información de PERSONAL de la contabilidad (nóminas, cuentas de trabajadores, embargos, cajas) a quien tenga el rol autorizado, en el mayor, en raw y en el futuro mayor analítico
+
+estado **pendiente** · prioridad 1 · rigor `critico` · SDD sí · rama `feature/F-135-restringir-personal-contabilidad`
+
+Nace el 2026-10-09 de un correo de **Juan Romero** (Dir. Administración y Control de Costes) pasado por el humano, que la registra con PRIORIDAD 2: «Revisando el mayor contable del datamart (`contabilidad.mayor`) hemos visto que cualquier usuario con acceso puede consultar información de personal que debe quedar restringida. Hay que limitarla a todos los usuarios salvo a los que tenemos ese rol.» ================ QUÉ HAY QUE RESTRINGIR, en palabras de Juan: (1) LOS ASIENTOS DE NÓMINA COMPLETOS: nóminas mensuales, pagas extra, complementarias, atrasos, bonus y ajustes de Seguridad Social; cubre las cuentas 640, 642, 649, 465, 466 y 476, y las retenciones 4751 que van en esos asientos. (2) LAS CUENTAS PERSONALES DE TRABAJADORES con todos sus movimientos: anticipos (460 y 461), préstamos al personal (544) y retenciones a nombre de trabajadores, que parecen embargos (4753). (3) LAS CAJAS A NOMBRE DE TRABAJADORES (570), al menos en los apuntes que van dentro de los asientos de nómina. (4) LOS MISMOS DATOS EN `raw` (`apu` y las que correspondan) si el rol de consulta puede leerlas, «como pasa con `raw.hmores`». (5) EL MAYOR ANALÍTICO DE LAS CP (F-127) debe NACER YA RESTRINGIDO. Y el criterio: «Si con el criterio de cuentas se cuela algo, prefiero que restrinjas DE MÁS y lo afinamos». ================ LO QUE HAY HOY Y CONDICIONA EL DISEÑO (comprobado al fichar): el MCP y Power BI entran con el MISMO rol de base de datos, `mcp_sigrid_dm_ro` (F-087, pendiente, es la que le da a Power BI un rol propio), y ese rol lee `contabilidad`, `raw` y `personal`. El MCP autentica a CUALQUIER cuenta del tenant (F-008 de `mcp-bbdd`) pero la base no distingue quién pregunta: hoy NO existe en la base ningún rol que represente «los que tienen ese rol». El patrón ya aprobado para datos personales es el esquema `personal` (F-057), que se da o se quita con un `GRANT` (y F-085 dejó allí el DNI de los usuarios). F-068 ya trató la exposición de `raw` (DNI, Seguridad Social y cuentas de `raw.emp`). Por eso la spec tiene que decidir, con el dato delante: (a) cómo se separa lo restringido (sacar esos apuntes a un objeto propio en un esquema con GRANT aparte, filtrar `contabilidad.mayor` y lo derivado —saldos, árbol, estados de F-058—, o seguridad por filas); (b) qué pasa con `raw.apu`, `raw.asi`, `raw.apa`, `raw.hmores` y demás origen (revocar al rol de consulta, vistas filtradas, o filtrar en la ingesta); (c) cómo se identifica a «los que tienen ese rol»: un rol de base de datos distinto exige que el MCP (`mcp-bbdd`) y Power BI conecten con él según quién pregunte, y eso CRUZA LA FRONTERA del proyecto (se anota para `mcp-bbdd` y F-087, no se implementa aquí); y (d) quién es ese rol en Negocio (lo dice Juan). A MEDIR: cuántos apuntes y asientos caen por cada criterio (cuentas por prefijo, asiento de nómina entero, cuenta 570 solo dentro de esos asientos), en qué tablas publicadas aparecen (mayor, saldos, cualquier vista de `contabilidad`, `retenciones` si toca 4751/4753) y qué se cuela o sobra con el criterio de cuentas. DEPENDE/AFECTA: F-127 (mayor analítico, debe nacer restringido), F-087 (rol propio de Power BI), F-068, F-057, `mcp-bbdd` (lista blanca y rol).
 
 ### F-129 · El objetivo del comparativo se mide contra la oferta de referencia del propio comparativo (oficina técnica o planificado ABC), no contra el descompuesto: hoy casa el 29 %
 
