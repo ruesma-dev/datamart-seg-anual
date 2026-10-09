@@ -23,8 +23,8 @@ Rama `feature/F-132-estado-desde-rac`. Un commit por tarea (`F-132 Tn: ...`). Fa
 
 ## Fase B (solo tras D7; el líder ajusta esta lista a la rama elegida)
 
-- [ ] T16: contraste final: `python main.py contraste-estados` al cumplirse el plazo de D6, salida en `progress/contraste_F-132.md` y decisión D7 del humano anotada en `progress/current.md`  |  Verificación: MANUAL (humano)
-- [ ] T17: (retirar) mover `EPOCA_DELPHI`/`fecha_delphi` a `domain/fecha_delphi.py`, borrar `11_historial_estados.sql`, su sub-paso y la lógica de la foto del dominio y sus tests  |  Verificación: `pytest tests/test_f067_sql.py tests/test_f047_steps.py tests/test_f132_sql.py`
+- [x] T16: contraste final: `python main.py contraste-estados` al cumplirse el plazo de D6, salida en `progress/contraste_F-132.md` y decisión D7 del humano anotada en `progress/current.md`  |  Verificación: MANUAL (humano)
+- [x] T17: (retirar) mover `EPOCA_DELPHI`/`fecha_delphi` a `domain/fecha_delphi.py`, borrar `11_historial_estados.sql`, su sub-paso y la lógica de la foto del dominio y sus tests  |  Verificación: `pytest tests/test_f067_sql.py tests/test_f047_steps.py tests/test_f132_sql.py`
 - [ ] T18: (borrar) comando `retirar-foto-estados [--confirmar]`, `compras_reset_sql.py` sin conservadas, fuera `contraste-estados`, fichas e inventario de F-006 207 → 205  |  Verificación: `pytest tests/test_f067_reset.py tests/test_f132_contraste.py tests/test_f006_*.py`
 - [ ] T19: (congelar) fichas «CONGELADA» con fechas y `reset-compras` intacto  |  Verificación: `pytest tests/test_f132_diccionario.py`
 - [ ] T20: diccionario v47, `docs/ARCHITECTURE.md` y `azure-apps` según la rama; MANUAL: el humano lanza `retirar-foto-estados --confirmar` (rama borrar) tras desplegar  |  Verificación: `python main.py check-diccionario` (MANUAL, humano)

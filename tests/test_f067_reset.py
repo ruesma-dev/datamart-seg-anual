@@ -24,10 +24,6 @@ from etl_sigrid.domain.historial_estados import TABLAS_PERSISTENTES
 from etl_sigrid.infrastructure.postgres.compras_reset_sql import SQL_RESET_COMPRAS
 
 RAIZ = Path(__file__).resolve().parents[1]
-SQL_HISTORIAL = (
-    RAIZ / "etl_sigrid" / "infrastructure" / "postgres" / "sql" / "compras"
-    / "11_historial_estados.sql"
-)
 
 #: El borrado del esquema entero, escrito por partes para que este fichero
 #: no se cace a sí mismo.
@@ -38,12 +34,8 @@ def _compacto(texto: str) -> str:
     return re.sub(r"\s+", " ", texto)
 
 
-def test_f067_reset_las_persistentes_son_las_que_crea_la_foto() -> None:
-    creadas = re.findall(
-        r"CREATE TABLE IF NOT EXISTS compras\.(\w+) \(", SQL_HISTORIAL.read_text(encoding="utf-8")
-    )
-    assert TABLAS_PERSISTENTES == ("historial_estados", "historial_estados_fotos")
-    assert sorted(creadas) == sorted(TABLAS_PERSISTENTES)
+# `las_persistentes_son_las_que_crea_la_foto` se retira con
+# `11_historial_estados.sql` (F-132, Fase B): ya no hay foto que las cree.
 
 
 def test_f067_reset_no_borra_el_esquema() -> None:

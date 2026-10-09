@@ -1413,9 +1413,8 @@ esquemas:
       procesos de cada documento (`compras.documento_procesos`, de `rac`), y
       desde F-132 el estado actual de contratos, facturas y comparativos y
       desde cuando estan en el (`compras.v_estado_documentos`, sacado de
-      `rac`). La FOTO DIARIA de estados de F-067 (`compras.historial_estados`,
-      que NO se reconstruye) queda como respaldo en contraste. Y el documento
-      de planificacion de compras (`compras.necesidades`).
+      `rac`; la foto diaria de estados de F-067 que la precedio se retiro). Y
+      el documento de planificacion de compras (`compras.necesidades`).
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_compras]
@@ -1906,14 +1905,12 @@ preguntas_aceptacion:
     pregunta: Cuando cambio de estado la factura X y por que estados ha pasado
     objetos_esperados:
       - compras.documento_procesos
-      - compras.historial_estados
     respuesta_correcta: >-
       Lee los pasos de `compras.documento_procesos` de la factura, ordenados
       por `orden`: cada uno con su estado de origen y de destino, la fecha y la
       hora (Madrid) y quien lo dio. Dice que es la historia NETA: un paso
-      deshecho en Sigrid ya no esta; mientras exista la foto diaria
-      (`compras.historial_estados`, respaldo de F-132) puede decir en que noche
-      se vio deshacer, como una ventana entre dos fotos.
+      deshecho en Sigrid ya no esta, y el datamart no sabe cuando se deshizo
+      (eso solo lo guarda `dbo.log`, que no se ingiere: F-105).
     reglas_implicadas: [R-FRESCURA]
     estado: respondible
 

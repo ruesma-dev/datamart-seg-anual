@@ -51,11 +51,9 @@ STEPS = {
             "09_comparativos_detalle.sql",
             # F-067: el documento de necesidades de compra (DPC).
             "10_necesidades.sql",
-            # F-067: la foto diaria de estados: no depende de nada del esquema
-            # y no se reconstruye.
-            "11_historial_estados.sql",
-            # F-085: el historial de procesos de `rac`, detrás de la foto: si
-            # falla, la foto de la noche ya está tomada.
+            # (F-067 ponía aquí `11`, la foto diaria de estados: la retiró
+            # F-132, Fase B, 2026-10-09.)
+            # F-085: el historial de procesos de `rac`.
             "12_documento_procesos.sql",
             # F-132: la vista del estado desde `rac`, la ÚLTIMA: el CASCADE de
             # `12` la tira cada noche. Es una vista: no cuenta filas.
@@ -171,34 +169,22 @@ def test_f038_r26_build_compras_cuenta_las_lineas_de_oferta_al_final(pg) -> None
     ]
 
 
-def test_f067_r8_build_compras_cuenta_la_historia_de_estados_al_final(pg) -> None:
-    """El sub-paso `11` cuenta `compras.historial_estados`: los tramos de la
-    foto diaria, que crecen cada noche con los cambios y nunca bajan. Si una
-    noche bajaran, alguien las ha borrado. Desde F-085 `12` (el historial de
-    procesos) va justo detrás, y desde F-132 `13` (la vista, que no cuenta
-    filas) detrás de `12`: la foto sigue siendo la última tabla que se cuenta
-    antes de `documento_procesos`."""
+def test_f132_build_compras_ya_no_cuenta_la_foto_y_acaba_en_la_vista(pg) -> None:
+    """El sub-paso `11` contaba `compras.historial_estados`, la foto diaria de
+    F-067. F-132 la retiró (Fase B, 2026-10-09): ya no se ejecuta ni se cuenta.
+    Detrás de `necesidades` va `12` (el historial de procesos), y detrás `13`
+    (la vista, que no cuenta filas)."""
     doble = pg("build_compras", _PgFalso())
 
     _step("build_compras").run()
 
     assert doble.ejecutados[-3:] == [
-        "11_historial_estados.sql", "12_documento_procesos.sql", "13_estado_documentos.sql",
+        "10_necesidades.sql", "12_documento_procesos.sql", "13_estado_documentos.sql",
     ]
     assert doble.contados[-2:] == [
-        ("compras", "historial_estados"), ("compras", "documento_procesos"),
+        ("compras", "necesidades"), ("compras", "documento_procesos"),
     ]
-
-
-def test_f067_r19_build_compras_cuenta_las_necesidades_antes_de_la_foto(pg) -> None:
-    doble = pg("build_compras", _PgFalso())
-
-    _step("build_compras").run()
-
-    assert doble.contados[-3:-1] == [
-        ("compras", "necesidades"),
-        ("compras", "historial_estados"),
-    ]
+    assert ("compras", "historial_estados") not in doble.contados
 
 
 @pytest.mark.parametrize("nombre", list(STEPS))

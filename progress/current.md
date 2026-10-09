@@ -20,6 +20,22 @@
 
 - **Estado**: T16 hecha (cierre del contraste anotado). `init.sh` de arranque sobre
   `a237288`: VERDE (7.245 passed, 229 skipped, 29 min 13 s).
+- **Diccionario del árbol tras la Fase B: 205 objetos, 1608 columnas, 96 de consumo**
+  (fuera las dos fichas de la foto: 8 + 7 columnas; versión sin publicar).
+- **Desviaciones respecto a la spec** (justificadas):
+  - **Las fichas de la foto, P24 y la descripción de `compras` salen en T17, no en
+    T18/T20**: en cuanto se borra `11_historial_estados.sql`, la puerta de F-006
+    (`test_f006_fichas`, `_origen_por_objeto`) rompe con una ficha sin SQL que la
+    cree. Es la regla «ficha en el mismo commit que el objeto», al revés.
+  - **`domain/historial_estados.py` sobrevive a T17 solo con tres constantes**
+    (`TIPOS_HISTORIAL`, `MOTIVOS_CIERRE`, `TABLAS_PERSISTENTES`): las leen el
+    contraste y `compras_reset_sql.py`, que se retiran en T18 junto con el módulo.
+    Así cada commit deja la suite en verde.
+  - **`01_documentos.sql` NO se toca** aunque su cabecera (l. 71-72) aún cite la
+    foto: la fija la huella de `test_f073_sql` r23 (observación 2 del review de la
+    Fase A). El veto nuevo de `test_f132_retirada.py` mira lo EJECUTABLE del SQL.
+  - `00_setup.sql` (observación 1 del review) y `12_documento_procesos.sql`: solo
+    comentarios, que citaban la foto o su módulo.
 
 ## 2026-10-08/09 · F-132 · FASE A APROBADA (review a la primera) e integrada en `main` · `blocked` hasta el 2026-10-22
 

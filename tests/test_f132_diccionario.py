@@ -170,30 +170,23 @@ def test_f132_r18_contratos_el_ejemplo_de_tres_semanas_da_la_fecha_del_envio() -
     assert "compras.v_estado_documentos" in tres_semanas[0]
 
 
+# Fase A fijaba aquí que las fichas de la foto la presentaban como RESPALDO en
+# contraste. La Fase B (rama BORRAR, 2026-10-09) retira la foto y sus fichas.
+
+
 @pytest.mark.parametrize(
     "nombre", ["compras.historial_estados", "compras.historial_estados_fotos"]
 )
-def test_f132_r18_la_foto_es_el_respaldo_en_contraste(nombre: str) -> None:
-    texto = _plano(_ficha(nombre).descripcion)
-    assert "respaldo" in texto and "f-132" in texto
-    assert "contraste-estados" in texto
-    assert "compras.v_estado_documentos" in texto
-    for frase in ("lo unico del datamart que sabe", "esa fecha no existe",
-                  "no existe en sigrid", "no hay copia en sigrid"):
-        assert frase not in texto, frase
+def test_f132_r26_las_fichas_de_la_foto_ya_no_estan(nombre: str) -> None:
+    assert nombre not in _diccionario().por_nombre
 
 
-def test_f132_r18_historial_lo_que_solo_ve_la_foto_es_el_deshacer() -> None:
-    texto = _plano(_ficha("compras.historial_estados").descripcion)
-    assert "deshacer" in texto or "deshech" in texto
-    # Lo que F-067 fija de la foto sigue siendo cierto y se mantiene.
-    assert "no se reconstruye" in texto
-    assert "la historia empieza el dia del despliegue" in texto
-
-
-def test_f132_r18_historial_el_cambio_de_estado_se_pregunta_a_la_vista() -> None:
-    ejemplos = " | ".join(_plano(e) for e in _ficha("compras.historial_estados").ejemplos_preguntas)
-    assert "cuando cambio de estado la factura x" not in ejemplos
+def test_f132_r28_ninguna_pregunta_espera_la_foto() -> None:
+    esperan = [
+        p["id"] for p in _global()["preguntas_aceptacion"]
+        if any(o.startswith("compras.historial_estados") for o in p["objetos_esperados"])
+    ]
+    assert esperan == []
 
 
 def test_f132_r18_fn_sigrid_tiempo_remite_a_la_vista_desde_rac() -> None:

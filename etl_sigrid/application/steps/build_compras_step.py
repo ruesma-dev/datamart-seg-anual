@@ -14,7 +14,6 @@ Encadena los archivos SQL en orden:
     08_comparativos.sql- el comparativo de ofertas y sus ofertas (F-038)
     09_comparativos_detalle.sql - sus líneas, el objetivo y las firmas (F-038)
     10_necesidades.sql - el documento de necesidades de compra, el DPC (F-067)
-    11_historial_estados.sql - la FOTO DIARIA de estados (F-067), PERSISTENTE
     12_documento_procesos.sql - el historial de PROCESOS de `rac` (F-085)
     13_estado_documentos.sql - el estado actual y desde cuándo, de `rac` (F-132)
 
@@ -27,19 +26,20 @@ corre DESPUÉS en `run-all` y este paso no lo declara en `depends_on` a
 propósito: lee el descompuesto de la noche anterior, y la primera ABC y el
 master 0 —las versiones que dan la base— están congeladas (F-038, design §1).
 
-`11` es distinto de todos los demás (F-067): sus dos tablas
-(`historial_estados` e `historial_estados_fotos`) NO se reconstruyen. Son la
-foto diaria de estados de contratos y facturas, que desde F-132 es el RESPALDO
-de `rac` mientras dura el contraste (la antigüedad del estado la publica `13`);
-el SQL las crea con `CREATE TABLE IF NOT EXISTS`, nunca las borra ni las vacía,
-y cada noche les añade la foto de la ingesta. No depende de nada del esquema; si
-un sub-paso anterior falla, esa noche no hay foto y se ve en
-`historial_estados_fotos` (un hueco), no se pierde lo ya guardado.
+NO HAY `11` (F-132, Fase B, 2026-10-09). Era la FOTO DIARIA de estados de
+contratos y facturas de F-067 (`11_historial_estados.sql`, dos tablas que no se
+reconstruían). Se montó creyendo que Sigrid no fechaba el cambio de estado;
+F-085 lo desmintió (`rac`) y F-132 publica la antigüedad del estado desde ahí
+(`13`). Con el contraste delante (2 noches, 0 discrepancias) el humano decidió
+BORRARLA: el fichero y su sub-paso ya no existen, y las dos tablas las borra a
+mano `python main.py retirar-foto-estados --confirmar`. El hueco en la
+numeración se deja a propósito: renumerar cambiaría el nombre de `12` y `13`,
+que citan el diccionario, los tests y la documentación.
 
-`12` (F-085) va DETRÁS de `11` a propósito: es el más caro de los dos (~1 M de
-pasos de `raw.rac` con dos ventanas por documento) y no lo necesita nadie del
-esquema, así que si fallara, la foto de esa noche ya está tomada. Lee `raw.rac`,
-`raw.con`, `raw.usu` y la función `fn_estado_documento` de `00_setup.sql`.
+`12` (F-085) es el más caro del paso (~1 M de pasos de `raw.rac` con dos
+ventanas por documento) y no lo necesita nadie del esquema salvo `13`. Lee
+`raw.rac`, `raw.con`, `raw.usu` y la función `fn_estado_documento` de
+`00_setup.sql`.
 
 `13` (F-132) va el ÚLTIMO porque la vista `compras.v_estado_documentos` lee
 `compras.documento_procesos`, y el `DROP TABLE ... CASCADE` de `12` se la lleva
@@ -167,21 +167,10 @@ SUB_PASOS: tuple[_SubStep, ...] = (
         target_schema="compras",
         target_table="necesidades",
     ),
-    # F-067: la foto diaria de estados. El ÚLTIMO a propósito: no lee nada de
-    # `compras` (solo `raw.con` y sus dos tablas), y sus tablas no se
-    # reconstruyen. Cuenta `historial_estados`, los tramos: crecen cada noche
-    # con los cambios y nunca bajan; si un día bajaran, alguien las ha borrado.
-    # Si la guarda del 98 % salta (ingesta a medias), el paso falla con el
-    # nombre de este sub-paso y la foto no se toma.
-    _SubStep(
-        name="historial_estados",
-        sql_file="11_historial_estados.sql",
-        target_schema="compras",
-        target_table="historial_estados",
-    ),
+    # (Aquí iba `11`, la foto diaria de estados de F-067: RETIRADA por F-132,
+    # Fase B, decisión del humano del 2026-10-09. Ver el docstring del módulo.)
     # F-085: el historial de PROCESOS de `rac` (quién hizo qué paso, desde qué
-    # estado, a cuál y cuándo). DETRÁS de la foto: si este falla, la foto de
-    # la noche ya está tomada. Cuenta su única tabla (~1,01 M de pasos).
+    # estado, a cuál y cuándo). Cuenta su única tabla (~1,01 M de pasos).
     _SubStep(
         name="documento_procesos",
         sql_file="12_documento_procesos.sql",
