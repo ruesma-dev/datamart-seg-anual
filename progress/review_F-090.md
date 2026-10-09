@@ -1,38 +1,46 @@
 <!-- progress/review_F-090.md -->
-Revisión completa (pasada 1), diff `75389c5..335d671` (merge-base con `main`, la `RAMA_BASE`)
+Revisión incremental desde 17ce64e (pasada 2): delta `17ce64e..2f3d927` + azure-apps `70cf76e`
 
 # F-090 · Review · el índice de documentos adjuntos de compras
 
-**Veredicto: CHANGES_REQUESTED** (código y SQL bien; falla documentación que se consume
-o que hace de evidencia: cinco cambios pequeños, abajo).
+**Veredicto: APPROVED** (pasada 2). Pasada 1 (`17ce64e`): CHANGES_REQUESTED por cinco
+cambios de documentación y estilo; los cinco están resueltos (tabla abajo).
 
 **Nivel de rigor:** `estandar`, declarado en `harness/features.json`. Exige fase RED,
 cobertura de lo cambiado ≥ umbral y campaña de mutación con supervivientes analizados.
 
-## Verificación ejecutada por el reviewer
+## Verificación de la pasada 2
 
-- `bash harness/init.sh` sobre `335d671`: **7.268 passed, 231 skipped** (16 min 33 s),
-  COBERTURA 100 % (28/28). Su único KO fue el tope de ESTE informe a medio escribir; ya
-  recortado, `init.sh` se relanzó tras el commit (resultado en la línea de respuesta).
-- Alcance y mutantes **recalculados** (`harness.alcance.alcance_de_feature` +
-  `harness.mutacion.generar_mutantes`, cálculo puro): 132 líneas (20 en
-  `build_compras_step.py`, 112 en `domain/documento_adjuntos.py`) y **8 mutantes**, todos
-  en el dominio: las 5 claves de `FAMILIAS_ADJUNTOS` (15→16, 44→45, 46→47, 12→13, 14→15),
-  `is None`→`is not None` en l. 80 y l. 89 y `group(1)`→`group(2)` en l. 83. Coincide con
+- `bash harness/init.sh` sobre `2f3d927`, entero: **VERDE**, 7.268 passed, 231 skipped (13 min 15 s), COBERTURA 100 % (28/28), TAMAÑO OK, ENTORNO LISTO.
+- El delta toca `config/diccionario/compras.yaml`, dos tests, `tasks.md` y `progress/`; ni
+  `etl_sigrid/` ni el SQL: el alcance de mutación no cambia y la campaña sigue valiendo
+  (RM1). `ruff` sobre los ficheros de F-090: sin avisos. `azure-apps` `70cf76e` sin push.
+- Lo aprobado en la pasada 1 (código, SQL, filtros, tests, mutación) no se relee.
+
+| Pasada 1 | Resuelto en |
+|---|---|
+| 1. receta de `documents/read` sin `blob_column` | `compras.yaml` (ficha `documento_adjuntos`) y `azure-apps/datamart_seg_anual.md` dicen `blob_column: ima`, obligatorio, y que es la columna de `ruesma_rep.gra` y no de `raw.gra`; `test_f090_r21` exige `"blob_column: ima"`; el paso 4 del MANUAL de `impl` §5 trae la receta completa |
+| 2. «Evidencias» desactualizadas | `impl` §6: campaña válida (8/8, 4 workers, `--timeout 1800`, 2.427 s, `b88fdbb`) e `init.sh` verde; §5 paso 1 «HECHO» |
+| 3. `current.md` | F-090 con su estado real; fuera la sección «F-132 · FASE B en curso» (su pendiente de `01_documentos.sql` pasa a la de «CERRADA») |
+| 4. T12 | `[x]` con la cifra |
+| 5. SIM300 | `tests/test_f090_dominio.py:184` corregido |
+
+## Verificación de la pasada 1 (sobre `335d671`, dada por buena)
+
+- `init.sh` verde (7.268 passed, 231 skipped, cobertura 100 %, 28/28). Alcance y mutantes
+  **recalculados** (`harness.alcance` + `harness.mutacion.generar_mutantes`): 132 líneas y
+  **8 mutantes**, todos en `domain/documento_adjuntos.py` (las 5 claves de
+  `FAMILIAS_ADJUNTOS`, los dos `is None`, `group(1)`); coinciden con
   `progress/mutacion_F-090.md`. Control del cero en `build_compras_step.py`: el fichero
-  entero sí genera 12 mutantes; en las 20 líneas del diff, 0 (solo añade un `_SubStep`
-  de datos y docstring). Cero legítimo.
+  entero genera 12; las 20 líneas del diff, 0 (un `_SubStep` de datos). Cero legítimo.
 - **Campaña no reejecutada: 2.427 s según el informe** (> 60 s): recálculo puro + RM1-RM6.
-- `ruff` sobre los ficheros nuevos: 1 aviso nuevo (cambio 5). `documents/read` leído en
-  `azure-apps/sigrid_api.md` §8.3 y en el código de `sigrid-api` (cambio 1).
 
 ## Checkpoints
 
-**C1** [x] `init.sh` en verde salvo el tope de este informe, ya corregido (arriba) · [x] ficheros del arnés.
+**C1** [x] `init.sh` en verde (arriba) · [x] ficheros del arnés.
 **C2** [x] una sola `in_progress` (F-090) · [x] rama `feature/F-090-documento-adjunto` ·
-[ ] `current.md` describe SOLO la sesión activa: la sección de F-090 dice «Mutación NO
-VÁLIDA … repetirla» (ya no es cierto) y sigue la sección «F-132 · FASE B … en curso»
-junto a la de «F-132 · CERRADA» (cambio 3) · [x] F-132 `done` tiene su entrada en `history.md`.
+[x] `current.md`: fuera la sección «F-132 · FASE B en curso» y F-090 con su estado real
+(pasada 2, cambio 3) · [x] F-132 `done` tiene su entrada en `history.md`.
 **C3** [x] hexagonal: el dominio solo importa `re` y `typing`; el SQL en `sql/compras/` con
 `14_`; el step solo añade datos · [x] primera línea con ruta en los 5 ficheros nuevos ·
 [x] sin `print`, sin TODO, sin secretos (barrido de IPs, GUID y `password` en el diff:
@@ -58,14 +66,12 @@ y 8 × 303,4 = 2.427 cuadra · [x] **RM3**: ninguno de los 8 es equivalente (cam
 familia o el grupo de la regex cambia el resultado; `15: ALBARAN` pisa la clave de
 FACTURA) · N/A **RM5**: rigor `estandar`, sin equivalentes · [x] **RM6**: no se quitó
 ninguna guarda · N/A campaña manual: la automática dio 8 · [x] sin supervivientes que
-analizar · [ ] **«Evidencias»**: la fila de mutación de `impl` §6 describe la campaña
-**anterior** (2 workers, «NO VÁLIDA … hay que repetirla») y no la válida que está en
-`progress/mutacion_F-090.md` (4 workers, `--timeout 1800`, 2.427 s, SHA `b88fdbb`); la fila
-de `init.sh` dice KO de entorno y no recoge el verde del árbol principal (cambio 2) ·
+analizar · [x] **«Evidencias»** (`impl` §6): campaña válida, 4 workers, `--timeout 1800`,
+2.427 s, SHA `b88fdbb`, e `init.sh` verde del árbol principal (pasada 2, cambio 2) ·
 [x] ningún N/A sin motivo.
 **C4 ter** N/A: no hay `harness/rutas_sensibles.json` en este repositorio.
-**C5** [ ] `tasks.md`: T1-T8 `[x]` con commit `F-090 Tn:`; T9-T11 MANUAL en `[ ]`, como
-debe ser; pero **T12 (`init.sh` en verde) sigue `[ ]`** y ya está en verde (cambio 4) ·
+**C5** [x] `tasks.md`: T1-T8 y T12 `[x]` con commit `F-090 Tn:` (T12 en `2f3d927`); T9-T11
+MANUAL en `[ ]`, como debe ser ·
 [x] `git status` limpio · [x] `features.json` en `in_progress`, correcto.
 
 ## Lo que pidió mirar el líder
@@ -78,7 +84,7 @@ debe ser; pero **T12 (`init.sh` en verde) sigue `[ ]`** y ya está en verde (cam
 - **Sin binario**: `gra` tiene dos binarios (`ima`, `pul`) y dos textos ilimitados (`tex`,
   `cam`) según `azure-apps/sigrid_tablas.md`: los cuatro fuera, R4 nombra la que falte.
 - **`cod` + `emp` bastan**: sí. `ruesma_rep.gra.cod` es único y la spec probó una lectura
-  con 200. Pero la receta publicada **no funciona tal cual**: falta `blob_column` (cambio 1).
+  con 200. La receta publicada ya lleva `blob_column: ima` (cambio 1, pasada 2).
   Los avisos del 11 % sin nombre y del 0,23 % sin binario están en la ficha y en `azure-apps`.
 - **Objetos intactos**: ningún SQL de `compras` cambia salvo el nuevo `14_` (R17 vigila `01_`);
   `documento_procesos` y `v_estado_documentos` no dependen del `14` ni él de ellos.
@@ -107,32 +113,7 @@ debe ser; pero **T12 (`init.sh` en verde) sigue `[ ]`** y ya está en verde (cam
 | R19-R25, R27 | `test_f090_diccionario.py::test_f090_r19_*` … `r25_*`, `r27_*` (22) |
 | R26, R28, R29 | MANUAL: T9, T11 y T10 (`impl_F-090.md` §5, pasos 3-5) |
 
-## Cambios requeridos
-
-1. **La receta de `documents/read` está incompleta, y el MCP la va a leer.**
-   `config/diccionario/compras.yaml`, ficha `documento_adjuntos`, párrafo «EL FICHERO NO
-   ESTA EN EL DATAMART» (`database: ruesma_rep`, `table: gra`, `id_column: cod`,
-   `id_value` = `cod_repositorio`), y la misma lista en `azure-apps/datamart_seg_anual.md`
-   (sección F-090): falta **`blob_column: ima`**, que `sigrid-api` exige
-   (`Field(...)`, `sigrid-api/domain/models/sql_models.py:182`; es lo que usó la prueba de
-   `progress/spec_F-090.md` l. 74-75). Añadirlo en los dos sitios, y en
-   `tests/test_f090_diccionario.py::test_f090_r21_*` añadir `"blob_column"` a los datos
-   buscados para que no se vuelva a caer. Aclarar de paso que ese `ima` es la columna de
-   `ruesma_rep.gra`, no la de `raw.gra` (que se excluye), para que nadie lea contradicción.
-2. **`progress/impl_F-090.md` §6 «Evidencias»**: sustituir la fila de mutación por la
-   campaña válida (8/8 muertos, 0 supervivientes, **4 workers**, `--timeout 1800`, 2.427 s,
-   línea base ~710 s, SHA `b88fdbb`, `progress/mutacion_F-090.md`) y la fila de `init.sh` por
-   el verde del árbol principal (passed, skipped, cobertura 100 % 28/28). La nota «hay que
-   repetirla» de §5 paso 1 pasa a «hecho».
-3. **`progress/current.md`**: en la sección de F-090, quitar «Mutación NO VÁLIDA … repetirla»
-   y poner el estado real (mutación válida, `init.sh` verde, en review). Retirar la sección
-   «F-132 · FASE B, rama BORRAR, en curso», que contradice la de «CERRADA» (F-132 ya está en
-   `history.md`).
-4. **`specs/F-090-documento-adjunto/tasks.md`**: marcar T12 `[x]` (init.sh verde en el árbol
-   principal, con la cifra). T9-T11 se quedan `[ ]`: son MANUAL.
-5. **`tests/test_f090_dominio.py:184`**: ruff SIM300 («yoda»), aviso nuevo: `ruff check --fix`.
-
-Ninguno toca producción ni SQL: pasada 2 incremental desde `335d671`, sin repetir campaña.
+Sin cambios requeridos.
 
 **Automejora (propuesta, no aplicada)**: en `CHECKPOINTS.md` C4 bis, «Evidencias», añadir
 «y coinciden con el `progress/mutacion_F-XXX.md` vigente (workers, tiempo, SHA)»: aquí la
