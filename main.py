@@ -4928,12 +4928,11 @@ def build_compras() -> None:
 
 @cli.command("reset-compras")
 def reset_compras() -> None:
-    """Vacía el esquema compras SALVO la foto diaria. Lanza después `build-compras`.
+    """Vacía el esquema compras (sin tirarlo). Lanza después `build-compras`.
 
-    F-067 (decisión del 2026-10-06): ya no borra el esquema entero. Borra sus
-    vistas, tablas y funciones y CONSERVA `compras.historial_estados` y
-    `compras.historial_estados_fotos`, la foto diaria de estados, que no se
-    puede recuperar (desde F-132, respaldo de `rac` en contraste). El SQL vive en
+    Borra sus vistas, tablas y funciones; no hace `DROP SCHEMA`. Desde F-132
+    (Fase B, 2026-10-09) no conserva ninguna tabla: la foto diaria de estados
+    de F-067, la única que no se reconstruía, se retiró. El SQL vive en
     `etl_sigrid/infrastructure/postgres/compras_reset_sql.py`.
     """
     pg = _get_pg()
@@ -4941,96 +4940,80 @@ def reset_compras() -> None:
         cur.execute(SQL_RESET_COMPRAS)
         conn.commit()
     click.secho(
-        "compras vaciado SALVO la foto diaria (historial_estados e "
-        "historial_estados_fotos, que se conservan). Lanza `python main.py "
-        "build-compras`.",
+        "compras vaciado (vistas, tablas y funciones; el esquema se conserva). "
+        "Lanza `python main.py build-compras`.",
         fg="green",
     )
 
 
-
-@cli.command("contraste-estados")
+@cli.command("retirar-foto-estados")
 @click.option(
-    "--timeout",
-    default=300,
-    show_default=True,
-    help="Segundos por consulta (SET LOCAL statement_timeout).",
+    "--confirmar",
+    is_flag=True,
+    default=False,
+    help="Borra de verdad. Sin él, solo lee y dice qué borraría.",
 )
-def contraste_estados_cmd(timeout: int) -> None:
+def retirar_foto_estados_cmd(confirmar: bool) -> None:
     """
-    Contrasta la foto diaria de estados (F-067) con `rac` (F-132). SOLO LECTURA.
+    Borra las dos tablas de la foto diaria de estados de F-067 (F-132, Fase B).
 
-    Desde F-132 la antigüedad del estado la publica `compras.v_estado_documentos`
-    a partir del último paso de `rac`; la foto sigue tomándose como RESPALDO
-    hasta que el humano, con este contraste delante, decida si se retira (D7).
+    Decisión del humano del 2026-10-09 (D7 = BORRAR): la antigüedad del estado
+    sale de `rac` (`compras.v_estado_documentos`) y el contraste de las dos
+    noches que hubo no encontró ninguna discrepancia. Ningún build las crea ni
+    las lee ya; este comando las borra UNA vez, a mano, DESPUÉS de desplegar la
+    imagen que ya no toma la foto (si no, la nocturna vieja las vuelve a crear).
 
-    Cada cambio que vio la foto se explica con `rac` como PASO, DESHECHO,
-    VUELTA_AL_INICIAL o FUERA_DE_PROCESO, y cada documento con pasos en la
-    ventana que la foto no vio cambiar, como ALTA o IDA_Y_VUELTA. Lo que no
-    casa es DISCREPANCIA: sus `documento_id` se imprimen y el comando sale con
-    código 1. Sin ninguna foto después de la línea base, sale con 0 sin
-    clasificar nada.
-
-    Se recalcula ENTERO sobre todas las noches cada vez (la foto guarda todas
-    y `rac` es la historia completa) y no corre en la nocturna (D8). Es la
-    historia NETA: un paso deshecho DESPUÉS de una noche cambia la clase de esa
-    noche al recalcular (de PASO a DESHECHO).
-
-    Las cuatro consultas van en transacciones READ ONLY con su
-    statement_timeout (el SQL, en `contraste_estados_sql.py`): las tablas de la
-    foto no se pueden recuperar y el servidor es compartido con producción.
+    Sin `--confirmar`: lee en una transacción READ ONLY cuáles de las dos
+    existen y cuántas filas tienen, y NO borra nada. Con `--confirmar`: las
+    borra en UNA transacción (`DROP TABLE IF EXISTS` de las dos, sin `CASCADE`
+    y con `lock_timeout`) y vuelve a leer para comprobar que ya no están; sale
+    con 1 si alguna sigue. Repetirlo es inocuo. El SQL vive en
+    `etl_sigrid/infrastructure/postgres/retirar_foto_sql.py`.
     """
-    from etl_sigrid.domain.estado_documentos import (
-        PasoEstado,
-        contrastar,
-        discrepancias,
-        formatear_contraste,
-    )
     from etl_sigrid.infrastructure.logging_config import get_logger
-    from etl_sigrid.infrastructure.postgres.contraste_estados_sql import (
-        SQL_CAMBIOS,
-        SQL_FOTOS,
-        SQL_NO_VISTOS,
-        SQL_PASOS,
+    from etl_sigrid.infrastructure.postgres.retirar_foto_sql import (
+        SENTENCIAS_RETIRADA,
+        SQL_TABLAS_FOTO,
+        TABLAS_FOTO,
     )
 
-    logger = get_logger("contraste-estados")
-    click.echo("Contraste foto diaria <-> rac · SOLO LECTURA, transacciones READ ONLY")
+    logger = get_logger("retirar-foto-estados")
     pg = _get_pg()
+    modo = "CON --confirmar: se borran" if confirmar else "SIN --confirmar: solo lectura"
+    click.echo(f"Retirada de la foto diaria de estados (F-132, Fase B) · {modo}")
 
-    noches = [
-        observado for observado, es_linea_base, _ in pg.filas_solo_lectura(SQL_FOTOS, timeout)
-        if not es_linea_base
-    ]
-    if not noches:
+    presentes = dict(pg.filas_solo_lectura(SQL_TABLAS_FOTO, 120))
+    for tabla in TABLAS_FOTO:
+        filas = presentes.get(tabla)
+        estado = "no existe" if filas is None else f"{filas} filas"
+        click.echo(f"  compras.{tabla}: {estado}")
+    if not presentes:
+        click.echo("Ninguna de las dos tablas existe: nada que borrar.")
+        logger.info("retirar_foto_estados_nada", confirmar=confirmar)
+        return
+    if not confirmar:
         click.echo(
-            "No hay ninguna foto posterior a la línea base: nada que contrastar."
+            "NO se ha borrado nada. Para borrarlas, en UNA transacción: "
+            "`python main.py retirar-foto-estados --confirmar`."
         )
-        logger.info("contraste_estados_sin_fotos")
+        logger.info("retirar_foto_estados_simulado", tablas=sorted(presentes))
         return
 
-    cambios = pg.filas_solo_lectura(SQL_CAMBIOS, timeout)
-    no_vistos = pg.filas_solo_lectura(SQL_NO_VISTOS, timeout)
-    ids = sorted({fila[0] for fila in cambios} | {fila[0] for fila in no_vistos})
-    pasos: dict[int, list[PasoEstado]] = {}
-    if ids:
-        for documento_id, orden, destino, momento in pg.filas_solo_lectura(
-            SQL_PASOS, timeout, (ids,)
-        ):
-            pasos.setdefault(documento_id, []).append(PasoEstado(orden, destino, momento))
+    with pg.connection() as conn, conn.cursor() as cur:
+        for sentencia in SENTENCIAS_RETIRADA:
+            cur.execute(sentencia)
+        conn.commit()
+    click.echo("Borradas: " + ", ".join(f"compras.{t}" for t in TABLAS_FOTO))
 
-    contrastados = contrastar(cambios, no_vistos, pasos)
-    click.echo(formatear_contraste(contrastados, noches))
-    n_discrepancias = discrepancias(contrastados)
-    logger.info(
-        "contraste_estados_hecho",
-        noches=len(noches),
-        cambios=len(cambios),
-        no_vistos=len(no_vistos),
-        discrepancias=n_discrepancias,
-    )
-    if n_discrepancias:
+    quedan = sorted(dict(pg.filas_solo_lectura(SQL_TABLAS_FOTO, 120)))
+    logger.info("retirar_foto_estados_hecho", borradas=sorted(presentes), quedan=quedan)
+    if quedan:
+        click.secho(
+            "ERROR: siguen existiendo: " + ", ".join(f"compras.{t}" for t in quedan),
+            fg="red",
+        )
         raise SystemExit(1)
+    click.secho("Comprobado: ya no queda ninguna de las dos.", fg="green")
 
 
 @cli.command("inspect-contrato-consumo")

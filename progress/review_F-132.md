@@ -3,6 +3,8 @@ Revisión completa (pasada 1) · FASE A · diff `4d25fcb..ef67f4e` (implementer)
 
 # F-132 · Review · Fase A · APPROVED
 
+> **Fase B (rama BORRAR): APPROVED el 2026-10-09** sobre `d74c9fd`, en `progress/review_F-132_faseB.md`.
+
 **Veredicto: APPROVED** (solo la Fase A: T1-T13 y T15. T14 es MANUAL del humano. La Fase B, T16-T21, NO está revisada ni empezada).
 
 **Nivel de rigor: `estandar`** (declarado en `features.json`). Exige fase RED, cobertura ≥ 80 % de lo cambiado, mutación muestreada (20, semilla del nivel) y la sección «Evidencias».

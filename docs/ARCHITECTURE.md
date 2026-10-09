@@ -297,40 +297,35 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
     descompuesto de la noche anterior (la primera ABC y el master 0 están
     congelados). Regla D4: la primera ABC si casa; si no, la versión anterior
     más reciente que case; nunca una posterior; sin ABC, solo Estudios.
-- **LA FOTO DIARIA DE ESTADOS, QUE NO SE RECONSTRUYE (F-067), HOY RESPALDO EN
-  CONTRASTE (F-132).** Se montó creyendo que Sigrid no fechaba el cambio de
-  estado (`concam` no audita `con.est` y `confir` no tiene firmas de
-  contrato); F-085 lo desmintió el 2026-10-07: la fecha está en `rac` (punto
-  siguiente) y desde F-132 la antigüedad del estado sale de ahí. La foto sigue
-  tomándose igual mientras dura el contraste. `sql/compras/11_historial_estados.sql`
-  toma cada noche una foto de `con.est` de contratos (tip 44) y facturas (15)
-  y la guarda **por tramos** (documento, estado, `desde`, `hasta`): la foto de
-  un día D es `desde <= D < COALESCE(hasta, ∞)`. Unos 186.000 tramos de línea
-  base y < 50.000 filas al año, frente a 68 M al año de una fila por documento
-  y día. Lo que cambia en la arquitectura:
-  - **`compras.historial_estados` e `historial_estados_fotos` son las dos
-    primeras tablas PERSISTENTES de `compras`.** Se crean con `CREATE TABLE IF
-    NOT EXISTS` y el fichero no tiene ni `DROP`, ni `TRUNCATE`, ni `DELETE`
-    (test). El resto de `compras` se rehace con `DROP ... CASCADE` y no las
-    toca porque no dependen de nada del esquema; `--full` solo trunca `raw`.
-    **Si alguien las borra, la historia de la foto se pierde** y vuelve a
-    empezar desde una línea base nueva: lo único que la foto ve y `rac` no (el
-    día en que se DESHIZO un paso) no se puede recuperar. Por eso `python main.py
-    reset-compras` (decisión del 2026-10-06) ya no tira el esquema: borra sus
-    vistas, tablas y funciones y CONSERVA estas dos (un test veta cualquier
-    borrado del esquema `compras` entero en el código del repositorio).
-  - **Guardas**: sin `raw.con` más nuevo que la última foto no se escribe nada
-    (relanzar el build es inocuo); si los documentos presentes son menos del
-    98 % de los tramos abiertos, `RAISE EXCEPTION` y el build falla sin
-    escribir (una ingesta a medias cerraría miles de tramos como
-    DESAPARECIDOS). La regla vive en `domain/historial_estados.py` y el SQL
-    lleva sus literales (test).
-  - **Una noche perdida no se recupera**: si `build_compras` falla, el cambio
-    de esos días se ve con dos noches de ventana (`observado_antes`), y el hueco
-    queda en `historial_estados_fotos`. La historia empieza el día del
-    despliegue; la primera foto es la línea base y su antigüedad es un mínimo.
+- **LA FOTO DIARIA DE ESTADOS DE F-067, RETIRADA POR F-132 (Fase B,
+  2026-10-09).** F-067 montó una foto diaria de `con.est` de contratos y
+  facturas (`sql/compras/11_historial_estados.sql`), guardada por tramos en las
+  dos primeras tablas PERSISTENTES de `compras` (`historial_estados` e
+  `historial_estados_fotos`), creyendo que Sigrid no fechaba el cambio de
+  estado. F-085 lo desmintió el 2026-10-07 (la fecha está en `rac`, punto
+  siguiente), F-132 publicó la antigüedad del estado desde ahí y, tras
+  contrastar la foto con `rac` dos noches (492 cambios, 0 discrepancias), el
+  humano decidió BORRARLA. Lo que queda en la arquitectura:
+  - **`compras` vuelve a reconstruirse entero cada noche**: ya no existe
+    `11_historial_estados.sql` ni su sub-paso (el hueco en la numeración se
+    deja: renumerar cambiaría los nombres de `12` y `13`), y
+    `python main.py reset-compras` borra todas sus vistas, tablas y funciones
+    sin tirar el esquema (un test veta cualquier `DROP SCHEMA` de `compras` en
+    el código del repositorio).
+  - **Las dos tablas se borran UNA vez, a mano**, con
+    `python main.py retirar-foto-estados --confirmar` (`retirar_foto_sql.py`, el
+    único fichero de `etl_sigrid/` que las nombra, y un test lo veta): un
+    `DROP TABLE IF EXISTS` de las dos en una transacción, sin `CASCADE` y con
+    `lock_timeout`, y una relectura que lo comprueba. Sin `--confirmar` lee en
+    READ ONLY y dice qué borraría. Va DESPUÉS de desplegar la imagen que ya no
+    toma la foto: con la imagen vieja, la nocturna las volvería a crear.
+  - **Lo que se pierde**: lo único que la foto veía y `rac` no, la noche en que
+    se DESHIZO un paso (~9 al día). Hasta F-105 (`dbo.log`) no está en el
+    datamart.
+- **LO QUE F-067 DEJÓ Y NO ERA LA FOTO** sigue vigente:
   - **`con.tiemod` es una fecha de Delphi** (días desde 1899-12-30, hora en la
-    parte decimal; `compras.fn_sigrid_tiempo`). SQL Server la lee con época
+    parte decimal; `compras.fn_sigrid_tiempo`, con la época en
+    `domain/fecha_delphi.py`). SQL Server la lee con época
     1900-01-01 y da dos días más. Se publica como
     `contratos.fecha_ultima_modificacion` y **no** es la fecha del cambio de
     estado: la firma no la mueve.
@@ -345,7 +340,7 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
   (`fn_estado_documento`), el login y el nombre (`raw.usu`, casado en mayúsculas
   y sin espacios), la fecha y la hora, el `orden` en su documento, `es_ultimo`,
   `encaja_con_anterior` y los días desde el paso anterior. Se reconstruye cada
-  noche y va DETRÁS de la foto de F-067. La regla (familias, orden, hora válida,
+  noche. La regla (familias, orden, hora válida,
   login) vive una vez en `domain/documento_procesos.py` y el SQL lleva sus
   literales (test). Es historia NETA: «Deshacer proceso» borra el paso.
   - **Los datos personales se quedan en `personal`**: `compras` publica login y
@@ -365,11 +360,9 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
   Historia NETA: un paso deshecho no se fecha. Va el ÚLTIMO de `build_compras`
   porque el `DROP ... CASCADE` de `12` tira la vista cada noche. La regla
   (familias, estados iniciales, orígenes) vive en `domain/estado_documentos.py`
-  y el SQL lleva sus literales (test). Ya no lee la foto de F-067, que queda
-  como RESPALDO: `python main.py contraste-estados` (solo lectura, a demanda,
-  fuera de la nocturna) recalcula sobre todas las noches cómo explica `rac`
-  cada cambio que vio la foto y sale con 1 si alguno no casa. Con ese
-  contraste delante, el humano decide si la foto se retira (Fase B).
+  y el SQL lleva sus literales (test). No lee la foto de F-067: durante la
+  Fase A se contrastó con ella (`python main.py contraste-estados`, de solo
+  lectura y ya retirado) y la Fase B la borró (punto de la foto, arriba).
 
 ## Acceso a datos
 
@@ -525,7 +518,7 @@ vuelva a buscarlo:
   contrato y en una factura). Es la historia NETA: «Deshacer proceso» borra el
   paso; la bruta está en `dbo.log` (F-105). Desde F-132 la antigüedad del
   estado sale de aquí (`compras.v_estado_documentos`), y la foto diaria de
-  F-067 queda como respaldo mientras dura el contraste.
+  F-067 se retiró (F-132, Fase B, 2026-10-09).
 - **Los contratos no pasan por el circuito de firma** (`confir`): sus 69.993
   firmas son de comparativos, facturas y obras, y las de factura vienen sin
   fecha. `PFfir` y `logfirdoc`, donde el backlog esperaba encontrarlo, están

@@ -160,13 +160,14 @@ $$;
 -- decimal (46300,537627 = 2026-10-05 12:54:10). OJO, MEDIDO: SQL Server, con
 -- `CAST(... AS datetime)`, usa la época 1900-01-01 y da DOS DÍAS MÁS —el
 -- 2026-10-07, imposible el día de la medición—. La época es `EPOCA_DELPHI` de
--- `etl_sigrid/domain/historial_estados.py` (lo fija `tests/test_f067_sql.py`).
+-- `etl_sigrid/domain/fecha_delphi.py` (lo fija `tests/test_f067_sql.py`).
 -- El 0 de Sigrid es NULL. Es la misma época que `personal.fn_fecha_serie`
 -- (F-101), que descarta la hora; esta la conserva.
 --
 -- `con.tiemod` NO ES LA FECHA DEL CAMBIO DE ESTADO (D2 del humano): es la
 -- última modificación del documento, y la firma no la mueve. La antigüedad del
--- estado sale de la foto diaria (`11_historial_estados.sql`).
+-- estado sale de `rac`: `compras.v_estado_documentos` (F-132,
+-- `13_estado_documentos.sql`).
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION compras.fn_sigrid_tiempo(v DOUBLE PRECISION)
 RETURNS TIMESTAMP

@@ -207,6 +207,14 @@ infraestructura.
 > **206**; y con `personal.usuarios_sigrid` (el usuario con su empleado y su
 > DNI), a **207 objetos**. Las columnas descritas suben de 1589 a **1619**
 > (23 + 7) y las fichas de consumo en dos.
+>
+> **Enmienda del 2026-10-09 (F-132, Fase B: la foto diaria se retira).** El
+> humano decide BORRAR la foto diaria de estados de F-067: salen
+> `compras.historial_estados` y `compras.historial_estados_fotos` (su SQL, sus
+> fichas y las tablas, que borra a mano `retirar-foto-estados --confirmar`). La
+> antigüedad del estado sigue en `compras.v_estado_documentos`, desde `rac`. El
+> inventario baja de 207 a **205 objetos**, las columnas descritas de 1623 a
+> **1608** (8 + 7) y las fichas de consumo en dos.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,

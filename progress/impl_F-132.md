@@ -216,3 +216,5 @@ Orden sugerido, tras integrar la rama:
   antigüedad «la da la foto diaria»; no se toca (spec y huella de F-073).
 - **Falta para cerrar**: review; MANUAL de §6 (despliegue, `build-compras`,
   contraste, v46, MCP y R24); contraste de 14 noches y decisión D7.
+- **FASE B (rama BORRAR, 2026-10-09)**: informe aparte, `progress/impl_F-132_faseB.md`
+  (este está en su tope); mutación en `progress/mutacion_F-132_faseB.md`.
