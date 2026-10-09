@@ -9,9 +9,18 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-09 · F-090 · SPEC ESCRITA (`specs/F-090-documento-adjunto/`), pendiente de aprobación
+## 2026-10-09 · F-090 · IMPLEMENTACIÓN en curso (implementer) · `in_progress`
 
-> Prioridad 1 y `sdd: true` (el humano, 2026-10-09); `status` sigue `pending`. Mediciones en `progress/spec_F-090.md`: el binario SÍ está, en `ruesma_rep` (99,75 % casa por `(emp, cod)`; `documents/read` probado con una factura), así que la ficha y el `acceptance` se han corregido. Índice propio `compras.documento_adjuntos` (199.042 enlaces de cinco familias, filtrado en origen). **Decisiones abiertas D1-D7** al final de `requirements.md` (familias, filtro en origen, login de quien sube, sin `auxgra`, sin marca de binario, `facturas` intacta, aceptar el `acceptance` reescrito). Trabajo en el worktree `../datamart-seg-anual-wt-f090` (rama `feature/F-090-documento-adjunto`, desde `main`). `init.sh` allí: 2 KO, ambos de ENTORNO y no de la spec: falta `.env` en el worktree (no se copia, regla dura) y, por eso, `tests/test_f006_comandos.py::test_f006_t26_cli_dry_run_no_toca_la_base` falla (lee `SigridApiSettings` del entorno; 255 tests pasaron antes de pararse con `-x`). Puerta de tamaño OK (145/150, 184/250).
+> Spec APROBADA por el humano el 2026-10-09 con D1-D7 según la recomendación
+> (`progress/spec_F-090.md` §8). Worktree `../datamart-seg-anual-wt-f090`, rama
+> `feature/F-090-documento-adjunto`, con `main` fusionado (`c7a8a54`: F-132 fase B y
+> F-135; conflictos solo en `BACKLOG.md`, regenerado, y en este fichero).
+
+- **Tarea en curso**: ver `specs/F-090-documento-adjunto/tasks.md` (las `[x]` están hechas).
+- **Entorno**: el worktree no tiene `.env` (regla dura: no se crea ni se copia), así que
+  `init.sh` aquí da KO de ENTORNO; la verificación final con `init.sh` en el árbol
+  principal la hace el líder.
+- **Desviaciones respecto a la spec**: se anotan aquí según aparezcan.
 
 ## 2026-10-09 · F-132 · FASE B, rama BORRAR, en curso (implementer) · `in_progress`
 
