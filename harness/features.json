@@ -2120,7 +2120,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 2,
+      "priority": 1,
       "branch": "feature/F-135-restringir-personal-contabilidad"
     }
   ]
