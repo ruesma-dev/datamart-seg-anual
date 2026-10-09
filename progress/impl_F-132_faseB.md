@@ -164,5 +164,5 @@ GREEN tras T20: `159 passed` (`f132_diccionario`, `f067_diccionario`, `f006_regl
 | Cobertura de las líneas cambiadas | **100,0 %** (42/42, umbral 80 %, nivel estándar; `PUERTA COBERTURA`, diff desde `09bec58`) |
 | Mutantes generados y supervivientes | **18 generados, 18 evaluados (campaña completa: menos de los 20 del muestreo), 16 muertos, 2 supervivientes, 0 timeouts**, 3.739,8 s con 2 workers. Los dos (el `120` del `statement_timeout` de las dos lecturas) eran un hueco real y los cierra un test nuevo, comprobado con el mutante aplicado a mano: `progress/mutacion_F-132_faseB.md` |
 | Tiempo de la suite | **1.362,92 s (22 min 42 s)** con cobertura; 309,86 s sin ella |
-| `init.sh` | Arranque sobre `a237288`: VERDE (7.245 passed). Final sobre `b0946ce`: **VERDE** («ENTORNO LISTO», tamaño impl 218/220). Tras el test de T21, ver `progress/current.md` |
+| `init.sh` | Arranque sobre `a237288`: VERDE (7.245 passed). Sobre `b0946ce`: VERDE (7.142 passed). **Final sobre `71ce870`** (con el test de T21): **VERDE**, 7.143 passed, 228 skipped, 12 min 59 s, cobertura 100 % (42/42), «ENTORNO LISTO», tamaño impl 220/220 |
 | Lectura real (solo lectura) | `retirar-foto-estados` sin `--confirmar` contra el Postgres del `.env`: 186.705 tramos y 3 fotos (§5) |

@@ -20,8 +20,8 @@
 
 - **Estado**: implementación de la FASE B TERMINADA, pendiente del reviewer. T16, T17, T18,
   T20 y T21 hechas (`02157ba`, `f4a30d8`, `b4f6a99`, `b0946ce` y el de T21); `azure-apps`
-  `8a8ac98`, sin push. Diccionario **v47 sin publicar**. `init.sh` final sobre `b0946ce`:
-  VERDE (7.142 passed, 228 skipped, 22 min 42 s; cobertura 100 %, 42/42). Mutación: 18
+  `8a8ac98`, sin push. Diccionario **v47 sin publicar**. `init.sh` final sobre `71ce870`: VERDE (7.143 passed, 12 min 59 s; antes, sobre `b0946ce`:
+  7.142 passed, 228 skipped, 22 min 42 s; cobertura 100 %, 42/42). Mutación: 18
   evaluados, 16 muertos, 2 supervivientes cerrados con test (`progress/mutacion_F-132_faseB.md`).
   Informe: `progress/impl_F-132_faseB.md` (MANUAL en su §5, EN ORDEN: imagen y job;
   `retirar-foto-estados` sin y con `--confirmar`; `publicar-diccionario` v47 +

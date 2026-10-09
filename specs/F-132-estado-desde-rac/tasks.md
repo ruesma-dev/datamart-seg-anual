@@ -28,4 +28,4 @@ Rama `feature/F-132-estado-desde-rac`. Un commit por tarea (`F-132 Tn: ...`). Fa
 - [x] T18: (borrar) comando `retirar-foto-estados [--confirmar]`, `compras_reset_sql.py` sin conservadas, fuera `contraste-estados`, fichas e inventario de F-006 207 → 205  |  Verificación: `pytest tests/test_f067_reset.py tests/test_f132_contraste.py tests/test_f006_*.py`
 - [ ] T19: (congelar) fichas «CONGELADA» con fechas y `reset-compras` intacto  |  Verificación: `pytest tests/test_f132_diccionario.py`
 - [x] T20: diccionario v47, `docs/ARCHITECTURE.md` y `azure-apps` según la rama; MANUAL: el humano lanza `retirar-foto-estados --confirmar` (rama borrar) tras desplegar  |  Verificación: `python main.py check-diccionario` (MANUAL, humano)
-- [ ] T21: Ejecutar `bash harness/init.sh` en verde  |  Verificación: `bash harness/init.sh`
+- [x] T21: Ejecutar `bash harness/init.sh` en verde  |  Verificación: `bash harness/init.sh`
