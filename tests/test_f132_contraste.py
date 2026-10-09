@@ -455,3 +455,17 @@ def test_f132_r15_justo_50_discrepancias_no_dicen_que_haya_mas() -> None:
 
     assert linea.startswith("DISCREPANCIA 2026-10-08 00:03:01: 51, 52, ")
     assert linea.endswith(", 100")
+
+
+def test_f132_r17_sin_timeout_cada_consulta_lleva_300_s_y_la_ayuda_lo_dice(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Superviviente de la campaña (`default=300` y `show_default=True`): el
+    `statement_timeout` por defecto es lo que protege al servidor compartido."""
+    pg = _PgContraste(FOTOS, CAMBIOS, NO_VISTOS, PASOS)
+
+    _lanzar(monkeypatch, pg)
+    ayuda = _lanzar(monkeypatch, pg, "--help")
+
+    assert {t for _, t, _ in pg.llamadas} == {300}
+    assert "default: 300" in ayuda.output
