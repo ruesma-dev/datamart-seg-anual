@@ -1,30 +1,22 @@
 # etl_sigrid/infrastructure/postgres/compras_reset_sql.py
 """
-F-067 · El SQL de `python main.py reset-compras`. **Solo construye texto.**
+F-067 · F-132 · El SQL de `python main.py reset-compras`. **Solo construye texto.**
 
-Hasta el 2026-10-06 el comando hacía `DROP SCHEMA ... CASCADE` sobre `compras`,
-y eso se habría llevado las dos tablas PERSISTENTES de la foto diaria de
-estados (`TABLAS_PERSISTENTES` del dominio): historia de la foto que no se
-puede recuperar (desde F-132, respaldo de `rac` en contraste). Decisión del humano (delegada en el líder, opción a):
-`reset-compras` borra TODO lo demás del esquema —vistas, tablas y funciones,
-en ese orden y con `CASCADE`— y NUNCA esas dos tablas ni sus índices, que
-mueren solo con su tabla. Después, `build-compras` lo reconstruye todo y la
-foto sigue donde estaba.
+Vacía el esquema `compras` SIN tirarlo: borra sus vistas, tablas y funciones,
+en ese orden y con `CASCADE`, y después `build-compras` lo reconstruye todo.
 
-Por qué es seguro el `CASCADE`: las dos tablas no dependen de ningún objeto de
-`compras` (ni claves foráneas, ni funciones en sus `CHECK` o `DEFAULT`), así
-que borrar los demás no las arrastra. Desde F-132 ninguna vista las lee:
-`compras.v_estado_documentos` sale de `rac`, se borra con las demás y
-`build-compras` la recrea.
+HISTORIA. Hasta el 2026-10-06 el comando hacía `DROP SCHEMA ... CASCADE`. F-067
+lo cambió para conservar las dos tablas de la foto diaria de estados, que no se
+reconstruían (decisión del humano, delegada en el líder, opción a): borraba
+todo lo demás. F-132 (Fase B, rama BORRAR, decisión del humano del 2026-10-09)
+retiró la foto y con ella la lista de conservadas (R26): ya no queda en
+`compras` ninguna tabla que no se reconstruya, así que se borran TODAS. Se
+mantiene el no tirar el esquema (R26: «sin `DROP SCHEMA`»).
 """
 
 from __future__ import annotations
 
-from etl_sigrid.domain.historial_estados import TABLAS_PERSISTENTES
-
-_CONSERVADAS = ", ".join(f"'{tabla}'" for tabla in TABLAS_PERSISTENTES)
-
-SQL_RESET_COMPRAS = f"""
+SQL_RESET_COMPRAS = """
 DO $$
 DECLARE
     r RECORD;
@@ -40,12 +32,11 @@ BEGIN
                        r.relname);
     END LOOP;
 
-    -- 2 · Las tablas, MENOS las persistentes de la foto diaria.
+    -- 2 · Las tablas, TODAS: desde F-132 ninguna de `compras` es persistente.
     FOR r IN
         SELECT c.relname
         FROM   pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
         WHERE  n.nspname = 'compras' AND c.relkind IN ('r', 'p')
-          AND  c.relname NOT IN ({_CONSERVADAS})
     LOOP
         EXECUTE format('DROP TABLE IF EXISTS compras.%I CASCADE', r.relname);
     END LOOP;

@@ -1,12 +1,14 @@
 # tests/test_f067_reset.py
 """
-F-067 · `reset-compras` CONSERVA la foto diaria (decisión del 2026-10-06).
+F-067 · F-132 · `reset-compras` vacía el esquema `compras` SIN tirarlo.
 
-`compras.historial_estados` y `compras.historial_estados_fotos` son historia que
-no existe en Sigrid: si se borran, no vuelven. `reset-compras` borraba el
-esquema entero con `CASCADE` y se las habría llevado. Decisión del humano (delegada
-en el líder, opción a): el comando borra todo lo demás de `compras` —vistas,
-tablas y funciones— y NUNCA esas dos tablas ni sus índices.
+HISTORIA. Hasta el 2026-10-06 el comando hacía `DROP SCHEMA ... CASCADE`. F-067
+lo cambió (decisión del humano, opción a) para conservar las dos tablas de la
+foto diaria de estados, que no se reconstruían: borraba vistas, tablas y
+funciones MENOS esas dos. F-132 (Fase B, rama BORRAR, decisión del humano del
+2026-10-09) retiró la foto, y con ella la lista de conservadas (R26): hoy borra
+TODAS las vistas, tablas y funciones de `compras`, y sigue sin tirar el esquema
+(R26: «sin lista de persistentes y sin `DROP SCHEMA`»).
 
 Ningún test abre red ni BBDD: el SQL se lee como texto y el comando se ejecuta
 contra un doble de `main._get_pg`.
@@ -20,7 +22,7 @@ from pathlib import Path
 from click.testing import CliRunner
 
 import main
-from etl_sigrid.domain.historial_estados import TABLAS_PERSISTENTES
+from etl_sigrid.infrastructure.postgres import compras_reset_sql
 from etl_sigrid.infrastructure.postgres.compras_reset_sql import SQL_RESET_COMPRAS
 
 RAIZ = Path(__file__).resolve().parents[1]
@@ -34,23 +36,25 @@ def _compacto(texto: str) -> str:
     return re.sub(r"\s+", " ", texto)
 
 
-# `las_persistentes_son_las_que_crea_la_foto` se retira con
-# `11_historial_estados.sql` (F-132, Fase B): ya no hay foto que las cree.
-
-
 def test_f067_reset_no_borra_el_esquema() -> None:
     assert not VETO.search(SQL_RESET_COMPRAS)
     assert "DROP SCHEMA" not in SQL_RESET_COMPRAS.upper()
 
 
-def test_f067_reset_las_tablas_se_borran_todas_menos_las_persistentes() -> None:
+def test_f132_r26_reset_borra_todas_las_tablas_sin_lista_de_conservadas() -> None:
     sql = _compacto(SQL_RESET_COMPRAS)
-    lista = ", ".join(f"'{t}'" for t in TABLAS_PERSISTENTES)
     assert (
-        "WHERE n.nspname = 'compras' AND c.relkind IN ('r', 'p') "
-        f"AND c.relname NOT IN ({lista})" in sql
+        "WHERE n.nspname = 'compras' AND c.relkind IN ('r', 'p') LOOP "
+        "EXECUTE format('DROP TABLE IF EXISTS compras.%I CASCADE', r.relname);" in sql
     ), sql
-    assert "EXECUTE format('DROP TABLE IF EXISTS compras.%I CASCADE', r.relname);" in sql
+    assert "NOT IN" not in sql.upper(), "sin la foto no queda nada que conservar"
+    assert "historial_estados" not in SQL_RESET_COMPRAS
+
+
+def test_f132_r26_reset_ya_no_depende_del_dominio_de_la_foto() -> None:
+    assert not hasattr(compras_reset_sql, "TABLAS_PERSISTENTES")
+    texto = Path(compras_reset_sql.__file__).read_text(encoding="utf-8")
+    assert "domain.historial_estados" not in texto
 
 
 def test_f067_reset_vistas_y_funciones_se_borran_todas() -> None:
@@ -70,12 +74,9 @@ def test_f067_reset_borra_en_orden_vistas_tablas_funciones() -> None:
     assert orden == sorted(orden)
 
 
-def test_f067_reset_ningun_indice_ni_tabla_persistente_se_nombra_para_borrar() -> None:
-    """Los índices de las dos tablas mueren solo con su tabla: no hay ningún
-    `DROP INDEX` y nada borra por nombre una persistente."""
+def test_f067_reset_ningun_indice_se_borra_por_nombre() -> None:
+    """Los índices mueren con su tabla: no hay ningún `DROP INDEX`."""
     assert "DROP INDEX" not in SQL_RESET_COMPRAS.upper()
-    for tabla in TABLAS_PERSISTENTES:
-        assert f"compras.{tabla}" not in SQL_RESET_COMPRAS
 
 
 class _Cursor:
@@ -118,7 +119,7 @@ class _PgFalso:
         return self.conexion
 
 
-def test_f067_reset_el_comando_ejecuta_el_reset_que_conserva_la_foto(monkeypatch) -> None:
+def test_f132_r26_el_comando_vacia_compras_entero(monkeypatch) -> None:
     pg = _PgFalso()
     monkeypatch.setattr(main, "_get_pg", lambda: pg)
 
@@ -127,12 +128,14 @@ def test_f067_reset_el_comando_ejecuta_el_reset_que_conserva_la_foto(monkeypatch
     assert resultado.exit_code == 0, resultado.output
     assert pg.conexion.ejecutadas == [SQL_RESET_COMPRAS]
     assert pg.conexion.commits == 1
-    assert "historial_estados" in resultado.output
+    assert "historial_estados" not in resultado.output
+    assert "SALVO" not in resultado.output
+    assert "build-compras" in resultado.output
 
 
 def test_f067_reset_veto_nadie_tira_el_esquema_compras() -> None:
-    """Ni `main.py`, ni un script, ni un parche viejo: tirar el esquema entero
-    se llevaría la historia. Se barre el código del repositorio."""
+    """Ni `main.py`, ni un script, ni un parche viejo tira el esquema entero
+    (R26 de F-132 lo mantiene). Se barre el código del repositorio."""
     excluidos = {".git", ".claude", ".venv", "venv", "node_modules", "__pycache__"}
     culpables = []
     for patron in ("*.py", "*.sql", "*.ps1", "*.sh"):

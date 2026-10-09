@@ -18,7 +18,7 @@
 > aplica). Orden del despliegue: imagen y job PRIMERO; después `retirar-foto-estados
 > --confirmar` (MANUAL del humano); después diccionario v47 y MCP (el líder).
 
-- **Estado**: T16 hecha (cierre del contraste anotado). `init.sh` de arranque sobre
+- **Estado**: T16, T17 y T18 hechas (commits `02157ba`, `f4a30d8` y el de T18). `init.sh` de arranque sobre
   `a237288`: VERDE (7.245 passed, 229 skipped, 29 min 13 s).
 - **Diccionario del árbol tras la Fase B: 205 objetos, 1608 columnas, 96 de consumo**
   (fuera las dos fichas de la foto: 8 + 7 columnas; versión sin publicar).
@@ -36,6 +36,19 @@
     Fase A). El veto nuevo de `test_f132_retirada.py` mira lo EJECUTABLE del SQL.
   - `00_setup.sql` (observación 1 del review) y `12_documento_procesos.sql`: solo
     comentarios, que citaban la foto o su módulo.
+  - **El dominio del contraste también sale** (`clasificar_cambio`,
+    `clasificar_no_visto`, `contrastar`, `discrepancias`, `formatear_contraste`,
+    `CLASES_*`, `Contrastado`) con sus tests de `test_f132_dominio.py` (R13, R14):
+    solo servían al comando retirado. Quedan `fecha_estado` y `dias_en_estado`.
+  - **`tests/test_f132_contraste.py` se queda con los dos tests de
+    `filas_solo_lectura(params=...)`**, la pieza general que trajo el contraste y
+    que sigue en `PostgresClient`. Los tests de la Fase B van en
+    `tests/test_f132_retirada.py` (nuevo): T18 se verifica con los dos.
+  - **`retirar-foto-estados`** vive en `retirar_foto_sql.py` (nuevo, el único de
+    `etl_sigrid/` que nombra las dos tablas; lo veta un test). Sin `--confirmar`
+    lee con `filas_solo_lectura` (READ ONLY) cuáles existen y sus filas; con él,
+    `SET LOCAL lock_timeout = '30s'` + `DROP TABLE IF EXISTS` de las dos, sin
+    `CASCADE`, en una transacción, y relee para comprobar (sale con 1 si queda alguna).
 
 ## 2026-10-08/09 · F-132 · FASE A APROBADA (review a la primera) e integrada en `main` · `blocked` hasta el 2026-10-22
 
