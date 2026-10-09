@@ -9,6 +9,39 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-09 · F-135 · SPEC ESCRITA, pendiente de aprobación del humano · `pending`
+
+> Spec-author. Rama `feature/F-135-restringir-personal-contabilidad` (desde `main`
+> `75389c5`). Spec en `specs/F-135-restringir-personal-contabilidad/` (requirements 149,
+> design 238, tasks 19 tareas); mediciones en `progress/spec_F-135.md` (solo recuentos y
+> agregados, medidas en Azure con `filas_solo_lectura` y sin bootstrap: ni un GRANT ni
+> un REVOKE). `init.sh` de arranque: pytest VERDE (7.143 passed, 40 min 43 s); su único
+> KO fue la puerta de tamaño sobre el `requirements.md` a medio escribir (151 > 150),
+> ya corregido.
+
+- **Lo medido que cambia el problema**: lo restringido (criterio V2) son **55.504
+  apuntes (2,55 % del mayor), 8.791 asientos, 25 empresas**. Pero además de
+  `contabilidad`, el rol general lee en `raw` **37.048 efectos de pago de nómina de
+  1.015 trabajadores, 34.191 con su cuenta bancaria (`raw.pag`)**, 100.502 repartos
+  analíticos de esos apuntes (`raw.apa`), `raw.rac`, `raw.con`, `raw.asi` y `raw.hmores`.
+  `retenciones` solo toca 8 apuntes (de proveedor); `compras`, `mart`, `cierre`: nada.
+- **Propuesta**: contabilidad completa en `contabilidad_restringida` (grupo `NOLOGIN`
+  `sigrid_dm_restringido_ro`) y `contabilidad` general filtrada y materializada;
+  `raw` fuera entero del rol general; `apply_grants` veta y VERIFICA cada noche.
+- **Decisiones abiertas para el humano** (`design.md` §8, con cifras y recomendación):
+  D1 criterio (V2 recomendado, +4.258 apuntes sobre el literal de Juan); D2 mecanismo
+  (copia física, +0,75 GB y +3-5 min estimados); D3 `raw` fuera entero (ANTES: confirmar
+  que ningún informe de Power BI lee `raw`); D4 `retenciones` sin tocar; D5 solo
+  recuentos de lo que queda fuera, sin importes; D6 enmascarar los nombres de 521
+  cuentas; D7 nombres de esquema y rol; D9 570 solo dentro de los asientos de nómina.
+- **Para Juan**: D8 quién es «ese rol» y por qué canal; D10 el coste por persona que ya
+  publica `personal` (mismo dato que `raw.reshor`, revocada); D12 si las 62 cuentas 4751
+  con nombre de persona son de trabajadores.
+- **Acceptance de F-135 ajustado** (criterio 2): añade `raw.con`, `rac` y `pag` (lo
+  medido) y deja la excepción de `retenciones` a la D4. `status` sin tocar.
+- **Fuera de este repositorio, anotado**: `mcp-bbdd` F-008 (rol según quién pregunta) y
+  F-087 (rol propio de Power BI). Hasta entonces el rol autorizado no lo usa ningún cliente.
+
 ## 2026-10-09 · F-132 · FASE B, rama BORRAR, en curso (implementer) · `in_progress`
 
 > **Decisión D7 del humano (2026-10-09)**: «bórrala ya» + «adelante». D6 se acorta (el
