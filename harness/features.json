@@ -1420,7 +1420,7 @@
         "Abrir el fichero desde el MCP o un portal queda FUERA (iria a `mcp-bbdd` o `portal`), igual que leer el contenido de los PDF para contrastarlo con lo registrado (feature futura)",
         "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "rigor": "estandar",
       "priority": 1,
