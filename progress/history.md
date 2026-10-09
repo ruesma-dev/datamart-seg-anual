@@ -1642,3 +1642,33 @@ QUEDA (humano): T12-T14 en el Postgres local/dev (FR26/10025 con sus cuatro paso
 nombre, coberturas, retenciones idénticas antes y después, tiempos; vigilar
 `usu.delO`), y el despliegue con +4 a +7 min sobre una nocturna que ya va 38 min por
 encima de las 4 h.
+
+## F-132 · La antigüedad del estado sale de `rac` y la foto diaria de F-067 se retira · 2026-10-09
+
+Rama `feature/F-132-estado-desde-rac`. `sdd=true`, rigor `estandar`. Nace de D7 de F-085.
+Dos fases, las dos APROBADAS a la primera (`progress/review_F-132.md`,
+`progress/review_F-132_faseB.md`). Spec en `specs/F-132-estado-desde-rac/`,
+mediciones en `progress/spec_F-132.md`, informes `progress/impl_F-132.md` y
+`progress/impl_F-132_faseB.md`, contraste en `progress/contraste_F-132.md`.
+
+Fase A (desplegada el 2026-10-09, imagen `r20261009-0858`, diccionario v46):
+`compras.v_estado_documentos` saca `en_estado_desde` del último paso de
+`compras.documento_procesos` (historia NETA de `rac`), con `origen_fecha` (PASO, ALTA,
+FUERA_DE_PROCESO), quién dio el paso y los comparativos dentro; comando
+`contraste-estados`; la premisa «Sigrid no guarda cuándo cambia el estado» corregida en
+YAML, diccionario, ARCHITECTURE y azure-apps; P23 respondible. Contratos en EPF con más
+de 21 días: 785, solo 23 enviados desde 2025.
+
+Fase B (decisión del humano 2026-10-09, «bórrala ya»: D6 acortada a 2 noches —492
+cambios, 0 discrepancias— y D7 = BORRAR): `build_compras` deja de tomar la foto;
+`EPOCA_DELPHI` a `domain/fecha_delphi.py`; comando `retirar-foto-estados [--confirmar]`;
+`reset-compras` sin conservadas; fuera `contraste-estados`; diccionario v47 (205 objetos).
+Se acepta perder la fecha de los pasos deshechos (~9 al día) hasta F-105.
+
+Verificado: `init.sh` 7.143 passed, cobertura 100 % de líneas cambiadas; mutación con los
+supervivientes cerrados por test.
+
+QUEDA (fase B sin desplegar): imagen y job → `retirar-foto-estados` sin y con
+`--confirmar`, ANTES de la nocturna siguiente → `check-diccionario` (v47, la publica la
+nocturna o a mano) y reiniciar el MCP. Pendiente para quien toque `01_documentos.sql`:
+su cabecera cita `11_historial_estados.sql`, que ya no existe (huella de F-073).
