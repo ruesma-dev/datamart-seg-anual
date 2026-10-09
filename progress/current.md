@@ -20,6 +20,8 @@
 - **Entorno**: el worktree no tiene `.env` (regla dura: no se crea ni se copia), así que
   `init.sh` aquí da KO de ENTORNO; la verificación final con `init.sh` en el árbol
   principal la hace el líder.
+- **Diccionario del árbol tras F-090: 208 objetos, 1624 columnas, 97 de consumo**
+  (versión 48, sin publicar: +`raw.rcg`, +`raw.gra`, +`compras.documento_adjuntos`).
 - **Desviaciones respecto a la spec**: se anotan aquí según aparezcan.
 
 ## 2026-10-09 · F-132 · FASE B, rama BORRAR, en curso (implementer) · `in_progress`

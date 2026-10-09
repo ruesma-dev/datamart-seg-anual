@@ -517,7 +517,17 @@
 # antiguedad del estado sigue en `compras.v_estado_documentos`, desde `rac`. P24
 # ya no espera la foto: un paso deshecho no se fecha en el datamart (F-105).
 
-version: 47
+# version 48 (F-090, 2026-10-09): EL INDICE DE DOCUMENTOS ADJUNTOS. Entran
+# `raw.rcg` y `raw.gra` (los «Graficos asociados» de Sigrid), FILTRADAS EN
+# ORIGEN a las cinco familias de compras y sin binario (las 74 tablas), y la
+# tabla `compras.documento_adjuntos`: una fila por fichero adjunto a una
+# factura, contrato, comparativo, oferta o albaran, con su clase por extension
+# y la cobertura medida por familia. El fichero NO esta en el datamart: vive en
+# `ruesma_rep` y lo sirve `sigrid-api` (`documents/read`). Las fichas de
+# `facturas`, `contratos`, `albaranes`, `comparativos` y `comparativo_ofertas`
+# apuntan al indice. `R-SIGRID-CON` declara los campos propios de `gra`.
+
+version: 48
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -969,7 +979,7 @@ reglas:
     regla: >-
       Antes de escribir cualquier consulta contra `raw`, seis cosas.
 
-      **1. `ide` es la clave de las 72 tablas.** Se llama igual en todas, es el
+      **1. `ide` es la clave de las 74 tablas.** Se llama igual en todas, es el
       indice primario y es unico. Un campo que acaba en `ide` —`conide`,
       `entide`, `obride`— es una referencia a el.
 

@@ -399,6 +399,12 @@ objetos:
         porque: >-
           Para el comparativo que nombra la cabecera del contrato. Para ir del
           comparativo al contrato, al reves, usa `compras.comparativos.contrato_id`.
+      - de: contrato_id
+        a: compras.documento_adjuntos.documento_id
+        cardinalidad: "1:N"
+        porque: >-
+          Para los ficheros adjuntos del contrato (el contrato firmado, en
+          PDF o Word). Los tiene el 92,4 % de los contratos (F-090).
     ejemplos_preguntas:
       - Que contratos tiene abiertos la obra X y con quien
       - Con que proveedores tiene contrato la obra X
@@ -580,6 +586,12 @@ objetos:
         a: compras.comparativos.comparativo_id
         cardinalidad: "N:1"
         porque: Para el comparativo de ofertas del que viene la entrega.
+      - de: albaran_id
+        a: compras.documento_adjuntos.documento_id
+        cardinalidad: "1:N"
+        porque: >-
+          Para los ficheros adjuntos del albaran. Casi ninguno los tiene
+          (0,2 %): la practica no esta implantada (F-090).
     ejemplos_preguntas:
       - Que albaranes ha traido el proveedor P este mes
 
@@ -880,6 +892,14 @@ objetos:
           son dos cosas distintas y se confunden. Ojo al grano: una factura
           tiene de 1 a 16 efectos, asi que contar filas del cruce no cuenta
           facturas.
+      - de: factura_id
+        a: compras.documento_adjuntos.documento_id
+        cardinalidad: "1:N"
+        porque: >-
+          Para los ficheros adjuntos de la factura (el original del
+          proveedor, casi siempre en PDF). Que una factura no tenga fila
+          alli es que Sigrid no tiene adjunto: desde 2019 lo tiene el 96,1
+          %, antes de 2017 practicamente ninguna (F-090).
     ejemplos_preguntas:
       - Que facturas nos ha pasado el proveedor P este ano
       - En que estado esta la factura X, esta aprobada o solo contabilizada
@@ -2752,6 +2772,14 @@ objetos:
         a: maestro.obras.obra_id
         cardinalidad: "N:1"
         porque: Para el nombre, la empresa y el cliente de la obra.
+      - de: comparativo_id
+        a: compras.documento_adjuntos.documento_id
+        cardinalidad: "1:N"
+        porque: >-
+          Para los ficheros adjuntos del propio comparativo (el concurso en
+          Excel, a veces). Para juntar los del comparativo y los de sus
+          ofertas, une por `compras.documento_adjuntos.comparativo_id`
+          (F-090).
     ejemplos_preguntas:
       - Que proveedores ganan comparativos de mas de una actividad
       - Cuantos comparativos hay por actividad
@@ -2889,6 +2917,13 @@ objetos:
         a: compras.comparativo_oferta_lineas.oferta_id
         cardinalidad: "1:N"
         porque: Para las lineas de la oferta, con su descuento y, en el OBJETIVO, su base.
+      - de: oferta_id
+        a: compras.documento_adjuntos.documento_id
+        cardinalidad: "1:N"
+        porque: >-
+          Para los ficheros adjuntos de la oferta (la oferta del proveedor;
+          a veces el concurso en Excel). Los tiene el 25,1 % de las ofertas
+          (F-090).
     ejemplos_preguntas:
       - Que proveedores ofertaron en el comparativo X y cuanto
       - Que ofertas son ficticias en el comparativo X
