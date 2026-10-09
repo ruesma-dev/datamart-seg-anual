@@ -215,6 +215,15 @@ infraestructura.
 > antigüedad del estado sigue en `compras.v_estado_documentos`, desde `rac`. El
 > inventario baja de 207 a **205 objetos**, las columnas descritas de 1623 a
 > **1608** (8 + 7) y las fichas de consumo en dos.
+>
+> **Enmienda del 2026-10-09 (F-090, el índice de documentos adjuntos).** Entran
+> `raw.rcg` y `raw.gra` (los «Gráficos asociados» de Sigrid, filtrados en origen
+> a las cinco familias de compras y sin binario; el censo de `raw` pasa a 74
+> tablas) y `compras.documento_adjuntos` (una fila por fichero adjunto a una
+> factura, contrato, comparativo, oferta o albarán; el fichero sigue en
+> `ruesma_rep` y lo sirve `sigrid-api`). El inventario sube de 205 a **208
+> objetos**, las columnas descritas de 1608 a **1624** (16) y las fichas de
+> consumo en una.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,

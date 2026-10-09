@@ -3781,3 +3781,187 @@ objetos:
       - Que facturas aprobo Fulano este mes
       - Cuanto tarda un contrato desde que se envia a la firma hasta que se firma
       - Por que estados paso el comparativo C y quien lanzo cada paso
+
+  documento_adjuntos:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **EL INDICE DE LOS FICHEROS ADJUNTOS de facturas, contratos,
+      comparativos, ofertas y albaranes** (F-090): una fila por fichero colgado
+      de un documento en la pestaña «Graficos asociados» de Sigrid (`raw.rcg`
+      unido a `raw.gra`), con el nombre del fichero, su clase por extension, la
+      fecha de alta, el login de quien lo subio y la clave con la que Sigrid
+      guarda el fichero. ~199.042 filas el 2026-10-09. Es el ORIGINAL que llego
+      (la factura en PDF, el contrato firmado, el concurso en Excel), no lo que
+      se registro en Sigrid a partir de el.
+
+      **COBERTURA, medida el 2026-10-09 (documentos con al menos un adjunto)**:
+      facturas 62,8 % en total, pero **96,1 % desde 2019** (93-99 % cada año) y
+      practicamente cero antes de 2017 (4 de 40.121 hasta 2016): adjuntar la
+      factura es una practica que se implanto en 2017-2018. Contratos 92,4 %
+      (86-98 % todos los años). Ofertas 25,1 %. Comparativos 14,3 % (21,4 %
+      desde 2022). Albaranes 0,2 %: la practica no esta implantada.
+
+      **QUE UN DOCUMENTO NO TENGA FILA AQUI SIGNIFICA QUE Sigrid no tiene
+      adjunto para ese documento**, no un fallo del ETL. Con la salvedad de la
+      cobertura historica: una factura de antes de 2017 sin adjunto es lo
+      normal, y una de 2024 sin adjunto es una excepcion. «Facturas sin
+      adjunto» son las que no tienen ninguna fila aqui con su `documento_id` y
+      `familia` FACTURA, no las que tienen `nombre_fichero` nulo.
+
+      **EL FICHERO NO ESTA EN EL DATAMART**: el datamart publica solo el
+      indice. El binario vive en la base DOCUMENTAL de Sigrid, `ruesma_rep`
+      (en su propia tabla `gra`), y lo sirve `sigrid-api` con `POST
+      /api/documents/read` (`database: ruesma_rep`, `table: gra`, `id_column:
+      cod`, `id_value` = `cod_repositorio`). La base documental casa por la
+      pareja (`empresa_repositorio`, `cod_repositorio`); el `ide` NO casa. El
+      0,23 % de los enlaces (461) no tiene binario en la base documental: la
+      fila existe y el fichero no se puede abrir. Y el 11 % de las filas
+      documentales tiene el nombre vacio: el nombre bueno es `nombre_fichero`,
+      el de esta tabla. Abrir el fichero no se hace desde el datamart: es cosa
+      de `sigrid-api` (o de una herramienta del MCP o de un portal que lo
+      llame).
+
+      **LA CLASE DE FICHERO SALE DE LA EXTENSION DEL NOMBRE** (`extension`,
+      `clase_fichero`), no de la clase de grafico de Sigrid: `gra.gratipide`
+      esta a 0 en el 100 % de los enlaces de compras. Por familia: facturas
+      99,5 % PDF; contratos 53 % PDF y 47 % Word; comparativos 72 % PDF y 25 %
+      Excel; ofertas 91 % PDF y 5,5 % Excel. El concurso en Excel de un
+      comparativo puede estar en el propio comparativo o en alguna de sus
+      ofertas: por eso las ofertas llevan `comparativo_id` (1.980 de 20.436
+      comparativos tienen un Excel en una de las dos, el 2026-10-09).
+
+      **FECHA DE ALTA**: la del fichero en Sigrid (`gra.fec`), no la del
+      documento. Trae 2 valores imposibles (año 2250), que se publican tal
+      cual.
+
+      **DATO PERSONAL**: `subido_por` es el LOGIN de Sigrid de quien subio el
+      fichero, y el sufijo de `cod_repositorio` (sello temporal + login) es ese
+      mismo login en el 99,8 % de las filas. El nombre de la persona no esta
+      aqui. Los adjuntos de personal (nominas, DNI, embargos) NO estan en el
+      datamart: la ingesta solo trae las cinco familias de compras.
+    grano: >-
+      Una fila por enlace documento-fichero de un documento de las familias
+      FACTURA (15), CONTRATO (44), COMPARATIVO (46), OFERTA (12) o ALBARAN (14).
+      `adjunto_id` (`rcg.ide`) es clave primaria declarada. NO es una fila por
+      fichero: 102 ficheros cuelgan de varios documentos, y un documento puede
+      tener varios ficheros.
+    clave_negocio: [adjunto_id]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      adjunto_id:
+        significado: Identificador del enlace documento-fichero en Sigrid (`rcg.ide`).
+        agregacion: no_sumable
+      documento_id:
+        significado: >-
+          El documento del que cuelga el fichero (`rcg.con`, `con.ide`): el
+          `factura_id`, `contrato_id`, `comparativo_id`, `oferta_id` o
+          `albaran_id` de las tablas de `compras`, segun `familia`.
+        agregacion: no_sumable
+      tipo_documento_codigo:
+        significado: Tipo de documento de Sigrid (`con.tip`) - 15, 44, 46, 12 o 14.
+        valores: [15, 44, 46, 12, 14]
+        agregacion: no_sumable
+      familia:
+        significado: Familia del documento, el nombre de `tipo_documento_codigo`.
+        valores: [FACTURA, CONTRATO, COMPARATIVO, OFERTA, ALBARAN]
+      codigo_documento:
+        significado: Codigo del documento tal y como se ve en Sigrid (`FR26/10025`).
+      comparativo_id:
+        significado: >-
+          El comparativo al que pertenece el adjunto: el propio documento en un
+          COMPARATIVO y el comparativo de la oferta en una OFERTA (el mismo de
+          `compras.comparativo_ofertas`). Sirve para juntar en una consulta los
+          ficheros del comparativo y los de todas sus ofertas.
+        nulo_significa: El documento no es un comparativo ni una oferta, o la oferta no esta en ningun comparativo.
+        agregacion: no_sumable
+      grafico_id:
+        significado: >-
+          Identificador del fichero en la base de negocio de Sigrid
+          (`gra.ide`). NO es la clave del binario: esa es `cod_repositorio`.
+        agregacion: no_sumable
+      cod_repositorio:
+        significado: >-
+          La clave con la que la base documental `ruesma_rep` guarda el fichero
+          (`gra.cod`): sello temporal + login de quien lo subio
+          (`202609181420515461.jmbecedas`). Es el `id_value` que pide
+          `sigrid-api` en `documents/read` con `id_column: cod`. DATO PERSONAL
+          en su sufijo (el login).
+      empresa_repositorio:
+        significado: >-
+          Empresa del fichero (`gra.emp`). La base documental casa por la
+          pareja (`empresa_repositorio`, `cod_repositorio`): en la base de
+          negocio hay un `cod` repetido en dos empresas.
+        agregacion: no_sumable
+      nombre_fichero:
+        significado: >-
+          Nombre del fichero en Sigrid (`gra.nom`), sin espacios en los
+          extremos. Lleva a menudo el proveedor y el numero de factura. Es el
+          nombre bueno: el de la base documental esta vacio en el 11 % de las
+          filas.
+        nulo_significa: El fichero no tiene nombre en Sigrid.
+      extension:
+        significado: >-
+          Lo que va tras el ULTIMO punto del nombre, en minusculas (`pdf`,
+          `xlsx`).
+        nulo_significa: El nombre esta vacio, no tiene punto o acaba en punto.
+      clase_fichero:
+        significado: >-
+          La clase del fichero por su extension: PDF (pdf), EXCEL (xls, xlsx,
+          xlsm, xlsb, csv), WORD (doc, docx, rtf, odt), CORREO (msg, eml),
+          IMAGEN (jpg, jpeg, png, tif, tiff, gif, bmp), OTRO (cualquier otra
+          extension) o SIN_EXTENSION.
+        valores: [PDF, EXCEL, WORD, CORREO, IMAGEN, OTRO, SIN_EXTENSION]
+      descripcion:
+        significado: Descripcion del fichero en Sigrid (`gra.res`), si la tiene.
+        nulo_significa: Nadie le puso descripcion.
+      fecha_alta:
+        significado: >-
+          Fecha en que se subio el fichero a Sigrid (`gra.fec`), no la del
+          documento. Hay 2 filas con año 2250 (fecha imposible, tal cual en
+          Sigrid).
+        nulo_significa: Sigrid no tiene fecha para el fichero.
+        agregacion: no_sumable
+      subido_por:
+        significado: >-
+          LOGIN de Sigrid de quien subio el fichero (`gra.usu`). DATO PERSONAL
+          (D3 de F-090, 2026-10-09: el login, sin nombre). El nombre de la
+          persona, si hace falta, esta en `raw.usu` por el login.
+        nulo_significa: Sigrid no guarda quien lo subio.
+      posicion:
+        significado: Posicion del fichero en la pestaña «Graficos asociados» del documento (`rcg.pos`).
+        agregacion: no_sumable
+    relaciones:
+      - de: documento_id
+        a: compras.facturas.factura_id
+        cardinalidad: "N:1"
+        porque: Los ficheros de una factura, filtrando antes `familia = 'FACTURA'`.
+      - de: documento_id
+        a: compras.contratos.contrato_id
+        cardinalidad: "N:1"
+        porque: Los ficheros de un contrato, filtrando antes `familia = 'CONTRATO'`.
+      - de: documento_id
+        a: compras.comparativos.comparativo_id
+        cardinalidad: "N:1"
+        porque: Los ficheros del propio comparativo, filtrando antes `familia = 'COMPARATIVO'`.
+      - de: documento_id
+        a: compras.comparativo_ofertas.oferta_id
+        cardinalidad: "N:1"
+        porque: Los ficheros de una oferta, filtrando antes `familia = 'OFERTA'`.
+      - de: documento_id
+        a: compras.albaranes.albaran_id
+        cardinalidad: "N:1"
+        porque: Los ficheros de un albaran, filtrando antes `familia = 'ALBARAN'`.
+      - de: comparativo_id
+        a: compras.comparativos.comparativo_id
+        cardinalidad: "N:1"
+        porque: >-
+          Todos los ficheros de un comparativo, los suyos y los de sus ofertas,
+          sin pasar por `comparativo_ofertas`.
+    ejemplos_preguntas:
+      - Que ficheros tiene adjuntos la factura FR26/10025 y como se llaman
+      - Cuantas facturas de 2025 estan sin adjunto
+      - Que comparativos de la obra 0720 tienen un Excel adjunto, en el comparativo o en alguna de sus ofertas
+      - Quien subio el contrato firmado de un contrato y cuando
