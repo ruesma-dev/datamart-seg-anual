@@ -212,10 +212,12 @@ class _PgFalso:
     def __init__(self, *lecturas: list[tuple[str, int]]) -> None:
         self._lecturas = list(lecturas)
         self.leidas: list[str] = []
+        self.timeouts: list[int] = []
         self.conexiones: list[_Conexion] = []
 
     def filas_solo_lectura(self, sql_text: str, timeout_s: int) -> list[tuple[str, int]]:
         self.leidas.append(sql_text)
+        self.timeouts.append(timeout_s)
         return self._lecturas.pop(0)
 
     def connection(self) -> _Conexion:
@@ -267,6 +269,20 @@ def test_f132_r26_con_confirmar_borra_las_dos_en_una_transaccion(
         resultado.output
     )
     assert "Comprobado: ya no queda ninguna de las dos." in resultado.output
+
+
+def test_f132_r26_las_dos_lecturas_llevan_su_statement_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Contar 186.000 filas en un servidor compartido: dos minutos como mucho por
+    lectura, antes y después del borrado (superviviente de la mutación de la
+    Fase B: ningún test miraba el `timeout_s` que se pasa)."""
+    pg = _PgFalso(PRESENTES, [])
+
+    resultado = _lanzar(monkeypatch, pg, "--confirmar")
+
+    assert resultado.exit_code == 0, resultado.output
+    assert pg.timeouts == [120, 120]
 
 
 def test_f132_r26_si_tras_borrar_sigue_alguna_sale_con_uno(

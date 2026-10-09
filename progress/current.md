@@ -18,7 +18,17 @@
 > aplica). Orden del despliegue: imagen y job PRIMERO; después `retirar-foto-estados
 > --confirmar` (MANUAL del humano); después diccionario v47 y MCP (el líder).
 
-- **Estado**: T16, T17, T18 y T20 hechas (commits `02157ba`, `f4a30d8`, `b4f6a99` y el de T20; `azure-apps` `8a8ac98`, sin push). Diccionario **v47 sin publicar**. `init.sh` de arranque sobre
+- **Estado**: implementación de la FASE B TERMINADA, pendiente del reviewer. T16, T17, T18,
+  T20 y T21 hechas (`02157ba`, `f4a30d8`, `b4f6a99`, `b0946ce` y el de T21); `azure-apps`
+  `8a8ac98`, sin push. Diccionario **v47 sin publicar**. `init.sh` final sobre `b0946ce`:
+  VERDE (7.142 passed, 228 skipped, 22 min 42 s; cobertura 100 %, 42/42). Mutación: 18
+  evaluados, 16 muertos, 2 supervivientes cerrados con test (`progress/mutacion_F-132_faseB.md`).
+  Informe: `progress/impl_F-132_faseB.md` (MANUAL en su §5, EN ORDEN: imagen y job;
+  `retirar-foto-estados` sin y con `--confirmar`; `publicar-diccionario` v47 +
+  `check-diccionario` + reiniciar MCP). NO se ha borrado nada en Azure: solo una lectura
+  READ ONLY (`retirar-foto-estados` sin `--confirmar`: 186.705 tramos, 3 fotos).
+- **Pendiente anotado**: la cabecera de `01_documentos.sql` (l. 71-72) aún cita la foto;
+  la fija la huella de `test_f073_sql` r23. Para quien toque `01`. `init.sh` de arranque sobre
   `a237288`: VERDE (7.245 passed, 229 skipped, 29 min 13 s).
 - **Diccionario del árbol tras la Fase B: 205 objetos, 1608 columnas, 96 de consumo**
   (fuera las dos fichas de la foto: 8 + 7 columnas; versión sin publicar).
