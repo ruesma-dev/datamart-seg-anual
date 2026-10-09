@@ -20,9 +20,20 @@
 > (comentario de `fn_sigrid_tiempo` en `00_setup.sql`, líneas en blanco en `main.py`).
 >
 > Fase A: APROBADA (`progress/review_F-132.md`, `init.sh` 7.245 passed); merge a `main`
-> `79b2abf`, espejo `dev` `b1c66f2`. **Despliegue pendiente** (tras la nocturna del
-> 09-10): el humano construye la imagen, apunta el job y lanza `build-compras`; luego
-> el líder publica el diccionario v46, reinicia el MCP y lanza el primer contraste.
+> `79b2abf`, espejo `dev` `b1c66f2`. **DESPLEGADA el 2026-10-09**: el humano construyó
+> la imagen `r20261009-0858`, apuntó el job (comprobado) y lanzó `build-compras`
+> (SUCCESS, 483,6 s; `estado_documentos` 0,3 s). El líder: `publicar-diccionario`
+> **v46** (207 objetos, 1.623 columnas), `check-diccionario` OK, MCP reiniciado
+> (`--0000014`, Healthy). Vista en Azure (solo lectura): PASO 166.938 facturas /
+> 18.558 contratos / 19.827 comparativos; ALTA 97 / 549 / 600; FUERA_DE_PROCESO 69 / 2
+> / 3. Contratos en EPF con más de 21 días: **785, de ellos 23 enviados desde 2025**.
+> Primer contraste (2 noches): 492 cambios, **0 discrepancias** (`progress/contraste_F-132.md`).
+> El conector claude.ai del MCP no reconectó en la sesión tras el reinicio (404 del
+> lado del conector, el contenedor Healthy): R24 (la pregunta al MCP) queda por hacer.
+>
+> **Nocturna del 09-10, la primera con F-085**: 00:00:20 → 04:39:34 UTC, **4 h 39 min**,
+> igual que la del 08-10 (4 h 40 min). `ingest_raw.rac` 132 s (antes 75 s) y
+> `build_compras` 983 s (+~1,5 min): F-085 cuesta ~2,5 min, dentro de la variación.
 
 Solo la Fase A (T1-T15 de `specs/F-132-estado-desde-rac/tasks.md`); la B espera a
 D7 del humano tras el contraste (hasta el 2026-10-22). La foto de F-067 sigue
