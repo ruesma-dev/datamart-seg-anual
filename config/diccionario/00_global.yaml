@@ -509,7 +509,15 @@
 # real del envio y P24 lee `compras.documento_procesos`. Corrige las fichas de
 # `contratos`, `historial_estados*`, `fn_sigrid_tiempo` y `raw.conest`.
 
-version: 46
+# version 47 (F-132 Fase B, 2026-10-09): LA FOTO DIARIA DE ESTADOS SE RETIRA.
+# Decision del humano (D7 = BORRAR) tras contrastarla con `rac` dos noches (492
+# cambios, 0 discrepancias). Salen las fichas de `compras.historial_estados` y
+# `compras.historial_estados_fotos` (las tablas las borra una vez, a mano,
+# `retirar-foto-estados --confirmar`) y el comando `contraste-estados`. La
+# antiguedad del estado sigue en `compras.v_estado_documentos`, desde `rac`. P24
+# ya no espera la foto: un paso deshecho no se fecha en el datamart (F-105).
+
+version: 47
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 

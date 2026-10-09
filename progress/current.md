@@ -18,7 +18,7 @@
 > aplica). Orden del despliegue: imagen y job PRIMERO; después `retirar-foto-estados
 > --confirmar` (MANUAL del humano); después diccionario v47 y MCP (el líder).
 
-- **Estado**: T16, T17 y T18 hechas (commits `02157ba`, `f4a30d8` y el de T18). `init.sh` de arranque sobre
+- **Estado**: T16, T17, T18 y T20 hechas (commits `02157ba`, `f4a30d8`, `b4f6a99` y el de T20; `azure-apps` `8a8ac98`, sin push). Diccionario **v47 sin publicar**. `init.sh` de arranque sobre
   `a237288`: VERDE (7.245 passed, 229 skipped, 29 min 13 s).
 - **Diccionario del árbol tras la Fase B: 205 objetos, 1608 columnas, 96 de consumo**
   (fuera las dos fichas de la foto: 8 + 7 columnas; versión sin publicar).
