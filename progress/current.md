@@ -9,6 +9,10 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-09 · F-090 · SPEC ESCRITA (`specs/F-090-documento-adjunto/`), pendiente de aprobación
+
+> Prioridad 1 y `sdd: true` (el humano, 2026-10-09); `status` sigue `pending`. Mediciones en `progress/spec_F-090.md`: el binario SÍ está, en `ruesma_rep` (99,75 % casa por `(emp, cod)`; `documents/read` probado con una factura), así que la ficha y el `acceptance` se han corregido. Índice propio `compras.documento_adjuntos` (199.042 enlaces de cinco familias, filtrado en origen). **Decisiones abiertas D1-D7** al final de `requirements.md` (familias, filtro en origen, login de quien sube, sin `auxgra`, sin marca de binario, `facturas` intacta, aceptar el `acceptance` reescrito).
+
 ## 2026-10-08/09 · F-132 · FASE A APROBADA (review a la primera) e integrada en `main` · `blocked` hasta el 2026-10-22
 
 > **BLOQUEADA por decisión del humano (2026-10-09)**, motivo: la FASE B (retirar o
