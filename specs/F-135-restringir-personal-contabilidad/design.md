@@ -111,7 +111,7 @@ Son el oráculo de los tests de SQL y la referencia del diccionario; el SQL no l
 Coste medido/estimado: `build_contabilidad` tarda hoy 590 s. La copia general añade un
 CTAS de ~2,12 M filas sin ventana nueva (el acumulado visible se calcula en `02`, en la
 misma pasada) y sus índices: **estimado +3-5 min y +0,75 GB** (el mayor ocupa 744 MB);
-el implementer lo mide en local y el humano en la primera nocturna (T15).
+el `.env` del puesto apunta a Azure, así que lo mide el humano en el despliegue (T15).
 
 ## 5. Permisos cada noche (`grants.py`, cliente y paso)
 
