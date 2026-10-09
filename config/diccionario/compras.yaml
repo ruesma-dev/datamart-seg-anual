@@ -3849,7 +3849,9 @@ objetos:
       indice. El binario vive en la base DOCUMENTAL de Sigrid, `ruesma_rep`
       (en su propia tabla `gra`), y lo sirve `sigrid-api` con `POST
       /api/documents/read` (`database: ruesma_rep`, `table: gra`, `id_column:
-      cod`, `id_value` = `cod_repositorio`). La base documental casa por la
+      cod`, `id_value` = `cod_repositorio`, `blob_column: ima`, obligatorio).
+      Ese `ima` es la columna del binario en `ruesma_rep.gra`, no en
+      `raw.gra`, que no la trae. La base documental casa por la
       pareja (`empresa_repositorio`, `cod_repositorio`); el `ide` NO casa. El
       0,23 % de los enlaces (461) no tiene binario en la base documental: la
       fila existe y el fichero no se puede abrir. Y el 11 % de las filas

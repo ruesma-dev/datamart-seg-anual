@@ -107,7 +107,7 @@ def test_f090_r20_la_ausencia_de_fila_no_es_un_fallo() -> None:
 def test_f090_r21_donde_esta_el_binario_y_como_se_pide() -> None:
     texto = _texto(_adjuntos())
     for dato in ("ruesma_rep", "sigrid-api", "documents/read", "cod_repositorio",
-                 "0,23 %", "11 %", "nombre_fichero"):
+                 "0,23 %", "11 %", "nombre_fichero", "blob_column: ima"):
         assert dato in texto, f"la ficha no dice «{dato}» (R21)"
     assert "EL FICHERO NO ESTA EN EL DATAMART" in _adjuntos()["descripcion"], "R21"
 

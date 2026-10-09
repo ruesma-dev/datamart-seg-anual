@@ -181,4 +181,4 @@ def test_f090_r2_filtro_gra_literal() -> None:
 
 
 def test_f090_r2_columnas_excluidas_de_gra() -> None:
-    assert COLUMNAS_EXCLUIDAS_GRA == frozenset({"ima", "pul", "tex", "cam"})
+    assert frozenset({"ima", "pul", "tex", "cam"}) == COLUMNAS_EXCLUIDAS_GRA

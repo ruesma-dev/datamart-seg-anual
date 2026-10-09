@@ -58,6 +58,11 @@ de Sigrid, `ingest_raw_step.py`, `settings.py` ni `objetos_pendientes.yaml`.
 - `ARCHITECTURE.md`: «Va el ÚLTIMO de `build_compras`» (F-132) pasa a «DETRÁS
   de `12`», que es lo que sigue siendo cierto.
 
+- **Review pasada 1** (CHANGES_REQUESTED, `progress/review_F-090.md`): la receta de
+  `documents/read` de la ficha y de `azure-apps` gana `blob_column: ima` (obligatorio en
+  `sigrid-api`; es la columna de `ruesma_rep.gra`, no de `raw.gra`) y `test_f090_r21` la
+  exige; evidencias de §6 con la campaña válida; `current.md`; T12 `[x]`; SIM300 de ruff.
+
 ## 3 · Fase RED (salidas reales, `../datamart-seg-anual/.venv/Scripts/python.exe -m pytest <fichero> -q`)
 
 T1, antes del dominio (`tests/test_f090_dominio.py`):
@@ -137,8 +142,8 @@ FAILED ...::test_f090_r25_azure_apps - AssertionEr...
 ## 5 · MANUAL pendiente, EN ESTE ORDEN (Azure lo autoriza el humano)
 
 1. **Integrar y verificar** (líder): `bash harness/init.sh` en el árbol
-   principal sobre esta rama -> verde; y la campaña de mutación VÁLIDA,
-   `python -m harness.mutacion --feature F-090 --workers 1` (§6).
+   principal sobre esta rama -> verde; y la campaña de mutación VÁLIDA. **HECHO**
+   (`335d671`, §6).
 2. **Imagen y job** (humano): imagen nueva con tag fechado y el job apuntado a
    ella; comprobar el tag del job (memoria «el repositorio en verde no es
    producción»).
@@ -159,8 +164,9 @@ FAILED ...::test_f090_r25_azure_apps - AssertionEr...
    `python main.py check-diccionario`, reiniciar `mcp-bbdd` y preguntarle: los
    adjuntos de una factura; cuántas facturas de 2025 no tienen adjunto; qué
    comparativos de la 0720 tienen un Excel (en el comparativo o en sus ofertas,
-   por `comparativo_id`). UNA llamada a `documents/read` con un
-   `cod_repositorio` publicado, sin guardar el fichero -> 200.
+   por `comparativo_id`). UNA llamada a `documents/read` (`database: ruesma_rep`,
+   `table: gra`, `id_column: cod`, `id_value` = un `cod_repositorio` publicado,
+   `blob_column: ima`), sin guardar el fichero -> 200.
 5. **T11 · R28** (líder): en la primera nocturna con F-090, `python main.py
    timings`: segundos de `ingest_raw.rcg`, `ingest_raw.gra` y del sub-paso,
    contra la ventana (4 h 39 min el 2026-10-09). Estimado: 1-2 min.
@@ -172,7 +178,7 @@ FAILED ...::test_f090_r25_azure_apps - AssertionEr...
 | Tests de F-090 | **101 passed** (`test_f090_dominio` 50, `test_f090_ingesta_sql` 29, `test_f090_diccionario` 22) |
 | Suite completa en el worktree (sobre `1c1064a`, con cobertura, sin `-x`) | **7.155 passed, 113 failed, 231 skipped en 1.374,34 s (22 min 54 s)**. De los 113: 112 son EXACTAMENTE los mismos que fallan en la base (`c7a8a54`, mismo worktree sin `.env`: 112 failed, 7.031 passed, 228 skipped, 10 min 46 s), todos `ValidationError ... SigridApiSettings` por falta de `.env`; el 113.º (`test_f132_retirada::...r25_build_compras_ya_no_tiene_el_sub_paso_de_la_foto`) era mío y lo corrige `b939e94` (ese fichero, re-ejecutado: 25 passed + los 7 de entorno) |
 | Los 112 de entorno, con ajustes FICTICIOS (`SIGRID_API_BASE_URL=http://127.0.0.1:9`, `PG_HOST=127.0.0.1`, `PG_PORT=9`, resto inventado; nada en disco, ningún `.env`) | **112 passed en 75,39 s**: el rojo es solo de entorno |
-| `bash harness/init.sh` en el worktree (sobre `1c1064a`) | KO de ENTORNO: «Falta .env» y pytest con `-x` parado en el 1.º de entorno (`test_f006_t26_cli_dry_run_no_toca_la_base`; 255 passed antes). Por eso su PUERTA COBERTURA daba 50 % (14/28): medía 255 tests. Resto OK: compileall, `features.json`, `BACKLOG.md` al día, rigor, **PUERTA TAMAÑO OK (requirements 145/150, design 184/250)**, rama |
+| `bash harness/init.sh` | **VERDE en el árbol principal** (con `.env`) sobre `335d671`: **7.268 passed, 231 skipped**, PUERTA COBERTURA **100 % (28/28)** (líder y reviewer). En el worktree, sin `.env`, solo daba KO de entorno (sin `.env`, y pytest con `-x` parado en `test_f006_t26_cli_dry_run_no_toca_la_base`) |
 | Cobertura de las líneas cambiadas | **100,0 % (28/28)**, umbral 80 %: `python -m harness.cobertura --base main` sobre el `coverage.json` de la suite completa (diff desde `75389c5`, merge-base con `main`) |
-| Mutantes generados y supervivientes | **8 generados, 8 evaluados, 8 muertos, 0 supervivientes, 0 timeouts** (alcance: 132 líneas; los 8 caen en `domain/documento_adjuntos.py`: las 5 claves de `FAMILIAS_ADJUNTOS`, los dos `is None` y el `group(1)`; `build_compras_step.py` solo añade DATOS, un `_SubStep`, y no genera mutantes). 3.567,5 s con 2 workers (líneas base de apertura VERDES, 530,8 y 534,9 s, con los ajustes ficticios de la fila de entorno). **PERO EL ARNÉS DECLARA LA CAMPAÑA «NO VÁLIDA»**: la línea base de CIERRE agotó los 600 s (suelo 120 × 5) por tiempo, no por fallo. Reintentada en serie (`--workers 1`): la línea base de apertura tampoco cupo en 600 s (la suite completa tarda ~9-11 min en esta máquina con otros agentes trabajando). Informe tal cual lo generó el arnés: `progress/mutacion_F-090.md`. **Hay que repetirla válida** (líder, árbol principal con `.env` y la máquina libre): `python -m harness.mutacion --feature F-090 --workers 1`; si tampoco cabe, subir `mutacion.timeout_por_mutante_s` es decisión del humano (no lo he tocado) |
+| Mutantes generados y supervivientes | **Campaña VÁLIDA** (`progress/mutacion_F-090.md`, la lanzó el líder; commit `335d671`, medida sobre `b88fdbb`): **8 generados, 8 evaluados, 8 muertos, 0 supervivientes, 0 timeouts, 0 sin veredicto**, campaña completa (sin muestreo), **4 workers, `--timeout 1800`, 2.427 s**, líneas base 708-723 s, 303,4 s de media por mutante. Los 8 caen en `domain/documento_adjuntos.py` (las 5 claves de `FAMILIAS_ADJUNTOS`, los dos `is None` y el `group(1)`); las 20 líneas de `build_compras_step.py` solo añaden un `_SubStep` de datos y no generan mutantes. Mis dos intentos previos (2 workers y en serie) no fueron válidos: la línea base agotó los 600 s por TIEMPO, no por fallo |
 | Tiempo de la suite | 1.374,34 s con cobertura (fila de arriba) |
