@@ -22,7 +22,19 @@
   principal la hace el líder.
 - **Diccionario del árbol tras F-090: 208 objetos, 1624 columnas, 97 de consumo**
   (versión 48, sin publicar: +`raw.rcg`, +`raw.gra`, +`compras.documento_adjuntos`).
-- **Desviaciones respecto a la spec**: se anotan aquí según aparezcan.
+- **Estado**: T1-T7 HECHAS (`8660af3` .. `1c1064a`, + `b939e94`); azure-apps `fc40216`, sin
+  push. Informe: `progress/impl_F-090.md` (MANUAL en su §5: `init.sh` en el árbol principal
+  por el líder, imagen y job, ingesta `rcg`/`gra`, `build-compras`, diccionario v48, MCP,
+  timings). T8 (informe) hecho; T9-T11 MANUAL; T12 (`init.sh` verde) lo cierra el líder.
+- **Desviaciones respecto a la spec** (justificadas en `progress/impl_F-090.md` §2):
+  - Diccionario **versión 48**, no 47: `main` ya usó la 47 (F-132 fase B).
+  - Las fichas van en el commit de su objeto (raw en T2, el índice en T4), con `gra` en el
+    punto 3 de `R-SIGRID-CON` y la enmienda del diseño de F-006 (208 objetos): lo exigen
+    las puertas de F-006.
+  - Además de los tests del censo que citaba la spec, se actualizan los que fijaban
+    `TOTAL_TABLAS` (F-066, F-074, F-097) y los que fijaban que `13` era el ÚLTIMO
+    sub-paso de compras (F-047, F-073, F-080, F-085, F-132): R10 de F-132 dice «detrás
+    de `12`». Comprueban ahora el orden desde `10_necesidades.sql`.
 
 ## 2026-10-09 · F-132 · FASE B, rama BORRAR, en curso (implementer) · `in_progress`
 
