@@ -1958,13 +1958,13 @@ objetos:
     capa: origen
     consumo_recomendado: false
     motivo_no_consumo: >-
-      Es una tabla de traduccion. Quien pregunte en que estado esta un contrato tiene que mirar el estado del documento y traducirlo aqui, y eso lo resolvera F-067 en `stg`.
+      Es una tabla de traduccion. El estado ya traducido esta en las cabeceras de `compras` (F-084), y desde cuando esta cada documento en el, en `compras.v_estado_documentos` (F-132).
     descripcion: >-
       **CATALOGO DE ESTADOS DE DOCUMENTO** (193 filas, 17 columnas). Sin ella, el estado de un contrato o de una factura es un numero suelto que nadie puede interpretar.
 
       **La traduccion va por `tip`, el tipo de documento**, y esto es lo que hay que saber antes de usarla: la tabla cubre 29 tipos distintos y **la misma cifra significa cosas distintas en cada uno**. Traducir el estado de una factura con la fila de un contrato da un nombre plausible y falso. Para los contratos, los siete estados medidos el 2026-09-06 son 1 pendiente de firma previa, 3 enviado, 5 recibido, 6 comprometido, 7 firmado, 8 terminado y 9 resuelto; 13.418 contratos estan en el 7.
 
-      Lo que ni esta tabla ni ninguna otra guardan es **cuando** un documento entro en su estado actual. Lo mas cercano es la marca de ultima modificacion del concepto, que sirve de aproximacion mientras F-067 no acumule su foto diaria.
+      **Cuando** entro un documento en su estado actual no esta en esta tabla: lo dice `rac`, la ventana «Procesos» de Sigrid, con el estado de origen y de destino de cada paso, el usuario, la fecha y la hora (F-085). Lo publica ya calculado `compras.v_estado_documentos` (F-132).
 
       **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `conest`, y se localiza con `grep -n "^| conest " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
 

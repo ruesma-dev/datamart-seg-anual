@@ -297,11 +297,12 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
     descompuesto de la noche anterior (la primera ABC y el master 0 están
     congelados). Regla D4: la primera ABC si casa; si no, la versión anterior
     más reciente que case; nunca una posterior; sin ABC, solo Estudios.
-- **LA FECHA DEL CAMBIO DE ESTADO NO EXISTE EN SIGRID: LA DA UNA FOTO DIARIA
-  QUE NO SE RECONSTRUYE (F-067).** *(Premisa corregida por F-085 el
-  2026-10-07: la fecha SÍ está en Sigrid, en `rac`; ver el punto siguiente. La
-  foto sigue y su relevo es F-132.)* `concam` no audita `con.est` y `confir` no
-  tiene firmas de contrato, así que `sql/compras/11_historial_estados.sql`
+- **LA FOTO DIARIA DE ESTADOS, QUE NO SE RECONSTRUYE (F-067), HOY RESPALDO EN
+  CONTRASTE (F-132).** Se montó creyendo que Sigrid no fechaba el cambio de
+  estado (`concam` no audita `con.est` y `confir` no tiene firmas de
+  contrato); F-085 lo desmintió el 2026-10-07: la fecha está en `rac` (punto
+  siguiente) y desde F-132 la antigüedad del estado sale de ahí. La foto sigue
+  tomándose igual mientras dura el contraste. `sql/compras/11_historial_estados.sql`
   toma cada noche una foto de `con.est` de contratos (tip 44) y facturas (15)
   y la guarda **por tramos** (documento, estado, `desde`, `hasta`): la foto de
   un día D es `desde <= D < COALESCE(hasta, ∞)`. Unos 186.000 tramos de línea
@@ -312,8 +313,9 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
     NOT EXISTS` y el fichero no tiene ni `DROP`, ni `TRUNCATE`, ni `DELETE`
     (test). El resto de `compras` se rehace con `DROP ... CASCADE` y no las
     toca porque no dependen de nada del esquema; `--full` solo trunca `raw`.
-    **Si alguien las borra, la historia se pierde**: no hay copia en Sigrid, y
-    vuelve a empezar desde una línea base nueva. Por eso `python main.py
+    **Si alguien las borra, la historia de la foto se pierde** y vuelve a
+    empezar desde una línea base nueva: lo único que la foto ve y `rac` no (el
+    día en que se DESHIZO un paso) no se puede recuperar. Por eso `python main.py
     reset-compras` (decisión del 2026-10-06) ya no tira el esquema: borra sus
     vistas, tablas y funciones y CONSERVA estas dos (un test veta cualquier
     borrado del esquema `compras` entero en el código del repositorio).
@@ -353,6 +355,21 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
     dominio (`COLUMNAS_CREDENCIALES_USU`) y un test falla si alguna deja de
     estar en `exclude_columns`. Ni `dbo.log` (F-105), ni `conpro`, ni `rol`
     entran.
+- **LA ANTIGÜEDAD DEL ESTADO SALE DE `rac` (F-132).**
+  `sql/compras/13_estado_documentos.sql` crea `compras.v_estado_documentos`:
+  una fila por contrato, factura y comparativo con su estado (el de la
+  cabecera) y desde cuándo está en él, del ÚLTIMO paso de
+  `compras.documento_procesos`. `origen_fecha` dice de dónde sale la fecha:
+  PASO (al segundo, el 99,4 %), ALTA (sin pasos y en un estado inicial: el día
+  de alta) o FUERA_DE_PROCESO (sin fecha, con la cota `cambio_posterior_a`).
+  Historia NETA: un paso deshecho no se fecha. Va el ÚLTIMO de `build_compras`
+  porque el `DROP ... CASCADE` de `12` tira la vista cada noche. La regla
+  (familias, estados iniciales, orígenes) vive en `domain/estado_documentos.py`
+  y el SQL lleva sus literales (test). Ya no lee la foto de F-067, que queda
+  como RESPALDO: `python main.py contraste-estados` (solo lectura, a demanda,
+  fuera de la nocturna) recalcula sobre todas las noches cómo explica `rac`
+  cada cambio que vio la foto y sale con 1 si alguno no casa. Con ese
+  contraste delante, el humano decide si la foto se retira (Fase B).
 
 ## Acceso a datos
 
@@ -506,8 +523,9 @@ vuelva a buscarlo:
   `compras.documento_procesos`, con los estados traducidos **por tipo de
   documento** (`conest`: la misma cifra significa cosas distintas en un
   contrato y en una factura). Es la historia NETA: «Deshacer proceso» borra el
-  paso; la bruta está en `dbo.log` (F-105). La foto diaria de F-067 sigue
-  construyéndose; su relevo por `rac` es F-132.
+  paso; la bruta está en `dbo.log` (F-105). Desde F-132 la antigüedad del
+  estado sale de aquí (`compras.v_estado_documentos`), y la foto diaria de
+  F-067 queda como respaldo mientras dura el contraste.
 - **Los contratos no pasan por el circuito de firma** (`confir`): sus 69.993
   firmas son de comparativos, facturas y obras, y las de factura vienen sin
   fecha. `PFfir` y `logfirdoc`, donde el backlog esperaba encontrarlo, están

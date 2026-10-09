@@ -9,6 +9,88 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-08/09 · F-132 · FASE A IMPLEMENTADA (implementer), pendiente de review · `in_progress`
+
+Solo la Fase A (T1-T15 de `specs/F-132-estado-desde-rac/tasks.md`); la B espera a
+D7 del humano tras el contraste (hasta el 2026-10-22). La foto de F-067 sigue
+construyéndose igual: ni DROP, ni TRUNCATE, ni DELETE sobre sus dos tablas.
+
+- **Estado**: implementación de la FASE A TERMINADA, pendiente del reviewer. T1-T13 y T15 hechas; T14 es MANUAL del humano (`progress/impl_F-132.md` §6). `init.sh` final sobre `b68c1aa`: VERDE (7.245 passed, 229 skipped, 17 min 32 s; cobertura 100 %, 142/142). Mutación: 20 evaluados, 18 muertos, 2 supervivientes cerrados con test (`progress/mutacion_F-132.md`). `azure-apps` `89f63d5`, sin push. Diccionario v46 sin publicar. `init.sh` de arranque sobre 4d25fcb: VERDE (7.133 passed).
+- **Entorno**: `init.sh` de arranque lanzado sobre 4d25fcb en el árbol principal;
+  para no ensuciarlo (el barrido de dataclasses de F-006 ve módulos nuevos de
+  `domain/` si aparecen con la suite corriendo, como pasó en F-085), el trabajo se
+  hace en el worktree `../datamart-seg-anual-wt-f132` (rama temporal
+  `trabajo/F-132` desde 4d25fcb) y se lleva a `feature/F-132-estado-desde-rac`
+  por fast-forward. Ningún commit va a `dev` ni a `main`.
+- **Diccionario del árbol tras F-132: 207 objetos, 1623 columnas, 98 de consumo**
+  (la vista pasa de 11 a 15 columnas; versión sin publicar).
+- **Desviaciones respecto a la spec** (justificadas):
+  - La ficha reescrita de `compras.v_estado_documentos` entra en T3, con su SQL, y
+    no en T8: la orden del líder es «ficha en el mismo commit que el objeto». Con
+    ella pasan a T3 la retirada de los tests de la vista de F-067
+    (`test_f067_sql` r9-r11, que era de T5, y `test_f067_diccionario` r10 y la
+    parte de la vista de r11, que eran de T9): describían la vista vieja.
+  - La ficha nueva NO declara relación `paso_id` -> `documento_procesos`: el
+    validador R5 de F-006 la rechaza (la clave de la vista es `documento_id`);
+    el camino se explica en la columna.
+  - `contraste-estados` lee con `PostgresClient.filas_solo_lectura` (transacción
+    `READ ONLY` + `statement_timeout` con `SET LOCAL`, la vía única del
+    repositorio) en vez de abrir una conexión con `read_only = True`: misma
+    garantía, la impone el motor. Para `SQL_PASOS` (`= ANY(%s)`) el método gana
+    un `params` opcional que solo viaja si se pasa.
+  - Cuatro consultas, no tres: `SQL_FOTOS` (las fotos y cuál es la línea base)
+    hace falta para R16 y para decir qué noches no tuvieron nada que contrastar.
+  - La tabla del informe lleva una columna `grupo` (CAMBIO / NO VISTO) además de
+    noche, tipo y clase: DISCREPANCIA existe en los dos grupos.
+  - La agregación y el formato del informe viven en el dominio (`contrastar`,
+    `formatear_contraste`, `discrepancias`), como `formatear_recuentos`; el
+    comando solo lee y convierte filas.
+  - T10 corrige además tres textos que la spec no lista y que la premisa o la
+    vista vieja dejaban falsos, SOLO en comentarios o docstrings (ni una línea
+    ejecutable): el docstring de `compras_reset_sql.py` («la única vista que
+    las lee») y el de `reset-compras` en `main.py` («historia que no existe en
+    Sigrid»). La cabecera de `01_documentos.sql` («la antigüedad la da la foto
+    diaria») se dejó COMO ESTABA: la spec dice que `01` no se toca y su texto
+    entero está fijado por huella en `test_f073_sql` r23 (el primer `init.sh`
+    tras T11 salió rojo por eso). Queda anotado para quien toque `01`.
+
+
+## 2026-10-08 · F-132 · SPEC ESCRITA (spec-author), `pending` a la espera de aprobación · la antigüedad del estado desde `rac`
+
+Spec en `specs/F-132-estado-desde-rac/` (requirements 150/150, design 246/250,
+21 tareas: Fase A T1-T15, Fase B T16-T21). Mediciones en `progress/spec_F-132.md`
+(solo lectura, sesión `read_only` contra Azure). Rama `feature/F-132-estado-desde-rac`
+desde `main` 43a50b9. `init.sh` de arranque VERDE (7.133 passed, 50 min).
+`acceptance` reescrito (criterios 1-5) porque la medición lo matiza; `status` sin tocar.
+
+**Lo que cambia la ficha**:
+- `rac` fecha al segundo el 99,4 % de contratos, facturas y comparativos; los
+  1.248 sin pasos están en su estado inicial (fecha = día de alta); 75 cambiaron
+  fuera de proceso y no se pueden fechar (se da la cota «después de»).
+- **Lo que solo ve la foto es un FLUJO, no ~70 documentos**: en la única noche
+  contrastable (07→08-10) 9 de los 230 cambios son pasos DESHECHOS y 3 contratos
+  volvieron a PFP sin un paso; 5 contratos se deshicieron y rehicieron el mismo
+  día sin que la foto lo viera. 0 DISCREPANCIA. Con historia NETA todo queda
+  explicado, pero sin foto el deshacer no se fecha hasta F-105 (`dbo.log`).
+- **Corrige el encargo**: la 2.ª observación de la foto es la NOCTURNA del 08-10
+  (observado 00:03:01, tomada 03:26:34 UTC); el `build-compras` de las 10:19 no
+  escribió nada (sin `raw.con` nueva). La del 09-10 aún no ha corrido.
+- 809 contratos EPF, 785 con más de 21 días, pero solo 23 de 2025 en adelante:
+  ~760 envíos antiguos sin cerrar (dato para Compras, no error).
+- Coste: la vista 0,8 s al consultar y < 1 s de build; la foto < 1 min por noche
+  (retirarla ahorra eso y 20 MB). El contraste es un comando a demanda: 0 min de
+  nocturna (la del 08-10 duró 4 h 40 min).
+
+**Decisiones abiertas para el humano** (detalle y cifras en `design.md` §8;
+recomendación en negrita): **D1** dos fases (A: vista + contraste + textos; B:
+retirada) · **D2** historia NETA de `rac` · **D3** comparativos dentro, obras
+fuera · **D4** la vista cambia de columnas (fuera las tres de la foto; dentro
+`origen_fecha`, `cambio_posterior_a`, código y quién dio el paso) · **D5** fuera
+de proceso sin fecha y con cota · **D6** 14 noches (hasta el 2026-10-22) y 0
+DISCREPANCIA sin explicar · **D7** (al final del contraste) recomendación previa
+**BORRAR** la foto con un comando que lanza el humano; alternativas congelar o
+conservarla como detector de deshechos hasta F-105 · **D8** contraste a demanda,
+no en la nocturna.
 
 ## 2026-10-08 · F-085 · CERRADA (`done`, APROBADO en pasada 2) · quién aprobó qué y cuándo (`rac`) · DESPLEGADA el 08-10 (`r20261008-1204`)
 
@@ -18,7 +100,7 @@
 > imagen `r20261008-1204`, job comprobado. `ingest --table rac --full` SUCCESS
 > (2.518.253 filas, ~3 min de lectura + 69 s de firma) y `usu` (233; `delO` sin
 > problema). `build-compras` SUCCESS (516,7 s; `documento_procesos` 1.010.427 filas en
-> 40,2 s; la foto de F-067 tomó una observación más a las 10:19 UTC) · `build-personal`
+> 40,2 s; la foto de F-067 NO escribió nada: `raw.con` no era más nueva que la nocturna, R7 de F-067; corregido por F-132) · `build-personal`
 > SUCCESS (`usuarios_sigrid` 233) · `apply-grants` · `publicar-diccionario` **v45**
 > (207 objetos, 1.619 columnas) · `check-diccionario` OK · MCP reiniciado
 > (`--0000014`, Healthy, sirve la v45). **Verificado por el MCP**: la FR26/10025 da los

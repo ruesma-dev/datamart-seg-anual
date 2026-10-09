@@ -2,17 +2,21 @@
 -- ============================================================================
 -- F-067 · LA FOTO DIARIA DE ESTADOS de contratos (tip 44) y facturas (tip 15).
 --
--- ESTAS DOS TABLAS NO SE RECONSTRUYEN. SON HISTORIA QUE NO EXISTE EN SIGRID Y
--- QUE NO SE PUEDE RECUPERAR: NI DROP, NI TRUNCATE, NI DELETE (lo prohíbe un
--- test). `--full` solo trunca `raw`; el resto de `compras` se rehace con
--- DROP + CREATE cada noche sin tocarlas, porque no dependen de ningún objeto
--- del esquema. Si alguien las borra, la historia empieza de nuevo desde cero.
+-- ESTAS DOS TABLAS NO SE RECONSTRUYEN. SON HISTORIA QUE
+-- NO SE PUEDE RECUPERAR: lo que solo ve la foto (el día en que se DESHIZO un
+-- paso) no queda en `rac`. NI DROP, NI TRUNCATE, NI DELETE (lo prohíbe un test).
+-- `--full` solo trunca `raw`; el resto de `compras` se rehace con DROP +
+-- CREATE cada noche sin tocarlas, porque no dependen de ningún objeto del
+-- esquema. Si alguien las borra, la historia empieza de nuevo desde cero.
 --
--- POR QUÉ EXISTE. La fecha en que un documento cambia de estado no está en
--- Sigrid: `concam` audita 1,5 M de cambios y ni uno del campo `est`, y
--- `confir` no tiene ni una firma de contrato. Decisión del humano
--- (2026-09-06): construirla aquí como foto diaria, que empieza a contar el día
--- que se despliega. `con.tiemod` NO sirve de atajo (D2): la firma no lo mueve.
+-- HOY ES EL RESPALDO DE `rac` (F-132). Se montó (F-067, decisión del humano
+-- del 2026-09-06) sobre una premisa que F-085 desmintió: `rac` es la historia
+-- NETA de estados de cada documento, al segundo y con usuario, desde 2008. Desde F-132 la antigüedad
+-- del estado la publica `compras.v_estado_documentos` desde `rac`
+-- (`13_estado_documentos.sql`), y esta foto sigue tomándose igual mientras
+-- dura el contraste (`python main.py contraste-estados`, hasta el 2026-10-22):
+-- con el contraste delante, el humano decide si se retira (Fase B, D7).
+-- `con.tiemod` NO sirve de atajo (D2 de F-067): la firma no lo mueve.
 --
 -- POR TRAMOS (documento, estado, desde, hasta), no una fila por día: la foto
 -- de cualquier día D se reconstruye con `desde <= D < COALESCE(hasta, ∞)`.
@@ -139,34 +143,3 @@ BEGIN
     )
     VALUES (v_obs, (v_ult IS NULL), v_actual, v_cambios, v_insertados - v_cambios, v_desaparecid);
 END $$;
-
--- ---------------------------------------------------------------------------
--- `compras.v_estado_documentos` (R9-R11): el estado ACTUAL de cada documento
--- de la foto y cuánto lleva en él, del tramo abierto. Se calcula AL
--- CONSULTAR: los días avanzan solos y `ultima_foto` dice si la historia se ha
--- parado. En un tramo de LÍNEA BASE `dias_en_estado` es un MÍNIMO («lleva al
--- menos N días»): en cuanto pasa de 21, «más de tres semanas» es cierto. El
--- cambio ocurrió entre `cambio_observado_tras` y `en_estado_desde`, no a una
--- hora exacta. Fechas en hora de Madrid. `con.tiemod` no entra aquí (D2).
--- ---------------------------------------------------------------------------
-CREATE OR REPLACE VIEW compras.v_estado_documentos AS
-SELECT
-    h.documento_id,
-    h.tipo_documento_codigo,
-    CASE h.tipo_documento_codigo WHEN 44 THEN 'CONTRATO' WHEN 15 THEN 'FACTURA' END AS tipo_documento,
-    h.estado_id,
-    est.codigo_estado                                  AS estado_codigo,
-    est.nombre_estado                                  AS estado,
-    (h.desde AT TIME ZONE 'Europe/Madrid')             AS en_estado_desde,
-    (h.observado_antes AT TIME ZONE 'Europe/Madrid')   AS cambio_observado_tras,
-    h.es_linea_base                                    AS antiguedad_es_minima,
-    ((now() AT TIME ZONE 'Europe/Madrid')::date
-     - (h.desde AT TIME ZONE 'Europe/Madrid')::date)   AS dias_en_estado,
-    ((SELECT max(f.observado_en) FROM compras.historial_estados_fotos f)
-     AT TIME ZONE 'Europe/Madrid')                     AS ultima_foto
-FROM compras.historial_estados h
--- La traducción por la PAREJA (tipo, estado), con su guarda de grano, es la
--- de `compras.contratos` y `compras.facturas` (F-084). LEFT: un estado fuera
--- de catálogo se publica igual, con el literal a NULL.
-LEFT JOIN LATERAL compras.fn_estado_documento(h.tipo_documento_codigo, h.estado_id) est ON TRUE
-WHERE h.hasta IS NULL;

@@ -4,8 +4,8 @@ F-067 · El SQL de `python main.py reset-compras`. **Solo construye texto.**
 
 Hasta el 2026-10-06 el comando hacía `DROP SCHEMA ... CASCADE` sobre `compras`,
 y eso se habría llevado las dos tablas PERSISTENTES de la foto diaria de
-estados (`TABLAS_PERSISTENTES` del dominio): historia que no existe en Sigrid y
-no se puede recuperar. Decisión del humano (delegada en el líder, opción a):
+estados (`TABLAS_PERSISTENTES` del dominio): historia de la foto que no se
+puede recuperar (desde F-132, respaldo de `rac` en contraste). Decisión del humano (delegada en el líder, opción a):
 `reset-compras` borra TODO lo demás del esquema —vistas, tablas y funciones,
 en ese orden y con `CASCADE`— y NUNCA esas dos tablas ni sus índices, que
 mueren solo con su tabla. Después, `build-compras` lo reconstruye todo y la
@@ -13,8 +13,9 @@ foto sigue donde estaba.
 
 Por qué es seguro el `CASCADE`: las dos tablas no dependen de ningún objeto de
 `compras` (ni claves foráneas, ni funciones en sus `CHECK` o `DEFAULT`), así
-que borrar los demás no las arrastra. La única vista que las lee,
-`compras.v_estado_documentos`, se borra y `build-compras` la recrea.
+que borrar los demás no las arrastra. Desde F-132 ninguna vista las lee:
+`compras.v_estado_documentos` sale de `rac`, se borra con las demás y
+`build-compras` la recrea.
 """
 
 from __future__ import annotations
