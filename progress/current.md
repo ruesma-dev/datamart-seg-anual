@@ -60,7 +60,18 @@
     `SET LOCAL lock_timeout = '30s'` + `DROP TABLE IF EXISTS` de las dos, sin
     `CASCADE`, en una transacción, y relee para comprobar (sale con 1 si queda alguna).
 
-## 2026-10-08/09 · F-132 · FASE A APROBADA (review a la primera) e integrada en `main` · `blocked` hasta el 2026-10-22
+## 2026-10-09 · F-132 · CERRADA (`done`): fases A y B APROBADAS · A desplegada, B SIN DESPLEGAR
+
+> **Cerrada el 2026-10-09.** Resumen en `progress/history.md`. El humano decidió borrar la
+> foto ya (D6 acortada a 2 noches, D7 = BORRAR). **MANUAL de la fase B, EN ESTE ORDEN y
+> el mismo día, antes de la nocturna** (`progress/impl_F-132_faseB.md` §5): 1) imagen y job
+> (humano, comprobar el tag); 2) `python main.py retirar-foto-estados` sin y con
+> `--confirmar` (humano); 3) `publicar-diccionario` v47 si la nocturna aún no lo hizo,
+> `check-diccionario` (205 objetos) y reiniciar el MCP (líder).
+
+### Historia de la feature (antes del cierre)
+
+#### 2026-10-08/09 · F-132 · FASE A APROBADA (review a la primera) e integrada en `main` · `blocked` hasta el 2026-10-22
 
 > **BLOQUEADA por decisión del humano (2026-10-09)**, motivo: la FASE B (retirar o
 > conservar la foto, D7) espera al CONTRASTE de 14 noches, hasta el **2026-10-22**.
