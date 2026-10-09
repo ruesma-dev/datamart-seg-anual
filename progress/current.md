@@ -18,6 +18,14 @@
 > un REVOKE). `init.sh` de arranque: pytest VERDE (7.143 passed, 40 min 43 s); su único
 > KO fue la puerta de tamaño sobre el `requirements.md` a medio escribir (151 > 150),
 > ya corregido.
+>
+> **AVISO, `init.sh` de cierre (sobre `27cf43e`) en ROJO por causa AJENA a F-135**:
+> tamaño OK (149/150, 238/250), pero pytest se para en
+> `tests/test_f085_diccionario.py::test_f085_r28_azure_apps` («azure-apps no dice
+> "72 tablas"»). Motivo: el commit `fc40216` de `azure-apps` (18:22, **F-090**, desde
+> su worktree, sin fusionar) ya escribe «74 tablas», y `main` aún espera 72. No lo he
+> tocado (ni `azure-apps` ni el worktree de F-090). Se arregla al fusionar F-090 en
+> `main`, o el líder decide antes. Toda rama que salga de `main` hasta entonces lo verá.
 
 - **Lo medido que cambia el problema**: lo restringido (criterio V2) son **55.504
   apuntes (2,55 % del mayor), 8.791 asientos, 25 empresas**. Pero además de
