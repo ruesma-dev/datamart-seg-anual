@@ -9,6 +9,18 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-09 · F-132 · FASE B, rama BORRAR, en curso (implementer) · `in_progress`
+
+> **Decisión D7 del humano (2026-10-09)**: «bórrala ya» + «adelante». D6 se acorta (el
+> contraste se cierra con 2 noches: 492 cambios, 0 `DISCREPANCIA`, cierre anotado en
+> `progress/contraste_F-132.md`) y **D7 = BORRAR** la foto diaria de F-067
+> (`progress/spec_F-132.md` §8). Tareas: T16, T17, T18, T20, T21 (T19, congelar, NO
+> aplica). Orden del despliegue: imagen y job PRIMERO; después `retirar-foto-estados
+> --confirmar` (MANUAL del humano); después diccionario v47 y MCP (el líder).
+
+- **Estado**: T16 hecha (cierre del contraste anotado). `init.sh` de arranque sobre
+  `a237288`: VERDE (7.245 passed, 229 skipped, 29 min 13 s).
+
 ## 2026-10-08/09 · F-132 · FASE A APROBADA (review a la primera) e integrada en `main` · `blocked` hasta el 2026-10-22
 
 > **BLOQUEADA por decisión del humano (2026-10-09)**, motivo: la FASE B (retirar o
