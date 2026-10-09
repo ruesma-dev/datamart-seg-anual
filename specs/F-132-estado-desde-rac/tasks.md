@@ -17,9 +17,9 @@ Rama `feature/F-132-estado-desde-rac`. Un commit por tarea (`F-132 Tn: ...`). Fa
 - [x] T10: premisa falsa fuera del diccionario: `tables_sigrid.yaml` (C3), `docs/ARCHITECTURE.md`, `README_COMPRAS_C1_C2.md`, docstrings de `historial_estados.py` y `build_compras_step.py`  |  Verificación: `pytest tests/test_f132_diccionario.py -k r22`
 - [x] T11: `azure-apps/datamart_seg_anual.md` (sección F-132; F-067 sin «SIN DESPLEGAR» ni «Sigrid no la guarda»), commit propio en ese repositorio, sin push  |  Verificación: `git -C ../azure-apps log -1 --stat`
 - [x] T12: mutación muestreada (rigor estandar: 20 mutantes, semilla fija) sobre `domain/estado_documentos.py` y el comando; supervivientes analizados en `progress/mutacion_F-132.md`  |  Verificación: `python -m harness.mutacion` según `harness/rigor.json`
-- [ ] T13: informe `progress/impl_F-132.md` (≤ 220 líneas) con las trazas RED y las MANUAL de abajo  |  Verificación: `python -m harness.tamano --feature F-132`
+- [x] T13: informe `progress/impl_F-132.md` (≤ 220 líneas) con las trazas RED y las MANUAL de abajo  |  Verificación: `python -m harness.tamano --feature F-132`
 - [ ] T14: MANUAL (humano), solo lectura tras desplegar y `build-compras`: `SELECT origen_fecha, tipo_documento, count(*) FROM compras.v_estado_documentos GROUP BY 1,2` → PASO ≈ 205.000, ALTA ≈ 1.250, FUERA_DE_PROCESO ≈ 75 (+ los pasos lanzados entre la ingesta de `con` y la de `rac`); `SELECT count(*) FROM compras.v_estado_documentos WHERE tipo_documento='CONTRATO' AND estado_codigo='EPF' AND dias_en_estado > 21` ≈ 785; `python main.py contraste-estados` → resultado en `progress/contraste_F-132.md`; publicar v46, reiniciar el MCP y hacerle la pregunta de R24  |  Verificación: MANUAL (humano)
-- [ ] T15: Ejecutar `bash harness/init.sh` en verde  |  Verificación: `bash harness/init.sh`
+- [x] T15: Ejecutar `bash harness/init.sh` en verde  |  Verificación: `bash harness/init.sh`
 
 ## Fase B (solo tras D7; el líder ajusta esta lista a la rama elegida)
 

@@ -9,13 +9,13 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-08 · F-132 · EN IMPLEMENTACIÓN (implementer), FASE A · `in_progress`
+## 2026-10-08/09 · F-132 · FASE A IMPLEMENTADA (implementer), pendiente de review · `in_progress`
 
 Solo la Fase A (T1-T15 de `specs/F-132-estado-desde-rac/tasks.md`); la B espera a
 D7 del humano tras el contraste (hasta el 2026-10-22). La foto de F-067 sigue
 construyéndose igual: ni DROP, ni TRUNCATE, ni DELETE sobre sus dos tablas.
 
-- **Tarea en curso**: T13 (informe) y T15 (`init.sh`). Hechas: T1-T12 (mutación: 20 evaluados, 18 muertos, 2 supervivientes cerrados con test) (`azure-apps` 89f63d5, sin push). Diccionario v46. `init.sh` de arranque sobre 4d25fcb: VERDE (7.133 passed, 228 skipped, 46 min 57 s).
+- **Estado**: implementación de la FASE A TERMINADA, pendiente del reviewer. T1-T13 y T15 hechas; T14 es MANUAL del humano (`progress/impl_F-132.md` §6). `init.sh` final sobre `b68c1aa`: VERDE (7.245 passed, 229 skipped, 17 min 32 s; cobertura 100 %, 142/142). Mutación: 20 evaluados, 18 muertos, 2 supervivientes cerrados con test (`progress/mutacion_F-132.md`). `azure-apps` `89f63d5`, sin push. Diccionario v46 sin publicar. `init.sh` de arranque sobre 4d25fcb: VERDE (7.133 passed).
 - **Entorno**: `init.sh` de arranque lanzado sobre 4d25fcb en el árbol principal;
   para no ensuciarlo (el barrido de dataclasses de F-006 ve módulos nuevos de
   `domain/` si aparecen con la suite corriendo, como pasó en F-085), el trabajo se
