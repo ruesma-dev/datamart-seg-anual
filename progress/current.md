@@ -26,6 +26,9 @@
   push. Informe: `progress/impl_F-090.md` (MANUAL en su §5: `init.sh` en el árbol principal
   por el líder, imagen y job, ingesta `rcg`/`gra`, `build-compras`, diccionario v48, MCP,
   timings). T8 (informe) hecho; T9-T11 MANUAL; T12 (`init.sh` verde) lo cierra el líder.
+- **Mutación NO VÁLIDA por tiempo** (8/8 muertos, pero la línea base de cierre agotó los
+  600 s; en serie, la de apertura tampoco cupo): repetirla en el árbol principal,
+  `python -m harness.mutacion --feature F-090 --workers 1` (`progress/mutacion_F-090.md`).
 - **Desviaciones respecto a la spec** (justificadas en `progress/impl_F-090.md` §2):
   - Diccionario **versión 48**, no 47: `main` ya usó la 47 (F-132 fase B).
   - Las fichas van en el commit de su objeto (raw en T2, el índice en T4), con `gra` en el

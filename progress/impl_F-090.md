@@ -137,7 +137,8 @@ FAILED ...::test_f090_r25_azure_apps - AssertionEr...
 ## 5 · MANUAL pendiente, EN ESTE ORDEN (Azure lo autoriza el humano)
 
 1. **Integrar y verificar** (líder): `bash harness/init.sh` en el árbol
-   principal sobre esta rama -> verde.
+   principal sobre esta rama -> verde; y la campaña de mutación VÁLIDA,
+   `python -m harness.mutacion --feature F-090 --workers 1` (§6).
 2. **Imagen y job** (humano): imagen nueva con tag fechado y el job apuntado a
    ella; comprobar el tag del job (memoria «el repositorio en verde no es
    producción»).
@@ -173,5 +174,5 @@ FAILED ...::test_f090_r25_azure_apps - AssertionEr...
 | Los 112 de entorno, con ajustes FICTICIOS (`SIGRID_API_BASE_URL=http://127.0.0.1:9`, `PG_HOST=127.0.0.1`, `PG_PORT=9`, resto inventado; nada en disco, ningún `.env`) | **112 passed en 75,39 s**: el rojo es solo de entorno |
 | `bash harness/init.sh` en el worktree (sobre `1c1064a`) | KO de ENTORNO: «Falta .env» y pytest con `-x` parado en el 1.º de entorno (`test_f006_t26_cli_dry_run_no_toca_la_base`; 255 passed antes). Por eso su PUERTA COBERTURA daba 50 % (14/28): medía 255 tests. Resto OK: compileall, `features.json`, `BACKLOG.md` al día, rigor, **PUERTA TAMAÑO OK (requirements 145/150, design 184/250)**, rama |
 | Cobertura de las líneas cambiadas | **100,0 % (28/28)**, umbral 80 %: `python -m harness.cobertura --base main` sobre el `coverage.json` de la suite completa (diff desde `75389c5`, merge-base con `main`) |
-| Mutantes generados y supervivientes | MUTACION_PENDIENTE |
+| Mutantes generados y supervivientes | **8 generados, 8 evaluados, 8 muertos, 0 supervivientes, 0 timeouts** (alcance: 132 líneas; los 8 caen en `domain/documento_adjuntos.py`: las 5 claves de `FAMILIAS_ADJUNTOS`, los dos `is None` y el `group(1)`; `build_compras_step.py` solo añade DATOS, un `_SubStep`, y no genera mutantes). 3.567,5 s con 2 workers (líneas base de apertura VERDES, 530,8 y 534,9 s, con los ajustes ficticios de la fila de entorno). **PERO EL ARNÉS DECLARA LA CAMPAÑA «NO VÁLIDA»**: la línea base de CIERRE agotó los 600 s (suelo 120 × 5) por tiempo, no por fallo. Reintentada en serie (`--workers 1`): la línea base de apertura tampoco cupo en 600 s (la suite completa tarda ~9-11 min en esta máquina con otros agentes trabajando). Informe tal cual lo generó el arnés: `progress/mutacion_F-090.md`. **Hay que repetirla válida** (líder, árbol principal con `.env` y la máquina libre): `python -m harness.mutacion --feature F-090 --workers 1`; si tampoco cabe, subir `mutacion.timeout_por_mutante_s` es decisión del humano (no lo he tocado) |
 | Tiempo de la suite | 1.374,34 s con cobertura (fila de arriba) |
