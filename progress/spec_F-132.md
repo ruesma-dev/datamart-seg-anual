@@ -129,3 +129,14 @@ proceso sin fecha y con la cota `cambio_posterior_a` · D6 14 noches (hasta el
 2026-10-22) y 0 `DISCREPANCIA` sin explicar · D7 recomendación previa BORRAR, que se
 decide al final con el contraste delante · D8 contraste a demanda, no en la nocturna.
 Se implementa la FASE A; la B espera a la decisión del humano.
+
+## 8. Fase B decidida por el humano (2026-10-09): BORRAR YA
+
+El 2026-10-09, tras ver el primer contraste (2 noches, 492 cambios, 0
+`DISCREPANCIA`), el humano ordenó «bórrala ya» y confirmó el plan («adelante»):
+**D6 se acorta** (el contraste se cierra con 2 noches en vez de 14) y **D7 = BORRAR**.
+Se implementa la rama «borrar» de la Fase B: T16 (contraste final con lo que hay),
+T17, T18, T20 y T21; T19 (congelar) no aplica. Se acepta perder la fecha de los
+pasos deshechos (~9 al día) hasta F-105 y las tres noches de foto (07, 08 y 09-10).
+Orden del despliegue: imagen y job PRIMERO; después `retirar-foto-estados
+--confirmar`; después diccionario v47 y MCP.

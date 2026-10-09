@@ -13,7 +13,75 @@
 
 > Prioridad 1 y `sdd: true` (el humano, 2026-10-09); `status` sigue `pending`. Mediciones en `progress/spec_F-090.md`: el binario SÍ está, en `ruesma_rep` (99,75 % casa por `(emp, cod)`; `documents/read` probado con una factura), así que la ficha y el `acceptance` se han corregido. Índice propio `compras.documento_adjuntos` (199.042 enlaces de cinco familias, filtrado en origen). **Decisiones abiertas D1-D7** al final de `requirements.md` (familias, filtro en origen, login de quien sube, sin `auxgra`, sin marca de binario, `facturas` intacta, aceptar el `acceptance` reescrito). Trabajo en el worktree `../datamart-seg-anual-wt-f090` (rama `feature/F-090-documento-adjunto`, desde `main`). `init.sh` allí: 2 KO, ambos de ENTORNO y no de la spec: falta `.env` en el worktree (no se copia, regla dura) y, por eso, `tests/test_f006_comandos.py::test_f006_t26_cli_dry_run_no_toca_la_base` falla (lee `SigridApiSettings` del entorno; 255 tests pasaron antes de pararse con `-x`). Puerta de tamaño OK (145/150, 184/250).
 
-## 2026-10-08/09 · F-132 · FASE A APROBADA (review a la primera) e integrada en `main` · `blocked` hasta el 2026-10-22
+## 2026-10-09 · F-132 · FASE B, rama BORRAR, en curso (implementer) · `in_progress`
+
+> **Decisión D7 del humano (2026-10-09)**: «bórrala ya» + «adelante». D6 se acorta (el
+> contraste se cierra con 2 noches: 492 cambios, 0 `DISCREPANCIA`, cierre anotado en
+> `progress/contraste_F-132.md`) y **D7 = BORRAR** la foto diaria de F-067
+> (`progress/spec_F-132.md` §8). Tareas: T16, T17, T18, T20, T21 (T19, congelar, NO
+> aplica). Orden del despliegue: imagen y job PRIMERO; después `retirar-foto-estados
+> --confirmar` (MANUAL del humano); después diccionario v47 y MCP (el líder).
+
+- **Estado**: implementación de la FASE B TERMINADA, pendiente del reviewer. T16, T17, T18,
+  T20 y T21 hechas (`02157ba`, `f4a30d8`, `b4f6a99`, `b0946ce` y el de T21); `azure-apps`
+  `8a8ac98`, sin push. Diccionario **v47 sin publicar**. `init.sh` final sobre `71ce870`: VERDE (7.143 passed, 12 min 59 s; antes, sobre `b0946ce`:
+  7.142 passed, 228 skipped, 22 min 42 s; cobertura 100 %, 42/42). Mutación: 18
+  evaluados, 16 muertos, 2 supervivientes cerrados con test (`progress/mutacion_F-132_faseB.md`).
+  Informe: `progress/impl_F-132_faseB.md` (MANUAL en su §5, EN ORDEN: imagen y job;
+  `retirar-foto-estados` sin y con `--confirmar`; `publicar-diccionario` v47 +
+  `check-diccionario` + reiniciar MCP). NO se ha borrado nada en Azure: solo una lectura
+  READ ONLY (`retirar-foto-estados` sin `--confirmar`: 186.705 tramos, 3 fotos).
+- **Pendiente anotado**: la cabecera de `01_documentos.sql` (l. 71-72) aún cita la foto;
+  la fija la huella de `test_f073_sql` r23. Para quien toque `01`. `init.sh` de arranque sobre
+  `a237288`: VERDE (7.245 passed, 229 skipped, 29 min 13 s).
+- **Diccionario del árbol tras la Fase B: 205 objetos, 1608 columnas, 96 de consumo**
+  (fuera las dos fichas de la foto: 8 + 7 columnas; versión sin publicar).
+- **Desviaciones respecto a la spec** (justificadas):
+  - **Las fichas de la foto, P24 y la descripción de `compras` salen en T17, no en
+    T18/T20**: en cuanto se borra `11_historial_estados.sql`, la puerta de F-006
+    (`test_f006_fichas`, `_origen_por_objeto`) rompe con una ficha sin SQL que la
+    cree. Es la regla «ficha en el mismo commit que el objeto», al revés.
+  - **`domain/historial_estados.py` sobrevive a T17 solo con tres constantes**
+    (`TIPOS_HISTORIAL`, `MOTIVOS_CIERRE`, `TABLAS_PERSISTENTES`): las leen el
+    contraste y `compras_reset_sql.py`, que se retiran en T18 junto con el módulo.
+    Así cada commit deja la suite en verde.
+  - **`01_documentos.sql` NO se toca** aunque su cabecera (l. 71-72) aún cite la
+    foto: la fija la huella de `test_f073_sql` r23 (observación 2 del review de la
+    Fase A). El veto nuevo de `test_f132_retirada.py` mira lo EJECUTABLE del SQL.
+  - `00_setup.sql` (observación 1 del review) y `12_documento_procesos.sql`: solo
+    comentarios, que citaban la foto o su módulo.
+  - **El dominio del contraste también sale** (`clasificar_cambio`,
+    `clasificar_no_visto`, `contrastar`, `discrepancias`, `formatear_contraste`,
+    `CLASES_*`, `Contrastado`) con sus tests de `test_f132_dominio.py` (R13, R14):
+    solo servían al comando retirado. Quedan `fecha_estado` y `dias_en_estado`.
+  - **`tests/test_f132_contraste.py` se queda con los dos tests de
+    `filas_solo_lectura(params=...)`**, la pieza general que trajo el contraste y
+    que sigue en `PostgresClient`. Los tests de la Fase B van en
+    `tests/test_f132_retirada.py` (nuevo): T18 se verifica con los dos.
+  - **`retirar-foto-estados`** vive en `retirar_foto_sql.py` (nuevo, el único de
+    `etl_sigrid/` que nombra las dos tablas; lo veta un test). Sin `--confirmar`
+    lee con `filas_solo_lectura` (READ ONLY) cuáles existen y sus filas; con él,
+    `SET LOCAL lock_timeout = '30s'` + `DROP TABLE IF EXISTS` de las dos, sin
+    `CASCADE`, en una transacción, y relee para comprobar (sale con 1 si queda alguna).
+
+## 2026-10-09 · F-132 · CERRADA (`done`): fases A y B APROBADAS · LAS DOS DESPLEGADAS
+
+> **Fase B DESPLEGADA el 2026-10-09**: el humano construyó la imagen `r20261009-1522`,
+> apuntó el job (comprobado por el líder) y lanzó `retirar-foto-estados` (las dos tablas
+> ya «no existe»). El líder: `publicar-diccionario` **v47** (205 objetos, 1.608 columnas),
+> `check-diccionario` OK, MCP reiniciado (`--0000014`, Healthy).
+
+
+> **Cerrada el 2026-10-09.** Resumen en `progress/history.md`. El humano decidió borrar la
+> foto ya (D6 acortada a 2 noches, D7 = BORRAR). **MANUAL de la fase B, EN ESTE ORDEN y
+> el mismo día, antes de la nocturna** (`progress/impl_F-132_faseB.md` §5): 1) imagen y job
+> (humano, comprobar el tag); 2) `python main.py retirar-foto-estados` sin y con
+> `--confirmar` (humano); 3) `publicar-diccionario` v47 si la nocturna aún no lo hizo,
+> `check-diccionario` (205 objetos) y reiniciar el MCP (líder).
+
+### Historia de la feature (antes del cierre)
+
+#### 2026-10-08/09 · F-132 · FASE A APROBADA (review a la primera) e integrada en `main` · `blocked` hasta el 2026-10-22
 
 > **BLOQUEADA por decisión del humano (2026-10-09)**, motivo: la FASE B (retirar o
 > conservar la foto, D7) espera al CONTRASTE de 14 noches, hasta el **2026-10-22**.

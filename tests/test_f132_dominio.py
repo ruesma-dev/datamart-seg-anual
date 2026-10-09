@@ -6,31 +6,22 @@ La regla la ejecuta SQL (`sql/compras/13_estado_documentos.sql`) y aquí se
 prueba caso a caso sobre su oráculo puro: de dónde sale `en_estado_desde`
 (PASO, ALTA o FUERA_DE_PROCESO), la cota `cambio_posterior_a` y los días.
 `tests/test_f132_sql.py` fija que el SQL lleva LOS MISMOS literales.
-
-Los casos del contraste (R13, R14) son documentos REALES de la noche del 07-10
-al 08-10, leídos en solo lectura el 2026-10-08: sus pasos de `rac` tal como
-los publica `compras.documento_procesos` (hora de Madrid, CEST = UTC+2) y la
-ventana de la foto (`observado_antes`, `desde`] en UTC.
 """
 
 from __future__ import annotations
 
 import ast
-from datetime import UTC, date, datetime, timedelta, timezone
+from datetime import date, datetime
 from pathlib import Path
 
 import pytest
 
 from etl_sigrid.domain.estado_documentos import (
-    CLASES_CAMBIO,
-    CLASES_NO_VISTO,
     ESTADOS_INICIALES,
     FAMILIAS_ESTADO,
     ORIGENES_FECHA,
     FechaEstado,
     PasoEstado,
-    clasificar_cambio,
-    clasificar_no_visto,
     dias_en_estado,
     fecha_estado,
 )
@@ -214,210 +205,6 @@ def test_f132_r7_cambio_posterior_a_solo_en_fuera_de_proceso() -> None:
     assert {con_paso.origen, de_alta.origen, fuera.origen} == set(ORIGENES_FECHA)
 
 
-# ===========================================================================
-# R13 · cada cambio que vio la foto, clasificado contra `rac`
-# ===========================================================================
-
-#: Octubre y septiembre de 2026 van en horario de verano: Madrid = UTC+2.
-CEST = timezone(timedelta(hours=2))
-
-#: La ventana real de la segunda foto: (línea base, nocturna del 08-10].
-INICIO = datetime(2026, 10, 7, 0, 3, 0, tzinfo=UTC)
-FIN = datetime(2026, 10, 8, 0, 3, 1, 945572, tzinfo=UTC)
-
-
-def _madrid(*partes: int) -> datetime:
-    """Un `momento` de `rac` (hora de Madrid) pasado a UTC, como el SQL."""
-    return datetime(*partes, tzinfo=CEST).astimezone(UTC)
-
-
-def _pasos(*cadena: tuple[int, tuple[int, ...]]) -> list[PasoEstado]:
-    return [
-        PasoEstado(orden=orden, destino=destino, momento=_madrid(*momento))
-        for orden, (destino, momento) in enumerate(cadena, start=1)
-    ]
-
-
-#: Factura 2808958, 5 -> 6: el paso 5>6 se dio el 07-10 a las 12:43:10.
-FACTURA_PASO = _pasos(
-    (2, (2026, 7, 31, 9, 9, 23)),
-    (3, (2026, 7, 31, 9, 9, 38)),
-    (4, (2026, 7, 31, 15, 3, 3)),
-    (5, (2026, 8, 3, 17, 37, 8)),
-    (6, (2026, 10, 7, 12, 43, 10)),
-)
-#: Contrato 2844510, 1 -> 3: el envío del 07-10 a las 12:11:10.
-CONTRATO_PASO = _pasos((3, (2026, 10, 7, 12, 11, 10)))
-#: Factura 2831855, 6 -> 5: el 5>6 se deshizo; su último paso es el 4>5 del 08-09.
-FACTURA_DESHECHO = _pasos(
-    (2, (2026, 9, 8, 12, 44, 8)),
-    (3, (2026, 9, 8, 12, 44, 15)),
-    (4, (2026, 9, 8, 13, 15, 22)),
-    (5, (2026, 9, 8, 13, 17, 59)),
-)
-#: Contrato 2833636, 7 -> 5: deshechos el 5>6 y el 6>7; queda el 3>5 del 10-09.
-CONTRATO_DESHECHO = _pasos(
-    (3, (2026, 9, 10, 13, 18, 30)),
-    (5, (2026, 9, 10, 13, 18, 35)),
-)
-#: Contrato 2652534 (7 en las dos fotos): la cadena 1>3>5>6>7 deshecha y
-#: rehecha en segundos el 07-10, sin que la foto viera cambio.
-CONTRATO_IDA_Y_VUELTA = _pasos(
-    (3, (2026, 10, 7, 8, 56, 28)),
-    (5, (2026, 10, 7, 8, 56, 33)),
-    (6, (2026, 10, 7, 8, 56, 41)),
-    (7, (2026, 10, 7, 8, 56, 48)),
-)
-#: Factura 2849508: nació el 07-10 y la foto la vio nacer ya en 4.
-FACTURA_ALTA = _pasos(
-    (2, (2026, 10, 7, 8, 7, 16)),
-    (3, (2026, 10, 7, 8, 8, 30)),
-    (4, (2026, 10, 7, 8, 42, 18)),
-)
-
-
-def test_f132_r13_las_clases_del_cambio_en_su_orden_de_prioridad() -> None:
-    assert CLASES_CAMBIO == (
-        "PASO", "DESHECHO", "VUELTA_AL_INICIAL", "FUERA_DE_PROCESO", "DISCREPANCIA"
-    )
-    assert CLASES_NO_VISTO == ("ALTA", "IDA_Y_VUELTA", "DISCREPANCIA")
-
-
-@pytest.mark.parametrize(
-    ("tipo", "estado_nuevo", "pasos"),
-    [(15, 6, FACTURA_PASO), (44, 3, CONTRATO_PASO)],
-    ids=["factura_2808958", "contrato_2844510"],
-)
-def test_f132_r13_paso_hay_un_paso_al_estado_nuevo_en_la_ventana(
-    tipo: int, estado_nuevo: int, pasos: list[PasoEstado]
-) -> None:
-    assert clasificar_cambio(tipo, estado_nuevo, INICIO, FIN, pasos) == "PASO"
-
-
-@pytest.mark.parametrize(
-    ("tipo", "estado_nuevo", "pasos"),
-    [(15, 5, FACTURA_DESHECHO), (44, 5, CONTRATO_DESHECHO)],
-    ids=["factura_2831855", "contrato_2833636"],
-)
-def test_f132_r13_deshecho_el_ultimo_paso_ya_llevaba_al_estado_nuevo(
-    tipo: int, estado_nuevo: int, pasos: list[PasoEstado]
-) -> None:
-    assert clasificar_cambio(tipo, estado_nuevo, INICIO, FIN, pasos) == "DESHECHO"
-
-
-def test_f132_r13_los_pasos_pueden_llegar_en_cualquier_orden() -> None:
-    desordenados = list(reversed(CONTRATO_DESHECHO))
-
-    assert clasificar_cambio(44, 5, INICIO, FIN, desordenados) == "DESHECHO"
-    # Por posición en la lista el «último» sería el 1>3 y saldría DESHECHO;
-    # por `orden` es el 3>5, que lleva a otro estado.
-    assert clasificar_cambio(44, 3, INICIO, FIN, desordenados) == "FUERA_DE_PROCESO"
-
-
-def test_f132_r13_vuelta_al_inicial_sin_un_solo_paso() -> None:
-    """Contrato 2775496: FIR (7) -> PFP (1) con la cadena entera deshecha."""
-    assert clasificar_cambio(44, 1, INICIO, FIN, []) == "VUELTA_AL_INICIAL"
-
-
-def test_f132_r13_sin_pasos_y_estado_nuevo_no_inicial_es_discrepancia() -> None:
-    assert clasificar_cambio(44, 5, INICIO, FIN, []) == "DISCREPANCIA"
-    assert clasificar_cambio(44, 20, INICIO, FIN, []) == "DISCREPANCIA"
-
-
-def test_f132_r13_fuera_de_proceso_el_ultimo_paso_lleva_a_otro_estado() -> None:
-    """Construido: la factura pasa a 10 y su último paso la dejó en 6."""
-    assert clasificar_cambio(15, 10, INICIO, FIN, FACTURA_PASO) == "FUERA_DE_PROCESO"
-
-
-def test_f132_r13_discrepancia_el_paso_existe_pero_despues_de_la_foto() -> None:
-    """Construido: la foto ya vio el 7 y el paso 6>7 es POSTERIOR (reloj o zona)."""
-    tarde = [*CONTRATO_PASO, PasoEstado(orden=2, destino=7, momento=FIN + timedelta(hours=8))]
-
-    assert clasificar_cambio(44, 7, INICIO, FIN, tarde) == "DISCREPANCIA"
-
-
-def test_f132_r13_la_ventana_es_abierta_por_abajo_y_cerrada_por_arriba() -> None:
-    en_el_fin = [PasoEstado(orden=1, destino=3, momento=FIN)]
-    en_el_inicio = [PasoEstado(orden=1, destino=3, momento=INICIO)]
-    antes = [PasoEstado(orden=1, destino=3, momento=INICIO - timedelta(seconds=1))]
-    despues = [PasoEstado(orden=1, destino=3, momento=FIN + timedelta(microseconds=1))]
-
-    assert clasificar_cambio(44, 3, INICIO, FIN, en_el_fin) == "PASO"
-    # En el inicio o antes: el paso ya estaba cuando la foto anterior miró.
-    assert clasificar_cambio(44, 3, INICIO, FIN, en_el_inicio) == "DESHECHO"
-    assert clasificar_cambio(44, 3, INICIO, FIN, antes) == "DESHECHO"
-    assert clasificar_cambio(44, 3, INICIO, FIN, despues) == "DISCREPANCIA"
-
-
-def test_f132_r13_el_paso_manda_sobre_el_deshecho() -> None:
-    """Contrato 2456588, 7 -> 8: cadena entera el 07-10 y el último a 8."""
-    cadena = _pasos(
-        (3, (2026, 10, 7, 13, 17, 59)),
-        (5, (2026, 10, 7, 13, 18, 7)),
-        (6, (2026, 10, 7, 13, 18, 20)),
-        (7, (2026, 10, 7, 13, 18, 29)),
-        (8, (2026, 10, 7, 13, 18, 40)),
-    )
-
-    assert clasificar_cambio(44, 8, INICIO, FIN, cadena) == "PASO"
-
-
-def test_f132_r13_un_paso_en_la_ventana_a_otro_estado_no_es_paso() -> None:
-    """El paso de la ventana tiene que llevar AL ESTADO NUEVO, no a cualquiera."""
-    assert clasificar_cambio(44, 5, INICIO, FIN, CONTRATO_PASO) == "FUERA_DE_PROCESO"
-
-
-def test_f132_r13_un_paso_sin_hora_no_cuenta_en_ninguna_ventana() -> None:
-    sin_hora = [PasoEstado(orden=1, destino=3, momento=None)]
-
-    assert clasificar_cambio(44, 3, INICIO, FIN, sin_hora) == "DISCREPANCIA"
-    assert clasificar_cambio(44, 1, INICIO, FIN, sin_hora) == "VUELTA_AL_INICIAL"
-
-
-def test_f132_r13_fuera_de_proceso_exige_que_ningun_paso_posterior_lleve_al_nuevo() -> None:
-    otro_y_luego_el_nuevo = [
-        *CONTRATO_PASO,
-        PasoEstado(orden=2, destino=7, momento=FIN + timedelta(days=1)),
-    ]
-    otro_y_luego_otro = [
-        *CONTRATO_PASO,
-        PasoEstado(orden=2, destino=5, momento=FIN + timedelta(days=1)),
-    ]
-
-    assert clasificar_cambio(44, 7, INICIO, FIN, otro_y_luego_el_nuevo) == "DISCREPANCIA"
-    assert clasificar_cambio(44, 7, INICIO, FIN, otro_y_luego_otro) == "FUERA_DE_PROCESO"
-
-
-# ===========================================================================
-# R14 · los pasos de la ventana que la foto NO vio cambiar
-# ===========================================================================
-
-
-def test_f132_r14_alta_la_foto_le_abrio_tramo_ese_dia() -> None:
-    """Factura 2849508: nace el 07-10 y la foto la ve nacer ya en 4."""
-    assert clasificar_no_visto(4, True, FIN, FACTURA_ALTA) == "ALTA"
-    # El alta manda aunque el estado no case: la foto la vio nacer.
-    assert clasificar_no_visto(9, True, FIN, FACTURA_ALTA) == "ALTA"
-
-
-def test_f132_r14_ida_y_vuelta_el_ultimo_paso_deja_el_estado_de_la_foto() -> None:
-    """Contrato 2652534: 7 en las dos fotos, la cadena rehecha el 07-10."""
-    assert clasificar_no_visto(7, False, FIN, CONTRATO_IDA_Y_VUELTA) == "IDA_Y_VUELTA"
-    assert clasificar_no_visto(7, False, FIN, list(reversed(CONTRATO_IDA_Y_VUELTA))) == (
-        "IDA_Y_VUELTA"
-    )
-
-
-def test_f132_r14_solo_cuentan_los_pasos_hasta_el_fin_de_la_ventana() -> None:
-    despues = [
-        *CONTRATO_IDA_Y_VUELTA,
-        PasoEstado(orden=5, destino=8, momento=FIN + timedelta(seconds=1)),
-    ]
-
-    assert clasificar_no_visto(7, False, FIN, despues) == "IDA_Y_VUELTA"
-    assert clasificar_no_visto(8, False, FIN, despues) == "DISCREPANCIA"
-
-
-def test_f132_r14_discrepancia_si_el_ultimo_paso_lleva_a_otro_estado() -> None:
-    assert clasificar_no_visto(5, False, FIN, CONTRATO_IDA_Y_VUELTA) == "DISCREPANCIA"
-    assert clasificar_no_visto(7, False, FIN, []) == "DISCREPANCIA"
+# R13 y R14 (el contraste con la foto diaria): RETIRADOS con la foto. La Fase B
+# de F-132 (rama BORRAR, 2026-10-09) borró el contraste y su dominio;
+# `tests/test_f132_retirada.py` fija que ya no están.

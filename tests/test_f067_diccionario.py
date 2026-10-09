@@ -73,9 +73,9 @@ def _relaciones(nombre: str) -> set[tuple[str, str, str]]:
 # R28 · cada objeto nuevo con su ficha y su clave
 # ===========================================================================
 
+#: Las dos tablas de la foto diaria (`historial_estados`, `historial_estados_fotos`)
+#: salieron con la Fase B de F-132 (2026-10-09): ya no tienen ficha.
 CLAVES = {
-    "compras.historial_estados": ("documento_id", "desde"),
-    "compras.historial_estados_fotos": ("observado_en",),
     "compras.v_estado_documentos": ("documento_id",),
     "compras.necesidades": ("necesidad_id",),
 }
@@ -181,15 +181,9 @@ def _ficha_entera(nombre: str) -> str:
 # fecha sale de `rac`, y su ficha la fija `tests/test_f132_diccionario.py`.
 
 
-def test_f067_r11_la_historia_de_la_foto_empieza_al_desplegar() -> None:
-    assert "la historia empieza el dia del despliegue" in _plano(
-        _ficha("compras.historial_estados").descripcion
-    )
-
-
-def test_f067_r8_la_ficha_avisa_de_que_la_historia_no_se_reconstruye() -> None:
-    for nombre in ("compras.historial_estados", "compras.historial_estados_fotos"):
-        assert "no se reconstruye" in _plano(_ficha(nombre).descripcion), nombre
+# R11 (la historia de la foto empieza al desplegar) y R8 (la ficha avisa de que
+# no se reconstruye): RETIRADOS con las fichas de la foto, que la Fase B de F-132
+# borró el 2026-10-09 (`tests/test_f132_diccionario.py` fija que ya no están).
 
 
 # ===========================================================================
@@ -264,7 +258,7 @@ def test_f067_r27_la_version_sube_a_44() -> None:
 @pytest.mark.parametrize(
     ("identificador", "objeto"),
     [
-        ("P24", "compras.historial_estados"),
+        ("P24", "compras.documento_procesos"),
         ("P25", "compras.comparativos"),
         ("P26", "compras.albaran_lineas"),
     ],

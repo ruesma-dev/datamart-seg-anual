@@ -27,8 +27,9 @@
 -- Lee: `raw.rac`, `raw.con`, `raw.usu` y `raw.conest` (por
 -- `compras.fn_estado_documento`, de `00_setup.sql`: el estado se traduce por
 -- la PAREJA tipo-estado, nunca solo por el estado). Se reconstruye cada noche
--- (DROP + CREATE), como el resto de `compras`. NO es la foto de F-067
--- (`11_historial_estados.sql`), que es persistente y no se toca aquí (D7).
+-- (DROP + CREATE), como el resto de `compras`. NO es la foto diaria de F-067,
+-- que F-132 retiró (Fase B, 2026-10-09): la antigüedad del estado la da el
+-- último paso de esta tabla, en `compras.v_estado_documentos` (`13`).
 --
 -- DATOS PERSONALES: el login (`usuario`) y el NOMBRE de quien lanzó el paso
 -- (`nombre_usuario`, `usu.res`), decisión D4 del humano del 2026-10-07. El DNI

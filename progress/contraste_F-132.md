@@ -32,3 +32,15 @@ Código de salida 0. La noche del 08-10 ya no da exactamente lo de la spec (214/
 facturas, 5 idas y vueltas): con la historia NETA, un paso deshecho DESPUÉS reclasifica
 la noche (4 facturas pasan de PASO a FUERA_DE_PROCESO, un contrato deja de ser IDA Y
 VUELTA). Lo avisó el implementer (`impl_F-132.md` §6.4). Sigue sin ninguna discrepancia.
+
+## 2026-10-09 · CONTRASTE CERRADO por decisión del humano (D6 acortada, D7 = BORRAR)
+
+El humano, con la salida de arriba delante (2 noches, 492 cambios, **0
+`DISCREPANCIA`**), ordenó el 2026-10-09 «bórrala ya» y confirmó el plan
+(«adelante»): **D6 se acorta** y el contraste se cierra con estas 2 noches en vez
+de las 14 previstas (hasta el 2026-10-22); **D7 = BORRAR** la foto
+(`progress/spec_F-132.md` §8). No se relanza el contraste: la Fase B retira el
+propio comando `contraste-estados` junto con las tablas que lee, así que esta es
+su última ejecución. Lo que se acepta perder: la noche en que se DESHIZO un paso
+(~9 al día; los 4 + 7 DESHECHO de contrato y los 7 + 7 de factura de arriba)
+hasta que F-105 lo traiga de `dbo.log`, y las tres noches de foto (07, 08 y 09-10).
