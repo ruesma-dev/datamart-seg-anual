@@ -106,3 +106,12 @@ dónde está y que el datamart no lo replica; (5) el criterio de comparativos y
 ofertas se concreta (Excel en el comparativo o en sus ofertas); (6) la ventana
 ya no tiene «19 min de margen»: va 39 min por encima. La descripción de la
 ficha se corrige en el párrafo del binario.
+
+## 8 · Aprobada por el humano (2026-10-09)
+
+El humano aprobó la spec el 2026-10-09 («apruebo») con D1-D7 tal como las recomienda
+`requirements.md`: D1 las cinco familias de compras (12, 14, 15, 44, 46; 199.042
+enlaces) · D2 filtrar en origen, sin nóminas, DNI ni embargos ni siquiera en `raw` ·
+D3 `subido_por` con el login, sin nombre · D4 sin `auxgra` · D5 sin comprobar cada
+noche el binario en `ruesma_rep` (0,23 % sin binario, declarado en la ficha) · D6
+objeto propio y `compras.facturas` intacta · D7 el `acceptance` reescrito.
