@@ -1421,9 +1421,9 @@
         "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
       ],
       "status": "pending",
-      "sdd": false,
+      "sdd": true,
       "rigor": "estandar",
-      "priority": 9,
+      "priority": 1,
       "branch": "feature/F-090-documento-adjunto"
     },
     {
