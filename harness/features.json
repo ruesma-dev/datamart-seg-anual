@@ -2117,7 +2117,7 @@
         "La nocturna no devuelve el permiso al día siguiente: el cambio vive en `infra/sql`/`apply-grants` con su test, como F-068",
         "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
       ],
-      "status": "spec_ready",
+      "status": "in_progress",
       "sdd": true,
       "rigor": "critico",
       "priority": 1,

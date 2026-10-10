@@ -9,6 +9,26 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-11 · F-135 · IMPLEMENTANDO (implementer) · `in_progress`
+
+> Rama `feature/F-135-restringir-personal-contabilidad`, desde `ffadfb2`. Spec aprobada
+> el 2026-10-11 con D1-D12 recomendadas y la precisión del humano (`spec_F-135.md` §9).
+> Informe final: `progress/impl_F-135.md`.
+
+- **`init.sh` de arranque**: un solo KO, `test_f006_dataclasses_inmutables` (342 passed
+  hasta ahí), y lo provoqué YO: creé `domain/restriccion_personal.py` (con un
+  `@dataclass`) mientras la suite corría, después de que el test fijara su lista. Ese
+  fichero, relanzado solo, pasa (179 passed). Se relanza `init.sh` entero tras T1.
+- **Tarea en curso**: ver la lista de `tasks.md` (se marcan `[x]` al cerrar cada una).
+- **Interpretación (no desviación)**: la precisión del humano pide que la copia completa
+  tenga «las mismas columnas» que la `contabilidad` de hoy. Se conservan TODAS las de hoy,
+  con el mismo nombre, orden y cálculo; `mayor` añade al final las tres de R5
+  (`restringido`, `motivo_restriccion`, `saldo_acumulado_visible`), que la spec aprobada
+  pide y que el build general necesita. `plan_cuentas` y `saldos_cuenta_mes` restringidos,
+  idénticos a los de hoy.
+- **Desviación justificada**: la spec dice `version: 48` del diccionario; F-090 ya
+  publicó la 48 el 2026-10-10, así que F-135 sube a **49**.
+
 ## 2026-10-09 · F-135 · SPEC ESCRITA, pendiente de aprobación del humano · `pending`
 
 > Spec-author. Rama `feature/F-135-restringir-personal-contabilidad` (desde `main`
