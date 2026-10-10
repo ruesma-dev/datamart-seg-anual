@@ -55,9 +55,11 @@ STEPS = {
             # F-132, Fase B, 2026-10-09.)
             # F-085: el historial de procesos de `rac`.
             "12_documento_procesos.sql",
-            # F-132: la vista del estado desde `rac`, la ÚLTIMA: el CASCADE de
-            # `12` la tira cada noche. Es una vista: no cuenta filas.
+            # F-132: la vista del estado desde `rac`, DETRÁS de `12`: el CASCADE
+            # de `12` la tira cada noche. Es una vista: no cuenta filas.
             "13_estado_documentos.sql",
+            # F-090: el índice de ficheros adjuntos (`rcg` + `gra`).
+            "14_documento_adjuntos.sql",
         ],
     ),
     "build_retenciones": (
@@ -178,10 +180,14 @@ def test_f132_build_compras_ya_no_cuenta_la_foto_y_acaba_en_la_vista(pg) -> None
 
     _step("build_compras").run()
 
-    assert doble.ejecutados[-3:] == [
+    # F-090 añade `14` (el índice de adjuntos) detrás: lo que se defiende es
+    # el orden desde `necesidades`, no que `13` sea el último.
+    i = doble.ejecutados.index("10_necesidades.sql")
+    assert doble.ejecutados[i : i + 3] == [
         "10_necesidades.sql", "12_documento_procesos.sql", "13_estado_documentos.sql",
     ]
-    assert doble.contados[-2:] == [
+    j = doble.contados.index(("compras", "necesidades"))
+    assert doble.contados[j : j + 2] == [
         ("compras", "necesidades"), ("compras", "documento_procesos"),
     ]
     assert ("compras", "historial_estados") not in doble.contados

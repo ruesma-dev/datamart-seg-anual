@@ -1672,3 +1672,31 @@ QUEDA (fase B sin desplegar): imagen y job → `retirar-foto-estados` sin y con
 `--confirmar`, ANTES de la nocturna siguiente → `check-diccionario` (v47, la publica la
 nocturna o a mano) y reiniciar el MCP. Pendiente para quien toque `01_documentos.sql`:
 su cabecera cita `11_historial_estados.sql`, que ya no existe (huella de F-073).
+
+## F-090 · El índice de adjuntos de los documentos de compras · 2026-10-09
+
+Rama `feature/F-090-documento-adjunto`. `sdd=true`, rigor `estandar`, prioridad 1 (el humano
+la subió el 2026-10-09). APROBADA en pasada 2 (`progress/review_F-090.md`; la 1 pidió cinco
+retoques de documentación, entre ellos `blob_column: ima` en la receta de `documents/read`).
+Spec en `specs/F-090-documento-adjunto/`, mediciones en `progress/spec_F-090.md`, informe en
+`progress/impl_F-090.md`, mutación en `progress/mutacion_F-090.md` (8/8 muertos).
+
+Corrige la ficha original: el binario SÍ está en Sigrid, en la base documental `ruesma_rep`
+(364.906 ficheros, ~165 GB; casa por `emp`+`cod` con `ruesma.gra` en el 99,75 %), y
+`sigrid-api` lo sirve con `documents/read` (probado con un PDF). Decisiones del humano: las
+cinco familias de compras (12, 14, 15, 44, 46; 199.042 enlaces), filtro en origen sin nada de
+personal ni en `raw`, `subido_por` solo login, sin `auxgra`, sin comprobar `ruesma_rep` cada
+noche, objeto propio con `compras.facturas` intacta.
+
+Hecho: `raw.rcg` y `raw.gra` (filtradas, sin `ima`/`pul`/`tex`/`cam`; censo 72 → 74);
+`compras.documento_adjuntos` (sub-paso `14` de `build_compras`, guarda R15) con lo necesario
+para pedir el fichero a `sigrid-api`; relaciones 1:N desde facturas, contratos, albaranes,
+comparativos y ofertas; diccionario v48 (208 objetos). Cobertura: facturas 62,8 % (96,1 %
+desde 2019), contratos 92,4 %, ofertas 25,1 %, comparativos 14,3 %; 1.980 comparativos con el
+Excel del concurso.
+
+Verificado: `init.sh` 7.268 passed, cobertura 100 % (28/28); mutación 8/8.
+
+QUEDA (sin desplegar): imagen y job; `ingest --table rcg --full` y `gra`, `build-compras`,
+`check-raw-recuentos`; diccionario v48 y MCP; tiempos de la primera nocturna. El SQL nuevo no
+ha corrido aún contra ningún Postgres.

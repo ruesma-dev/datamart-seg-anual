@@ -71,6 +71,8 @@ FICHEROS_COMPRAS = [
     "12_documento_procesos.sql",
     # F-132: la vista del estado desde `rac`, detrás de `12` (su CASCADE la tira).
     "13_estado_documentos.sql",
+    # F-090: el índice de ficheros adjuntos (`rcg` + `gra`).
+    "14_documento_adjuntos.sql",
 ]
 
 

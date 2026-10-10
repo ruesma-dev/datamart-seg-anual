@@ -16,6 +16,7 @@ Encadena los archivos SQL en orden:
     10_necesidades.sql - el documento de necesidades de compra, el DPC (F-067)
     12_documento_procesos.sql - el historial de PROCESOS de `rac` (F-085)
     13_estado_documentos.sql - el estado actual y desde cuándo, de `rac` (F-132)
+    14_documento_adjuntos.sql - el índice de ficheros adjuntos, de `rcg`/`gra` (F-090)
 
 Lee de `raw.*` y, como `03_views.sql`, de `maestro.v_obra_fichas` (de
 `build_maestros`, que corre antes en `run-all`). No necesita `stg` ni `mart`.
@@ -41,9 +42,15 @@ ventanas por documento) y no lo necesita nadie del esquema salvo `13`. Lee
 `raw.rac`, `raw.con`, `raw.usu` y la función `fn_estado_documento` de
 `00_setup.sql`.
 
-`13` (F-132) va el ÚLTIMO porque la vista `compras.v_estado_documentos` lee
-`compras.documento_procesos`, y el `DROP TABLE ... CASCADE` de `12` se la lleva
-cada noche: `13` la vuelve a crear. Lee además las tres cabeceras (`01`, `08`).
+`13` (F-132) va DETRÁS de `12` porque la vista `compras.v_estado_documentos`
+lee `compras.documento_procesos`, y el `DROP TABLE ... CASCADE` de `12` se la
+lleva cada noche: `13` la vuelve a crear. Lee además las tres cabeceras (`01`,
+`08`).
+
+`14` (F-090) solo lee `raw` (`rcg`, `gra`, `con`, `comprv`) y la función
+`fn_sigrid_date` de `00_setup.sql`; no depende de ningún otro objeto de
+`compras` ni ninguno depende de él. Va al final para no mover a nadie. El
+fichero adjunto NO se lee: vive en `ruesma_rep` y lo sirve `sigrid-api`.
 
 POR QUÉ EXISTE ESTE FICHERO (F-047, absorbe F-044). `build-compras` ejecutaba
 su SQL **en línea dentro del comando**, sin step, y por eso **no dejaba fila en
@@ -183,6 +190,16 @@ SUB_PASOS: tuple[_SubStep, ...] = (
     # VISTA: no declara tabla destino y no se cuentan filas (contarlas la
     # recorrería entera para nada).
     _SubStep(name="estado_documentos", sql_file="13_estado_documentos.sql"),
+    # F-090: el índice de ficheros adjuntos de facturas, contratos, comparativos,
+    # ofertas y albaranes (`raw.rcg` + `raw.gra`). Cuenta su única tabla
+    # (~199.042 filas). Si la guarda R15 salta (ingesta de `gra` a medias), el
+    # paso falla con el nombre de este sub-paso y la cifra de huérfanos.
+    _SubStep(
+        name="documento_adjuntos",
+        sql_file="14_documento_adjuntos.sql",
+        target_schema="compras",
+        target_table="documento_adjuntos",
+    ),
 )
 
 

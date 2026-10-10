@@ -53,8 +53,10 @@ FICHEROS_COMPRAS = [
     # (F-067 ponía aquí `11`, la foto diaria de estados: la retiró F-132.)
     # F-085: el historial de procesos de `rac`.
     "12_documento_procesos.sql",
-    # F-132: la vista del estado desde `rac`, la última (el CASCADE de `12` la tira).
+    # F-132: la vista del estado desde `rac`, detrás de `12` (su CASCADE la tira).
     "13_estado_documentos.sql",
+    # F-090: el índice de ficheros adjuntos (`rcg` + `gra`).
+    "14_documento_adjuntos.sql",
 ]
 
 #: Lo que cada sub-paso nuevo declara como objeto a contar.

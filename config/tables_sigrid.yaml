@@ -1476,3 +1476,54 @@ tables:
     # que la remesa ES UN DOCUMENTO (`tip = 27`) y su codigo -`RP26/0254`- y su
     # descripcion viven en `raw.con`, no aqui. Las 3.919 tienen fila en `con`
     # (MEDIDO). `rco`, las remesas de COBRO, no entran: eso es F-037.
+
+  # --- F-090: el indice de documentos adjuntos de compras -------------------
+  # Peticion 3 de Juan Romero (2026-09-18) y punto 4a de su correo del
+  # 2026-10-06: que ficheros cuelgan de cada factura, contrato, comparativo,
+  # oferta y albaran en la pestana «Graficos asociados» de Sigrid. Lo publica
+  # `compras.documento_adjuntos` (`sql/compras/14_documento_adjuntos.sql`).
+  # EL BINARIO NO ENTRA: vive en la base DOCUMENTAL `ruesma_rep` (casa con
+  # `gra` por `(emp, cod)` en el 99,75 %) y lo sirve `sigrid-api` con
+  # `documents/read`; compras suma ~81 GB, mas que el disco de 64 GB.
+  #
+  # FILTRADAS EN ORIGEN (D2 del humano, 2026-10-09) a las cinco familias de
+  # compras de `etl_sigrid/domain/documento_adjuntos.py::FAMILIAS_ADJUNTOS`
+  # (12 oferta, 14 albaran, 15 factura, 44 contrato, 46 comparativo). Los dos
+  # `where` son LITERALMENTE `filtro_rcg()` y `filtro_gra()` del dominio, y
+  # `tests/test_f090_ingesta_sql.py` falla si no. `check-raw-recuentos` cuenta
+  # con el mismo `where`.
+
+  - source_table: rcg
+    target_table: rcg
+    id_column: ide
+    incremental_column: null   # medido 2026-10-09: `rcg` no tiene tiemod
+    where: "con IN (SELECT ide FROM dbo.con WHERE tip IN (12, 14, 15, 44, 46))"
+    exclude_columns: []
+    # EL ENLACE documento <-> grafico: `con` el documento, `gra` el grafico,
+    # `pos` la posicion. Medido el 2026-10-09 (F-090): 289.451 filas en total,
+    # 0 huerfanos contra `gra` y `con`; las cinco familias de compras son
+    # 199.042. Fuera quedan 90.409, de ellos 44.398 de personal (empleados y
+    # nominas: DNI, nominas, embargos) que D2 deja fuera hasta de `raw`, porque
+    # el MCP lee `raw`. `fecalt` y `feclee` vacias casi siempre.
+    # Coste: 20 paginas de 10.000 filas en 7,2 s por la pasarela.
+
+  - source_table: gra
+    target_table: gra
+    id_column: ide
+    incremental_column: null   # medido 2026-10-09: `gra` no tiene tiemod
+    where: "ide IN (SELECT r.gra FROM dbo.rcg r JOIN dbo.con c ON c.ide = r.con WHERE c.tip IN (12, 14, 15, 44, 46))"
+    exclude_columns:
+      - ima    # BINARIO: el fichero incrustado (71 filas, 12,8 MB); el bueno esta en ruesma_rep
+      - pul    # BINARIO: vacia hoy
+      - tex    # texto ilimitado: 370 filas, no sirve al indice
+      - cam    # texto ilimitado: vacia hoy
+    # EL GRAFICO (el fichero adjunto): `nom` el nombre, `fec` el alta
+    # (AAAAMMDD), `usu` el login de quien lo subio, `res` la descripcion y
+    # `cod` la clave con la que `ruesma_rep` guarda el binario (sello temporal
+    # + login). Medido el 2026-10-09 (F-090): 289.036 filas en total; con el
+    # filtro de D2, las 199.042 de compras. `gratipide` = 0 en el 100 % de
+    # compras: `auxgra` NO se ingiere (D4), la clase sale de la extension.
+    # VA DETRAS DE `rcg` a proposito: un enlace nuevo durante la noche trae su
+    # grafico (la guarda R15 del SQL cubre el resto).
+    # Coste: 20 paginas en 41,5 s (~1,6 s por pagina: la subconsulta del
+    # filtro se repite en cada una).
