@@ -9,62 +9,43 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-09 · F-132 · FASE B, rama BORRAR, en curso (implementer) · `in_progress`
+## 2026-10-09 · F-090 · IMPLEMENTADA, en REVIEW (pasada 1: CHANGES_REQUESTED, corregidos) · `in_progress`
 
-> **Decisión D7 del humano (2026-10-09)**: «bórrala ya» + «adelante». D6 se acorta (el
-> contraste se cierra con 2 noches: 492 cambios, 0 `DISCREPANCIA`, cierre anotado en
-> `progress/contraste_F-132.md`) y **D7 = BORRAR** la foto diaria de F-067
-> (`progress/spec_F-132.md` §8). Tareas: T16, T17, T18, T20, T21 (T19, congelar, NO
-> aplica). Orden del despliegue: imagen y job PRIMERO; después `retirar-foto-estados
-> --confirmar` (MANUAL del humano); después diccionario v47 y MCP (el líder).
+> Spec APROBADA por el humano el 2026-10-09 con D1-D7 según la recomendación
+> (`progress/spec_F-090.md` §8). Rama `feature/F-090-documento-adjunto`, hoy en el árbol
+> principal (se implementó en el worktree `../datamart-seg-anual-wt-f090`, ya retirado), con
+> `main` fusionado (`c7a8a54`: F-132 fase B y F-135).
 
-- **Estado**: implementación de la FASE B TERMINADA, pendiente del reviewer. T16, T17, T18,
-  T20 y T21 hechas (`02157ba`, `f4a30d8`, `b4f6a99`, `b0946ce` y el de T21); `azure-apps`
-  `8a8ac98`, sin push. Diccionario **v47 sin publicar**. `init.sh` final sobre `71ce870`: VERDE (7.143 passed, 12 min 59 s; antes, sobre `b0946ce`:
-  7.142 passed, 228 skipped, 22 min 42 s; cobertura 100 %, 42/42). Mutación: 18
-  evaluados, 16 muertos, 2 supervivientes cerrados con test (`progress/mutacion_F-132_faseB.md`).
-  Informe: `progress/impl_F-132_faseB.md` (MANUAL en su §5, EN ORDEN: imagen y job;
-  `retirar-foto-estados` sin y con `--confirmar`; `publicar-diccionario` v47 +
-  `check-diccionario` + reiniciar MCP). NO se ha borrado nada en Azure: solo una lectura
-  READ ONLY (`retirar-foto-estados` sin `--confirmar`: 186.705 tramos, 3 fotos).
-- **Pendiente anotado**: la cabecera de `01_documentos.sql` (l. 71-72) aún cita la foto;
-  la fija la huella de `test_f073_sql` r23. Para quien toque `01`. `init.sh` de arranque sobre
-  `a237288`: VERDE (7.245 passed, 229 skipped, 29 min 13 s).
-- **Diccionario del árbol tras la Fase B: 205 objetos, 1608 columnas, 96 de consumo**
-  (fuera las dos fichas de la foto: 8 + 7 columnas; versión sin publicar).
-- **Desviaciones respecto a la spec** (justificadas):
-  - **Las fichas de la foto, P24 y la descripción de `compras` salen en T17, no en
-    T18/T20**: en cuanto se borra `11_historial_estados.sql`, la puerta de F-006
-    (`test_f006_fichas`, `_origen_por_objeto`) rompe con una ficha sin SQL que la
-    cree. Es la regla «ficha en el mismo commit que el objeto», al revés.
-  - **`domain/historial_estados.py` sobrevive a T17 solo con tres constantes**
-    (`TIPOS_HISTORIAL`, `MOTIVOS_CIERRE`, `TABLAS_PERSISTENTES`): las leen el
-    contraste y `compras_reset_sql.py`, que se retiran en T18 junto con el módulo.
-    Así cada commit deja la suite en verde.
-  - **`01_documentos.sql` NO se toca** aunque su cabecera (l. 71-72) aún cite la
-    foto: la fija la huella de `test_f073_sql` r23 (observación 2 del review de la
-    Fase A). El veto nuevo de `test_f132_retirada.py` mira lo EJECUTABLE del SQL.
-  - `00_setup.sql` (observación 1 del review) y `12_documento_procesos.sql`: solo
-    comentarios, que citaban la foto o su módulo.
-  - **El dominio del contraste también sale** (`clasificar_cambio`,
-    `clasificar_no_visto`, `contrastar`, `discrepancias`, `formatear_contraste`,
-    `CLASES_*`, `Contrastado`) con sus tests de `test_f132_dominio.py` (R13, R14):
-    solo servían al comando retirado. Quedan `fecha_estado` y `dias_en_estado`.
-  - **`tests/test_f132_contraste.py` se queda con los dos tests de
-    `filas_solo_lectura(params=...)`**, la pieza general que trajo el contraste y
-    que sigue en `PostgresClient`. Los tests de la Fase B van en
-    `tests/test_f132_retirada.py` (nuevo): T18 se verifica con los dos.
-  - **`retirar-foto-estados`** vive en `retirar_foto_sql.py` (nuevo, el único de
-    `etl_sigrid/` que nombra las dos tablas; lo veta un test). Sin `--confirmar`
-    lee con `filas_solo_lectura` (READ ONLY) cuáles existen y sus filas; con él,
-    `SET LOCAL lock_timeout = '30s'` + `DROP TABLE IF EXISTS` de las dos, sin
-    `CASCADE`, en una transacción, y relee para comprobar (sale con 1 si queda alguna).
+- **Tareas**: T1-T8 y T12 `[x]` en `specs/F-090-documento-adjunto/tasks.md`; T9-T11 MANUAL.
+- **Diccionario del árbol tras F-090: 208 objetos, 1624 columnas, 97 de consumo**
+  (versión 48, sin publicar: +`raw.rcg`, +`raw.gra`, +`compras.documento_adjuntos`).
+- **Estado**: T1-T7 HECHAS (`8660af3` .. `1c1064a`, + `b939e94`); azure-apps `fc40216`, sin
+  push. Informe: `progress/impl_F-090.md` (MANUAL en su §5: `init.sh` en el árbol principal
+  por el líder, imagen y job, ingesta `rcg`/`gra`, `build-compras`, diccionario v48, MCP,
+  timings).
+- **Verificado**: `init.sh` VERDE en el árbol principal sobre `335d671` (7.268 passed, 231
+  skipped, cobertura 100 %, 28/28). Mutación VÁLIDA (`335d671`, medida sobre `b88fdbb`):
+  8/8 muertos, 0 supervivientes, 4 workers, `--timeout 1800`, 2.427 s
+  (`progress/mutacion_F-090.md`).
+- **Review pasada 1** (`progress/review_F-090.md`): CHANGES_REQUESTED, cinco cambios de
+  documentación y estilo, corregidos (`blob_column: ima` en la receta de `documents/read`,
+  evidencias, este fichero, T12, SIM300). Pendiente: pasada 2.
+- **Desviaciones respecto a la spec** (justificadas en `progress/impl_F-090.md` §2):
+  - Diccionario **versión 48**, no 47: `main` ya usó la 47 (F-132 fase B).
+  - Las fichas van en el commit de su objeto (raw en T2, el índice en T4), con `gra` en el
+    punto 3 de `R-SIGRID-CON` y la enmienda del diseño de F-006 (208 objetos): lo exigen
+    las puertas de F-006.
+  - Además de los tests del censo que citaba la spec, se actualizan los que fijaban
+    `TOTAL_TABLAS` (F-066, F-074, F-097) y los que fijaban que `13` era el ÚLTIMO
+    sub-paso de compras (F-047, F-073, F-080, F-085, F-132): R10 de F-132 dice «detrás
+    de `12`». Comprueban ahora el orden desde `10_necesidades.sql`.
 
 ## 2026-10-09 · F-132 · CERRADA (`done`): fases A y B APROBADAS · LAS DOS DESPLEGADAS
 
 > **Fase B DESPLEGADA el 2026-10-09**: el humano construyó la imagen `r20261009-1522`,
 > apuntó el job (comprobado por el líder) y lanzó `retirar-foto-estados` (las dos tablas
-> ya «no existe»). El líder: `publicar-diccionario` **v47** (205 objetos, 1.608 columnas),
+> ya «no existe»). Queda anotado para quien toque `01_documentos.sql`: su cabecera
+> (l. 71-72) aún cita la foto (la fija la huella de `test_f073_sql` r23). El líder: `publicar-diccionario` **v47** (205 objetos, 1.608 columnas),
 > `check-diccionario` OK, MCP reiniciado (`--0000014`, Healthy).
 
 

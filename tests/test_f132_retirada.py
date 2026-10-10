@@ -50,7 +50,11 @@ def test_f132_r25_build_compras_ya_no_tiene_el_sub_paso_de_la_foto() -> None:
     from etl_sigrid.application.steps.build_compras_step import SUB_PASOS
 
     assert "historial_estados" not in [s.name for s in SUB_PASOS]
-    assert [s.sql_file for s in SUB_PASOS][-3:] == [
+    # F-090 añade `14` (el índice de adjuntos) detrás de `13`: lo que se
+    # defiende es que tras `necesidades` ya no va `11`.
+    ficheros = [s.sql_file for s in SUB_PASOS]
+    i = ficheros.index("10_necesidades.sql")
+    assert ficheros[i : i + 3] == [
         "10_necesidades.sql", "12_documento_procesos.sql", "13_estado_documentos.sql",
     ]
     assert all(s.target_table not in TABLAS_FOTO for s in SUB_PASOS)

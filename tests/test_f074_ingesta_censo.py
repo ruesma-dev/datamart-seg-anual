@@ -41,8 +41,9 @@ FICHERO_GLOBAL = RAIZ / "config" / "diccionario" / "00_global.yaml"
 
 #: Cuantas tablas ingiere el ETL HOY: 56 + 9 al cerrar esta feature, +3 de
 #: F-080, +1 de F-102 (`auxemp`), +1 de F-107 (`caa`), +1 de F-095 (`rac`) y +1
-#: de F-085 (`usu`). La usan tambien F-080, F-102, F-107, F-095 y F-085.
-TOTAL_TABLAS = 72
+#: de F-085 (`usu`), +2 de F-090 (`rcg`, `gra`). La usan tambien F-080, F-102,
+#: F-107, F-095, F-085 y F-090.
+TOTAL_TABLAS = 74
 
 #: Las tres que SI tienen `tiemod`, comprobado en `INFORMATION_SCHEMA` y
 #: poblado al 100 % en las tres (7/7, 60/60 y 37/37).

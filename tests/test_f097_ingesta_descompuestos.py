@@ -186,7 +186,9 @@ def test_f097_r2_paso_propio_sin_dependencias() -> None:
 def test_f097_r2_fuera_de_tables_sigrid_y_la_ingesta_sigue_en_71() -> None:
     config = yaml.safe_load((RAIZ / "config" / "tables_sigrid.yaml").read_text(encoding="utf-8"))
     tablas = config["tables"]
-    assert len(tablas) == 72, "TOTAL_TABLAS: 71 + `usu` (F-085); el des no pasa por raw (D12)"
+    assert len(tablas) == 74, (
+        "TOTAL_TABLAS: 71 + `usu` (F-085) + `rcg` y `gra` (F-090); el des no pasa por raw (D12)"
+    )
     destinos = {t["target_table"] for t in tablas}
     assert not {"_des_texto", "obrparpre_des", "des_texto"} & destinos
     obrparpre = next(t for t in tablas if t["source_table"] == "obrparpre")

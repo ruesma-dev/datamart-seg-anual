@@ -2,7 +2,7 @@
 #
 # Fichas del esquema `raw`: la copia de Sigrid, tabla a tabla.
 #
-# **A NIVEL DE OBJETO, NO DE COLUMNA** (DA-2 de la spec). Son 72 tablas con
+# **A NIVEL DE OBJETO, NO DE COLUMNA** (DA-2 de la spec). Son 74 tablas con
 # cientos de campos de cuatro letras cuyo diccionario completo —tipos, indices y
 # referencias— vive en `azure-apps/sigrid_tablas.md`. Cada ficha remite alli con
 # el `grep` de su bloque. Lo que SI se documenta aqui es lo que ese documento no
@@ -2216,6 +2216,52 @@ objetos:
 
       **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
     grano: Una fila por remesa de pago, identificada por `ide`, el mismo de su fila en `raw.con`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  rcg:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es el enlace documento <-> fichero adjunto en bruto, con identificadores desnudos. Que ficheros tiene cada factura, contrato, comparativo, oferta o albaran, con el nombre del fichero, su clase y la clave del binario, ya esta resuelto en `compras.documento_adjuntos`.
+    descripcion: >-
+      **EL ENLACE DE LOS «GRAFICOS ASOCIADOS» DE SIGRID** (F-090): una fila por fichero colgado de un documento. `con` es el documento (`raw.con.ide`), `gra` el grafico, o sea el fichero (`raw.gra.ide`), y `pos` su posicion en la pestaña. Un mismo grafico puede colgar de varios documentos (102 casos medidos), asi que la clave del enlace es `ide`, no la pareja documento-grafico.
+
+      **FILTRADA EN ORIGEN a las cinco familias de compras** (decision D2 del humano del 2026-10-09): solo los enlaces cuyo documento es una factura (`con.tip` 15), un contrato (44), un comparativo (46), una oferta (12) o un albaran (14). Medido el 2026-10-09: 199.042 de los 289.451 enlaces de Sigrid. Los de personal (empleados y nominas: DNI, nominas, embargos), posventa y el resto NO estan aqui, y no es un fallo de la ingesta: no se traen a proposito. Contar esta tabla contra el total de Sigrid no casa por eso; `check-raw-recuentos` aplica el mismo filtro.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `rcg`, y se localiza con `grep -n "^| rcg " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid, con su filtro: lo que cambio ayer en Sigrid esta aqui esta manana. No tiene columna de ultima modificacion.
+    grano: Una fila por enlace documento-fichero de un documento de compras, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  gra:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Son los ficheros adjuntos en bruto, sin el documento del que cuelgan (eso esta en `raw.rcg`). El indice ya unido al documento, con la clase de fichero por extension y la fecha de alta convertida, esta en `compras.documento_adjuntos`.
+    descripcion: >-
+      **LOS FICHEROS ADJUNTOS («graficos» en Sigrid)** (F-090): una fila por fichero, con su nombre (`nom`), su descripcion (`res`), su fecha de alta (`fec`, entero AAAAMMDD), el login de quien lo subio (`usu`) y `cod`, la clave con la que la base DOCUMENTAL de Sigrid guarda el binario (sello temporal + login).
+
+      **EL FICHERO NO ESTA AQUI NI EN NINGUNA TABLA DEL DATAMART.** El binario vive en la base documental `ruesma_rep` de Sigrid (casa con esta tabla por `(emp, cod)` en el 99,75 %) y lo sirve `sigrid-api` (`documents/read` con `cod`); el datamart publica solo el indice.
+
+      **FILTRADA EN ORIGEN** (decision D2 del humano del 2026-10-09): solo los ficheros enlazados por `raw.rcg` a una factura, contrato, comparativo, oferta o albaran (199.042 el 2026-10-09, de 289.036 en Sigrid). Los adjuntos de personal y posventa no se traen a proposito. `gratipide` (la clase de grafico de Sigrid, catalogo `auxgra`, que no se ingiere) esta a 0 en el 100 % de estos ficheros: la clase de fichero sale de la extension, en `compras.documento_adjuntos`.
+
+      **Dato personal**: `usu` y el sufijo de `cod` son el LOGIN de quien subio el fichero, y `raw` es legible por el rol del MCP. `nom` lleva nombres de proveedor y numeros de factura.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `gra`, y se localiza con `grep -n "^| gra " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid, con su filtro y DETRAS de `rcg`: lo que cambio ayer en Sigrid esta aqui esta manana. No tiene columna de ultima modificacion.
+
+      **No se traen** 4 columnas de binario o texto ilimitado: el fichero incrustado (`ima`, 71 filas), el otro binario (`pul`, vacio) y dos textos ilimitados (`tex`, `cam`). Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+    grano: Una fila por fichero adjunto a un documento de compras, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
     refresco: nocturno
