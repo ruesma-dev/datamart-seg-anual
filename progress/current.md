@@ -9,7 +9,23 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-09 · F-090 · IMPLEMENTADA, en REVIEW (pasada 1: CHANGES_REQUESTED, corregidos) · `in_progress`
+## 2026-10-10 · F-090 · CERRADA (`done`, APROBADO en pasada 2) · DESPLEGADA el 10-10 (`r20261010-1309`)
+
+> **DESPLEGADA por el líder el 2026-10-10, por orden del humano** («integra, despliega, y si
+> puedes haz el ingest y builds»): merge a `main` `1b35f35`, espejo `dev` `7133721`; imagen
+> `r20261010-1309`, job comprobado. `ingest --table rcg --full` y `gra` SUCCESS (199.078 filas
+> cada una, ~90 s); `build-compras` SUCCESS (487,6 s; `documento_adjuntos` 199.078 filas en
+> 11,4 s: el SQL nuevo funcionó a la primera); `apply-grants`; `publicar-diccionario` **v48**
+> (208 objetos, 1.624 columnas); `check-diccionario` OK; `check-raw-recuentos` CONFORME (`rcg`
+> y `gra` exactas); MCP reiniciado (Healthy). Verificado en Azure (solo lectura): 199.078
+> adjuntos de 144.568 documentos; facturas 133.112 PDF; comparativos 1.122 Excel; **1.970
+> comparativos con el Excel del concurso** (spec: 1.980); 219 facturas de 2025 sin adjunto.
+> Queda: tiempos de la primera nocturna con F-090 (T11, estimado +1-2 min) y la pregunta al
+> MCP cuando el conector de claude.ai vuelva.
+
+### Historia de la feature (antes del cierre)
+
+#### 2026-10-09 · F-090 · IMPLEMENTADA, en REVIEW (pasada 1: CHANGES_REQUESTED, corregidos) · `in_progress`
 
 > Spec APROBADA por el humano el 2026-10-09 con D1-D7 según la recomendación
 > (`progress/spec_F-090.md` §8). Rama `feature/F-090-documento-adjunto`, hoy en el árbol
