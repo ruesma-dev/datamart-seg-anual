@@ -357,12 +357,28 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
   `compras.documento_procesos`. `origen_fecha` dice de dónde sale la fecha:
   PASO (al segundo, el 99,4 %), ALTA (sin pasos y en un estado inicial: el día
   de alta) o FUERA_DE_PROCESO (sin fecha, con la cota `cambio_posterior_a`).
-  Historia NETA: un paso deshecho no se fecha. Va el ÚLTIMO de `build_compras`
-  porque el `DROP ... CASCADE` de `12` tira la vista cada noche. La regla
+  Historia NETA: un paso deshecho no se fecha. Va DETRÁS de `12` en
+  `build_compras` porque el `DROP ... CASCADE` de `12` tira la vista cada noche. La regla
   (familias, estados iniciales, orígenes) vive en `domain/estado_documentos.py`
   y el SQL lleva sus literales (test). No lee la foto de F-067: durante la
   Fase A se contrastó con ella (`python main.py contraste-estados`, de solo
   lectura y ya retirado) y la Fase B la borró (punto de la foto, arriba).
+- **EL ÍNDICE DE DOCUMENTOS ADJUNTOS SALE DE `rcg` Y `gra` (F-090).**
+  `sql/compras/14_documento_adjuntos.sql`, el último sub-paso de
+  `build_compras`, publica `compras.documento_adjuntos`: una fila por fichero
+  adjunto (la pestaña «Gráficos asociados» de Sigrid) a una factura, contrato,
+  comparativo, oferta o albarán (~199.042), con el nombre del fichero, su clase
+  por EXTENSIÓN, la fecha de alta, el login de quien lo subió y
+  `cod_repositorio`. Las familias y las extensiones viven una vez en
+  `domain/documento_adjuntos.py` y el SQL y los filtros de ingesta llevan sus
+  literales (test). Una guarda falla si más del 1 % de los enlaces no encuentra
+  su gráfico (ingesta a medias). No toca `compras.facturas` ni ningún otro
+  objeto: se cruza con ellos por `documento_id` y `comparativo_id`.
+  - **El fichero NO se replica**: vive en la base documental de Sigrid,
+    `ruesma_rep` (~81 GB solo en compras, más que el disco de 64 GB), y lo
+    sirve `sigrid-api` con `documents/read` y `cod_repositorio`. Abrirlo desde
+    el MCP (`mcp-bbdd`) o un portal (`portal`) es trabajo de esos proyectos;
+    este ETL no lee `ruesma_rep`.
 
 ## Acceso a datos
 
@@ -385,9 +401,9 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
   Azure. Hoy **lee y valida, no carga** a `aux.*`: las tablas destino y el
   esquema de los libros no están definidos todavía.
 
-### Qué se copia de Sigrid: 72 tablas, y qué NO está ahí (F-066, F-074, F-080, F-102, F-107, F-095, F-085)
+### Qué se copia de Sigrid: 74 tablas, y qué NO está ahí (F-066, F-074, F-080, F-102, F-107, F-095, F-085, F-090)
 
-`config/tables_sigrid.yaml` declara **72 tablas**: eran 31, F-066 las dejó en 56
+`config/tables_sigrid.yaml` declara **74 tablas**: eran 31, F-066 las dejó en 56
 el 2026-09-06, F-074 sumó nueve más el 2026-09-09, F-080 otras tres el
 2026-09-11 —`auxnap`, `auxban` y `rpa`, el bloque de pago del efecto y las
 remesas—, F-102 una el 2026-09-23 —`auxemp`, las 38 empresas del grupo, que da
@@ -403,7 +419,12 @@ usuarios de Sigrid **sin credenciales, sin DNI y sin correo** (diez columnas
 excluidas; la lista de credenciales vive una vez en
 `domain/documento_procesos.py` y un test falla si alguna entra), que traduce el
 login a persona en `compras.documento_procesos` (nombre) y en
-`personal.usuarios_sigrid` (empleado y DNI). Además de recuperar la columna `con.tex` (el memo del documento,
+`personal.usuarios_sigrid` (empleado y DNI). F-090 suma las dos últimas el
+2026-10-09, `rcg` y `gra`, los «Gráficos asociados» de Sigrid (el enlace
+documento -> fichero y el fichero), **filtradas en origen** a las cinco
+familias de compras (199.042 de 289.451 enlaces: fuera nóminas, DNI y demás
+adjuntos de personal) y **sin binario** (`gra` sin `ima`, `pul`, `tex` ni
+`cam`); `auxgra` no entra. Además de recuperar la columna `con.tex` (el memo del documento,
 informado en el 65,5 % de las facturas; traerlo cuesta +26 % de tiempo de
 lectura sobre `con`, medio minuto de la ventana nocturna).
 Las 25 que entraron el primer día vienen en tres grupos, y ninguna se supuso: todo lo

@@ -128,7 +128,7 @@ def test_f085_r2_el_comentario_de_usu_da_el_motivo_de_cada_exclusion() -> None:
 
 
 def test_f085_r4_el_censo_pasa_a_72_sin_conpro_rol_ni_log() -> None:
-    assert len(_tablas()) == 72
+    assert len(_tablas()) == 74  # +2 de F-090 (`rcg`, `gra`)
     assert "usu" in _tablas()
     for tabla in ("conpro", "rol", "log"):
         assert tabla not in _tablas(), f"`{tabla}` no se da de alta (D5, D8)"
@@ -400,12 +400,15 @@ def test_f085_r6_compras_acaba_en_documento_procesos() -> None:
 
     subs = build_compras_step.SUB_PASOS
     # Desde F-132 la vista `13_estado_documentos.sql` va detrás (lo fija
-    # `tests/test_f132_sql.py`): `12` es el último que cuenta filas. Delante
-    # iba la foto diaria de F-067 (`11`), que la Fase B de F-132 retiró.
-    assert [s.sql_file for s in subs[-3:-1]] == [
+    # `tests/test_f132_sql.py`). Delante iba la foto diaria de F-067 (`11`),
+    # que la Fase B de F-132 retiró. Y F-090 añade `14` (el índice de
+    # adjuntos, que también cuenta filas) al final, detrás de `13`.
+    ficheros = [s.sql_file for s in subs]
+    i = ficheros.index("10_necesidades.sql")
+    assert ficheros[i : i + 2] == [
         "10_necesidades.sql", "12_documento_procesos.sql",
     ]
-    assert (subs[-2].target_schema, subs[-2].target_table) == (
+    assert (subs[i + 1].target_schema, subs[i + 1].target_table) == (
         "compras", "documento_procesos",
     )
 

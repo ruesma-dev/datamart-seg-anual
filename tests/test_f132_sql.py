@@ -265,7 +265,7 @@ def test_f132_r11_el_sql_remite_a_su_oraculo_del_dominio() -> None:
 
 
 # ===========================================================================
-# R10 · el sub-paso de `build_compras`, el último
+# R10 · el sub-paso de `build_compras`, detrás de `12`
 # ===========================================================================
 
 
@@ -273,13 +273,17 @@ def test_f132_r10_compras_acaba_en_la_vista_detras_de_documento_procesos() -> No
     from etl_sigrid.application.steps import build_compras_step
 
     subs = build_compras_step.SUB_PASOS
-    assert [s.sql_file for s in subs][-3:] == [
+    # F-090 añade `14` (el índice de adjuntos) detrás: R10 pide «detrás de
+    # `12`», no «la última».
+    ficheros = [s.sql_file for s in subs]
+    i = ficheros.index("10_necesidades.sql")
+    assert ficheros[i : i + 3] == [
         "10_necesidades.sql", "12_documento_procesos.sql", "13_estado_documentos.sql",
     ]
-    ultimo = subs[-1]
-    assert ultimo.name == "estado_documentos"
+    vista = subs[i + 2]
+    assert vista.name == "estado_documentos"
     # Es una vista: no se cuentan filas (contarlas la recorrería entera).
-    assert ultimo.target_schema is None and ultimo.target_table is None
+    assert vista.target_schema is None and vista.target_table is None
 
 
 def test_f132_r10_el_docstring_del_paso_nombra_el_13() -> None:
