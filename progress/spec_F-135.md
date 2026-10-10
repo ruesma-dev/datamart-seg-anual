@@ -176,3 +176,29 @@ del 2026-09-22 (fuera del alcance de Juan: D10).
   `raw` hoy solo lo protege lo que el rol tenga revocado.
 - `POWERBI.md` (el modelo documentado) solo lee `mart`; no prueba que ningún informe
   lea `raw` (lo comprueba el humano: D3).
+
+## 9. Aprobada por el humano (2026-10-11)
+
+El humano preguntó por las alternativas (vista filtrada, RLS, dos mitades, enmascarar
+columnas, filtrar en el MCP), si separar en dos esquemas dificulta la lectura de la IA y
+qué pegas tiene, y con las respuestas del líder APROBÓ la spec («con estas respuestas
+apruebo»), con D1-D12 según la recomendación de `design.md` §8 y esta PRECISIÓN suya:
+
+> «el rol admin debe leer como hasta hoy, el rol general, con esta restricción».
+
+Cómo se aplica (requisito para el implementer y el reviewer):
+- **Rol general** (`mcp_sigrid_dm_ro`, MCP y Power BI): `contabilidad` restringida
+  (V2) y sin `raw`, como dice la spec.
+- **Admin**: el dueño y el administrador de la base siguen leyéndolo todo, sin ningún
+  cambio. El rol autorizado nuevo (`sigrid_dm_restringido_ro`) lee en
+  `contabilidad_restringida` el mayor y sus saldos **con el mismo contenido, las mismas
+  columnas y las mismas cifras que `contabilidad` tiene hoy**: ni una fila menos, ni una
+  columna distinta. Se comprueba en el MANUAL (recuento y suma de debe/haber de la copia
+  completa = los de `contabilidad.mayor` antes del despliegue).
+- Regla dura en el diccionario: el mayor COMPLETO se lee SOLO de
+  `contabilidad_restringida`; no se suman los dos esquemas.
+
+Pendientes que NO bloquean la implementación (precondiciones del despliegue o preguntas
+para Juan): D9, confirmar que ningún informe de Power BI lee `raw` (si alguno lo lee, se
+aplica la variante B de D3); D11 quién tiene «ese rol»; D10 si el coste por persona de
+`personal` también se restringe.
