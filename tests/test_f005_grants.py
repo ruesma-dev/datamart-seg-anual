@@ -242,6 +242,7 @@ class _ClienteFalso:
         owner_role: str,
         schemas: object,
         excluded_tables: object = (),
+        vetoed_schemas: object = (),
     ) -> list[str]:
         esquemas = list(schemas)  # type: ignore[call-overload]
         excluidas = list(excluded_tables)  # type: ignore[call-overload]
@@ -250,6 +251,16 @@ class _ClienteFalso:
         return build_readonly_grant_statements(
             readonly_role, owner_role, esquemas, excluded_tables=excluidas
         )
+
+    # F-135: el rol autorizado y la verificación del catálogo. Esta batería
+    # fija el camino de F-005; lo de F-135 vive en `test_f135_grants.py`.
+    def apply_restricted_grants(self, role: str, owner_role: str, schemas: object) -> list[str]:
+        self.llamadas.append("apply_restricted_grants")
+        return []
+
+    def lecturas_indebidas(self, role: str, schemas: object, tables: object) -> list[str]:
+        self.llamadas.append("lecturas_indebidas")
+        return []
 
 
 def _settings_falso(**postgres: object) -> SimpleNamespace:
@@ -261,6 +272,10 @@ def _settings_falso(**postgres: object) -> SimpleNamespace:
         # F-068: el step lee la lista de tablas excluidas. Aquí va vacía a
         # propósito: lo que fija esta batería es el camino sin exclusiones.
         "excluded_table_list": [],
+        # F-135: sin vetos ni rol autorizado, el camino de F-005 tal cual.
+        "vetoed_schema_list": [],
+        "restricted_role": "",
+        "restricted_schema_list": [],
     }
     base.update(postgres)
     return SimpleNamespace(postgres=SimpleNamespace(**base))

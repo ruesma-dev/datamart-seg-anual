@@ -323,6 +323,7 @@ class _ClienteFalso:
         owner_role: str,
         schemas: object,
         excluded_tables: object = (),
+        vetoed_schemas: object = (),
     ) -> list[str]:
         self.recibido = {
             "readonly_role": readonly_role,
@@ -331,6 +332,13 @@ class _ClienteFalso:
             "excluded_tables": list(excluded_tables),  # type: ignore[call-overload]
         }
         return ["GRANT ..."]
+
+    # F-135: el rol autorizado y la verificación; aquí no se ejercitan.
+    def apply_restricted_grants(self, role: str, owner_role: str, schemas: object) -> list[str]:
+        return []
+
+    def lecturas_indebidas(self, role: str, schemas: object, tables: object) -> list[str]:
+        return []
 
 
 def test_f068_r7_el_paso_pasa_la_lista_de_exclusion_al_cliente() -> None:
@@ -346,6 +354,11 @@ def test_f068_r7_el_paso_pasa_la_lista_de_exclusion_al_cliente() -> None:
             set_role=DUENO,
             consumption_schema_list=["mart", "raw"],
             excluded_table_list=["raw.emp", "raw.res"],
+            # F-135 veta `raw`; esta prueba fija el mecanismo de F-068, que
+            # sigue valiendo el día que `raw` vuelva (variante B de su D3)
+            vetoed_schema_list=[],
+            restricted_role="",
+            restricted_schema_list=[],
         )
     )
 
