@@ -1,12 +1,41 @@
 -- etl_sigrid/infrastructure/postgres/sql/contabilidad/02_mayor.sql
 -- ============================================================================
--- F-056 · SCHEMA contabilidad (3/4): EL MAYOR, UNA FILA POR APUNTE
+-- F-056 · SCHEMA contabilidad (3/8): EL MAYOR COMPLETO, UNA FILA POR APUNTE
 --
 -- Construye:
---   contabilidad.mayor   una fila por fila de raw.apu, SIN FILTRAR NINGUNA
+--   contabilidad_restringida.mayor   una fila por fila de raw.apu, SIN FILTRAR
+--                                    NINGUNA, con la marca de lo restringido
 --
--- Lee de raw.apu, raw.con (el asiento y el tercero), contabilidad.plan_cuentas
--- (la cuenta) y la vista maestro.centros_coste (centro -> obra). Nada mas (R2).
+-- Lee de raw.apu, raw.con (el asiento y el tercero),
+-- contabilidad_restringida.plan_cuentas (la cuenta) y la vista
+-- maestro.centros_coste (centro -> obra). Nada mas (R2).
+--
+-- F-135 (2026-10-11): ES EL MAYOR COMPLETO, solo para el rol autorizado. Sus
+-- columnas son las de F-056, con el mismo nombre, orden y calculo (requisito
+-- del humano: «el rol admin debe leer como hasta hoy»), mas tres al final:
+--
+--   restringido              TRUE si el apunte es de PERSONAL (criterio V2,
+--                            `etl_sigrid/domain/restriccion_personal.py`)
+--   motivo_restriccion       'CUENTA' si la cuenta es CR (aunque el asiento
+--                            tambien sea AP), 'ASIENTO_PERSONAL' si solo lo es
+--                            el asiento, NULL si es visible (R7)
+--   saldo_acumulado_visible  el acumulado de la cuenta sumando SOLO lo visible;
+--                            NULL en los restringidos. Es el `saldo_acumulado`
+--                            de `contabilidad.mayor` (R9): el acumulado del
+--                            mayor completo delataria lo restringido en las
+--                            cuentas mixtas (bancos, IVA...: 71 prefijos)
+--
+-- EL CRITERIO (R1-R4), con los MISMOS literales que el dominio (un test los
+-- compara):
+--   CR  cuenta restringida entera: codigo ~ la regex de los 14 prefijos, en
+--       cualquier clase de asiento.
+--   AP  asiento de personal: TODOS sus apuntes NORMAL y alguno en una CR o con
+--       concepto ~* nomina. Se restringe ENTERO (la caja, el banco, el IVA).
+--       `clase_bruta = 'NORMAL'` equivale a `clase_asiento = 'NORMAL'`
+--       (SALDO_INICIAL solo sale de APERTURA), y se mira en `fechados`, que ya
+--       esta materializado, para no materializar otra vez 2,17 M de filas.
+--       Se agrupa por `asiento_id` (solo los no nulos) y se une por hash: sin
+--       ventana por asiento.
 --
 -- UNA FILA POR APUNTE (R13, R14, R24): 2.166.701 el 2026-09-26. `apunte_id` es
 -- clave primaria y nada de lo que se une multiplica: el asiento, el tercero y
@@ -62,8 +91,8 @@
 -- proveedor), con su nombre de `raw.con`.
 -- ============================================================================
 
-DROP TABLE IF EXISTS contabilidad.mayor CASCADE;
-CREATE TABLE contabilidad.mayor AS
+DROP TABLE IF EXISTS contabilidad_restringida.mayor CASCADE;
+CREATE TABLE contabilidad_restringida.mayor AS
 WITH apuntes AS (
     SELECT
         a.ide                                                    AS apunte_id,
@@ -118,6 +147,29 @@ saldos AS (
         CASE WHEN c.clase_asiento IN ('CIERRE', 'APERTURA') THEN 0::NUMERIC(18, 2)
              ELSE c.importe END                                  AS importe_saldo
     FROM clasificados c
+),
+-- F-135: los asientos de personal (AP), una fila por asiento
+asientos_personal AS (
+    SELECT f.asiento_id
+    FROM fechados f
+    LEFT JOIN contabilidad_restringida.plan_cuentas pa ON pa.cuenta_id = f.cuenta_id
+    WHERE f.asiento_id IS NOT NULL
+    GROUP BY f.asiento_id
+    HAVING bool_and(f.clase_bruta = 'NORMAL')
+       AND bool_or(pa.codigo_cuenta ~ '^(640|641|642|643|644|645|649|465|466|476|460|461|544|4753)' OR f.concepto ~* '\mn[oóÓ]minas?\M')
+),
+-- F-135: la cuenta y la marca de cada apunte
+marcados AS (
+    SELECT
+        s.*,
+        pc.codigo_cuenta,
+        pc.nombre_cuenta,
+        pc.clave_cuenta,
+        COALESCE(pc.codigo_cuenta ~ '^(640|641|642|643|644|645|649|465|466|476|460|461|544|4753)', FALSE) AS es_cuenta_restringida,
+        (ap.asiento_id IS NOT NULL)                              AS es_asiento_personal
+    FROM saldos s
+    LEFT JOIN contabilidad_restringida.plan_cuentas pc ON pc.cuenta_id = s.cuenta_id
+    LEFT JOIN asientos_personal ap ON ap.asiento_id = s.asiento_id
 )
 SELECT
     s.apunte_id,
@@ -131,9 +183,9 @@ SELECT
     s.mes,
     s.empresa_id,
     s.cuenta_id,
-    pc.codigo_cuenta,
-    pc.nombre_cuenta,
-    pc.clave_cuenta,
+    s.codigo_cuenta,
+    s.nombre_cuenta,
+    s.clave_cuenta,
     s.concepto,
     s.documento,
     s.punteo,
@@ -152,31 +204,44 @@ SELECT
     cc.codigo_obra,
     cc.empresa::TEXT || '-' || cc.codigo_obra                    AS clave_obra,
     s.tercero_id,
-    ter.res                                                      AS tercero_nombre
-FROM saldos s
-LEFT JOIN contabilidad.plan_cuentas pc ON pc.cuenta_id = s.cuenta_id
+    ter.res                                                      AS tercero_nombre,
+    (s.es_cuenta_restringida OR s.es_asiento_personal)           AS restringido,
+    CASE WHEN s.es_cuenta_restringida THEN 'CUENTA'
+         WHEN s.es_asiento_personal THEN 'ASIENTO_PERSONAL' END  AS motivo_restriccion,
+    CASE WHEN s.es_cuenta_restringida OR s.es_asiento_personal THEN NULL
+         ELSE SUM(s.importe_saldo) FILTER (
+                  WHERE NOT (s.es_cuenta_restringida OR s.es_asiento_personal)
+              ) OVER (
+                  PARTITION BY s.cuenta_id
+                  ORDER BY s.fecha, s.codigo_asiento, s.posicion, s.apunte_id
+              ) END::NUMERIC(18, 2)                              AS saldo_acumulado_visible
+FROM marcados s
 LEFT JOIN maestro.centros_coste cc ON cc.centro_coste_id = s.centro_coste_id
 LEFT JOIN raw.con ter ON ter.ide = s.tercero_id;
 
-ALTER TABLE contabilidad.mayor ADD PRIMARY KEY (apunte_id);
-CREATE INDEX idx_con_mayor_empresa_cuenta_fecha ON contabilidad.mayor (empresa_id, codigo_cuenta, fecha);
-CREATE INDEX idx_con_mayor_cuenta_fecha         ON contabilidad.mayor (cuenta_id, fecha);
-CREATE INDEX idx_con_mayor_asiento              ON contabilidad.mayor (asiento_id);
-CREATE INDEX idx_con_mayor_obra                 ON contabilidad.mayor (obra_id);
-CREATE INDEX idx_con_mayor_tercero              ON contabilidad.mayor (tercero_id);
+ALTER TABLE contabilidad_restringida.mayor ADD PRIMARY KEY (apunte_id);
+CREATE INDEX idx_con_mayor_empresa_cuenta_fecha ON contabilidad_restringida.mayor (empresa_id, codigo_cuenta, fecha);
+CREATE INDEX idx_con_mayor_cuenta_fecha         ON contabilidad_restringida.mayor (cuenta_id, fecha);
+CREATE INDEX idx_con_mayor_asiento              ON contabilidad_restringida.mayor (asiento_id);
+CREATE INDEX idx_con_mayor_obra                 ON contabilidad_restringida.mayor (obra_id);
+CREATE INDEX idx_con_mayor_tercero              ON contabilidad_restringida.mayor (tercero_id);
+-- F-135: los restringidos son el 2,55 %; el indice parcial los encuentra sin
+-- recorrer los 2,17 M de filas
+CREATE INDEX idx_con_mayor_restringido          ON contabilidad_restringida.mayor (restringido) WHERE restringido;
 
-COMMENT ON TABLE contabilidad.mayor IS
-'F-056. El mayor contable: una fila por apunte de raw.apu, sin filtrar ninguno. fecha = la del apunte (apu.fec) y fecha_asiento la del asiento (difieren en 297); empresa del asiento; cuenta de contabilidad.plan_cuentas; importe = debe - haber. clase_asiento: CIERRE, SALDO_INICIAL, APERTURA, REGULARIZACION, NORMAL. El saldo es importe_saldo (0 en CIERRE y APERTURA) y saldo_acumulado; sumar importe sin filtrar la clase duplica. obra_id solo por el centro del apunte (maestro.centros_coste).';
+COMMENT ON TABLE contabilidad_restringida.mayor IS
+'F-056 y F-135. El mayor contable COMPLETO, solo para el rol autorizado: una fila por apunte de raw.apu, sin filtrar ninguno, con las columnas de F-056 y al final restringido, motivo_restriccion (CUENTA, ASIENTO_PERSONAL o NULL) y saldo_acumulado_visible. fecha = la del apunte (apu.fec) y fecha_asiento la del asiento (difieren en 297); empresa del asiento; cuenta de contabilidad_restringida.plan_cuentas; importe = debe - haber. clase_asiento: CIERRE, SALDO_INICIAL, APERTURA, REGULARIZACION, NORMAL. El saldo es importe_saldo (0 en CIERRE y APERTURA) y saldo_acumulado; sumar importe sin filtrar la clase duplica. obra_id solo por el centro del apunte (maestro.centros_coste).';
 
--- R14: el mayor tiene EXACTAMENTE las filas de raw.apu, o el build falla
+-- R14 de F-056 (R6 de F-135): el mayor COMPLETO tiene EXACTAMENTE las filas
+-- de raw.apu, o el build falla
 DO $$
 DECLARE
     v_mayor BIGINT;
     v_apu   BIGINT;
 BEGIN
-    SELECT count(*) INTO v_mayor FROM contabilidad.mayor;
+    SELECT count(*) INTO v_mayor FROM contabilidad_restringida.mayor;
     SELECT count(*) INTO v_apu FROM raw.apu;
     IF v_mayor <> v_apu THEN
-        RAISE EXCEPTION 'mayor: contabilidad.mayor tiene % filas y raw.apu tiene %; un apunte se ha perdido o multiplicado', v_mayor, v_apu;
+        RAISE EXCEPTION 'mayor: contabilidad_restringida.mayor tiene % filas y raw.apu tiene %; un apunte se ha perdido o multiplicado', v_mayor, v_apu;
     END IF;
 END $$;
