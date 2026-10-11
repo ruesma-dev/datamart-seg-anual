@@ -495,7 +495,8 @@ def test_f135_r14_generales_materializadas_con_los_indices_de_hoy(
 def test_f135_r14_las_generales_solo_leen_el_completo(nombre: str) -> None:
     leidas = set(re.findall(r"(?:FROM|JOIN)\s+(\w+\.\w+)", _sql(nombre).split("DO $$")[0]))
     assert leidas <= {f"{RESTR}.plan_cuentas", f"{RESTR}.mayor"}, f"{nombre} lee {leidas}"
-    assert "raw." not in _sql(nombre), f"{nombre} no recalcula nada desde raw"
+    sin_comentario = re.sub(r"COMMENT ON TABLE .*? IS '[^']*';", "", _sql(nombre))
+    assert "raw." not in sin_comentario, f"{nombre} no recalcula nada desde raw"
 
 
 @pytest.mark.parametrize("nombre", FICHEROS)
