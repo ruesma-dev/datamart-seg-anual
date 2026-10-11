@@ -23,6 +23,14 @@
 --     └── sigrid_dm_app    LOGIN, contraseña en Key Vault. Lo usa el ETL, tanto
 --                          desde el puesto del humano como desde el job de F-003
 --   mcp_sigrid_dm_ro   LOGIN, contraseña en Key Vault. Solo lectura, para el MCP
+--                      (y hoy también Power BI). Es el rol GENERAL: desde F-135
+--                      NO lee `raw` ni `contabilidad_restringida`
+--   sigrid_dm_restringido_ro  NOLOGIN, sin contraseña (F-135). El rol AUTORIZADO:
+--                      lee la contabilidad COMPLETA, con los apuntes de personal
+--                      (nóminas, cuentas de trabajadores, embargos). Es un GRUPO:
+--                      sus miembros los decide Negocio (Juan Romero) y se dan
+--                      con `GRANT sigrid_dm_restringido_ro TO <login>`; hoy no
+--                      tiene ninguno
 --
 -- Por qué un grupo y no un solo rol: los objetos los crea siempre
 -- sigrid_dm_etl gracias a PG_SET_ROLE, así que si mañana entra un segundo
@@ -45,6 +53,12 @@ WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mcp_sigrid_dm_ro')
 ALTER ROLE sigrid_dm_app    WITH LOGIN PASSWORD :'app_pwd';
 ALTER ROLE mcp_sigrid_dm_ro WITH LOGIN PASSWORD :'mcp_pwd';
 
+-- F-135: el rol AUTORIZADO es un grupo sin login y sin contraseña. Quien lo
+-- necesite entra con su propio login, miembro de este grupo.
+SELECT 'CREATE ROLE sigrid_dm_restringido_ro NOLOGIN'
+WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sigrid_dm_restringido_ro')
+\gexec
+
 -- Ninguno de los dos crea bases ni roles.
 --
 -- SIN `NOSUPERUSER`, a propósito. En Azure Database for PostgreSQL Flexible
@@ -61,6 +75,7 @@ ALTER ROLE mcp_sigrid_dm_ro WITH LOGIN PASSWORD :'mcp_pwd';
 -- ejecutar la Fase 2 del runbook.
 ALTER ROLE sigrid_dm_app    WITH NOCREATEDB NOCREATEROLE;
 ALTER ROLE mcp_sigrid_dm_ro WITH NOCREATEDB NOCREATEROLE;
+ALTER ROLE sigrid_dm_restringido_ro WITH NOLOGIN NOCREATEDB NOCREATEROLE;
 
 -- 2. El rol del ETL es miembro del grupo propietario.
 GRANT sigrid_dm_etl TO sigrid_dm_app;
@@ -69,6 +84,8 @@ GRANT sigrid_dm_etl TO sigrid_dm_app;
 --    CONNECT que PostgreSQL concede a PUBLIC, así que hay que darlo explícito.
 GRANT CONNECT ON DATABASE sigrid_dm TO sigrid_dm_app;
 GRANT CONNECT ON DATABASE sigrid_dm TO mcp_sigrid_dm_ro;
+-- F-135: lo heredan los futuros miembros del grupo
+GRANT CONNECT ON DATABASE sigrid_dm TO sigrid_dm_restringido_ro;
 
 -- 4. Esquemas del datamart. Los crea también el auto-bootstrap del ETL, pero
 --    dejarlos aquí permite comprobar los once nada más provisionar.
@@ -88,6 +105,9 @@ CREATE SCHEMA IF NOT EXISTS personal;
 -- F-056: el plan de cuentas, el mayor y los saldos por cuenta y mes. Esquema
 -- propio por lo mismo que `personal`: su acceso se da o se quita con un GRANT.
 CREATE SCHEMA IF NOT EXISTS contabilidad;
+-- F-135: la contabilidad COMPLETA, con los apuntes de personal. Solo la lee el
+-- rol autorizado; al general se le VETA (punto 5 ter).
+CREATE SCHEMA IF NOT EXISTS contabilidad_restringida;
 -- F-097: los descompuestos de las partidas. Esquema propio por lo mismo.
 CREATE SCHEMA IF NOT EXISTS descompuestos;
 RESET ROLE;
@@ -102,9 +122,15 @@ RESET ROLE;
 --    esquemas, no solo los cinco de consumo. Se revisará al rediseñar el MCP
 --    en F-006. La lista efectiva la manda PG_CONSUMPTION_SCHEMAS.
 --
---    OJO: este bloque concede `raw` ENTERO, y eso incluye tablas con datos
---    personales. El punto 5 bis, justo debajo, se las quita. No se puede
---    hacer aquí: `GRANT SELECT ON ALL TABLES IN SCHEMA` no admite excepciones.
+--    F-135 (2026-10-11): `raw` YA NO ESTÁ en esta lista (D3, variante A): trae
+--    el mayor, 37.048 efectos de pago de nómina con la cuenta bancaria del
+--    trabajador, los repartos analíticos de personal y las cabeceras de esos
+--    asientos. Tampoco `contabilidad_restringida`. Los dos están VETADOS y el
+--    punto 5 ter se los quita al rol general. La lista es exactamente
+--    `DEFAULT_CONSUMPTION_SCHEMAS` de `config/settings.py` (un test lo vigila).
+--
+--    El punto 5 bis, de F-068, sigue quitando tablas sueltas de `raw` aunque
+--    `raw` ya no se conceda: es la red para el día que vuelva (variante B).
 --
 --    LA TRANSACCIÓN QUE ABRE AQUÍ Y CIERRA AL FINAL DEL 5 BIS NO ES ADORNO.
 --    Sin `BEGIN` explícito, psql confirma cada `DO` por separado: entre el
@@ -125,7 +151,7 @@ DECLARE
 BEGIN
     FOREACH esquema IN ARRAY ARRAY[
         'mart', 'cierre', 'compras', 'maestro', 'retenciones', 'personal',
-        'contabilidad', 'descompuestos', 'raw', 'stg', 'aux', '_meta'
+        'contabilidad', 'descompuestos', 'stg', 'aux', '_meta'
     ]
     LOOP
         EXECUTE format('GRANT USAGE ON SCHEMA %I TO mcp_sigrid_dm_ro', esquema);
@@ -248,13 +274,83 @@ END
 $$;
 RESET ROLE;
 
+-- 5 ter. Esquemas VETADOS al rol general y concesiones del rol AUTORIZADO
+--    (F-135, 2026-10-11).
+--
+--    Origen: correo de Juan Romero del 2026-10-09, «hay que limitarla a todos
+--    los usuarios salvo a los que tenemos ese rol». La contabilidad completa
+--    vive en `contabilidad_restringida` y `raw` trae el mismo dato y más; los
+--    dos quedan fuera del rol general. La lista es `DEFAULT_VETOED_SCHEMAS` de
+--    `config/settings.py` (un test lo vigila) y la sostiene cada noche
+--    `apply_grants`, que además COMPRUEBA en el catálogo que el rol general no
+--    los lee y falla si los lee.
+--
+--    DOS CONCEDENTES, como en el 5 bis y por lo mismo: un REVOKE solo quita lo
+--    concedido por quien lo ejecuta. Una vez como el administrador que corre
+--    este fichero y otra como `sigrid_dm_etl`, que es el dueño y el que concede
+--    cada noche. Las tres mitades —tablas, USAGE del esquema y privilegio por
+--    defecto— hacen falta: sin USAGE no se llega a ninguna tabla, y la regla
+--    por defecto es la que haría legible la tabla que nazca mañana.
+--
+--    Dentro de la MISMA transacción que el GRANT del punto 5: si el fichero se
+--    corta a medias, el servidor deshace todo y no queda `raw` concedido.
+DO $$
+DECLARE
+    vetado text;
+BEGIN
+    FOREACH vetado IN ARRAY ARRAY['contabilidad_restringida', 'raw']
+    LOOP
+        -- en una base recién creada el esquema puede no existir todavía
+        IF to_regnamespace(vetado) IS NOT NULL THEN
+            EXECUTE format(
+                'REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA %I FROM mcp_sigrid_dm_ro', vetado
+            );
+            EXECUTE format(
+                'REVOKE ALL PRIVILEGES ON SCHEMA %I FROM mcp_sigrid_dm_ro', vetado
+            );
+        END IF;
+    END LOOP;
+END
+$$;
+
+SET ROLE sigrid_dm_etl;
+-- El rol autorizado lee la contabilidad completa (lo mismo que concede la
+-- nocturna; aquí para que el rol nazca ya con su lectura).
+GRANT USAGE ON SCHEMA contabilidad_restringida TO sigrid_dm_restringido_ro;
+GRANT SELECT ON ALL TABLES IN SCHEMA contabilidad_restringida TO sigrid_dm_restringido_ro;
+ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl IN SCHEMA contabilidad_restringida GRANT SELECT ON TABLES TO sigrid_dm_restringido_ro;
+
+DO $$
+DECLARE
+    vetado text;
+BEGIN
+    FOREACH vetado IN ARRAY ARRAY['contabilidad_restringida', 'raw']
+    LOOP
+        IF to_regnamespace(vetado) IS NOT NULL THEN
+            EXECUTE format(
+                'REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA %I FROM mcp_sigrid_dm_ro', vetado
+            );
+            EXECUTE format(
+                'REVOKE ALL PRIVILEGES ON SCHEMA %I FROM mcp_sigrid_dm_ro', vetado
+            );
+            EXECUTE format(
+                'ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl IN SCHEMA %I '
+                'REVOKE ALL ON TABLES FROM mcp_sigrid_dm_ro', vetado
+            );
+        END IF;
+    END LOOP;
+END
+$$;
+RESET ROLE;
+
 COMMIT;
 
 -- 6. Comprobaciones. Deben salir: los tres roles, sigrid_dm_app dentro de
 --    sigrid_dm_etl, y los once esquemas.
 SELECT rolname, rolcanlogin, rolsuper, rolcreatedb, rolcreaterole
 FROM pg_roles
-WHERE rolname IN ('sigrid_dm_etl', 'sigrid_dm_app', 'mcp_sigrid_dm_ro')
+WHERE rolname IN ('sigrid_dm_etl', 'sigrid_dm_app', 'mcp_sigrid_dm_ro',
+                  'sigrid_dm_restringido_ro')
 ORDER BY rolname;
 
 SELECT r.rolname AS miembro, g.rolname AS grupo
@@ -267,7 +363,7 @@ SELECT nspname AS esquema, pg_catalog.pg_get_userbyid(nspowner) AS propietario
 FROM pg_namespace
 WHERE nspname IN ('raw', 'stg', 'aux', 'mart', '_meta',
                   'cierre', 'compras', 'maestro', 'retenciones', 'personal',
-                  'contabilidad', 'descompuestos')
+                  'contabilidad', 'contabilidad_restringida', 'descompuestos')
 ORDER BY nspname;
 
 -- F-068: las tablas excluidas NO deben aparecer aquí. CERO filas es el
@@ -278,3 +374,16 @@ WHERE grantee = 'mcp_sigrid_dm_ro'
   AND table_schema = 'raw'
   AND table_name IN ('emp', 'res')
 ORDER BY table_name, privilege_type;
+
+-- F-135: el rol GENERAL no lee ningún esquema vetado. CERO filas en la primera
+-- consulta y `lee = f` en las dos filas de la segunda es el resultado correcto.
+SELECT table_schema, table_name, privilege_type
+FROM information_schema.table_privileges
+WHERE grantee = 'mcp_sigrid_dm_ro'
+  AND table_schema IN ('contabilidad_restringida', 'raw')
+ORDER BY table_schema, table_name, privilege_type;
+
+SELECT nspname, has_schema_privilege('mcp_sigrid_dm_ro', nspname, 'USAGE') AS lee
+FROM pg_namespace
+WHERE nspname IN ('contabilidad_restringida', 'raw')
+ORDER BY nspname;

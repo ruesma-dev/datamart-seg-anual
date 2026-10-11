@@ -178,9 +178,9 @@ class ApplyGrantsStep(PipelineStep):
             return self._fallo(
                 result,
                 f"el rol '{rol}' sigue leyendo lo vetado: {', '.join(indebidas)}. "
-                "Probable concesión de otro concedente (el administrador), que esta "
-                "nocturna no puede revocar: ejecuta el punto 5 ter de "
-                "infra/sql/02_roles.sql (F-135, F-068).",
+                "Es una concesión que esta nocturna no puede revocar (a PUBLIC, o de "
+                "un concedente que no es el dueño): ejecuta el punto 5 ter de "
+                "infra/sql/02_roles.sql y, si sigue, revoca la de PUBLIC (F-135, F-068).",
             )
         result.metadata["verificacion"] = "ok"
 
