@@ -27,7 +27,12 @@
   pide y que el build general necesita. `plan_cuentas` y `saldos_cuenta_mes` restringidos,
   idénticos a los de hoy.
 - **Desviación justificada**: la spec dice `version: 48` del diccionario; F-090 ya
-  publicó la 48 el 2026-10-10, así que F-135 sube a **49**.
+  publicó la 48 el 2026-10-10, así que F-135 sube a **49**. Recuentos del diccionario
+  tras F-135: **212 objetos y 1698 columnas descritas** (3 fichas nuevas en
+  `contabilidad_restringida` y `contabilidad.apuntes_restringidos_mes`).
+- Las fichas del completo NO declaran `claves_alternativas`: las seis aprobadas por el
+  humano (F-108) siguen siendo seis; la del plan la vigila `check-unicidad` en el general,
+  que tiene los mismos nodos.
 
 ## 2026-10-09 · F-135 · SPEC ESCRITA, pendiente de aprobación del humano · `pending`
 

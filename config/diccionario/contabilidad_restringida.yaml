@@ -63,7 +63,6 @@ objetos:
       identificada por `cuenta_id`. El par (`empresa_id`, `codigo_cuenta`) y
       `clave_cuenta` tambien son unicos; el codigo solo, no.
     clave_negocio: [cuenta_id]
-    claves_alternativas: [[empresa_id, codigo_cuenta], [clave_cuenta]]
     paso_etl: build_contabilidad
     refresco: nocturno
     columnas:
@@ -75,20 +74,19 @@ objetos:
       empresa_id:
         significado: >-
           Empresa de Sigrid del nodo (`con.emp`); `1` es Ruesma. Con
-          `codigo_cuenta` forma la clave alternativa de la ficha: la vigila
-          `check-unicidad` contra la base (F-108).
+          `codigo_cuenta` es unica: es la clave alternativa que
+          `check-unicidad` vigila en `contabilidad.plan_cuentas`, que tiene los
+          mismos nodos (F-108).
         agregacion: no_sumable
       empresa_nombre:
         significado: Nombre de la empresa (`raw.auxemp.res` por `numemp`).
       codigo_cuenta:
         significado: >-
           Codigo del nodo (`con.cod`): 1 a 4 digitos en los grupos, 10 en las
-          auxiliares. Repetido entre empresas: se cruza junto con `empresa_id`,
-          con quien forma la clave alternativa que vigila `check-unicidad`.
+          auxiliares. Repetido entre empresas: se cruza junto con `empresa_id`.
       clave_cuenta:
         significado: >-
-          La clave legible '<empresa>-<codigo>' ('1-4308000197'), unica: es
-          clave alternativa de la ficha y la vigila `check-unicidad`. Es la
+          La clave legible '<empresa>-<codigo>' ('1-4308000197'), unica. Es la
           forma de pedir una cuenta concreta sin equivocarse de empresa.
       nombre_cuenta:
         significado: Nombre del nodo (`con.res`).
