@@ -71,16 +71,22 @@ def test_f005_r14_la_lista_ampliada_incluye_los_esquemas_internos() -> None:
     """
     Decisión del humano de 2026-08-08: el MCP lee todo de momento. Con la lista
     por defecto de PG_CONSUMPTION_SCHEMAS, los esquemas internos también entran.
+
+    SALVO `raw` desde F-135 (2026-10-11, D3-A): trae el mayor, los pagos de
+    nómina y los repartos analíticos de personal, y queda VETADO al rol general.
     """
     from config.settings import DEFAULT_CONSUMPTION_SCHEMAS
 
     esquemas = [s.strip() for s in DEFAULT_CONSUMPTION_SCHEMAS.split(",")]
     for esquema in (*ESQUEMAS_CONSUMO, *ESQUEMAS_INTERNOS):
-        assert esquema in esquemas
+        if esquema == "raw":
+            assert esquema not in esquemas, "F-135: raw fuera del rol general"
+        else:
+            assert esquema in esquemas
 
     sentencias = build_readonly_grant_statements("mcp_ro", "sigrid_dm_etl", esquemas)
     texto = "\n".join(sentencias)
-    assert 'GRANT SELECT ON ALL TABLES IN SCHEMA "raw" TO "mcp_ro"' in texto
+    assert '"raw"' not in texto
     assert 'GRANT SELECT ON ALL TABLES IN SCHEMA "_meta" TO "mcp_ro"' in texto
 
 

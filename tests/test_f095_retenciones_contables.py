@@ -733,7 +733,9 @@ def test_f095_r27_main_y_grants_sin_cambios() -> None:
     nombres = [p.name for p in main.build_pipeline_steps(ajustes)]
     assert "build_retenciones" in nombres, "run-all construye retenciones"
     assert "retenciones" in DEFAULT_CONSUMPTION_SCHEMAS.split(",")
-    assert "raw" in DEFAULT_CONSUMPTION_SCHEMAS.split(","), "raw.rac la lee el MCP (riesgo b)"
+    # F-135 (2026-10-11) saca `raw` del rol general (D3-A): `raw.rac` ya NO la
+    # lee el MCP, y el riesgo (b) de F-095 desaparece con ella. Se fija lo nuevo.
+    assert "raw" not in DEFAULT_CONSUMPTION_SCHEMAS.split(","), "F-135: raw vetado al MCP"
     assert "retenciones" in ESQUEMAS_DEL_DATAMART
 
 
