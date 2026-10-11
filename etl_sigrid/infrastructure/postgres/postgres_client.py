@@ -41,6 +41,8 @@ from etl_sigrid.infrastructure.postgres.fingerprint import build_estructura_quer
 from etl_sigrid.infrastructure.postgres.frescura import FilaFrescura
 from etl_sigrid.infrastructure.postgres.grants import (
     build_readonly_grant_statements,
+    build_restricted_grant_statements,
+    build_veto_statements,
     partir_tabla_cualificada,
 )
 from etl_sigrid.infrastructure.postgres.timings import Timing
@@ -159,6 +161,28 @@ BYTES_POR_GB = 1024 * 1024 * 1024
 # No cuenta WAL ni logs del servidor: ese hueco lo absorbe el margen entre el
 # límite (80 %) y la protección de Azure (~95 %).
 SQL_OCUPACION_DISCO = "SELECT SUM(pg_database_size(datname)) FROM pg_database"
+
+# F-135 (R18): lo que un rol PUEDE leer de verdad, preguntado al catálogo con
+# `has_*_privilege`, que resuelve herencia de roles, PUBLIC y concesiones de
+# cualquier concedente. Es la comprobación que no se fía del REVOKE: un REVOKE
+# solo quita lo concedido por el mismo concedente (la lección de F-068), y una
+# concesión hecha a mano por el administrador sobreviviría en silencio.
+SQL_LECTURAS_ESQUEMAS = """
+    SELECT n.nspname
+    FROM pg_namespace n
+    WHERE n.nspname = ANY(%s)
+      AND has_schema_privilege(%s, n.oid, 'USAGE')
+    ORDER BY n.nspname
+"""
+SQL_LECTURAS_TABLAS = """
+    SELECT n.nspname || '.' || c.relname
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE c.relkind IN ('r', 'v', 'm', 'p', 'f')
+      AND (n.nspname = ANY(%s) OR n.nspname || '.' || c.relname = ANY(%s))
+      AND has_table_privilege(%s, c.oid, 'SELECT')
+    ORDER BY 1
+"""
 
 # Peso de cada obra = filas de raw.obrparpre que le tocan, ponderando la rama
 # master por el número de posiciones de su `planif`, que es lo que de verdad
@@ -1274,9 +1298,15 @@ class PostgresClient:
         owner_role: str,
         schemas: Iterable[str],
         excluded_tables: Iterable[str] = (),
+        vetoed_schemas: Iterable[str] = (),
     ) -> list[str]:
         """
         Reaplica los permisos de lectura y devuelve las sentencias ejecutadas.
+
+        `vetoed_schemas` (F-135) son esquemas que el rol NO puede leer nunca: sus
+        sentencias de veto van DETRÁS de todos los GRANT, en la misma conexión,
+        y solo sobre los vetados que EXISTEN (un REVOKE sobre un esquema ausente
+        falla, y uno ausente no tiene nada que proteger).
 
         Solo se conceden permisos sobre los esquemas que existen: `run-all` no
         construye `cierre`, `compras`, `maestro` ni `retenciones` (van en
@@ -1314,6 +1344,7 @@ class PostgresClient:
         if sin_tabla:
             logger.warning("grants_tablas_excluidas_inexistentes", tables=sin_tabla)
 
+        vetados = [s for s in vetoed_schemas if s in existentes]
         sentencias = build_readonly_grant_statements(
             readonly_role,
             owner_role,
@@ -1321,7 +1352,7 @@ class PostgresClient:
             database=self._target_db,
             excluded_tables=excluidas,
             missing_tables=sin_tabla,
-        )
+        ) + build_veto_statements(readonly_role, owner_role, vetados)
         if not sentencias:
             return []
 
@@ -1335,9 +1366,60 @@ class PostgresClient:
             schemas=aplicables,
             excluded_tables=excluidas,
             excluded_tables_missing=sin_tabla,
+            vetoed_schemas=vetados,
             statements=len(sentencias),
         )
         return sentencias
+
+    def apply_restricted_grants(
+        self,
+        role: str,
+        owner_role: str,
+        schemas: Iterable[str],
+    ) -> list[str]:
+        """Da al rol AUTORIZADO lectura sobre `schemas` y devuelve lo ejecutado (F-135).
+
+        Solo sobre los esquemas que existen, por lo mismo que
+        `apply_readonly_grants`: en una base recién creada el esquema
+        restringido no está hasta el primer `build_contabilidad`.
+        """
+        existentes = set(self.list_schemas())
+        aplicables = [s for s in schemas if s in existentes]
+        sentencias = build_restricted_grant_statements(role, owner_role, aplicables)
+        if not sentencias:
+            return []
+        with self.connection() as conn, conn.cursor() as cur:
+            for stmt in sentencias:
+                cur.execute(stmt)
+        logger.info(
+            "grants_rol_autorizado_aplicados",
+            role=role,
+            schemas=aplicables,
+            statements=len(sentencias),
+        )
+        return sentencias
+
+    def lecturas_indebidas(
+        self,
+        role: str,
+        schemas: Iterable[str],
+        tables: Iterable[str],
+    ) -> list[str]:
+        """Lo que `role` PUEDE leer de `schemas` y de `tables` (F-135, R18).
+
+        Devuelve `'<esquema> (USAGE)'` por cada esquema sobre el que tiene USAGE
+        y `'<esquema>.<tabla> (SELECT)'` por cada tabla, vista o materializada
+        de esos esquemas, o de la lista `tables`, que puede leer. Vacía es lo
+        correcto. Solo consulta el catálogo: no escribe nada.
+        """
+        esquemas = list(schemas)
+        tablas = list(tables)
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_LECTURAS_ESQUEMAS, (esquemas, role))
+            con_usage = [f"{fila[0]} (USAGE)" for fila in cur.fetchall()]
+            cur.execute(SQL_LECTURAS_TABLAS, (esquemas, tablas, role))
+            con_select = [f"{fila[0]} (SELECT)" for fila in cur.fetchall()]
+        return con_usage + con_select
 
     # ---------------------------------------------------------------------
     # Diccionario semántico (F-006)
