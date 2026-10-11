@@ -9,7 +9,7 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-11 · F-135 · IMPLEMENTANDO (implementer) · `in_progress`
+## 2026-10-11 · F-135 · IMPLEMENTADA (T1-T14), a la espera del reviewer · `in_progress`
 
 > Rama `feature/F-135-restringir-personal-contabilidad`, desde `ffadfb2`. Spec aprobada
 > el 2026-10-11 con D1-D12 recomendadas y la precisión del humano (`spec_F-135.md` §9).
@@ -19,7 +19,13 @@
   hasta ahí), y lo provoqué YO: creé `domain/restriccion_personal.py` (con un
   `@dataclass`) mientras la suite corría, después de que el test fijara su lista. Ese
   fichero, relanzado solo, pasa (179 passed). Se relanza `init.sh` entero tras T1.
-- **Tarea en curso**: ver la lista de `tasks.md` (se marcan `[x]` al cerrar cada una).
+- **Estado**: T1-T14 hechas, un commit por tarea (+ `azure-apps` `3110470`, sin push).
+  `init.sh` VERDE (7.486 passed, cobertura 100 % de 135 líneas); mutación 25/25 muertos,
+  0 supervivientes; SQL y permisos probados en un PostgreSQL 16.15 local; T14 contra
+  Azure en solo lectura: 55.519 restringidos, 0 CR visibles. Quedan T15-T18 (MANUAL del
+  humano, en orden, en `progress/impl_F-135.md` §8) y el review.
+- **Aviso**: el contraste T14 (`SELECT` READ ONLY, 206 s) se lanzó a las 02:07 UTC, dentro
+  de la ventana nocturna; no escribió nada, pero compitió por CPU con la nocturna.
 - **Interpretación (no desviación)**: la precisión del humano pide que la copia completa
   tenga «las mismas columnas» que la `contabilidad` de hoy. Se conservan TODAS las de hoy,
   con el mismo nombre, orden y cálculo; `mayor` añade al final las tres de R5

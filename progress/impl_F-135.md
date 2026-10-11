@@ -139,9 +139,26 @@ una agregación por asiento con regex (el `SELECT` equivalente de T14, más pesa
 Con la nocturna en ~4 h 40 min, el margen al `replicaTimeout` de 5 h baja a unos 13-16 min:
 **riesgo a vigilar** (T15 mide la duración real).
 
-## 7. Evidencias
+## 7. Evidencias (números medidos)
 
-PENDIENTE: se completa al terminar la campaña de mutación y el `init.sh` final.
+| Evidencia | Resultado |
+|---|---|
+| Suite completa (`bash harness/init.sh` sobre `bbb1c01`) | **7.486 passed, 238 skipped**, 0 failed; ENTORNO LISTO |
+| Tiempo de la suite | **1.896,6 s (31 min 36 s)** |
+| `PUERTA COBERTURA` | **100,0 % de 135 líneas cambiadas** (135/135, umbral 80 %, nivel crítico) |
+| `PUERTA TAMAÑO` | requirements 149/150, design 238/250, impl 200/220 |
+| Mutación (`--feature F-135 --workers 4 --timeout 1800`) | **25 mutantes, 25 muertos, 0 supervivientes, 0 timeouts**, 6.047 s → `progress/mutacion_F-135.md` |
+| Tests de F-135 | 186 (85 dominio, 61 SQL/diccionario/docs, 40 permisos) |
+| SQL y permisos en PostgreSQL 16.15 real (local) | 51 + 16 comprobaciones en verde (§4) |
+
+Sobre la mutación: el generador del arnés solo produce mutantes de operadores (25 en 530
+líneas); el texto de las sentencias SQL que arman `grants.py` y el paso no se muta, y por eso
+lo fijan los tests de igualdad exacta (`test_f135_grants.py`) y la ejecución real en local
+(§4). El SQL de `sql/contabilidad/` tampoco es Python: lo cubren los contratos expresión a
+expresión (`test_f056`, `test_f135_sql`) y la prueba local. Primer intento de la campaña
+abortado por **línea base roja** (4 tests): destapó dos fallos míos de T10 (`current.md` sin
+el recuento de 1.698 columnas; las fichas del completo declaraban claves alternativas que
+F-108 no aprobó). Corregidos en `bbb1c01`; segunda campaña, sobre ese HEAD, la de la tabla.
 
 ## 8. MANUAL pendiente (humano), EN ESTE ORDEN y el MISMO DÍA (pasos 3-6 antes de la nocturna)
 
