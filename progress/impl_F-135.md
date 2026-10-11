@@ -25,11 +25,9 @@ Aquí solo hay recuentos y agregados: ni nombres, ni NIF, ni importes de persona
 | T11 | `docs/ARCHITECTURE.md`; `azure-apps/datamart_seg_anual.md`, `mcp_bbdd.md` §2 | Qué lee cada rol, el veto de `raw`, lo pendiente en `mcp-bbdd` F-008 y F-087 |
 | T12 | `harness/features.json` (+ `BACKLOG.md`) | Ficha de F-127: el criterio de `apa` (100.502 de 716.007), sin tocar su `status` |
 
-Tests nuevos: `tests/test_f135_dominio.py` (85), `test_f135_sql.py` (61), `test_f135_grants.py`
-(40). Adaptados sin cambiar lo que comprueban: `test_f056` (01-03 en el esquema nuevo; además
-se arregla su parser, que cortaba la consulta en un `)` dentro de un literal), `test_f005`,
-`test_f068` (fakes con la interfaz nueva; `raw` ya no está en el consumo), `test_f095`
-(`raw.rac` ya no la lee el MCP), `test_f057` y `test_f006_formato` (13 esquemas).
+Tests nuevos `test_f135_{dominio,sql,grants}.py`. Adaptados sin cambiar lo que comprueban:
+`test_f056` (01-03 en el esquema nuevo; su parser cortaba en un `)` dentro de un literal),
+`test_f005`/`test_f068` (fakes; `raw` fuera del consumo), `test_f095`, `test_f057`, `test_f006_formato`.
 
 ## 2. Decisiones y desviaciones (justificadas también en `progress/current.md`)
 
@@ -38,13 +36,22 @@ se arregla su parser, que cortaba la consulta en un `)` dentro de un literal), `
   completo; plan y saldos completos, idénticos. Comprobado en local (§4).
 - **Desviación**: `version: 49` del diccionario, no 48: F-090 publicó la 48 el 2026-10-10.
 - **Veto con `REVOKE ALL`** (no solo `SELECT`) en tablas, esquema y privilegio por defecto.
-- **Hallazgo que corrige una premisa (sin efecto en el código)**: en la prueba local con
-  un administrador NO superusuario miembro de `sigrid_dm_etl` (como en Azure), una
-  concesión que hace el administrador al rol general queda registrada como del DUEÑO, y la
-  nocturna SÍ la revoca. Lo que la nocturna no alcanza es una concesión a `PUBLIC` (u otro
-  concedente real): ese es el caso que caza la postcondición R18, y el mensaje lo dice.
-- `contabilidad_restringida` lleva `consumo_recomendado: true` (es la contabilidad de verdad
-  para quien puede leerla); la regla dura explica que el rol general recibe «permission denied».
+- **Hallazgo (sin efecto en el código)**: con un administrador miembro de `sigrid_dm_etl`,
+  su concesión al general queda como del DUEÑO y la nocturna SÍ la revoca; lo que no alcanza
+  es una concesión a `PUBLIC`: ese caso lo caza la postcondición R18, y el mensaje lo dice.
+
+**Review pasada 1 (CHANGES_REQUESTED), corregido** — `632f59e`, `71d4ad8`; `azure-apps` `b979a4a`:
+1. **Falla cerrado** (opción b del líder): un apunte con `cuenta_id` cuyo código no resuelve
+   en el plan cuenta como CR (`COALESCE(codigo ~ regex, cuenta_id IS NOT NULL)` en los dos
+   sitios de `02`): se restringe con motivo propio `CUENTA_SIN_RESOLVER`, hace AP a su
+   asiento y se cuenta aparte en `apuntes_restringidos_mes.num_apuntes_sin_resolver`; la
+   guarda de `05` falla además si alguno llega al general. Oráculo: `cuenta_sin_resolver` y
+   `ApunteContable.cuenta_id` (opcional). Test contrato `test_f135_r10_la_cuenta_sin_resolver_falla_cerrado`
+   + 4 de dominio. Hoy en Azure son 0 (medido por el reviewer): no cambia ninguna cifra.
+   Diccionario: 1.699 columnas descritas (versión 49 sin publicar).
+2. `azure-apps/datamart_seg_anual.md`: «Estado: implementada en la rama, SIN DESPLEGAR».
+3. `test_f135_r23_la_ficha_de_f127_hereda_el_criterio_de_apa`. Sin RED posible (la ficha
+   ya estaba de T12): sobre `ffadfb2` habría fallado (le faltan `conide`, el rol y la cifra).
 
 ## 3. Fase RED (comando exacto y salida real, antes del código)
 
@@ -84,14 +91,14 @@ $ python -m pytest tests/test_f135_sql.py -q -k docs                            
 FAILED ...test_f135_docs_dicen_que_lee_cada_rol[azure-apps/datamart]
 3 failed, 2 passed, 56 deselected
 ```
-Todas en verde tras su código: `pytest tests/test_f135_*.py` → 186 passed.
+Pasada 1, antes del código: `pytest tests/test_f135_dominio.py` → `ImportError: cannot import
+name 'MOTIVO_CUENTA_SIN_RESOLVER'`; `pytest tests/test_f135_sql.py tests/test_f056_contabilidad.py`
+→ `7 failed, 121 passed` (r5 ×2, r7, r10 nuevo, r13, ficha de recuentos, contrato del mayor).
 
 ## 4. Verificación del SQL y de los permisos en un PostgreSQL 16.15 REAL (local)
 
-Contenedor desechable `postgres:16` (16.15, la versión de Azure, `en_US.utf8`), nada de Azure.
-Scripts y logs en el scratchpad de la sesión (`prueba_local_sql.py`, `prueba_local_grants.sh`,
-`prueba_local_apply_grants.py`).
-- **SQL (51 comprobaciones, VERDE)**: raw sintético de 21 apuntes y 10 asientos (nómina,
+Contenedor desechable `postgres:16` (16.15, como Azure); scripts y logs en el scratchpad de la sesión.
+- **SQL (56 comprobaciones, VERDE; 51 en la pasada 0)**: raw sintético de 23 apuntes y 11 asientos (nómina,
   pago, anticipo solo por concepto, «Denominación», regularización, cierre de 4753, embargo,
   apunte sin cuenta, retención de profesional, «NÓMINAS» en mayúsculas). Se ejecuta el SQL de
   HEAD (la contabilidad de hoy) y luego los 8 nuevos: **`contabilidad_restringida` = la
@@ -101,7 +108,9 @@ Scripts y logs en el scratchpad de la sesión (`prueba_local_sql.py`, `prueba_lo
   completo); plan con 3 CR enmascaradas y el grupo 640 sin enmascarar; saldos sin filas CR,
   `incompleto` correcto y cuadre con el mayor general; recuentos por mes. **Guarda R10**:
   colando un CR salta («tiene 1 apuntes de cuentas restringidas») y queda la tabla anterior; con
-  un `restringido` NULL salta la del recuento («6 visibles + 14 restringidos no suman los 21»).
+  un `restringido` NULL salta la del recuento. **Pasada 1**: una 465 en `raw.con` sin fila en
+  `raw.cua` → `CUENTA_SIN_RESOLVER` y su banco `ASIENTO_PERSONAL`, 0 en el general,
+  `num_apuntes_sin_resolver = 1`; forzada al general, la guarda nueva salta («no resuelve»).
 - **`02_roles.sql`** como administrador NO superusuario (CREATEROLE, como Azure), sobre una base
   provisionada con el `02` de HEAD y con `raw` concedido: corre entero y es reejecutable; tras él,
   el general recibe `permission denied for schema raw` / `... contabilidad_restringida` y sigue
@@ -132,12 +141,10 @@ plena ventana nocturna; fue lectura pura, pero compitió con la nocturna por la 
 
 ## 6. Ventana nocturna (medido o estimado)
 
-No medible sin escribir en Azure. Estimado: la copia general del mayor es un CTAS de
-~2,12 M filas desde una tabla (sin uniones ni ventana nueva) + 5 índices, y el `02` añade
-una agregación por asiento con regex (el `SELECT` equivalente de T14, más pesado, tardó
-206 s en lectura y con la nocturna en marcha). **+4-7 min sobre los 590 s de hoy y ~+0,75 GB**.
-Con la nocturna en ~4 h 40 min, el margen al `replicaTimeout` de 5 h baja a unos 13-16 min:
-**riesgo a vigilar** (T15 mide la duración real).
+No medible sin escribir en Azure. Estimado: CTAS general de ~2,12 M filas desde tabla + 5
+índices, y en `02` una agregación por asiento con regex (el `SELECT` de T14 tardó 206 s):
+**+4-7 min sobre los 590 s de hoy, ~+0,75 GB**. Con la nocturna en ~4 h 40 min, el margen al
+`replicaTimeout` de 5 h baja a 13-16 min: **riesgo a vigilar** (T15 mide la duración real).
 
 ## 7. Evidencias (números medidos)
 
@@ -148,17 +155,13 @@ Con la nocturna en ~4 h 40 min, el margen al `replicaTimeout` de 5 h baja a unos
 | `PUERTA COBERTURA` | **100,0 % de 135 líneas cambiadas** (135/135, umbral 80 %, nivel crítico) |
 | `PUERTA TAMAÑO` | requirements 149/150, design 238/250, impl 217/220 |
 | Mutación (`--feature F-135 --workers 4 --timeout 1800`) | **25 mutantes, 25 muertos, 0 supervivientes, 0 timeouts**, 6.047 s → `progress/mutacion_F-135.md` |
-| Tests de F-135 | 186 (85 dominio, 61 SQL/diccionario/docs, 40 permisos) |
-| SQL y permisos en PostgreSQL 16.15 real (local) | 51 + 16 comprobaciones en verde (§4) |
+| Tests de F-135 | 192 (89 dominio, 63 SQL/diccionario/docs, 40 permisos) |
+| SQL y permisos en PostgreSQL 16.15 real (local) | 56 + 16 comprobaciones en verde (§4) |
 
-Sobre la mutación: el generador del arnés solo produce mutantes de operadores (25 en 530
-líneas); el texto de las sentencias SQL que arman `grants.py` y el paso no se muta, y por eso
-lo fijan los tests de igualdad exacta (`test_f135_grants.py`) y la ejecución real en local
-(§4). El SQL de `sql/contabilidad/` tampoco es Python: lo cubren los contratos expresión a
-expresión (`test_f056`, `test_f135_sql`) y la prueba local. Primer intento de la campaña
-abortado por **línea base roja** (4 tests): destapó dos fallos míos de T10 (`current.md` sin
-el recuento de 1.698 columnas; las fichas del completo declaraban claves alternativas que
-F-108 no aprobó). Corregidos en `bbb1c01`; segunda campaña, sobre ese HEAD, la de la tabla.
+Mutación: solo mutantes de operadores; el texto SQL (de `grants.py` y de `sql/`) lo fijan los
+tests de igualdad y contrato y la prueba local (§4). Un primer intento abortó por línea base
+roja: dos fallos míos de T10 (recuento de columnas en `current.md`; claves alternativas no
+aprobadas en las fichas del completo), corregidos en `bbb1c01`.
 
 ## 8. MANUAL pendiente (humano), EN ESTE ORDEN y el MISMO DÍA (pasos 3-6 antes de la nocturna)
 
@@ -191,7 +194,7 @@ F-108 no aprobó). Corregidos en `bbb1c01`; segunda campaña, sobre ese HEAD, la
    contabilidad_restringida.mayor WHERE restringido` = recuento del completo (~55.519 restringidos).
 8. **Prueba NEGATIVA (R25-R26)** con el login REAL `mcp_sigrid_dm_ro` (contraseña de Key Vault en
    una variable de la sesión): `SELECT 1 FROM contabilidad_restringida.mayor LIMIT 1;` y lo mismo
-   con `raw.apu`, `raw.apa`, `raw.pag`, `raw.con`, `raw.hmores` → cada una `ERROR: permission
+   con `raw.apu`, `raw.apa`, `raw.pag`, `raw.con`, `raw.asi`, `raw.rac`, `raw.hmores` → `ERROR: permission
    denied for schema …` (anotar el mensaje). `SELECT count(*) FROM contabilidad.mayor WHERE
    codigo_cuenta ~ '^(640|641|642|643|644|645|649|465|466|476|460|461|544|4753)';` → 0;
    `SELECT count(*) FROM contabilidad.saldos_cuenta_mes s JOIN contabilidad.plan_cuentas p USING
