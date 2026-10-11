@@ -3,12 +3,10 @@ Revisión completa (pasada 1) · diff `ffadfb2..782f226` (implementer) sobre bas
 
 # F-135 · Review · CHANGES_REQUESTED
 
-**Veredicto: CHANGES_REQUESTED.** El trabajo es sólido y lo he reproducido casi entero. Lo devuelvo por
-una sola grieta de seguridad que he conseguido provocar (cambio 1). Los cambios 2 y 3 son menores y
-se arreglan en el mismo viaje. Hoy no hay ninguna fila expuesta: la grieta está latente (medido abajo).
+**Veredicto: CHANGES_REQUESTED** por una grieta de seguridad latente que he provocado en local
+(cambio 1; hoy 0 filas expuestas, medido). Los cambios 2 y 3 son menores, en el mismo viaje.
 
-**Nivel de rigor: `critico`** (declarado). Exige fase RED, cobertura ≥ 80 % de lo cambiado, mutación
-con cero supervivientes, «Evidencias» y las MANUAL con su comando exacto.
+**Nivel de rigor: `critico`** (declarado): fase RED, cobertura ≥ 80 %, mutación sin supervivientes, MANUAL con comando.
 
 ## Verificación ejecutada (resultado real)
 
@@ -19,21 +17,17 @@ con cero supervivientes, «Evidencias» y las MANUAL con su comando exacto.
   completa es **idéntica a la `contabilidad` de hoy**: EXCEPT ALL en los dos sentidos da 0, con los mismos
   tipos y las mismas columnas en el mismo orden (el mayor lleva 3 más al final). El general sale sin CR y
   con el acumulado de lo visible, y las dos guardas de R10 saltan cuando deben.
-- **`02_roles.sql`** como administrador no superusuario, sobre una base con el `02` viejo y `raw` concedido:
-  el rol general recibe «permission denied» en `contabilidad_restringida.mayor`, `raw.apu`, `raw.pag` y
-  `raw.emp`, y sigue leyendo `contabilidad.mayor`. El autorizado lee `2 | 1`. Es reejecutable, y la
-  comprobación final da 0 filas y `lee = f`.
-- **`apply_grants` con el cliente real**: 16/16 OK. Lo he comprobado en cuatro casos. Una noche normal
-  termina en SUCCESS con `verificacion = ok`. Una concesión de otro concedente da FAILED y la nombra. Un
-  `.env` viejo con `raw` da FAILED sin ejecutar nada. Una tabla nueva nace sin lectura para el general y
-  con lectura para el autorizado.
+- **Permisos en local**: `02_roles.sql` (administrador no superusuario, sobre el `02` viejo con `raw`
+  concedido) deja al general con «permission denied» en `contabilidad_restringida`/`raw`, leyendo
+  `contabilidad.mayor`, y al autorizado leyendo `2 | 1`; es reejecutable. `apply_grants` con el cliente
+  real: 16/16 OK (noche normal SUCCESS + `verificacion = ok`; otro concedente → FAILED nombrándolo;
+  `.env` viejo → FAILED sin ejecutar nada; tabla nueva sin lectura para el general).
 - **Contraste en Azure (T14) repetido por mí**, en solo lectura, a las 05:3x UTC y sobre el mayor de esta
   noche: **55.519 restringidos, 8.796 asientos, 25 empresas, 0 CR visibles, 521 cuentas CR**, 6.065/11.810
   saldos. Coincide cifra a cifra con el informe (§5). El criterio V2 que se implementó es el medido: la
   spec daba 55.504 y 8.791 el 09-10, y el mayor ha crecido 945 apuntes.
-- **Mutación, recálculo puro** (`harness.alcance` + `generar_mutantes`): **7 ficheros, 530 líneas, 25
-  mutantes**, igual que el informe y con el mismo texto original→mutado. La campaña **no se ha
-  reejecutado**: el informe declara 6.047 s, por encima de 60 s.
+- **Mutación, recálculo puro**: 7 ficheros, 530 líneas, 25 mutantes, igual que el informe y con el mismo
+  texto original→mutado. No reejecutada: el informe declara 6.047 s (> 60 s).
 
 ## Lo que pedía mirar el líder
 
@@ -52,10 +46,8 @@ con cero supervivientes, «Evidencias» y las MANUAL con su comando exacto.
    la **prueba negativa con el login real** `mcp_sigrid_dm_ro`, la positiva y R28 al día siguiente. Los
    pasos 3-6 van el mismo día y antes de la nocturna, que es lo que cierra la ventana de una nocturna con
    la imagen vieja.
-5. **`progress/` sin datos personales**: barrido de `impl_F-135.md`, `mutacion_F-135.md` y el diff de
-   `current.md`, con patrones de €, NIF/DNI (`[0-9]{8}[A-Z]`) y nombres. Solo hay recuentos. El único
-   importe es el de 4 proveedores (spec, ya aprobada). La ficha nueva cita `AHORRAMAS, S.A.`, que es una
-   empresa y viene heredada de F-056.
+5. **`progress/` sin datos personales**: barrido (€, `[0-9]{8}[A-Z]`, nombres) de `impl`, `mutacion` y el
+   diff de `current.md`: solo recuentos; el único importe es de 4 proveedores (spec ya aprobada).
 6. **Escrituras en Azure del implementer: ninguna.** T14 usó `filas_solo_lectura` con
    `_bootstrap_done = True` (lo he comprobado en su script). **Aviso sobre mí mismo:** mi primera lectura
    de `_meta.etl_runs` se hizo sin desactivar el bootstrap del cliente. Ejecutó contra Azure el DDL
@@ -139,18 +131,10 @@ T15-T18 son MANUAL y siguen en `[ ]`, como deben · [x] `git status` limpio · [
    - que cita la cifra «100.502 de las 716.007»;
    - que su `status` no ha cambiado.
 
-## Observaciones (no bloquean)
-
-- Al MANUAL §8 paso 8 se le pueden sumar `raw.asi` y `raw.rac`, que también son de D3. No los exige R25.
-- `prueba_local_sql.py` deja abierta la transacción implícita de psycopg a partir de la primera lectura.
-  Los ficheros nuevos corren como savepoints en vez de transacciones sueltas. Las comprobaciones siguen
-  valiendo (misma sesión). Se arregla con `autocommit=True` si se reutiliza.
+**Observación (no bloquea):** al MANUAL §8 paso 8 se pueden sumar `raw.asi` y `raw.rac` (D3).
 
 ## Automejora (propuesta, no aplicada)
 
-- **`reviewer.md`, C4 bis (campañas):** hoy una lectura de diagnóstico contra Azure con
-  `build_postgres_client` ejecuta el bootstrap (DDL) antes de la primera consulta, aunque luego vaya por
-  `filas_solo_lectura`. Me pasó a mí. Propongo dos cosas:
-  - que `filas_solo_lectura` no dispare `_auto_bootstrap`, o que exista un `build_postgres_client_lectura`;
-  - que este protocolo diga «lecturas contra Azure solo por un cliente sin bootstrap».
-  Vale para cualquier proyecto con auto-bootstrap: portar a `arnes-base` si se aprueba.
+- `build_postgres_client` ejecuta el bootstrap (DDL) antes de la primera lectura, también para un
+  diagnóstico por `filas_solo_lectura` (me pasó a mí). Propongo un cliente de solo lectura sin bootstrap
+  y que `reviewer.md` lo exija para leer de Azure. Vale para cualquier proyecto: portar a `arnes-base`.
