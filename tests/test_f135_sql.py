@@ -727,3 +727,24 @@ def test_f135_docs_azure_apps_dice_que_raw_queda_fuera() -> None:
         pytest.skip("azure-apps no está junto a este repositorio")
     texto = ruta.read_text(encoding="utf-8")
     assert "PG_VETOED_SCHEMAS" in texto and "apuntes_restringidos_mes" in texto
+
+
+# ===========================================================================
+# R23 · F-127 hereda el criterio (review de F-135, pasada 1, cambio 3)
+# ===========================================================================
+
+
+def test_f135_r23_la_ficha_de_f127_hereda_el_criterio_de_apa() -> None:
+    """El mayor analítico NACE RESTRINGIDO: la ficha de F-127 dice con qué
+    criterio (las tres vías de un `apa` restringido), con qué rol y con la cifra
+    medida, y F-135 no le cambia el estado."""
+    import json
+
+    datos = json.loads((RAIZ / "harness" / "features.json").read_text(encoding="utf-8"))
+    f127 = next(f for f in datos["features"] if f["id"] == "F-127")
+    texto = f127["description"] + " " + " ".join(f127["acceptance"])
+    for termino in ("apuide", "conide", "cuenta_analitica_contrapartida_id",
+                    "sigrid_dm_restringido_ro", "contabilidad_restringida"):
+        assert termino in texto, f"la ficha de F-127 no dice «{termino}» (R23)"
+    assert "100.502 de las 716.007" in texto, "la cifra medida (R23)"
+    assert f127["status"] == "pending", "F-135 no cambia el estado de F-127"
