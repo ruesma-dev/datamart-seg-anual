@@ -527,7 +527,20 @@
 # `facturas`, `contratos`, `albaranes`, `comparativos` y `comparativo_ofertas`
 # apuntan al indice. `R-SIGRID-CON` declara los campos propios de `gra`.
 
-version: 48
+# version 49 (F-135, 2026-10-11): LA INFORMACION DE PERSONAL DE LA
+# CONTABILIDAD, SOLO PARA EL ROL AUTORIZADO. Correo de Juan Romero del
+# 2026-10-09. Esquema nuevo `contabilidad_restringida` con la contabilidad
+# COMPLETA (las fichas de F-056 mas `restringido`, `motivo_restriccion` y
+# `saldo_acumulado_visible` en el mayor), que solo lee
+# `sigrid_dm_restringido_ro`. `contabilidad` pasa a ser la GENERAL: sin los
+# apuntes de personal, con las 521 cuentas de personal enmascaradas en el plan,
+# `num_apuntes_restringidos` e `incompleto` en los saldos y la tabla nueva
+# `contabilidad.apuntes_restringidos_mes` (solo recuentos). Regla dura nueva
+# `R-CONTABILIDAD-RESTRINGIDA`; `R-SALDO-CONTABLE` y `R-FRESCURA` alcanzan el
+# esquema nuevo. `raw` sale del rol general. La ficha de
+# `retenciones.apuntes_contables` declara su excepcion (D4).
+
+version: 49
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -549,9 +562,10 @@ reglas:
   - codigo: R-FRESCURA
     titulo: Siete esquemas pueden quedarse atras sin tumbar la noche
     severidad: bloqueante
-    ambito: [cierre, compras, maestro, retenciones, personal, contabilidad, descompuestos]
+    ambito: [cierre, compras, maestro, retenciones, personal, contabilidad, contabilidad_restringida, descompuestos]
     regla: >-
-      Estos siete esquemas SI se construyen cada noche dentro de `run-all`, y
+      Estos siete esquemas (ocho con `contabilidad_restringida`, que construye
+      el mismo `build_contabilidad`) SI se construyen cada noche dentro de `run-all`, y
       los siete registran paso, asi que su fecha de build siempre es
       consultable. Lo que no cambia es que su paso NO es dependencia de ningun
       otro: si `build_cierre`, `build_compras`, `build_maestros`,
@@ -737,6 +751,9 @@ reglas:
       - contabilidad.plan_cuentas
       - contabilidad.mayor
       - contabilidad.saldos_cuenta_mes
+      - contabilidad_restringida.plan_cuentas
+      - contabilidad_restringida.mayor
+      - contabilidad_restringida.saldos_cuenta_mes
     regla: >-
       El saldo de una cuenta es la suma de `importe_saldo` (en el mayor o en
       `contabilidad.saldos_cuenta_mes`) y el saldo a una fecha es
@@ -758,6 +775,43 @@ reglas:
       regularizaciones vienen con 0), por eso la clase se publica ya resuelta
       en `clase_asiento`. Con la regla, la subcuenta 434 de la empresa 1 en 2026
       da 5.345.557,80, lo mismo que la pantalla de Sigrid.
+
+  - codigo: R-CONTABILIDAD-RESTRINGIDA
+    titulo: A la contabilidad general le falta la informacion de personal, y esta marcado
+    severidad: bloqueante
+    ambito: [contabilidad, contabilidad_restringida]
+    regla: >-
+      `contabilidad` es la contabilidad GENERAL: le faltan los apuntes de
+      PERSONAL -los asientos de nomina enteros (todos sus apuntes NORMAL y
+      alguno en una cuenta de personal o con «nomina» en el concepto: la caja,
+      el banco y el IVA de ese asiento tambien) y todos los de las cuentas de
+      personal (prefijos 640, 641, 642, 643, 644, 645, 649, 465, 466, 476, 460,
+      461, 544 y 4753)-. Esas cuentas van en `contabilidad.plan_cuentas` con
+      `restringida = true` y el nombre '(cuenta restringida)', y no tienen
+      fila en los saldos. Antes de dar un saldo o un total como completo:
+      (1) en `contabilidad.saldos_cuenta_mes`, si `incompleto` es true a la
+      fila le faltan `num_apuntes_restringidos` apuntes y su saldo esta
+      recortado; (2) `contabilidad.apuntes_restringidos_mes` dice cuantos
+      apuntes y asientos faltan por empresa y mes (solo recuentos, nunca
+      importes). El detalle completo vive en `contabilidad_restringida`, que
+      solo lee el rol autorizado `sigrid_dm_restringido_ro`; el rol del MCP y
+      de Power BI no lo lee y una consulta contra el devuelve «permission
+      denied», que no es un fallo. El mayor completo se lee SOLO de
+      `contabilidad_restringida.mayor`: los dos esquemas NUNCA se suman ni se
+      unen, porque el completo ya contiene al general y sumarlos duplica lo
+      visible. Excepcion: `retenciones` no se recorta (8 apuntes de retencion
+      de proveedor en asientos mixtos, sin dato de trabajador), asi que sus
+      saldos pueden incluir apuntes que no estan en `contabilidad.mayor`.
+    motivo: >-
+      Correo de Juan Romero (Dir. Administracion y Control de Costes) del
+      2026-10-09: cualquier usuario con acceso al mayor podia consultar
+      nominas, cuentas de trabajadores y embargos; «hay que limitarla a todos
+      los usuarios salvo a los que tenemos ese rol», con el criterio de
+      restringir de mas ante la duda. Medido ese dia: 55.504 apuntes (2,55 % del
+      mayor), 8.791 asientos, 25 empresas; restringir el asiento entero oculta
+      tambien unos 7.270 apuntes que no son de personal (remesas que pagan a la
+      vez nominas y proveedores) y deja 6.063 filas de saldos incompletas. Lo
+      afinara Juan. Aprobado por el humano el 2026-10-11 (F-135).
 
   - codigo: R-DESCOMPUESTO-ORIGEN
     titulo: Los descompuestos no se mezclan entre origenes ni entre versiones
@@ -1488,6 +1542,23 @@ esquemas:
       `importe_saldo`, porque los asientos de CIERRE y APERTURA duplican. No es
       el plan analitico de `maestro.cuentas_analiticas`, y la contabilidad no
       cuadra con el seguimiento de `mart` y `cierre` por construccion.
+    consumo_recomendado: true
+    refresco: nocturno
+    pasos_etl: [build_contabilidad]
+
+  contabilidad_restringida:
+    titulo: La contabilidad COMPLETA, con la informacion de personal (solo rol autorizado)
+    para_que_sirve: >-
+      La misma contabilidad que `contabilidad` -plan de cuentas, mayor y
+      saldos por cuenta y mes, desde 2008 y en las 38 empresas- pero COMPLETA:
+      con los asientos de nomina, las cuentas de trabajadores, sus prestamos,
+      anticipos y embargos (F-135). Es lo que `contabilidad` publicaba hasta el
+      2026-10-11, con las mismas filas, columnas y cifras, mas la marca
+      `restringido` en el mayor. SOLO LO LEE el rol autorizado
+      `sigrid_dm_restringido_ro` (grupo sin login; sus miembros los decide
+      Negocio): para el rol del MCP y de Power BI esta vetado. No se suma con
+      `contabilidad` (`R-CONTABILIDAD-RESTRINGIDA`), y vale la misma trampa del
+      saldo (`R-SALDO-CONTABLE`).
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_contabilidad]

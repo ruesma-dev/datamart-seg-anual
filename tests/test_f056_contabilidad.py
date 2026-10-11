@@ -1264,7 +1264,12 @@ def test_f056_r27_fichas_con_grano_claves_y_columnas(tabla: str) -> None:
     assert ficha["grano"] and ficha["descripcion"]
     assert ficha["paso_etl"] == "build_contabilidad"
     assert ficha["refresco"] == "nocturno"
-    assert list(ficha["columnas"]) == COLUMNAS[tabla], (
+    # F-135: la ficha es la de la contabilidad GENERAL, que anade columnas
+    # al final (lo que falta, solo recuentos); la del completo, en
+    # `tests/test_f135_sql.py`
+    extra = {"plan_cuentas": ["restringida"],
+             "saldos_cuenta_mes": ["num_apuntes_restringidos", "incompleto"]}.get(tabla, [])
+    assert list(ficha["columnas"]) == COLUMNAS[tabla] + extra, (
         f"las columnas de la ficha de {tabla} no son las del SQL (R27)"
     )
     for nombre, columna in ficha["columnas"].items():
@@ -1334,7 +1339,8 @@ def test_f056_r29_global_esquema_regla_y_version() -> None:
     reglas = {r["codigo"]: r for r in glob["reglas"]}
     regla = reglas["R-SALDO-CONTABLE"]
     assert regla["severidad"] == "bloqueante"
-    assert set(regla["ambito"]) == {f"contabilidad.{t}" for t in TABLAS}
+    # F-135: la trampa vale igual en la contabilidad completa
+    assert set(regla["ambito"]) == {f"{e}.{t}" for t in TABLAS for e in ("contabilidad", ESQ)}
     texto = regla["regla"] + regla["motivo"]
     for termino in ("importe_saldo", "saldo_acumulado", "CIERRE", "APERTURA", "REGULARIZACION"):
         assert termino in texto, f"R-SALDO-CONTABLE no dice «{termino}»"

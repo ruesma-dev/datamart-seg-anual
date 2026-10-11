@@ -997,6 +997,15 @@ objetos:
       aqui sin filtrar `clase` multiplica el saldo. El saldo ya agregado y sin
       esa trampa esta en `retenciones.saldo_contable`.
     descripcion: >-
+      **NO SE RECORTA POR F-135, Y ES A PROPOSITO** (D4, aprobada por el humano
+      el 2026-10-11): 8 apuntes de esta tabla caen en asientos de personal de
+      la contabilidad (5 asientos, 4 proveedores, medidos el 2026-10-09), pero
+      son las cuentas de retencion de PROVEEDOR (`prv.cueretide`), ninguna
+      cuenta de personal y ningun concepto de nomina: asientos mixtos que
+      pagan a la vez nominas y proveedores. Quitarlos descuadraria el saldo
+      de esos proveedores. Por eso aqui hay 8 apuntes que no estan en
+      `contabilidad.mayor` (`R-CONTABILIDAD-RESTRINGIDA`).
+
       Los apuntes contables de las cuentas de retencion de proveedor (F-095):
       una fila por apunte de `raw.apu` sobre las cuentas de
       `retenciones.cuentas_proveedor`, SIN FILTRAR NINGUNO, con su clase y su

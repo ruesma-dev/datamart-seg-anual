@@ -55,6 +55,7 @@ ESQUEMAS_DEL_DATAMART = (
     "cierre",
     "compras",
     "contabilidad",
+    "contabilidad_restringida",
     "descompuestos",
     "maestro",
     "mart",

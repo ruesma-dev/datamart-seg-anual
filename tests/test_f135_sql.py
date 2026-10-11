@@ -552,3 +552,117 @@ def test_f135_sub_pasos_el_docstring_dice_que_es_general_y_que_restringido() -> 
     assert RESTR in doc and "sigrid_dm_restringido_ro" in doc
     for nombre in FICHEROS:
         assert nombre in doc, f"el docstring no cita {nombre}"
+
+
+# ===========================================================================
+# R21-R22 · el diccionario (T10)
+# ===========================================================================
+
+DIR_DICC = RAIZ / "config" / "diccionario"
+COLUMNAS_GENERALES = {
+    "plan_cuentas": (PLAN_GEN, COLUMNAS["plan_cuentas"] + ["restringida"]),
+    "mayor": (MAYOR_GEN, COLUMNAS["mayor"]),
+    "saldos_cuenta_mes": (
+        SALDOS_GEN, COLUMNAS["saldos_cuenta_mes"] + ["num_apuntes_restringidos", "incompleto"]
+    ),
+    "apuntes_restringidos_mes": (
+        RECUENTO, ["empresa_id", "ejercicio", "mes", "num_apuntes", "num_asientos"]
+    ),
+}
+
+
+@cache
+def _yaml(nombre: str) -> dict:
+    import yaml
+
+    return yaml.safe_load((DIR_DICC / nombre).read_text(encoding="utf-8"))
+
+
+def _texto(dato: object) -> str:
+    import yaml
+
+    return yaml.safe_dump(dato, allow_unicode=True, width=10_000)
+
+
+def test_f135_diccionario_el_esquema_restringido_es_del_datamart() -> None:
+    from etl_sigrid.domain.diccionario import ESQUEMAS_DEL_DATAMART
+
+    assert RESTR in ESQUEMAS_DEL_DATAMART
+    entrada = _yaml("00_global.yaml")["esquemas"][RESTR]
+    assert entrada["pasos_etl"] == ["build_contabilidad"]
+    assert entrada["refresco"] == "nocturno"
+    assert "sigrid_dm_restringido_ro" in entrada["para_que_sirve"]
+
+
+@pytest.mark.parametrize(
+    ("tabla", "nombre", "esperadas"),
+    [
+        ("plan_cuentas", PLAN, COLUMNAS["plan_cuentas"]),
+        ("mayor", MAYOR, COLUMNAS["mayor"] + EXTRA_MAYOR),
+        ("saldos_cuenta_mes", SALDOS, COLUMNAS["saldos_cuenta_mes"]),
+    ],
+)
+def test_f135_diccionario_fichas_del_completo_con_las_columnas_del_sql(
+    tabla: str, nombre: str, esperadas: list[str]
+) -> None:
+    fichero = _yaml("contabilidad_restringida.yaml")
+    assert fichero["esquema"] == RESTR
+    ficha = fichero["objetos"][tabla]
+    assert list(ficha["columnas"]) == esperadas == _columnas(nombre, f"{RESTR}.{tabla}")
+    assert ficha["paso_etl"] == "build_contabilidad" and ficha["refresco"] == "nocturno"
+    for columna, datos in ficha["columnas"].items():
+        assert datos.get("significado"), f"{RESTR}.{tabla}.{columna} sin significado"
+    assert "sigrid_dm_restringido_ro" in ficha["descripcion"]
+
+
+@pytest.mark.parametrize("tabla", sorted(COLUMNAS_GENERALES))
+def test_f135_diccionario_fichas_generales_con_las_columnas_del_sql(tabla: str) -> None:
+    nombre, esperadas = COLUMNAS_GENERALES[tabla]
+    ficha = _yaml("contabilidad.yaml")["objetos"][tabla]
+    assert list(ficha["columnas"]) == esperadas == _columnas(nombre, f"contabilidad.{tabla}")
+    for columna, datos in ficha["columnas"].items():
+        assert datos.get("significado"), f"contabilidad.{tabla}.{columna} sin significado"
+
+
+def test_f135_diccionario_la_general_dice_que_le_falta_y_donde_esta() -> None:
+    objetos = _yaml("contabilidad.yaml")["objetos"]
+    mayor = _texto(objetos["mayor"])
+    for termino in ("contabilidad_restringida", "apuntes_restringidos_mes", "55.504", "R-CONTABILIDAD-RESTRINGIDA"):
+        assert termino in mayor, f"la ficha del mayor general no dice «{termino}»"
+    assert "SIN FILTRAR NINGUNO" not in objetos["mayor"]["descripcion"], "ya no es verdad"
+    acumulado = objetos["mayor"]["columnas"]["saldo_acumulado"]["significado"]
+    assert "visible" in acumulado.lower()
+    saldos = objetos["saldos_cuenta_mes"]["columnas"]
+    assert "importe" not in saldos["num_apuntes_restringidos"].get("unidad", "")
+    assert saldos["incompleto"]["significado"]
+    plan = objetos["plan_cuentas"]
+    assert TEXTO_CUENTA_ENMASCARADA in _texto(plan)
+    recuento = objetos["apuntes_restringidos_mes"]
+    assert recuento["clave_negocio"] == ["empresa_id", "ejercicio", "mes"]
+    assert recuento["paso_etl"] == "build_contabilidad"
+    assert all("unidad" not in c for c in recuento["columnas"].values()), "solo recuentos (D5)"
+
+
+def test_f135_r22_regla_dura_contabilidad_restringida() -> None:
+    glob = _yaml("00_global.yaml")
+    assert glob["version"] >= 49, "F-090 publicó la 48; F-135 sube a 49"
+    reglas = {r["codigo"]: r for r in glob["reglas"]}
+    regla = reglas["R-CONTABILIDAD-RESTRINGIDA"]
+    assert regla["severidad"] == "bloqueante"
+    assert {"contabilidad", RESTR} <= set(regla["ambito"])
+    texto = regla["regla"] + " " + regla["motivo"]
+    for termino in (
+        "contabilidad_restringida", "sigrid_dm_restringido_ro", "incompleto",
+        "apuntes_restringidos_mes", "num_apuntes_restringidos", "NUNCA se suman",
+        "retenciones", "Juan Romero",
+    ):
+        assert termino in texto, f"R-CONTABILIDAD-RESTRINGIDA no dice «{termino}»"
+    assert set(reglas["R-SALDO-CONTABLE"]["ambito"]) >= {
+        f"{RESTR}.mayor", f"{RESTR}.saldos_cuenta_mes"
+    }, "la trampa del cierre y la apertura vale igual en la completa"
+    assert RESTR in reglas["R-FRESCURA"]["ambito"]
+
+
+def test_f135_r21_retenciones_declara_la_excepcion() -> None:
+    texto = (DIR_DICC / "retenciones.yaml").read_text(encoding="utf-8")
+    assert "F-135" in texto and "8 apuntes" in texto and "cueretide" in texto

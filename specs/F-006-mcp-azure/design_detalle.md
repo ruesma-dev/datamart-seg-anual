@@ -224,6 +224,15 @@ infraestructura.
 > `ruesma_rep` y lo sirve `sigrid-api`). El inventario sube de 205 a **208
 > objetos**, las columnas descritas de 1608 a **1624** (16) y las fichas de
 > consumo en una.
+>
+> **Enmienda del 2026-10-11 (F-135, la información de personal de la
+> contabilidad).** Entra el esquema `contabilidad_restringida` (el decimotercero)
+> con la contabilidad COMPLETA --`plan_cuentas`, `mayor` y `saldos_cuenta_mes`,
+> que solo lee el rol autorizado `sigrid_dm_restringido_ro`-- y
+> `contabilidad.apuntes_restringidos_mes` (cuánto falta en la general, solo
+> recuentos). El inventario sube de 208 a **212 objetos**, las columnas
+> descritas de 1624 a **1698** (20 + 33 + 13 del completo; 1 + 2 + 5 de la
+> general) y las fichas de consumo en cuatro.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,
