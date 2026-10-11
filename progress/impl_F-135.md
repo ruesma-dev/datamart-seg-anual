@@ -143,10 +143,10 @@ Con la nocturna en ~4 h 40 min, el margen al `replicaTimeout` de 5 h baja a unos
 
 | Evidencia | Resultado |
 |---|---|
-| Suite completa (`bash harness/init.sh` sobre `bbb1c01`) | **7.486 passed, 238 skipped**, 0 failed; ENTORNO LISTO |
-| Tiempo de la suite | **1.896,6 s (31 min 36 s)** |
+| Suite completa (`bash harness/init.sh`, final sobre `ba557e1`) | **7.486 passed, 238 skipped**, 0 failed; ENTORNO LISTO (exit 0) |
+| Tiempo de la suite | **1.462,6 s (24 min 22 s)** el final; 1.896,6 s el de `bbb1c01` |
 | `PUERTA COBERTURA` | **100,0 % de 135 líneas cambiadas** (135/135, umbral 80 %, nivel crítico) |
-| `PUERTA TAMAÑO` | requirements 149/150, design 238/250, impl 200/220 |
+| `PUERTA TAMAÑO` | requirements 149/150, design 238/250, impl 217/220 |
 | Mutación (`--feature F-135 --workers 4 --timeout 1800`) | **25 mutantes, 25 muertos, 0 supervivientes, 0 timeouts**, 6.047 s → `progress/mutacion_F-135.md` |
 | Tests de F-135 | 186 (85 dominio, 61 SQL/diccionario/docs, 40 permisos) |
 | SQL y permisos en PostgreSQL 16.15 real (local) | 51 + 16 comprobaciones en verde (§4) |
