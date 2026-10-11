@@ -20,6 +20,14 @@ conceder el esquema y REVOCAR después, en la misma tanda y en ese orden. La
 lista vive en `config/settings.py` (`DEFAULT_EXCLUDED_TABLES`), que es donde
 está escrito el porqué y la condición bajo la cual el humano ya ha decidido
 levantarlo: que el MCP tenga control por usuario.
+
+ESQUEMAS VETADOS Y ROL AUTORIZADO (F-135, 2026-10-11): la contabilidad COMPLETA
+(`contabilidad_restringida`, con los apuntes de personal) y `raw` entero quedan
+fuera del rol general. A diferencia de las tablas excluidas, aquí se veta el
+ESQUEMA: sus tablas, su USAGE y su privilegio por defecto. Y el rol autorizado
+(`sigrid_dm_restringido_ro`) recibe la lectura de la contabilidad completa. Las
+dos listas de sentencias se generan aparte de `build_readonly_grant_statements`,
+que no cambia (F-068 intacto): quien las ejecuta pone los vetos DETRÁS.
 """
 
 from __future__ import annotations
@@ -165,4 +173,104 @@ def build_readonly_grant_statements(
             )
         )
 
+    return [s.as_string(None) for s in sentencias]
+
+
+def esquemas_en_conflicto(consumo: Sequence[str], vetados: Sequence[str]) -> list[str]:
+    """Los esquemas que están a la vez en la lista de consumo y en la de vetados.
+
+    En el orden en que aparecen en `consumo` y sin repetir. No vacía significa
+    una configuración contradictoria —típicamente un `.env` viejo que aún
+    lista `raw`— y quien llama debe parar sin ejecutar nada (F-135, R17): un
+    GRANT y su REVOKE en la misma tanda dejan el resultado al orden de las
+    sentencias, que es justo lo que no se quiere confiar a la suerte.
+    """
+    vetado = set(vetados)
+    conflicto: list[str] = []
+    for esquema in consumo:
+        if esquema in vetado and esquema not in conflicto:
+            conflicto.append(esquema)
+    return conflicto
+
+
+def build_veto_statements(
+    readonly_role: str,
+    owner_role: str,
+    vetoed_schemas: Sequence[str],
+) -> list[str]:
+    """Sentencias que dejan a `readonly_role` SIN lectura sobre `vetoed_schemas`.
+
+    Función pura. Por esquema, tres sentencias y las tres hacen falta:
+
+      - `REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA`: lo concedido tabla a
+        tabla (o por el `GRANT ... ON ALL TABLES` de una noche anterior);
+      - `REVOKE ALL PRIVILEGES ON SCHEMA`: sin USAGE no se llega a ninguna tabla,
+        tampoco a la que nazca mañana;
+      - `ALTER DEFAULT PRIVILEGES ... REVOKE ALL ON TABLES`: la regla del
+        catálogo que haría legible una tabla recién creada (F-068).
+
+    OJO, la lección de F-068: un REVOKE solo quita lo concedido por EL MISMO
+    concedente. Lo que concedió el administrador a mano no lo quita la
+    nocturna; por eso el paso COMPRUEBA después en el catálogo (R18), y
+    `infra/sql/02_roles.sql` revoca con los dos concedentes.
+    """
+    ro = sql.Identifier(readonly_role)
+    sentencias: list[sql.Composable] = []
+    for esquema in vetoed_schemas:
+        esq = sql.Identifier(esquema)
+        sentencias.append(
+            sql.SQL("REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA {} FROM {}").format(esq, ro)
+        )
+        sentencias.append(
+            sql.SQL("REVOKE ALL PRIVILEGES ON SCHEMA {} FROM {}").format(esq, ro)
+        )
+        if owner_role:
+            sentencias.append(
+                sql.SQL(
+                    "ALTER DEFAULT PRIVILEGES FOR ROLE {} IN SCHEMA {} "
+                    "REVOKE ALL ON TABLES FROM {}"
+                ).format(sql.Identifier(owner_role), esq, ro)
+            )
+        else:
+            sentencias.append(
+                sql.SQL(
+                    "ALTER DEFAULT PRIVILEGES IN SCHEMA {} REVOKE ALL ON TABLES FROM {}"
+                ).format(esq, ro)
+            )
+    return [s.as_string(None) for s in sentencias]
+
+
+def build_restricted_grant_statements(
+    restricted_role: str,
+    owner_role: str,
+    schemas: Sequence[str],
+) -> list[str]:
+    """Sentencias que dan al rol AUTORIZADO lectura sobre `schemas` (F-135, R15).
+
+    Función pura. USAGE, SELECT sobre lo que existe y el privilegio por defecto
+    para lo que nazca (el build hace DROP + CREATE cada noche). `owner_role`,
+    como en `build_readonly_grant_statements`: vacío, la regla aplica al rol de
+    la sesión. Solo lectura: ni INSERT, ni ALL PRIVILEGES.
+    """
+    rol = sql.Identifier(restricted_role)
+    sentencias: list[sql.Composable] = []
+    for esquema in schemas:
+        esq = sql.Identifier(esquema)
+        sentencias.append(sql.SQL("GRANT USAGE ON SCHEMA {} TO {}").format(esq, rol))
+        sentencias.append(
+            sql.SQL("GRANT SELECT ON ALL TABLES IN SCHEMA {} TO {}").format(esq, rol)
+        )
+        if owner_role:
+            sentencias.append(
+                sql.SQL(
+                    "ALTER DEFAULT PRIVILEGES FOR ROLE {} IN SCHEMA {} "
+                    "GRANT SELECT ON TABLES TO {}"
+                ).format(sql.Identifier(owner_role), esq, rol)
+            )
+        else:
+            sentencias.append(
+                sql.SQL(
+                    "ALTER DEFAULT PRIVILEGES IN SCHEMA {} GRANT SELECT ON TABLES TO {}"
+                ).format(esq, rol)
+            )
     return [s.as_string(None) for s in sentencias]
