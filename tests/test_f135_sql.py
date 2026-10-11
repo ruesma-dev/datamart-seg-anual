@@ -666,3 +666,36 @@ def test_f135_r22_regla_dura_contabilidad_restringida() -> None:
 def test_f135_r21_retenciones_declara_la_excepcion() -> None:
     texto = (DIR_DICC / "retenciones.yaml").read_text(encoding="utf-8")
     assert "F-135" in texto and "8 apuntes" in texto and "cueretide" in texto
+
+
+# ===========================================================================
+# R24 · la documentación dice qué lee cada rol (T11)
+# ===========================================================================
+
+AZURE_APPS = RAIZ.parent / "azure-apps"
+
+
+@pytest.mark.parametrize(
+    "ruta",
+    [
+        RAIZ / "docs" / "ARCHITECTURE.md",
+        AZURE_APPS / "datamart_seg_anual.md",
+        AZURE_APPS / "mcp_bbdd.md",
+    ],
+    ids=["ARCHITECTURE", "azure-apps/datamart", "azure-apps/mcp_bbdd"],
+)
+def test_f135_docs_dicen_que_lee_cada_rol(ruta: Path) -> None:
+    if not ruta.exists():
+        pytest.skip(f"{ruta} no está junto a este repositorio")
+    texto = ruta.read_text(encoding="utf-8")
+    for termino in ("contabilidad_restringida", "sigrid_dm_restringido_ro", "F-135", "F-087"):
+        assert termino in texto, f"{ruta.name} no dice «{termino}»"
+    assert "F-008" in texto, f"{ruta.name} no dice que el rol por usuario es de mcp-bbdd (F-008)"
+
+
+def test_f135_docs_azure_apps_dice_que_raw_queda_fuera() -> None:
+    ruta = AZURE_APPS / "datamart_seg_anual.md"
+    if not ruta.exists():
+        pytest.skip("azure-apps no está junto a este repositorio")
+    texto = ruta.read_text(encoding="utf-8")
+    assert "PG_VETOED_SCHEMAS" in texto and "apuntes_restringidos_mes" in texto

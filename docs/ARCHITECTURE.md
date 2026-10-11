@@ -48,6 +48,26 @@ mayor). El mayor se MATERIALIZA porque `raw.apu` no tiene índice por cuenta y s
 recrea cada noche: como vista, cualquier agregado de empresa o año pasaría de
 la ventana de 30 s del MCP.
 
+**Desde F-135 (2026-10-11) la contabilidad son DOS esquemas**, por la misma
+razón de fondo: los permisos de PostgreSQL se dan por esquema, así que lo que el
+rol general no debe leer vive físicamente en otro que nunca se le concede.
+`contabilidad_restringida` lleva la contabilidad COMPLETA —las tres tablas de
+F-056 con las mismas filas, columnas y cifras, y en el mayor tres columnas más:
+`restringido`, `motivo_restriccion` y `saldo_acumulado_visible`— y solo la lee
+el grupo `sigrid_dm_restringido_ro` (NOLOGIN; sus miembros los decide Negocio).
+`contabilidad` pasa a ser la GENERAL, la que leen el MCP y Power BI: sin los
+apuntes de PERSONAL (los asientos de nómina enteros y las cuentas de
+trabajadores: 55.504 apuntes, el 2,55 %, criterio en
+`domain/restriccion_personal.py`), con las 521 cuentas de personal enmascaradas
+en el plan, el saldo acumulado recalculado sobre lo visible (el del completo
+delataría lo restringido en las cuentas mixtas), `incompleto` en los saldos y
+`contabilidad.apuntes_restringidos_mes` con solo recuentos de lo que falta. Las
+generales siguen materializadas y con los índices de siempre; un `DO` al final
+de `05_mayor_general.sql` hace fallar el paso si se cuela un apunte de cuenta
+restringida o si general más restringidos no suman el completo. Regla dura
+`R-CONTABILIDAD-RESTRINGIDA`: el mayor completo se lee solo de
+`contabilidad_restringida` y los dos esquemas nunca se suman.
+
 **`descompuestos` (F-097, 2026-09-28) es de qué se compone cada partida**, por
 ORIGEN, y es el primer esquema del datamart que NO se reconstruye de cero:
 ver «Los descompuestos: el primer esquema incremental», más abajo.
@@ -525,6 +545,15 @@ las tablas de `PG_EXCLUDED_TABLES` y cambia el `ALTER DEFAULT PRIVILEGES` de
 La lista es `DEFAULT_EXCLUDED_TABLES` en `config/settings.py`, y ahí está
 escrita la condición para levantarla.
 
+**Desde F-135 (2026-10-11) `raw` entero queda fuera del rol general**, vetado y
+no solo sin conceder: además de esas cuatro tablas trae el mayor, 37.048
+efectos de pago de nómina de 1.015 trabajadores con su cuenta bancaria
+(`raw.pag`), los repartos analíticos de los apuntes de personal (`raw.apa`), sus
+cabeceras (`raw.con`, `raw.asi`), `raw.rac` y `raw.hmores`. Lo sostiene
+`apply_grants` cada noche con `PG_VETOED_SCHEMAS` (ver «El datamart en Azure»).
+`PG_EXCLUDED_TABLES` se conserva tal cual: vuelve a valer el día que `raw` se
+devuelva, y para eso hay que deshacer antes el veto.
+
 **Lo que Sigrid NO guarda**, medido dos veces y escrito aquí para que nadie
 vuelva a buscarlo:
 
@@ -573,10 +602,12 @@ fallo con cualquier tolerancia.
   nocturna—. Base propia y no esquema compartido: PostgreSQL
   no permite consultas entre bases, y esa es la frontera que impide que el rol
   de lectura vea `albaranes`.
-- **Tres roles.** `sigrid_dm_etl` (grupo `NOLOGIN`) es el propietario de todo;
+- **Cuatro roles.** `sigrid_dm_etl` (grupo `NOLOGIN`) es el propietario de todo;
   `sigrid_dm_app` (login, contraseña en Key Vault) es el que usa el ETL y es
-  miembro del grupo; `mcp_sigrid_dm_ro` (login) es de solo lectura, para el
-  MCP. Autenticación por contraseña: habilitar Entra es una operación de
+  miembro del grupo; `mcp_sigrid_dm_ro` (login) es el rol GENERAL de solo
+  lectura, el del MCP y hoy también el de Power BI; y desde F-135
+  `sigrid_dm_restringido_ro` (grupo `NOLOGIN`, sin miembros todavía) es el rol
+  AUTORIZADO que lee la contabilidad completa. Autenticación por contraseña: habilitar Entra es una operación de
   servidor y se descartó para no tocar las otras dos bases. El modo
   `PG_AUTH_MODE=entra` existe en el código, probado, pero inactivo.
 - **`PG_SET_ROLE=sigrid_dm_etl`** en cada sesión: los objetos deben tener
@@ -588,6 +619,28 @@ fallo con cualquier tolerancia.
 - **Los permisos de lectura se reaplican en cada ejecución** (paso
   `apply_grants` y comando `apply-grants`): siete ficheros SQL recrean vistas
   con `DROP VIEW ... CASCADE` y un `DROP` se lleva los `GRANT`.
+- **Qué lee cada rol, desde F-135.** El GENERAL (`mcp_sigrid_dm_ro`) lee los
+  esquemas de `PG_CONSUMPTION_SCHEMAS` —`mart`, `cierre`, `compras`,
+  `maestro`, `retenciones`, `personal`, `contabilidad` (la general),
+  `descompuestos`, `stg`, `aux` y `_meta`— y NO lee los de `PG_VETOED_SCHEMAS`:
+  `contabilidad_restringida` y `raw`. El AUTORIZADO
+  (`sigrid_dm_restringido_ro`) lee `contabilidad_restringida`
+  (`PG_RESTRICTED_SCHEMAS`). El dueño y el administrador lo leen todo, como
+  siempre. `apply_grants`, cada noche y en este orden: (1) si un esquema está a
+  la vez en consumo y en vetados —un `.env` viejo que aún lista `raw`— o el del
+  autorizado no está vetado, FAILED sin ejecutar nada; (2) concede al general,
+  y DETRÁS le veta los esquemas vetados (tablas, USAGE y privilegio por
+  defecto); (3) concede al autorizado si existe (si no, avisa y sigue); (4)
+  pregunta al catálogo (`has_schema_privilege`, `has_table_privilege`) si el
+  general aún lee algo vetado o excluido, y si lo lee, FAILED con la lista: una
+  concesión que la nocturna no puede revocar (a PUBLIC, o de otro concedente)
+  no pasa inadvertida. `infra/sql/02_roles.sql` hace lo mismo al provisionar,
+  como administrador y como `sigrid_dm_etl` (punto 5 ter).
+- **Lo que NO es de este repositorio** (F-135): que el MCP conecte con el rol
+  autorizado según quién pregunta, y que su lista blanca admita
+  `contabilidad_restringida` (`mcp-bbdd`, su F-008); y que Power BI tenga rol
+  propio (F-087). Hasta entonces el rol autorizado existe pero ningún cliente lo
+  usa: nadie lee lo que no debía, y quien debe verlo lo tiene en Sigrid.
 - **La recuperación es volver a ejecutar el ETL, no restaurar**: el PITR es de
   servidor entero y arrastraría `albaranes` y `partes` al pasado.
 - Procedimiento completo: `docs/runbook_postgres_azure.md`.
