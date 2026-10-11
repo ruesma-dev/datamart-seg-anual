@@ -786,7 +786,9 @@ reglas:
       alguno en una cuenta de personal o con «nomina» en el concepto: la caja,
       el banco y el IVA de ese asiento tambien) y todos los de las cuentas de
       personal (prefijos 640, 641, 642, 643, 644, 645, 649, 465, 466, 476, 460,
-      461, 544 y 4753)-. Esas cuentas van en `contabilidad.plan_cuentas` con
+      461, 544 y 4753)-; por si acaso, tambien el de una cuenta que no
+      resuelve en el plan (motivo CUENTA_SIN_RESOLVER, que se cuenta aparte en
+      `num_apuntes_sin_resolver`). Esas cuentas van en `contabilidad.plan_cuentas` con
       `restringida = true` y el nombre '(cuenta restringida)', y no tienen
       fila en los saldos. Antes de dar un saldo o un total como completo:
       (1) en `contabilidad.saldos_cuenta_mes`, si `incompleto` es true a la

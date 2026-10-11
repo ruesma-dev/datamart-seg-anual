@@ -296,21 +296,27 @@ def test_f135_r5_el_acumulado_visible_solo_suma_lo_visible() -> None:
 
 
 def test_f135_r5_el_asiento_de_personal() -> None:
-    """R2 en SQL: todos NORMAL y alguno CR o con concepto de nómina, por asiento."""
+    """R2 en SQL: todos NORMAL y alguno CR (o con cuenta que no resuelve: falla
+    cerrado) o con concepto de nómina, por asiento."""
     cte = _cte(MAYOR, "asientos_personal")
     assert cte.strip() == (
         f"SELECT f.asiento_id FROM fechados f LEFT JOIN {RESTR}.plan_cuentas pa "
         "ON pa.cuenta_id = f.cuenta_id WHERE f.asiento_id IS NOT NULL GROUP BY f.asiento_id "
-        "HAVING bool_and(f.clase_bruta = 'NORMAL') AND bool_or(pa.codigo_cuenta ~ "
-        f"'{REGEX_CUENTA_RESTRINGIDA}' OR f.concepto ~* '{PATRON_CONCEPTO_NOMINA}')"
+        "HAVING bool_and(f.clase_bruta = 'NORMAL') AND bool_or(COALESCE(pa.codigo_cuenta ~ "
+        f"'{REGEX_CUENTA_RESTRINGIDA}', f.cuenta_id IS NOT NULL) OR f.concepto ~* "
+        f"'{PATRON_CONCEPTO_NOMINA}')"
     )
 
 
 def test_f135_r5_la_marca_de_cada_apunte() -> None:
     cte = _cte(MAYOR, "marcados")
     assert (
-        f"COALESCE(pc.codigo_cuenta ~ '{REGEX_CUENTA_RESTRINGIDA}', FALSE) AS es_cuenta_restringida"
-    ) in cte, "un apunte sin cuenta no es CR, y la marca nunca es NULL"
+        f"COALESCE(pc.codigo_cuenta ~ '{REGEX_CUENTA_RESTRINGIDA}', s.cuenta_id IS NOT NULL) "
+        "AS es_cuenta_restringida"
+    ) in cte, (
+        "sin cuenta (cueide = 0) no es CR; con cuenta que no resuelve en el plan, SÍ "
+        "(falla cerrado); y la marca nunca es NULL"
+    )
     assert "(ap.asiento_id IS NOT NULL) AS es_asiento_personal" in cte
     assert "LEFT JOIN asientos_personal ap ON ap.asiento_id = s.asiento_id" in cte
     final = _consultas(MAYOR, f"{RESTR}.mayor")[-1][1]
@@ -334,7 +340,8 @@ def test_f135_r6_la_guarda_de_recuento_va_sobre_el_completo() -> None:
 def test_f135_r7_la_cuenta_gana_al_asiento() -> None:
     final = _consultas(MAYOR, f"{RESTR}.mayor")[-1][1]
     assert (
-        "CASE WHEN s.es_cuenta_restringida THEN 'CUENTA' "
+        "CASE WHEN s.es_cuenta_restringida AND s.codigo_cuenta IS NULL THEN 'CUENTA_SIN_RESOLVER' "
+        "WHEN s.es_cuenta_restringida THEN 'CUENTA' "
         "WHEN s.es_asiento_personal THEN 'ASIENTO_PERSONAL' END AS motivo_restriccion"
     ) in final
 
@@ -380,6 +387,24 @@ def test_f135_r10_guarda_sin_cr_y_con_recuento_cuadrado() -> None:
     assert texto.index("DO $$") > texto.index("CREATE TABLE contabilidad.mayor AS"), (
         "postcondición en la misma transacción: si salta, queda la tabla anterior"
     )
+
+
+def test_f135_r10_la_cuenta_sin_resolver_falla_cerrado() -> None:
+    """Review de F-135, pasada 1: un apunte con `cuenta_id` cuya cuenta no está
+    en el plan quedaba con `codigo_cuenta` NULL, `restringido = false`, y pasaba
+    al general sin que la guarda lo viera. Ahora (1) `02` lo restringe y hace
+    AP a su asiento (los dos COALESCE de arriba), y (2) la guarda de `05`, por
+    si acaso, para el build si aun así llega uno al general."""
+    guarda = _guarda(MAYOR_GEN)
+    assert (
+        "SELECT count(*) INTO v_sin_resolver FROM contabilidad.mayor "
+        "WHERE cuenta_id IS NOT NULL AND codigo_cuenta IS NULL;"
+    ) in guarda
+    assert "IF v_sin_resolver <> 0 THEN RAISE EXCEPTION" in guarda
+    marcados = _cte(MAYOR, "marcados")
+    assert "s.cuenta_id IS NOT NULL) AS es_cuenta_restringida" in marcados
+    assert ", FALSE)" not in marcados, "el COALESCE a FALSE es el que abría el criterio"
+    assert "f.cuenta_id IS NOT NULL) OR f.concepto" in _cte(MAYOR, "asientos_personal")
 
 
 def test_f135_r11_saldos_generales_solo_de_lo_visible() -> None:
@@ -450,6 +475,8 @@ def test_f135_r13_recuentos_sin_importes() -> None:
     assert items == [
         "m.empresa_id", "m.ejercicio", "m.mes",
         "COUNT(*) AS num_apuntes", "COUNT(DISTINCT m.asiento_id) AS num_asientos",
+        "COUNT(*) FILTER (WHERE m.motivo_restriccion = 'CUENTA_SIN_RESOLVER') "
+        "AS num_apuntes_sin_resolver",
     ]
     assert clausulas == ["WHERE m.restringido", "GROUP BY m.empresa_id, m.ejercicio, m.mes"]
     sql = _sql(RECUENTO)
@@ -566,7 +593,8 @@ COLUMNAS_GENERALES = {
         SALDOS_GEN, COLUMNAS["saldos_cuenta_mes"] + ["num_apuntes_restringidos", "incompleto"]
     ),
     "apuntes_restringidos_mes": (
-        RECUENTO, ["empresa_id", "ejercicio", "mes", "num_apuntes", "num_asientos"]
+        RECUENTO,
+        ["empresa_id", "ejercicio", "mes", "num_apuntes", "num_asientos", "num_apuntes_sin_resolver"],
     ),
 }
 

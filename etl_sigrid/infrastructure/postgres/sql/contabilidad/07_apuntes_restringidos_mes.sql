@@ -12,6 +12,10 @@
 -- cuanto (R13). SOLO RECUENTOS (D5): ni debe, ni haber, ni importe. El importe
 -- restringido por empresa y mes seria la masa salarial mensual, que es justo
 -- lo que se protege.
+--
+-- `num_apuntes_sin_resolver` cuenta aparte los restringidos por FALLAR CERRADO:
+-- apuntes cuya cuenta no resuelve en el plan (review de F-135; hoy 0). Si no es
+-- 0, hay un apunte de cuenta desconocida que nadie ha clasificado.
 -- ============================================================================
 
 DROP TABLE IF EXISTS contabilidad.apuntes_restringidos_mes CASCADE;
@@ -21,7 +25,8 @@ SELECT
     m.ejercicio,
     m.mes,
     COUNT(*)                      AS num_apuntes,
-    COUNT(DISTINCT m.asiento_id)  AS num_asientos
+    COUNT(DISTINCT m.asiento_id)  AS num_asientos,
+    COUNT(*) FILTER (WHERE m.motivo_restriccion = 'CUENTA_SIN_RESOLVER') AS num_apuntes_sin_resolver
 FROM contabilidad_restringida.mayor m
 WHERE m.restringido
 GROUP BY m.empresa_id, m.ejercicio, m.mes;

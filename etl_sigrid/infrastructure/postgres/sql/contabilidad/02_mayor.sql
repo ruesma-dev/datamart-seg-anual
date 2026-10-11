@@ -17,8 +17,9 @@
 --   restringido              TRUE si el apunte es de PERSONAL (criterio V2,
 --                            `etl_sigrid/domain/restriccion_personal.py`)
 --   motivo_restriccion       'CUENTA' si la cuenta es CR (aunque el asiento
---                            tambien sea AP), 'ASIENTO_PERSONAL' si solo lo es
---                            el asiento, NULL si es visible (R7)
+--                            tambien sea AP), 'CUENTA_SIN_RESOLVER' si trae
+--                            cuenta y no resuelve en el plan, 'ASIENTO_PERSONAL'
+--                            si solo lo es el asiento, NULL si es visible (R7)
 --   saldo_acumulado_visible  el acumulado de la cuenta sumando SOLO lo visible;
 --                            NULL en los restringidos. Es el `saldo_acumulado`
 --                            de `contabilidad.mayor` (R9): el acumulado del
@@ -36,6 +37,13 @@
 --       esta materializado, para no materializar otra vez 2,17 M de filas.
 --       Se agrupa por `asiento_id` (solo los no nulos) y se une por hash: sin
 --       ventana por asiento.
+--   FALLA CERRADO (review de F-135, pasada 1): un apunte que trae cuenta
+--       (`cuenta_id`) cuyo codigo NO resuelve en el plan (una auxiliar de
+--       `raw.con` sin su fila en `raw.cua`, una carga desfasada) cuenta como CR:
+--       `COALESCE(codigo ~ regex, cuenta_id IS NOT NULL)`. Se restringe con
+--       motivo CUENTA_SIN_RESOLVER y hace AP a su asiento. Un COALESCE a FALSE
+--       lo dejaba pasar al general con su concepto y su importe. Sin cuenta
+--       (`cueide = 0`, cuenta_id NULL) sigue siendo visible. Hoy son 0.
 --
 -- UNA FILA POR APUNTE (R13, R14, R24): 2.166.701 el 2026-09-26. `apunte_id` es
 -- clave primaria y nada de lo que se une multiplica: el asiento, el tercero y
@@ -156,7 +164,7 @@ asientos_personal AS (
     WHERE f.asiento_id IS NOT NULL
     GROUP BY f.asiento_id
     HAVING bool_and(f.clase_bruta = 'NORMAL')
-       AND bool_or(pa.codigo_cuenta ~ '^(640|641|642|643|644|645|649|465|466|476|460|461|544|4753)' OR f.concepto ~* '\mn[oóÓ]minas?\M')
+       AND bool_or(COALESCE(pa.codigo_cuenta ~ '^(640|641|642|643|644|645|649|465|466|476|460|461|544|4753)', f.cuenta_id IS NOT NULL) OR f.concepto ~* '\mn[oóÓ]minas?\M')
 ),
 -- F-135: la cuenta y la marca de cada apunte
 marcados AS (
@@ -165,7 +173,7 @@ marcados AS (
         pc.codigo_cuenta,
         pc.nombre_cuenta,
         pc.clave_cuenta,
-        COALESCE(pc.codigo_cuenta ~ '^(640|641|642|643|644|645|649|465|466|476|460|461|544|4753)', FALSE) AS es_cuenta_restringida,
+        COALESCE(pc.codigo_cuenta ~ '^(640|641|642|643|644|645|649|465|466|476|460|461|544|4753)', s.cuenta_id IS NOT NULL) AS es_cuenta_restringida,
         (ap.asiento_id IS NOT NULL)                              AS es_asiento_personal
     FROM saldos s
     LEFT JOIN contabilidad_restringida.plan_cuentas pc ON pc.cuenta_id = s.cuenta_id
@@ -206,7 +214,8 @@ SELECT
     s.tercero_id,
     ter.res                                                      AS tercero_nombre,
     (s.es_cuenta_restringida OR s.es_asiento_personal)           AS restringido,
-    CASE WHEN s.es_cuenta_restringida THEN 'CUENTA'
+    CASE WHEN s.es_cuenta_restringida AND s.codigo_cuenta IS NULL THEN 'CUENTA_SIN_RESOLVER'
+         WHEN s.es_cuenta_restringida THEN 'CUENTA'
          WHEN s.es_asiento_personal THEN 'ASIENTO_PERSONAL' END  AS motivo_restriccion,
     CASE WHEN s.es_cuenta_restringida OR s.es_asiento_personal THEN NULL
          ELSE SUM(s.importe_saldo) FILTER (
@@ -230,7 +239,7 @@ CREATE INDEX idx_con_mayor_tercero              ON contabilidad_restringida.mayo
 CREATE INDEX idx_con_mayor_restringido          ON contabilidad_restringida.mayor (restringido) WHERE restringido;
 
 COMMENT ON TABLE contabilidad_restringida.mayor IS
-'F-056 y F-135. El mayor contable COMPLETO, solo para el rol autorizado: una fila por apunte de raw.apu, sin filtrar ninguno, con las columnas de F-056 y al final restringido, motivo_restriccion (CUENTA, ASIENTO_PERSONAL o NULL) y saldo_acumulado_visible. fecha = la del apunte (apu.fec) y fecha_asiento la del asiento (difieren en 297); empresa del asiento; cuenta de contabilidad_restringida.plan_cuentas; importe = debe - haber. clase_asiento: CIERRE, SALDO_INICIAL, APERTURA, REGULARIZACION, NORMAL. El saldo es importe_saldo (0 en CIERRE y APERTURA) y saldo_acumulado; sumar importe sin filtrar la clase duplica. obra_id solo por el centro del apunte (maestro.centros_coste).';
+'F-056 y F-135. El mayor contable COMPLETO, solo para el rol autorizado: una fila por apunte de raw.apu, sin filtrar ninguno, con las columnas de F-056 y al final restringido, motivo_restriccion (CUENTA, CUENTA_SIN_RESOLVER, ASIENTO_PERSONAL o NULL) y saldo_acumulado_visible. fecha = la del apunte (apu.fec) y fecha_asiento la del asiento (difieren en 297); empresa del asiento; cuenta de contabilidad_restringida.plan_cuentas; importe = debe - haber. clase_asiento: CIERRE, SALDO_INICIAL, APERTURA, REGULARIZACION, NORMAL. El saldo es importe_saldo (0 en CIERRE y APERTURA) y saldo_acumulado; sumar importe sin filtrar la clase duplica. obra_id solo por el centro del apunte (maestro.centros_coste).';
 
 -- R14 de F-056 (R6 de F-135): el mayor COMPLETO tiene EXACTAMENTE las filas
 -- de raw.apu, o el build falla

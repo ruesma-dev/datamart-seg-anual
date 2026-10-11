@@ -373,14 +373,17 @@ objetos:
           4753, en cualquier clase de asiento) o el de un asiento de personal
           entero (todos sus apuntes NORMAL y alguno en esas cuentas o con
           «nomina» en el concepto; la caja, el banco y el IVA de ese asiento
-          tambien). Nunca NULL. Criterio de Juan Romero (2026-10-09): ante la
-          duda, restringir de mas.
+          tambien). Tambien el de una cuenta que NO resuelve en el plan (trae
+          cuenta y su codigo no esta): se restringe por si acaso y hace de
+          personal a su asiento. Nunca NULL. Criterio de Juan Romero
+          (2026-10-09): ante la duda, restringir de mas.
       motivo_restriccion:
         significado: >-
           Por que esta restringido: CUENTA si la cuenta es restringida entera
-          (aunque el asiento tambien sea de personal), ASIENTO_PERSONAL si solo
-          lo es el asiento.
-        valores: [CUENTA, ASIENTO_PERSONAL]
+          (aunque el asiento tambien sea de personal), CUENTA_SIN_RESOLVER si
+          trae cuenta y esta no resuelve en el plan (falla cerrado; hoy 0),
+          ASIENTO_PERSONAL si solo lo es el asiento.
+        valores: [CUENTA, CUENTA_SIN_RESOLVER, ASIENTO_PERSONAL]
         nulo_significa: El apunte es visible (`restringido = false`).
       saldo_acumulado_visible:
         significado: >-

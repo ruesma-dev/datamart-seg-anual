@@ -25,7 +25,9 @@
 -- ventana, el motivo de F-056 para no usar vistas.
 --
 -- LA GUARDA (R10). Al final, en la misma transaccion: 0 apuntes de cuentas CR
--- (la regex del dominio, tal cual) y `general + restringidos = completo`. Si
+-- (la regex del dominio, tal cual), 0 apuntes con cuenta que no resuelve en el
+-- plan (02 ya los restringe: esto es la red por si acaso; review de F-135) y
+-- `general + restringidos = completo`. Si
 -- no, RAISE: el fichero entero se deshace y queda la tabla de la noche
 -- anterior, que ya estaba filtrada.
 -- ============================================================================
@@ -80,6 +82,7 @@ COMMENT ON TABLE contabilidad.mayor IS
 DO $$
 DECLARE
     v_cr            BIGINT;
+    v_sin_resolver  BIGINT;
     v_general       BIGINT;
     v_completo      BIGINT;
     v_restringidos  BIGINT;
@@ -89,6 +92,13 @@ BEGIN
     WHERE codigo_cuenta ~ '^(640|641|642|643|644|645|649|465|466|476|460|461|544|4753)';
     IF v_cr <> 0 THEN
         RAISE EXCEPTION 'mayor_general: contabilidad.mayor tiene % apuntes de cuentas restringidas; no se publica', v_cr;
+    END IF;
+
+    SELECT count(*) INTO v_sin_resolver
+    FROM contabilidad.mayor
+    WHERE cuenta_id IS NOT NULL AND codigo_cuenta IS NULL;
+    IF v_sin_resolver <> 0 THEN
+        RAISE EXCEPTION 'mayor_general: contabilidad.mayor tiene % apuntes con cuenta que no resuelve en el plan; no se publica', v_sin_resolver;
     END IF;
 
     SELECT count(*) INTO v_general FROM contabilidad.mayor;

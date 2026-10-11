@@ -556,6 +556,13 @@ objetos:
           DISTINCT: para otro corte se recuenta, no se suma). No es el numero
           de nominas.
         agregacion: no_sumable
+      num_apuntes_sin_resolver:
+        significado: >-
+          De `num_apuntes`, los restringidos porque su cuenta NO resuelve en el
+          plan (motivo CUENTA_SIN_RESOLVER): se restringen por si acaso, sin
+          saber si son de personal. Lo normal es 0; otra cifra es un apunte de
+          cuenta desconocida que conviene mirar.
+        agregacion: suma
     relaciones: []
     ejemplos_preguntas:
       - Cuantos apuntes de personal faltan en la contabilidad de la empresa 1 en 2025

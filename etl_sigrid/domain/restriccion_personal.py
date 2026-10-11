@@ -19,6 +19,12 @@ Criterio aprobado por el humano el 2026-10-11 (V2 de la spec, D1-b):
 * **Apunte restringido**: el de una CR o el de un AP. Su motivo es `CUENTA` si
   la cuenta es CR (aunque el asiento también sea AP) y `ASIENTO_PERSONAL` si
   solo lo es el asiento.
+* **Falla cerrado** (review de F-135, pasada 1): un apunte que trae cuenta
+  (`cuenta_id`) pero cuyo código no resuelve en el plan no se sabe si es de
+  personal, así que se trata como CR: se restringe con motivo
+  `CUENTA_SIN_RESOLVER` (para contarlo aparte) y hace AP a su asiento. Sin eso,
+  una auxiliar sin su fila en `raw.cua` dejaría pasar una 465 y su banco al
+  general. Hoy son 0 en Azure: no cambia ninguna cifra.
 
 Este módulo es el ORÁCULO: el SQL de `contabilidad_restringida.mayor` no lo
 llama, pero lleva los mismos literales (`REGEX_CUENTA_RESTRINGIDA` y
@@ -64,6 +70,7 @@ CLASE_NORMAL = "NORMAL"
 
 #: Valores de `motivo_restriccion` (R7).
 MOTIVO_CUENTA = "CUENTA"
+MOTIVO_CUENTA_SIN_RESOLVER = "CUENTA_SIN_RESOLVER"
 MOTIVO_ASIENTO_PERSONAL = "ASIENTO_PERSONAL"
 
 #: Lo que publica `contabilidad.plan_cuentas.nombre_cuenta` en las cuentas
@@ -74,11 +81,16 @@ TEXTO_CUENTA_ENMASCARADA = "(cuenta restringida)"
 
 @dataclass(frozen=True, slots=True)
 class ApunteContable:
-    """Lo que el criterio mira de un apunte del mayor."""
+    """Lo que el criterio mira de un apunte del mayor.
+
+    `cuenta_id` es la cuenta que trae el apunte (`None` si no trae ninguna,
+    `cueide = 0`); `codigo_cuenta`, su código en el plan (`None` si no resuelve).
+    """
 
     codigo_cuenta: str | None
     clase_asiento: str
     concepto: str | None
+    cuenta_id: int | None = None
 
 
 def es_cuenta_restringida(codigo: str | None) -> bool:
@@ -90,6 +102,16 @@ def es_cuenta_restringida(codigo: str | None) -> bool:
     return codigo is not None and codigo.startswith(PREFIJOS_CUENTA_RESTRINGIDA)
 
 
+def cuenta_sin_resolver(apunte: ApunteContable) -> bool:
+    """True si el apunte trae cuenta pero su código no resuelve en el plan."""
+    return apunte.cuenta_id is not None and apunte.codigo_cuenta is None
+
+
+def _cuenta_cerrada(apunte: ApunteContable) -> bool:
+    """CR, o cuenta que no resuelve: lo que se restringe por la cuenta."""
+    return es_cuenta_restringida(apunte.codigo_cuenta) or cuenta_sin_resolver(apunte)
+
+
 def concepto_es_de_nomina(concepto: str | None) -> bool:
     """True si el concepto contiene la palabra nómina, en cualquier forma (R3)."""
     return concepto is not None and _PATRON_CONCEPTO_PY.search(concepto) is not None
@@ -98,24 +120,28 @@ def concepto_es_de_nomina(concepto: str | None) -> bool:
 def es_asiento_de_personal(apuntes: Sequence[ApunteContable]) -> bool:
     """True si el asiento es AP (R2).
 
-    Todos sus apuntes de clase `NORMAL` y alguno en una CR o con concepto de
-    nómina. Un asiento sin apuntes no es AP.
+    Todos sus apuntes de clase `NORMAL` y alguno en una CR (o en una cuenta que
+    no resuelve: falla cerrado) o con concepto de nómina. Un asiento sin
+    apuntes no es AP.
     """
     if not apuntes:
         return False
     if any(a.clase_asiento != CLASE_NORMAL for a in apuntes):
         return False
     return any(
-        es_cuenta_restringida(a.codigo_cuenta) or concepto_es_de_nomina(a.concepto)
+        _cuenta_cerrada(a) or concepto_es_de_nomina(a.concepto)
         for a in apuntes
     )
 
 
 def motivo_restriccion(apunte: ApunteContable, asiento_es_personal: bool) -> str | None:
-    """`CUENTA`, `ASIENTO_PERSONAL` o `None` (visible) (R7).
+    """`CUENTA_SIN_RESOLVER`, `CUENTA`, `ASIENTO_PERSONAL` o `None` (visible) (R7).
 
-    La cuenta gana: un apunte de una CR dentro de un AP es `CUENTA`.
+    La cuenta gana: un apunte de una CR dentro de un AP es `CUENTA`. Una cuenta
+    que no resuelve no tiene código, así que nunca es a la vez CR.
     """
+    if cuenta_sin_resolver(apunte):
+        return MOTIVO_CUENTA_SIN_RESOLVER
     if es_cuenta_restringida(apunte.codigo_cuenta):
         return MOTIVO_CUENTA
     if asiento_es_personal:

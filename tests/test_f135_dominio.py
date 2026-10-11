@@ -20,12 +20,14 @@ from etl_sigrid.domain.restriccion_personal import (
     CLASE_NORMAL,
     MOTIVO_ASIENTO_PERSONAL,
     MOTIVO_CUENTA,
+    MOTIVO_CUENTA_SIN_RESOLVER,
     PATRON_CONCEPTO_NOMINA,
     PREFIJOS_CUENTA_RESTRINGIDA,
     REGEX_CUENTA_RESTRINGIDA,
     TEXTO_CUENTA_ENMASCARADA,
     ApunteContable,
     concepto_es_de_nomina,
+    cuenta_sin_resolver,
     es_apunte_restringido,
     es_asiento_de_personal,
     es_cuenta_restringida,
@@ -252,3 +254,49 @@ def test_f135_r1_el_dominio_no_importa_infraestructura() -> None:
     assert "infrastructure" not in texto
     assert "psycopg" not in texto
     assert texto.splitlines()[0] == "# etl_sigrid/domain/restriccion_personal.py"
+
+
+# ===========================================================================
+# Review pasada 1, cambio 1: la cuenta que no resuelve en el plan, FALLA CERRADO
+# ===========================================================================
+
+
+def test_f135_r7_cuenta_sin_resolver_es_restringida_con_su_motivo() -> None:
+    """Un apunte con `cuenta_id` cuya cuenta no está en el plan (código NULL) no
+    se sabe si es de personal: se restringe (criterio de Juan, «restringe de
+    más»), con un motivo propio para poder contarlo aparte."""
+    apunte = ApunteContable(codigo_cuenta=None, clase_asiento="NORMAL", concepto="x", cuenta_id=465)
+    assert cuenta_sin_resolver(apunte)
+    assert motivo_restriccion(apunte, asiento_es_personal=False) == MOTIVO_CUENTA_SIN_RESOLVER
+    assert motivo_restriccion(apunte, asiento_es_personal=True) == MOTIVO_CUENTA_SIN_RESOLVER
+    assert es_apunte_restringido(apunte, asiento_es_personal=False)
+    assert MOTIVO_CUENTA_SIN_RESOLVER == "CUENTA_SIN_RESOLVER"
+
+
+def test_f135_r7_sin_cuenta_no_es_cuenta_sin_resolver() -> None:
+    """`cueide = 0` (cuenta_id NULL, 294 apuntes de importe cero) NO es eso: no
+    hay cuenta que resolver."""
+    apunte = ApunteContable(codigo_cuenta=None, clase_asiento="NORMAL", concepto=None, cuenta_id=None)
+    assert not cuenta_sin_resolver(apunte)
+    assert motivo_restriccion(apunte, asiento_es_personal=False) is None
+    resuelta = ApunteContable(codigo_cuenta="5720000001", clase_asiento="NORMAL", concepto=None, cuenta_id=7)
+    assert not cuenta_sin_resolver(resuelta)
+    assert motivo_restriccion(resuelta, asiento_es_personal=False) is None
+
+
+def test_f135_r2_cuenta_sin_resolver_hace_ap_al_asiento() -> None:
+    """Falla cerrado también en el asiento: la cuenta podría ser una 465, y su
+    banco no puede quedar visible (lo que reprodujo el reviewer)."""
+    sin_resolver = ApunteContable(codigo_cuenta=None, clase_asiento="NORMAL", concepto="pago", cuenta_id=9)
+    banco = ApunteContable(codigo_cuenta="5720000001", clase_asiento="NORMAL", concepto="pago", cuenta_id=8)
+    assert es_asiento_de_personal([sin_resolver, banco])
+    assert motivo_restriccion(banco, asiento_es_personal=True) == MOTIVO_ASIENTO_PERSONAL
+    # en un asiento no NORMAL, la propia cuenta se restringe igual, pero el asiento no es AP
+    cierre = ApunteContable(codigo_cuenta=None, clase_asiento="CIERRE", concepto="x", cuenta_id=9)
+    assert not es_asiento_de_personal([cierre])
+    assert motivo_restriccion(cierre, asiento_es_personal=False) == MOTIVO_CUENTA_SIN_RESOLVER
+
+
+def test_f135_r7_el_constructor_de_siempre_sigue_valiendo() -> None:
+    """`cuenta_id` es opcional: sin él, el apunte se juzga como antes."""
+    assert ApunteContable("6400000001", "NORMAL", None).cuenta_id is None

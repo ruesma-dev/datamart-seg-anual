@@ -1119,7 +1119,7 @@ CONTRATO_SQL: dict[str, list[tuple[bool, list[str], list[str]]]] = {
                 'LEFT JOIN contabilidad_restringida.plan_cuentas pa ON pa.cuenta_id = f.cuenta_id',
                 'WHERE f.asiento_id IS NOT NULL',
                 'GROUP BY f.asiento_id',
-                "HAVING bool_and(f.clase_bruta = 'NORMAL') AND bool_or(pa.codigo_cuenta ~ \'^(640|641|642|643|644|645|649|465|466|476|460|461|544|4753)\' OR f.concepto ~* \'\\mn[oóÓ]minas?\\M\')",
+                "HAVING bool_and(f.clase_bruta = 'NORMAL') AND bool_or(COALESCE(pa.codigo_cuenta ~ \'^(640|641|642|643|644|645|649|465|466|476|460|461|544|4753)\', f.cuenta_id IS NOT NULL) OR f.concepto ~* \'\\mn[oóÓ]minas?\\M\')",
             ],
         ),
         (
@@ -1129,7 +1129,7 @@ CONTRATO_SQL: dict[str, list[tuple[bool, list[str], list[str]]]] = {
                 'pc.codigo_cuenta',
                 'pc.nombre_cuenta',
                 'pc.clave_cuenta',
-                "COALESCE(pc.codigo_cuenta ~ \'^(640|641|642|643|644|645|649|465|466|476|460|461|544|4753)\', FALSE) AS es_cuenta_restringida",
+                "COALESCE(pc.codigo_cuenta ~ \'^(640|641|642|643|644|645|649|465|466|476|460|461|544|4753)\', s.cuenta_id IS NOT NULL) AS es_cuenta_restringida",
                 '(ap.asiento_id IS NOT NULL) AS es_asiento_personal',
             ],
             [
@@ -1171,7 +1171,7 @@ CONTRATO_SQL: dict[str, list[tuple[bool, list[str], list[str]]]] = {
                 's.tercero_id',
                 'ter.res AS tercero_nombre',
                 '(s.es_cuenta_restringida OR s.es_asiento_personal) AS restringido',
-                "CASE WHEN s.es_cuenta_restringida THEN 'CUENTA' WHEN s.es_asiento_personal THEN 'ASIENTO_PERSONAL' END AS motivo_restriccion",
+                "CASE WHEN s.es_cuenta_restringida AND s.codigo_cuenta IS NULL THEN 'CUENTA_SIN_RESOLVER' WHEN s.es_cuenta_restringida THEN 'CUENTA' WHEN s.es_asiento_personal THEN 'ASIENTO_PERSONAL' END AS motivo_restriccion",
                 'CASE WHEN s.es_cuenta_restringida OR s.es_asiento_personal THEN NULL ELSE SUM(s.importe_saldo) FILTER ( WHERE NOT (s.es_cuenta_restringida OR s.es_asiento_personal) ) OVER ( PARTITION BY s.cuenta_id ORDER BY s.fecha, s.codigo_asiento, s.posicion, s.apunte_id ) END::NUMERIC(18, 2) AS saldo_acumulado_visible',
             ],
             [

@@ -231,7 +231,7 @@ infraestructura.
 > que solo lee el rol autorizado `sigrid_dm_restringido_ro`-- y
 > `contabilidad.apuntes_restringidos_mes` (cuánto falta en la general, solo
 > recuentos). El inventario sube de 208 a **212 objetos**, las columnas
-> descritas de 1624 a **1698** (20 + 33 + 13 del completo; 1 + 2 + 5 de la
+> descritas de 1624 a **1699** (20 + 33 + 13 del completo; 1 + 2 + 6 de la
 > general) y las fichas de consumo en cuatro.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
