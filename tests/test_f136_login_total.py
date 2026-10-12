@@ -714,3 +714,134 @@ def test_f136_r12_r19_la_cabecera_explica_el_total_y_el_uso_nuevo() -> None:
     cabecera = _roles_crudo().split("\\set ON_ERROR_STOP on")[0]
     for texto in (TOTAL, "TOTAL_PWD", "\\getenv", "2026-10-12", "-X -v ON_ERROR_STOP=1 -f"):
         assert texto in cabecera, f"la cabecera no cita {texto}"
+
+
+# ===========================================================================
+# R20-R21 · psql con las opciones DELANTE y sin contraseñas con -v (T6)
+# ===========================================================================
+
+PROVISION = RAIZ / "infra" / "15_provision_db.ps1"
+RUNBOOK = RAIZ / "docs" / "runbook_postgres_azure.md"
+
+
+def _unir_continuaciones(lineas: list[str]) -> list[str]:
+    """Une las líneas partidas con `\\` (bash) o con acento grave (PowerShell)."""
+    unidas: list[str] = []
+    actual = ""
+    for linea in lineas:
+        cuerpo = linea.rstrip()
+        if cuerpo.endswith("\\") or cuerpo.endswith("`"):
+            actual += cuerpo[:-1] + " "
+            continue
+        unidas.append(actual + cuerpo)
+        actual = ""
+    if actual:
+        unidas.append(actual)
+    return unidas
+
+
+def _codigo_del_runbook() -> list[str]:
+    lineas: list[str] = []
+    dentro = False
+    for linea in RUNBOOK.read_text(encoding="utf-8").splitlines():
+        if linea.lstrip().startswith("```"):
+            dentro = not dentro
+            continue
+        if dentro and not linea.lstrip().startswith("#"):
+            lineas.append(linea)
+    return _unir_continuaciones(lineas)
+
+
+def _codigo_de_provision() -> list[str]:
+    lineas = [
+        linea for linea in PROVISION.read_text(encoding="utf-8-sig").splitlines()
+        if not linea.lstrip().startswith("#")
+    ]
+    return _unir_continuaciones(lineas)
+
+
+def _uso_de_02_roles() -> list[str]:
+    return [
+        linea.lstrip("- ").strip() for linea in _roles_crudo().splitlines()
+        if linea.startswith("--") and linea.lstrip("- ").startswith("psql ")
+    ]
+
+
+def _llamadas_psql(lineas: list[str]) -> list[str]:
+    import re
+
+    return [
+        linea[m.start(1):] for linea in lineas
+        for m in [re.search(r"(?:^|[\s(;&|{])(psql(?:\.exe)?)\s", linea)] if m
+    ]
+
+
+#: la cadena de conexión: literal entre comillas o una variable `$dsn...`
+_CADENA = r"(\"host=[^\"]*\"|\"?\$dsn\w*\"?)"
+
+
+def _opciones_tras_la_cadena(llamada: str) -> str | None:
+    """Lo que venga DETRÁS de la cadena de conexión con pinta de opción, o None."""
+    import re
+
+    m = re.search(_CADENA, llamada)
+    if not m:
+        return None
+    resto = llamada[m.end():]
+    # el final de la llamada: tubería, redirección, separador o cierre de bloque
+    resto = re.split(r"\s[|;}>]|\s*#|\s2>", resto)[0]
+    opcion = re.search(r"(?:^|\s)(-{1,2}[A-Za-z][\w-]*)", resto)
+    return opcion.group(1) if opcion else ""
+
+
+@pytest.mark.parametrize(
+    "origen", ["runbook", "15_provision_db.ps1", "02_roles.sql"],
+)
+def test_f136_r20_psql_con_las_opciones_antes_de_la_cadena(origen: str) -> None:
+    lineas = {
+        "runbook": _codigo_del_runbook,
+        "15_provision_db.ps1": _codigo_de_provision,
+        "02_roles.sql": _uso_de_02_roles,
+    }[origen]()
+    llamadas = _llamadas_psql(lineas)
+    assert llamadas, f"{origen}: no se encontró ninguna llamada a psql"
+    for llamada in llamadas:
+        if llamada.split()[1:2] == ["--version"]:
+            continue
+        tras = _opciones_tras_la_cadena(llamada)
+        assert tras is not None, f"{origen}: llamada sin cadena de conexión: {llamada}"
+        assert tras == "", f"{origen}: «{tras}» va detrás de la cadena: {llamada}"
+
+
+@pytest.mark.parametrize("ruta", [PROVISION, RUNBOOK, ROLES_SQL])
+def test_f136_r20_ninguna_contrasena_con_v(ruta: Path) -> None:
+    import re
+
+    texto = ruta.read_text(encoding="utf-8-sig")
+    assert not re.search(r"-v\s+\w*pwd", texto, re.IGNORECASE), ruta.name
+    assert not re.search(r"-v\s+\w*(password|clave)", texto, re.IGNORECASE), ruta.name
+
+
+def test_f136_r20_el_detector_caza_la_incidencia() -> None:
+    """La forma del 2026-10-12 y la de `15_provision_db.ps1` antes de F-136."""
+    assert _opciones_tras_la_cadena('psql "host=h dbname=d" -v ON_ERROR_STOP=1 -f x.sql') == "-v"
+    assert _opciones_tras_la_cadena('psql "$dsnAdmin" -f (Join-Path $d "x.sql")') == "-f"
+    assert _opciones_tras_la_cadena('psql -X -c "SELECT 1" $dsnT') == ""
+    assert _opciones_tras_la_cadena('psql -X -f x.sql "host=h user=u"') == ""
+    assert _opciones_tras_la_cadena("psql -X -c 'SELECT 1'") is None
+    assert _llamadas_psql(["  & psql -X -f a $dsn"]) == ["psql -X -f a $dsn"]
+    assert _llamadas_psql(["el `psql` de Windows"]) == []
+    assert _unir_continuaciones(["psql -X `", "  -f a `", "  $dsn"]) == ["psql -X    -f a    $dsn"]
+
+
+def test_f136_r21_provision_exige_las_tres_y_no_las_pasa() -> None:
+    texto = PROVISION.read_text(encoding="utf-8-sig")
+    codigo = "\n".join(_codigo_de_provision())
+    for variable in ("APP_PWD", "MCP_PWD", "TOTAL_PWD"):
+        assert f"-not $env:{variable}" in codigo, f"-Ejecutar no exige {variable}"
+    for llamada in _llamadas_psql(_codigo_de_provision()):
+        assert "PWD" not in llamada.upper(), (
+            f"la contraseña llega a psql por herencia del entorno, no por argumento: {llamada}"
+        )
+        assert llamada.startswith("psql -X "), f"sin -X (psqlrc) : {llamada}"
+    assert TOTAL in texto, "el rótulo de roles nombra el total"

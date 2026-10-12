@@ -86,8 +86,9 @@ az monitor metrics list \
   --resource $(az postgres flexible-server show -g rg-albaranes-dev -n psql-albaranes-rs9k2 --query id -o tsv) \
   --metric storage_percent --interval PT1H -o table
 
-psql "host=psql-albaranes-rs9k2.postgres.database.azure.com dbname=postgres user=<admin> sslmode=require" \
-     -f infra/sql/03_diagnostico.sql
+# psql: opciones DELANTE y la cadena de conexión al final (F-136)
+psql -X -f infra/sql/03_diagnostico.sql \
+     "host=psql-albaranes-rs9k2.postgres.database.azure.com dbname=postgres user=<admin> sslmode=require"
 ```
 
 **Si quedan menos de 14 GB libres, PARA.** 12 GB de proyección más 2 GB de
@@ -99,24 +100,48 @@ Ampliar almacenamiento es irreversible.
 Ninguna contraseña se escribe en el repositorio, ni en `specs/`, ni en
 `progress/`, ni en `.env.example`, ni en un `.ps1`.
 
-```bash
-# Generar y guardar en Key Vault (ajusta el nombre del vault)
-az keyvault secret set --vault-name <kv> --name pg-sigrid-dm-app --value "$(openssl rand -base64 32)"
-az keyvault secret set --vault-name <kv> --name pg-mcp-sigrid-dm-ro --value "$(openssl rand -base64 32)"
+Desde F-136 (2026-10-13) se generan y se cargan en **Windows PowerShell 5.1**,
+sin que el valor pase nunca por la pantalla. Para ROTARLAS, o para dar de alta
+el login total, el procedimiento completo es el de la **§12**.
 
-# Recuperarlas a variables de entorno de ESTA sesión, para el paso siguiente
-export APP_PWD=$(az keyvault secret show --vault-name <kv> --name pg-sigrid-dm-app --query value -o tsv)
-export MCP_PWD=$(az keyvault secret show --vault-name <kv> --name pg-mcp-sigrid-dm-ro --query value -o tsv)
+```powershell
+# Clave de 64 caracteres hexadecimales: sin + / = ' que rompan una cadena o el .env
+function Nueva-Clave {
+    $b = New-Object byte[] 32
+    [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b)
+    ($b | ForEach-Object { $_.ToString("x2") }) -join ""
+}
+$kv = "kv-datamart-seg-dev"
+$q = @("--query", "value", "-o", "tsv")
+
+# Guardar en Key Vault: SIEMPRE con -o none, o la CLI devuelve el valor
+$v = Nueva-Clave
+az keyvault secret set --vault-name $kv --name pg-sigrid-dm-app --value $v -o none
+$v = Nueva-Clave
+az keyvault secret set --vault-name $kv --name pg-mcp-sigrid-dm-ro --value $v -o none
+$v = $null
+
+# Releerlas a variables de entorno de ESTA sesión, sin imprimirlas: 02_roles.sql
+# las lee con \getenv. TOTAL_PWD, del vault del MCP (§12).
+$env:APP_PWD = az keyvault secret show --vault-name $kv --name pg-sigrid-dm-app @q
+$env:MCP_PWD = az keyvault secret show --vault-name $kv --name pg-mcp-sigrid-dm-ro @q
+$env:TOTAL_PWD = az keyvault secret show --vault-name kv-mcp-bbdd-dev --name pg-password-total @q
 ```
 
-Dos avisos que no son formalismo:
+Tres avisos que no son formalismo:
 
-- `ALTER ROLE ... PASSWORD` puede quedar en el log del servidor si
-  `log_statement` está en `all`. Por eso las contraseñas van por **variable de
-  psql desde un fichero**, nunca escritas en la línea de comandos, y por eso
-  conviene comprobar el valor de `log_statement` antes (no cambiarlo: es
-  parámetro de servidor).
-- La contraseña del MCP **la custodia F-006**. Aquí solo se crea el rol.
+- **`psql` con las opciones DELANTE de la cadena de conexión.** En Windows deja
+  de leer opciones en cuanto encuentra la cadena: las de detrás las ignora y
+  las imprime. Así se expusieron dos contraseñas el 2026-10-12, cuando
+  viajaban con `-v`. Desde F-136 ninguna contraseña va en la línea de órdenes:
+  `02_roles.sql` las lee del entorno con `\getenv` (psql 15 o posterior).
+- `ALTER ROLE ... PASSWORD` puede quedar en el log del servidor: con
+  `log_statement = none` (medido el 2026-10-12) uno correcto no llega, pero con
+  `log_min_error_statement = error` uno que FALLE sí deja su texto. Por eso
+  `02_roles.sql` comprueba antes lo que haría fallar (su guarda) y no se
+  cambia ningún parámetro: son de servidor.
+- Cada variable es opcional: la que no esté definida deja la contraseña de su
+  login SIN CAMBIOS. Solo hace falta la de un login que aún no existe.
 
 ## 5. Crear la base y los roles
 
@@ -138,17 +163,19 @@ $env:PG_ADMIN_USER = "<admin del servidor>"
 O directamente con `psql`:
 
 ```bash
-psql "host=<host> dbname=postgres user=<admin> sslmode=require" \
-     -v ON_ERROR_STOP=1 -f infra/sql/01_create_database.sql
-psql "host=<host> dbname=sigrid_dm user=<admin> sslmode=require" \
-     -v ON_ERROR_STOP=1 -v app_pwd="$APP_PWD" -v mcp_pwd="$MCP_PWD" \
-     -f infra/sql/02_roles.sql
+# Opciones DELANTE, cadena al final; las contraseñas, del entorno (\getenv)
+psql -X -v ON_ERROR_STOP=1 -f infra/sql/01_create_database.sql \
+     "host=<host> dbname=postgres user=<admin> sslmode=require"
+psql -X -v ON_ERROR_STOP=1 -f infra/sql/02_roles.sql \
+     "host=<host> dbname=sigrid_dm user=<admin> sslmode=require"
 ```
 
-Qué debe salir: `sigrid_dm` con propietario `sigrid_dm_etl`, los tres roles,
-`sigrid_dm_app` dentro de `sigrid_dm_etl`, y **los once esquemas** (`raw`,
+Qué debe salir: `sigrid_dm` con propietario `sigrid_dm_etl`, una línea
+`<login>: contraseña fijada` (o `SIN CAMBIOS`) por login, los cinco roles,
+`sigrid_dm_app` dentro de `sigrid_dm_etl`, **los trece esquemas** (`raw`,
 `stg`, `aux`, `mart`, `_meta`, `cierre`, `compras`, `maestro`,
-`retenciones`, `personal`, `contabilidad`).
+`retenciones`, `personal`, `contabilidad`, `contabilidad_restringida`,
+`descompuestos`) y las comprobaciones de F-135 y F-136 del punto 6.
 
 **Comprobación obligatoria después**: que `albaranes` y `partes` siguen
 conectando y que el listado de reglas de firewall es **exactamente** el de
@@ -332,7 +359,7 @@ sin ese último `apply-grants` el MCP se queda sin ver esas cuatro capas.
 
 ```bash
 python main.py timings --last 1
-psql "host=<host> dbname=sigrid_dm user=<admin> sslmode=require" -f infra/sql/03_diagnostico.sql
+psql -X -f infra/sql/03_diagnostico.sql "host=<host> dbname=sigrid_dm user=<admin> sslmode=require"
 ```
 
 Escribe `progress/medicion_carga_inicial.md` con la tabla de tiempos por paso,
@@ -382,13 +409,13 @@ columnas ausentes.
 ## 11. Comprobación de la frontera de seguridad
 
 ```bash
-# El rol del MCP no puede escribir
-psql "host=<host> dbname=sigrid_dm user=mcp_sigrid_dm_ro sslmode=require" \
-     -c "INSERT INTO mart.fact_seguimiento_mensual VALUES (1);"   # permission denied
+# El rol del MCP no puede escribir (opciones DELANTE de la cadena, F-136)
+psql -X -c "INSERT INTO mart.fact_seguimiento_mensual VALUES (1);" \
+     "host=<host> dbname=sigrid_dm user=mcp_sigrid_dm_ro sslmode=require"   # permission denied
 
 # Ni leer datos de las otras bases
-psql "host=<host> dbname=albaranes user=mcp_sigrid_dm_ro sslmode=require" \
-     -c "\dt"    # conecta (ver §5 bis) pero ninguna tabla debe ser legible
+psql -X -c "\dt" \
+     "host=<host> dbname=albaranes user=mcp_sigrid_dm_ro sslmode=require"   # conecta (§5 bis), nada legible
 ```
 
 **Alcance de lectura**: por decisión del humano del 2026-08-08 el MCP lee
