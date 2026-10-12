@@ -2122,6 +2122,24 @@
       "rigor": "critico",
       "priority": 1,
       "branch": "feature/F-135-restringir-personal-contabilidad"
+    },
+    {
+      "id": "F-136",
+      "title": "Usuario de base de acceso TOTAL para el MCP (mcp_sigrid_dm_total) y rotación de las contraseñas expuestas",
+      "description": "Nace el 2026-10-12, el día del despliegue de F-135. El humano fija quién ve la contabilidad completa: «tenemos que tener rol total juan, antonio de vicente y yo pablo gris. el resto el standar», y «total no incluye raw. siempre fuera». Hoy el MCP sabe quién pregunta (Entra, oid y UPN) pero conecta siempre con `mcp_sigrid_dm_ro`, así que los tres ven la contabilidad general (ver progress/explore_identidad_mcp.md). La solución tiene dos mitades: ESTA (el usuario de base) y la F-008 de `mcp-bbdd` (dos conexiones y la elección por identidad, con la lista de oid en la configuración del contenedor). AQUÍ: (1) login `mcp_sigrid_dm_total` en `infra/sql/02_roles.sql`, miembro de `mcp_sigrid_dm_ro` y de `sigrid_dm_restringido_ro`: lee lo mismo que el estándar más `contabilidad_restringida`, y NUNCA `raw`; contraseña solo en Key Vault (la del MCP, `kv-mcp-bbdd-dev`); (2) `apply-grants` verifica cada noche en el catálogo que el total no lee `raw` y que el estándar sigue sin leer lo vetado (fail-closed, FAILED con la lista); (3) ROTACIÓN de las contraseñas de `sigrid_dm_app` y `mcp_sigrid_dm_ro`, expuestas el 2026-10-12 en la terminal y en la conversación al lanzar `02_roles.sql` (incidencia en progress/current.md): valores nuevos en `kv-datamart-seg-dev` (`pg-sigrid-dm-app`, `pg-mcp-sigrid-dm-ro`) y `kv-mcp-bbdd-dev/pg-password`, `02_roles.sql`, reiniciar el MCP, credencial de Power BI y .env local del humano; procedimiento MANUAL con `psql` en Windows con las OPCIONES ANTES de la cadena de conexión (si no, las ignora y las imprime). Power BI (informes publicados o Desktop de los tres) queda para F-087 según responda el humano.",
+      "acceptance": [
+        "Existe el login mcp_sigrid_dm_total (LOGIN, NOSUPERUSER, NOCREATEDB, NOCREATEROLE), miembro de mcp_sigrid_dm_ro y de sigrid_dm_restringido_ro, creado por infra/sql/02_roles.sql de forma idempotente y sin contraseña en ningún fichero",
+        "Prueba NEGATIVA real con el login total: permission denied en raw (apu, pag, asi, rac, hmores); prueba POSITIVA: lee contabilidad_restringida.mayor (recuento = raw.apu medido con el ETL) y contabilidad.mayor",
+        "apply-grants comprueba en el catálogo que mcp_sigrid_dm_total no lee raw y que mcp_sigrid_dm_ro no lee raw ni contabilidad_restringida; si alguno lo lee, FAILED con la lista; la nocturna no lo deshace",
+        "Rotación de las contraseñas de sigrid_dm_app y mcp_sigrid_dm_ro hecha y verificada (job, MCP y Power BI conectan tras el cambio), con un procedimiento MANUAL que nunca imprime una contraseña",
+        "azure-apps/datamart_seg_anual.md y el diccionario (si cambia algo publicado) actualizados en el mismo trabajo",
+        "bash harness/init.sh en verde"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "critico",
+      "priority": 1,
+      "branch": "feature/F-136-usuario-mcp-total"
     }
   ]
 }
