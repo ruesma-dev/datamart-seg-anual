@@ -543,3 +543,174 @@ def test_f136_paso_sin_nombres_a_mano_y_docstring() -> None:
         assert campo in codigo
     doc = apply_grants_step.__doc__ or ""
     assert "F-136" in doc and "total" in doc
+
+
+# ===========================================================================
+# R12-R19 · infra/sql/02_roles.sql (T5): contrato textual. La prueba con
+# PostgreSQL 16 real y el psql.exe de Windows está en impl_F-136.md (T10).
+# ===========================================================================
+
+ROLES_SQL = RAIZ / "infra" / "sql" / "02_roles.sql"
+LOGINS = (("sigrid_dm_app", "app_pwd", "APP_PWD"), (ESTANDAR, "mcp_pwd", "MCP_PWD"),
+          (TOTAL, "total_pwd", "TOTAL_PWD"))
+
+
+def _roles_crudo() -> str:
+    return ROLES_SQL.read_text(encoding="utf-8")
+
+
+def _roles_sql() -> str:
+    """El fichero sin las líneas de comentario: una cita no ejecuta nada."""
+    return "\n".join(
+        linea for linea in _roles_crudo().splitlines() if not linea.lstrip().startswith("--")
+    )
+
+
+def test_f136_r12_crea_el_total_login_idempotente() -> None:
+    sql = _roles_sql()
+    assert (
+        f"SELECT 'CREATE ROLE {TOTAL} LOGIN'\n"
+        f"WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{TOTAL}')\n\\gexec"
+    ) in sql
+    assert f"ALTER ROLE {TOTAL} WITH LOGIN NOCREATEDB NOCREATEROLE;" in sql
+    assert "NOSUPERUSER" not in sql, "Azure no lo admite: CREATE ROLE ya lo da"
+
+
+def test_f136_r12_la_comprobacion_final_mira_rolsuper_de_los_cinco() -> None:
+    import re
+
+    sql = _roles_sql()
+    consulta = re.search(r"SELECT rolname, rolcanlogin, rolsuper.*?;", sql, re.DOTALL)
+    assert consulta
+    roles = set(re.findall(r"'(\w+)'", consulta.group(0)))
+    assert roles == {DUENO, "sigrid_dm_app", ESTANDAR, AUTORIZADO, TOTAL}
+
+
+def _tramo_transaccion(sql: str) -> tuple[int, int]:
+    return sql.index("\nBEGIN;"), sql.index("\nCOMMIT;")
+
+
+def test_f136_r13_las_dos_pertenencias_como_administrador_en_la_transaccion() -> None:
+    sql = _roles_sql()
+    apertura, cierre = _tramo_transaccion(sql)
+    for grupo in (ESTANDAR, AUTORIZADO):
+        sentencia = f"GRANT {grupo} TO {TOTAL} WITH INHERIT TRUE, SET FALSE;"
+        assert sql.count(sentencia) == 1, f"falta: {sentencia}"
+        pos = sql.index(sentencia)
+        assert apertura < pos < cierre, "fuera de la transacción"
+        antes = sql[:pos]
+        assert antes.rindex("RESET ROLE;") > antes.rindex("SET ROLE sigrid_dm_etl;"), (
+            "como el ADMINISTRADOR, que tiene ADMIN OPTION; sigrid_dm_etl no"
+        )
+        ultimo_veto = antes.rfind(f"FROM {TOTAL}")
+        assert ultimo_veto != -1, "después del veto del 5 ter: nunca hereda un raw abierto"
+
+
+def test_f136_r14_raw_vetado_al_total_con_los_dos_concedentes() -> None:
+    import re
+
+    from config.settings import DEFAULT_TOTAL_VETOED_SCHEMAS
+
+    sql = _roles_sql()
+    listas = re.findall(r"FOREACH vetado_total IN ARRAY ARRAY\[(.*?)\]", sql, re.DOTALL)
+    assert len(listas) == 2, "una vez como administrador y otra como sigrid_dm_etl"
+    for lista in listas:
+        assert re.findall(r"'(\w+)'", lista) == DEFAULT_TOTAL_VETOED_SCHEMAS.split(",")
+    for sentencia in (
+        f"REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA %I FROM {TOTAL}",
+        f"REVOKE ALL PRIVILEGES ON SCHEMA %I FROM {TOTAL}",
+    ):
+        assert sql.count(sentencia) == 2, f"«{sentencia}» con los dos concedentes"
+    assert sql.count(f"REVOKE ALL ON TABLES FROM {TOTAL}") == 1, "privilegio por defecto, como dueño"
+    assert sql.count("IF to_regnamespace(vetado_total) IS NOT NULL THEN") == 2
+    apertura, cierre = _tramo_transaccion(sql)
+    posiciones = [m.start() for m in re.finditer(r"FOREACH vetado_total IN ARRAY", sql)]
+    assert all(apertura < p < cierre for p in posiciones)
+    assert "FOREACH vetado_total IN ARRAY" in sql.split("SET ROLE sigrid_dm_etl;")[-1]
+
+
+def test_f136_r15_ningun_grant_al_total_salvo_las_pertenencias() -> None:
+    import re
+
+    sql = _roles_sql()
+    concesiones = re.findall(rf"GRANT\b[^;]*?\bTO\s+{TOTAL}\b[^;]*;", sql)
+    assert concesiones == [
+        f"GRANT {ESTANDAR} TO {TOTAL} WITH INHERIT TRUE, SET FALSE;",
+        f"GRANT {AUTORIZADO} TO {TOTAL} WITH INHERIT TRUE, SET FALSE;",
+    ]
+    assert not re.search(rf"\bTO\s+{TOTAL}\b'", sql), "ni dentro de un format() de un DO"
+
+
+def test_f136_r16_contrasenas_por_getenv_y_silencio_antes() -> None:
+    sql = _roles_sql()
+    primera = sql.index("PASSWORD")
+    for orden in ("\\set ECHO none", "\\set VERBOSITY terse", "\\set SHOW_CONTEXT never",
+                  "\\set ON_ERROR_STOP on"):
+        assert orden in sql and sql.index(orden) < primera, f"{orden} antes de la primera contraseña"
+    for _, variable, entorno in LOGINS:
+        linea = f"\\getenv {variable} {entorno}"
+        assert linea in sql and sql.index(linea) < primera
+
+
+def test_f136_r16_la_cabecera_no_pasa_contrasenas_con_v() -> None:
+    import re
+
+    assert not re.search(r"-v\s+\w*_?pwd", _roles_crudo(), re.IGNORECASE)
+
+
+def test_f136_r17_cada_contrasena_es_opcional_y_se_anuncia_sin_valor() -> None:
+    sql = _roles_sql()
+    for login, variable, _ in LOGINS:
+        bloque = (
+            f"\\if :{{?{variable}}}\n"
+            f"ALTER ROLE {login} WITH LOGIN PASSWORD :'{variable}';\n"
+            f"\\echo '{login}: contraseña fijada'\n"
+            "\\else\n"
+            f"\\echo '{login}: contraseña SIN CAMBIOS'\n"
+            "\\endif"
+        )
+        assert bloque in sql, f"falta el bloque de {login}"
+        assert sql.count(f"PASSWORD :'{variable}'") == 1
+    assert sql.count("PASSWORD") == 3, "ninguna otra sentencia con contraseña"
+
+
+def test_f136_r18_guarda_antes_de_crear_nada() -> None:
+    sql = _roles_sql()
+    primera_escritura = min(sql.index("CREATE ROLE"), sql.index("ALTER ROLE"))
+    guarda = sql.index("\\gset")
+    assert guarda < primera_escritura
+    for login, variable, entorno in LOGINS:
+        clave = f"falta_{variable.removesuffix('_pwd')}"
+        assert f"NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{login}') AS {clave}" in sql
+        bloque = (
+            f"\\if :{clave}\n"
+            f"\\if :{{?{variable}}}\n"
+            "\\else\n"
+            f"DO $$ BEGIN RAISE EXCEPTION 'F-136: {login} no existe y falta {entorno} "
+            "en el entorno (runbook §12)'; END $$;\n"
+            "\\endif\n"
+            "\\endif"
+        )
+        assert bloque in sql, f"falta la guarda de {login}"
+        assert sql.index(bloque) < primera_escritura
+
+
+def test_f136_r19_comprobacion_final_del_total() -> None:
+    sql = _roles_sql()
+    final = sql.split("\nCOMMIT;", 1)[1]
+    assert (
+        "FROM pg_auth_members AS m\n"
+        "JOIN pg_roles AS r ON r.oid = m.member\n"
+        "JOIN pg_roles AS g ON g.oid = m.roleid\n"
+        f"WHERE r.rolname = '{TOTAL}'"
+    ) in final
+    for esquema in ("raw", RESTR, "contabilidad"):
+        assert f"has_schema_privilege('{TOTAL}', '{esquema}', 'USAGE')" in final
+    assert f"has_database_privilege('{TOTAL}', current_database(), 'CONNECT')" in final
+    assert f"WHERE grantee = '{TOTAL}'" in final
+
+
+def test_f136_r12_r19_la_cabecera_explica_el_total_y_el_uso_nuevo() -> None:
+    cabecera = _roles_crudo().split("\\set ON_ERROR_STOP on")[0]
+    for texto in (TOTAL, "TOTAL_PWD", "\\getenv", "2026-10-12", "-X -v ON_ERROR_STOP=1 -f"):
+        assert texto in cabecera, f"la cabecera no cita {texto}"
