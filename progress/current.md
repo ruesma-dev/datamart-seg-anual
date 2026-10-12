@@ -9,6 +9,20 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-12 · F-136 · SPEC ESCRITA (spec-author), pendiente de aprobación del humano
+
+> Rama `feature/F-136-usuario-mcp-total`. Spec en `specs/F-136-usuario-mcp-total/`, informe y
+> mediciones (solo lectura en Azure) en `progress/spec_F-136.md`.
+
+- Login `mcp_sigrid_dm_total` (miembro del estándar y del autorizado, `raw` vetado), verificado
+  cada noche por `apply_grants`; `02_roles.sql` con `\getenv` y contraseñas opcionales; runbook
+  §12 con la rotación + alta en una sola sesión (vault primero, nunca un valor en pantalla).
+- Hallazgo: `infra/15_provision_db.ps1` y el runbook llaman a `psql` con la cadena de conexión
+  DELANTE (el mismo fallo de la incidencia); R20 lo corrige y lo fija con un test.
+- **Decisiones abiertas para el humano: D1-D14** (design §8; resumen en `spec_F-136.md` §3).
+  Sobre todo D6 (`\getenv`), D7 (contraseñas opcionales), D10 (orden: imagen → rotación de día
+  → nocturna → F-008) y D12 (borrar `.env.azure.bak` y las copias de `kv-albaranes-rs9k2`).
+
 ## 2026-10-12 · F-135 · CERRADA (`done`, APROBADO en pasada 2) · DESPLEGADA el 12-10 (`r20261012-1945`, diccionario v49)
 
 > Merge en `main` `adec1c8` (y espejo en `dev`). Orden del humano: «despliega ya». El
