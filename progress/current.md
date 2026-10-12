@@ -36,10 +36,26 @@
 - **Diccionario v49** publicado (212 objetos, 1.699 columnas, 22 reglas, hash `0b3b980fd848`),
   `check-diccionario` OK, MCP reiniciado (`ca-mcp-bbdd-dev--0000014`); `contexto_bbdd` sirve
   la v49 con `R-CONTABILIDAD-RESTRINGIDA`.
-- **Pendiente del HUMANO**: `infra/sql/02_roles.sql` como administrador (crea
-  `sigrid_dm_restringido_ro`; hasta entonces solo el administrador y el dueño leen el
-  completo); prueba negativa con el login real `mcp_sigrid_dm_ro` (paso 8) y positiva (paso 9);
-  confirmar Power BI y `raw` (paso 1); D10 y D11 a Juan.
+- **MANUAL del humano, 12-10 por la noche (pasos 4, 8 y 9), TODO EN VERDE**:
+  `infra/sql/02_roles.sql` como administrador → `COMMIT`; 4 roles
+  (`sigrid_dm_restringido_ro` sin login), 13 esquemas, 0 filas en las dos consultas de
+  privilegios, `lee = f` en `contabilidad_restringida` y `raw`. Contraseñas pasadas con los
+  valores EN USO (job: `kv-datamart-seg-dev`; MCP: `kv-mcp-bbdd-dev`, que coincide con la copia
+  del datamart). **Negativa** con el login real `mcp_sigrid_dm_ro`: `permission denied for
+  schema` en `contabilidad_restringida.mayor`, `raw.apu`, `raw.pag`, `raw.asi`, `raw.rac` y
+  `raw.hmores`; `personal_visible = 0`, `mayor_general = 2.120.712`. **Positiva** (administrador
+  con `SET ROLE sigrid_dm_restringido_ro`, concedido y revocado en la misma sesión):
+  `completo = 2.176.231` (= `raw.apu`), `restringidos = 55.519`.
+- **INCIDENCIA (contraseñas expuestas)**: el primer intento de `02_roles.sql` puso las opciones
+  de `psql` detrás de la cadena de conexión; en Windows `psql` las ignora y las repite en el
+  aviso, y las contraseñas de `sigrid_dm_app` y `mcp_sigrid_dm_ro` quedaron en la terminal y en
+  la conversación (NO en el repositorio). El servidor tiene `AllowAzureServices`. **Recomendada
+  la rotación** (decisión del humano, propuesta para después de comprobar la nocturna del 13-10):
+  `02_roles.sql` con valores nuevos + `kv-datamart-seg-dev` (`pg-sigrid-dm-app`,
+  `pg-mcp-sigrid-dm-ro`) + `kv-mcp-bbdd-dev/pg-password` + reiniciar el MCP + credencial de los
+  conjuntos de datos de Power BI + `.env` local del humano.
+- **Pendiente del HUMANO**: confirmar Power BI y `raw` (paso 1, no comprobado antes del
+  despliegue); D10 y D11 a Juan; la rotación de arriba.
 - **Pendiente del LÍDER (13-10, T18)**: nocturna con la imagen nueva: `apply_grants` SUCCESS con
   `verificacion = ok`, duración total frente a ~4 h 40 min (margen al tope de 5 h) y repetir la
   comprobación de catálogo.
