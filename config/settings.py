@@ -94,10 +94,43 @@ class SigridApiSettings(BaseSettings):
 # F-097 añade `descompuestos` (de qué se compone cada partida, por origen). Con
 # él entran sus dos tablas de ESTADO (`_des_texto`, `_versiones_cargadas`), que
 # su ficha marca como no recomendadas para consumo.
+#
+# F-135 (2026-10-11) SACA `raw` (D3, variante A, aprobada por el humano): además
+# del mayor, `raw` trae 37.048 efectos de pago de nómina de 1.015 trabajadores
+# con su cuenta bancaria (`raw.pag`), los repartos analíticos de esos apuntes
+# (`raw.apa`), sus cabeceras (`raw.con`, `raw.asi`), `raw.rac` y `raw.hmores`.
+# El MCP ya no lo admitía en su lista blanca; Power BI no tiene lista blanca y
+# lo único que protegía `raw` era lo revocado. Ahora `raw` está además VETADO
+# (`DEFAULT_VETOED_SCHEMAS`, abajo): ponerlo de vuelta en esta lista hace FALLAR
+# `apply_grants` sin ejecutar nada (R17), en vez de reabrirlo en silencio.
 DEFAULT_CONSUMPTION_SCHEMAS = (
     "mart,cierre,compras,maestro,retenciones,personal,contabilidad,descompuestos,"
-    "raw,stg,aux,_meta"
+    "stg,aux,_meta"
 )
+
+# Esquemas que el rol GENERAL de lectura (`PG_READONLY_ROLE`, el del MCP y
+# Power BI) NO puede leer nunca (F-135). `apply_grants` emite cada noche, DESPUÉS
+# de todos los GRANT, `REVOKE` del esquema, de sus tablas y de su privilegio por
+# defecto, y luego COMPRUEBA en el catálogo que el rol ya no los lee (R18): si
+# los lee —por ejemplo por una concesión hecha por otro concedente, que la
+# nocturna no puede revocar (la lección de F-068)— el paso termina en FAILED.
+#
+#   contabilidad_restringida  la contabilidad COMPLETA, con los apuntes de
+#                             personal (nóminas, cuentas de trabajadores,
+#                             embargos): solo para el rol autorizado
+#   raw                       la copia literal de Sigrid, con todo lo anterior
+#                             y más (ver el comentario de arriba)
+#
+# Un esquema no puede estar a la vez aquí y en `DEFAULT_CONSUMPTION_SCHEMAS`.
+DEFAULT_VETOED_SCHEMAS = "contabilidad_restringida,raw"
+
+# El rol AUTORIZADO (F-135): grupo NOLOGIN que lee la contabilidad completa. Lo
+# crea `infra/sql/02_roles.sql`; quién es miembro lo decide Negocio (Juan
+# Romero, D8) y se da con `GRANT sigrid_dm_restringido_ro TO <login>`. Hoy no lo
+# usa ningún cliente: el MCP tendría que conectar con él según quién pregunta
+# (`mcp-bbdd`, su F-008) y Power BI necesita rol propio (F-087).
+DEFAULT_RESTRICTED_ROLE = "sigrid_dm_restringido_ro"
+DEFAULT_RESTRICTED_SCHEMAS = "contabilidad_restringida"
 
 # Tablas que el rol del MCP NO puede leer, aunque su esquema esté en la lista
 # de arriba. Formato `esquema.tabla`, separadas por comas.
@@ -143,6 +176,12 @@ DEFAULT_CONSUMPTION_SCHEMAS = (
 # a euros (F-061) y para saber quién estaba de alta cuándo; no entran al
 # alcance del MCP porque hoy no sabe quién pregunta. Mismo tapón TEMPORAL
 # y misma reversión ya decidida que `emp` y `res`.
+#
+# F-135 (2026-10-11): `raw` ya no está en la lista de consumo y además está
+# VETADO (`PG_VETOED_SCHEMAS`). Esta lista se conserva tal cual porque sigue
+# valiendo el día que `raw` vuelva, pero devolver `raw` al rol general exige
+# ahora TAMBIÉN deshacer F-135: sacarlo de los vetados y decidir antes qué pasa
+# con el mayor, los pagos de nómina y los repartos analíticos que trae.
 DEFAULT_EXCLUDED_TABLES = "raw.emp,raw.res,raw.reshor,raw.emphis"
 
 AUTH_MODES = ("password", "entra")
@@ -201,6 +240,22 @@ class PostgresSettings(BaseSettings):
                     "solo lectura NO puede leer aunque su esquema esté en "
                     "consumption_schemas. TEMPORAL (F-068): ver el comentario "
                     "de DEFAULT_EXCLUDED_TABLES.",
+    )
+    vetoed_schemas: str = Field(
+        DEFAULT_VETOED_SCHEMAS,
+        description="Esquemas, separados por comas, que el rol de solo lectura NO "
+                    "puede leer nunca (F-135): se le revocan cada noche y se "
+                    "comprueba en el catálogo. Ver DEFAULT_VETOED_SCHEMAS.",
+    )
+    restricted_role: str = Field(
+        DEFAULT_RESTRICTED_ROLE,
+        description="Rol AUTORIZADO (grupo NOLOGIN) que lee los esquemas "
+                    "restringidos (F-135). Si no existe, apply_grants avisa y sigue.",
+    )
+    restricted_schemas: str = Field(
+        DEFAULT_RESTRICTED_SCHEMAS,
+        description="Esquemas, separados por comas, que lee el rol autorizado. "
+                    "Todos tienen que estar también en vetoed_schemas.",
     )
     # --- Troceo del build de stg.plan_mensual (F-019) ----------------------
     # El 2026-08-09 ese build llenó el disco del servidor compartido (93,4 %) y
@@ -318,6 +373,16 @@ class PostgresSettings(BaseSettings):
     def excluded_table_list(self) -> list[str]:
         """`excluded_tables` como lista, sin blancos ni entradas vacías."""
         return [t.strip() for t in self.excluded_tables.split(",") if t.strip()]
+
+    @property
+    def vetoed_schema_list(self) -> list[str]:
+        """`vetoed_schemas` como lista, sin blancos ni entradas vacías (F-135)."""
+        return [s.strip() for s in self.vetoed_schemas.split(",") if s.strip()]
+
+    @property
+    def restricted_schema_list(self) -> list[str]:
+        """`restricted_schemas` como lista, sin blancos ni entradas vacías (F-135)."""
+        return [s.strip() for s in self.restricted_schemas.split(",") if s.strip()]
 
     @property
     def conninfo(self) -> str:

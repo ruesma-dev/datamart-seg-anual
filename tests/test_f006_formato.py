@@ -279,11 +279,12 @@ def test_f006_r4_son_doce_esquemas_y_estos() -> None:
     así que un esquema que entre o salga tiene que hacerlo por aquí y no en
     silencio.
     """
-    assert len(ESQUEMAS_DEL_DATAMART) == 12
+    # Trece desde F-135 (2026-10-11), que anadio `contabilidad_restringida`.
+    assert len(ESQUEMAS_DEL_DATAMART) == 13
     assert set(ESQUEMAS_DEL_DATAMART) == {
         "_meta", "raw", "stg", "aux", "mart",
         "cierre", "compras", "maestro", "retenciones", "personal",
-        "contabilidad", "descompuestos",
+        "contabilidad", "contabilidad_restringida", "descompuestos",
     }
 
 

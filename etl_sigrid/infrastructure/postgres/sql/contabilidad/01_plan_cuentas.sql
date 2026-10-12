@@ -1,11 +1,16 @@
 -- etl_sigrid/infrastructure/postgres/sql/contabilidad/01_plan_cuentas.sql
 -- ============================================================================
--- F-056 · SCHEMA contabilidad (2/4): EL PLAN DE CUENTAS COMO ARBOL
+-- F-056 · SCHEMA contabilidad (2/8): EL PLAN DE CUENTAS COMO ARBOL, COMPLETO
 --
 -- Construye:
---   contabilidad.plan_cuentas   una fila por nodo del plan FINANCIERO
+--   contabilidad_restringida.plan_cuentas   una fila por nodo del plan FINANCIERO
 --
 -- Lee de raw.con, raw.cua y raw.auxemp. Nada mas (R2).
+--
+-- F-135: es el plan COMPLETO, el de F-056 sin tocar una columna ni una cifra,
+-- en el esquema que solo lee el rol autorizado. El plan GENERAL
+-- (`contabilidad.plan_cuentas`, con los nombres de las cuentas restringidas
+-- enmascarados) sale de esta tabla en `04_plan_cuentas_general.sql`.
 --
 -- LO QUE EL DATO ES (medido el 2026-09-26; corrige lo que decia F-066)
 -- ---------------------------------------------------------------------------
@@ -47,8 +52,8 @@
 -- pre-agregada por `numemp`.
 -- ============================================================================
 
-DROP TABLE IF EXISTS contabilidad.plan_cuentas CASCADE;
-CREATE TABLE contabilidad.plan_cuentas AS
+DROP TABLE IF EXISTS contabilidad_restringida.plan_cuentas CASCADE;
+CREATE TABLE contabilidad_restringida.plan_cuentas AS
 WITH grupos AS (
     SELECT g.ide, g.emp, g.cod
     FROM raw.con g
@@ -118,10 +123,10 @@ LEFT JOIN grupos g2 ON g2.emp = n.empresa_id AND n.nivel >= 2 AND g2.cod = LEFT(
 LEFT JOIN grupos g3 ON g3.emp = n.empresa_id AND n.nivel >= 3 AND g3.cod = LEFT(n.codigo_cuenta, 3)
 LEFT JOIN grupos g4 ON g4.emp = n.empresa_id AND n.nivel >= 4 AND g4.cod = LEFT(n.codigo_cuenta, 4);
 
-ALTER TABLE contabilidad.plan_cuentas ADD PRIMARY KEY (cuenta_id);
+ALTER TABLE contabilidad_restringida.plan_cuentas ADD PRIMARY KEY (cuenta_id);
 -- R-CODIGO-POR-EMPRESA: el codigo solo es unico DENTRO de la empresa
-CREATE UNIQUE INDEX uq_con_plan_empresa_codigo ON contabilidad.plan_cuentas (empresa_id, codigo_cuenta);
-CREATE INDEX idx_con_plan_padre ON contabilidad.plan_cuentas (cuenta_padre_id);
+CREATE UNIQUE INDEX uq_con_plan_empresa_codigo ON contabilidad_restringida.plan_cuentas (empresa_id, codigo_cuenta);
+CREATE INDEX idx_con_plan_padre ON contabilidad_restringida.plan_cuentas (cuenta_padre_id);
 
-COMMENT ON TABLE contabilidad.plan_cuentas IS
-'F-056. El plan de cuentas FINANCIERO como arbol, una fila por nodo de las 38 empresas: grupos de raw.con tip 16 (niveles 1-4 por la longitud del codigo) y cuentas auxiliares de raw.cua (nivel 5, las unicas imputables). El padre es el grupo de la MISMA empresa cuyo codigo es el prefijo inmediato; el declarado de la auxiliar va aparte. (empresa_id, codigo_cuenta) es unico; el codigo solo no lo es. No es el plan analitico de maestro.cuentas_analiticas.';
+COMMENT ON TABLE contabilidad_restringida.plan_cuentas IS
+'F-056 y F-135. El plan COMPLETO, solo para el rol autorizado: el plan de cuentas FINANCIERO como arbol, una fila por nodo de las 38 empresas: grupos de raw.con tip 16 (niveles 1-4 por la longitud del codigo) y cuentas auxiliares de raw.cua (nivel 5, las unicas imputables). El padre es el grupo de la MISMA empresa cuyo codigo es el prefijo inmediato; el declarado de la auxiliar va aparte. (empresa_id, codigo_cuenta) es unico; el codigo solo no lo es. No es el plan analitico de maestro.cuentas_analiticas.';

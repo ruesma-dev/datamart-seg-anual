@@ -1,15 +1,35 @@
 # etl_sigrid/application/steps/build_contabilidad_step.py
 """
-Step que materializa el schema `contabilidad` (F-056): el plan de cuentas como
-árbol, el mayor y los saldos por cuenta y mes.
+Step que materializa la contabilidad (F-056): el plan de cuentas como árbol, el
+mayor y los saldos por cuenta y mes, en DOS esquemas desde F-135.
+
+* `contabilidad_restringida` — la contabilidad COMPLETA, la de F-056 sin tocar
+  una columna ni una cifra, más la marca de lo restringido. Solo la lee el grupo
+  `sigrid_dm_restringido_ro` (y el dueño y el administrador de la base).
+* `contabilidad` — la GENERAL, la que leen el MCP y Power BI: sin los apuntes de
+  PERSONAL (nóminas, cuentas de trabajadores, embargos; criterio en
+  `domain/restriccion_personal.py`), con las cuentas de personal enmascaradas en
+  el plan y con solo RECUENTOS de lo que falta, nunca importes.
 
 Encadena los archivos SQL en orden:
-    00_setup.sql              - schema y `contabilidad.fn_fecha`
-    01_plan_cuentas.sql       - el plan FINANCIERO como árbol (grupos de
-                                `con.tip = 16` y cuentas auxiliares de `cua`)
-    02_mayor.sql              - una fila por apunte de `raw.apu`, con la guarda
-                                que compara su recuento con el origen
-    03_saldos_cuenta_mes.sql  - cuenta x ejercicio x mes, desde el mayor
+    00_setup.sql                     - los dos esquemas y `contabilidad.fn_fecha`
+    01_plan_cuentas.sql              - restringida: el plan FINANCIERO como árbol
+                                       (grupos de `con.tip = 16` y auxiliares de `cua`)
+    02_mayor.sql                     - restringida: una fila por apunte de `raw.apu`,
+                                       con `restringido`, `motivo_restriccion`,
+                                       `saldo_acumulado_visible` y la guarda que
+                                       compara su recuento con el origen
+    03_saldos_cuenta_mes.sql         - restringida: cuenta x ejercicio x mes
+    04_plan_cuentas_general.sql      - general: el plan con las cuentas CR enmascaradas
+    05_mayor_general.sql             - general: solo lo visible, con su guarda (0 CR
+                                       y general + restringidos = completo)
+    06_saldos_general.sql            - general: saldos de lo visible + recuento de
+                                       lo que falta (`incompleto`)
+    07_apuntes_restringidos_mes.sql  - general: cuántos apuntes faltan por empresa y
+                                       mes, sin importes
+
+Los permisos NO van aquí: los da (y los veta y verifica) `apply_grants` cada
+noche. Este paso solo construye.
 
 Lee de `raw.*` (con, cua, auxemp, apu) y de UNA cosa fuera de `raw`: la vista
 `maestro.centros_coste`, el puente centro de coste -> obra. Esa vista es SQL
@@ -46,7 +66,8 @@ class _SubStep:
     target_table: str | None = None
 
 
-#: Los cuatro ficheros SQL, EN ORDEN, y de qué tabla se cuentan filas.
+#: Los ocho ficheros SQL, EN ORDEN, y de qué tabla se cuentan filas. Los de la
+#: contabilidad general (04-07) van DETRÁS de los del completo: leen de él.
 #:
 #: Vive fuera de `run()` por lo mismo que en `build_personal_step`: es DATO, y
 #: sustituirla en un test es lo que permite ejercitar el fichero que falta.
@@ -56,26 +77,50 @@ SUB_PASOS: tuple[_SubStep, ...] = (
     _SubStep(
         name="plan_cuentas",
         sql_file="01_plan_cuentas.sql",
-        target_schema="contabilidad",
+        target_schema="contabilidad_restringida",
         target_table="plan_cuentas",
     ),
     _SubStep(
         name="mayor",
         sql_file="02_mayor.sql",
-        target_schema="contabilidad",
+        target_schema="contabilidad_restringida",
         target_table="mayor",
     ),
     _SubStep(
         name="saldos_cuenta_mes",
         sql_file="03_saldos_cuenta_mes.sql",
+        target_schema="contabilidad_restringida",
+        target_table="saldos_cuenta_mes",
+    ),
+    _SubStep(
+        name="plan_cuentas_general",
+        sql_file="04_plan_cuentas_general.sql",
+        target_schema="contabilidad",
+        target_table="plan_cuentas",
+    ),
+    _SubStep(
+        name="mayor_general",
+        sql_file="05_mayor_general.sql",
+        target_schema="contabilidad",
+        target_table="mayor",
+    ),
+    _SubStep(
+        name="saldos_general",
+        sql_file="06_saldos_general.sql",
         target_schema="contabilidad",
         target_table="saldos_cuenta_mes",
+    ),
+    _SubStep(
+        name="apuntes_restringidos_mes",
+        sql_file="07_apuntes_restringidos_mes.sql",
+        target_schema="contabilidad",
+        target_table="apuntes_restringidos_mes",
     ),
 )
 
 
 class BuildContabilidadStep(PipelineStep):
-    """Construye el schema `contabilidad` (plan de cuentas, mayor y saldos)."""
+    """Construye `contabilidad_restringida` (completa) y `contabilidad` (general)."""
 
     def __init__(self, settings: Settings) -> None:
         self._settings = settings

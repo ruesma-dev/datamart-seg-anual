@@ -1700,3 +1700,35 @@ Verificado: `init.sh` 7.268 passed, cobertura 100 % (28/28); mutación 8/8.
 QUEDA (sin desplegar): imagen y job; `ingest --table rcg --full` y `gra`, `build-compras`,
 `check-raw-recuentos`; diccionario v48 y MCP; tiempos de la primera nocturna. El SQL nuevo no
 ha corrido aún contra ningún Postgres.
+
+## F-135 · La información de personal de la contabilidad, solo para el rol autorizado · 2026-10-12
+
+Rama `feature/F-135-restringir-personal-contabilidad`. `sdd=true`, rigor `critico`, prioridad 1.
+Nace del correo de Juan Romero del 2026-10-09 (nóminas, cuentas de trabajadores, embargos y
+cajas visibles en `contabilidad.mayor`). APROBADA en pasada 2 (`progress/review_F-135.md`; la 1
+encontró que una cuenta sin resolver en el plan abría el criterio en silencio y se cerró
+fallando cerrado). Spec en `specs/F-135-restringir-personal-contabilidad/`, mediciones en
+`progress/spec_F-135.md`, informe en `progress/impl_F-135.md`, mutación 25/25 y 19/19.
+
+Decisiones del humano (2026-10-11): D1-D12 según la recomendación, con su precisión «el rol
+admin debe leer como hasta hoy, el rol general, con esta restricción». Criterio V2 (asiento de
+personal + cuentas 640-645, 649, 465, 466, 476, 460, 461, 544 y 4753 enteras; 570 solo en
+asientos de nómina; más los apuntes con cuenta sin resolver). ~55.519 apuntes (2,55 %).
+
+Hecho: `contabilidad_restringida` con la copia COMPLETA (mismas filas, columnas y cifras que la
+`contabilidad` de antes, más tres columnas al final) para el grupo `sigrid_dm_restringido_ro`
+(NOLOGIN) y el dueño/administrador; `contabilidad` general filtrada y materializada, con solo
+recuentos de lo que falta y los 521 nombres de cuentas CR enmascarados; `raw` fuera del rol
+general (con guarda contra un `.env` viejo); veto con `REVOKE ALL` en `apply-grants` y
+`infra/sql/02_roles.sql` con postcondición en el catálogo; diccionario v49 con
+R-CONTABILIDAD-RESTRINGIDA; F-127 hereda el criterio.
+
+Verificado: `init.sh` 7.492 passed, cobertura 100 % (143/143); SQL y permisos probados en un
+PostgreSQL 16 local; contraste de solo lectura en Azure (0 cuentas CR visibles).
+
+QUEDA (sin desplegar, MANUAL de `impl_F-135.md` §8, en orden y el mismo día): confirmar que
+ningún informe de Power BI lee `raw`; espacio en disco; cifras de antes; `02_roles.sql` como
+administrador; imagen y job; `build-contabilidad` + `apply-grants`; copia = antes; prueba
+negativa y positiva; diccionario v49 y MCP. Riesgo: +4-7 min sobre una nocturna de ~4 h 40 min
+(el job corta a las 5 h). Fuera: `mcp-bbdd` (conectar con el rol autorizado) y F-087.
+Preguntas para Juan: quién tiene «ese rol» y si el coste por persona de `personal` se restringe.
