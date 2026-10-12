@@ -2135,7 +2135,7 @@
         "azure-apps/datamart_seg_anual.md y el diccionario (si cambia algo publicado) actualizados en el mismo trabajo",
         "bash harness/init.sh en verde"
       ],
-      "status": "spec_ready",
+      "status": "in_progress",
       "sdd": true,
       "rigor": "critico",
       "priority": 1,

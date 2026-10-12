@@ -132,6 +132,21 @@ DEFAULT_VETOED_SCHEMAS = "contabilidad_restringida,raw"
 DEFAULT_RESTRICTED_ROLE = "sigrid_dm_restringido_ro"
 DEFAULT_RESTRICTED_SCHEMAS = "contabilidad_restringida"
 
+# El login de acceso TOTAL del MCP (F-136): lee lo mismo que el rol general más
+# la contabilidad completa, por PERTENENCIA a los dos grupos (`02_roles.sql`,
+# punto 5 quater), sin ningún GRANT propio. `apply_grants` no le concede nada:
+# le veta cada noche lo de abajo y comprueba en el catálogo que no lo lee.
+# Quién conecta con él lo decide la F-008 de `mcp-bbdd` (por oid, fuera del
+# repositorio). Vacío = no se mira el total.
+DEFAULT_TOTAL_ROLE = "mcp_sigrid_dm_total"
+
+# Lo que el login total NO lee nunca (F-136). Decisión del humano del
+# 2026-10-12: «total no incluye raw. siempre fuera». Lista explícita y no
+# derivada de los vetados, para que un `raw` añadido a lo restringido no se le
+# cuele en silencio: `apply_grants` exige que cada esquema de aquí esté vetado
+# al general y fuera de lo restringido y del consumo (R3).
+DEFAULT_TOTAL_VETOED_SCHEMAS = "raw"
+
 # Tablas que el rol del MCP NO puede leer, aunque su esquema esté en la lista
 # de arriba. Formato `esquema.tabla`, separadas por comas.
 #
@@ -256,6 +271,17 @@ class PostgresSettings(BaseSettings):
         DEFAULT_RESTRICTED_SCHEMAS,
         description="Esquemas, separados por comas, que lee el rol autorizado. "
                     "Todos tienen que estar también en vetoed_schemas.",
+    )
+    total_role: str = Field(
+        DEFAULT_TOTAL_ROLE,
+        description="Login de acceso TOTAL del MCP (F-136), miembro del rol general "
+                    "y del autorizado. apply_grants le veta total_vetoed_schemas y "
+                    "lo verifica; si no existe, avisa y sigue. Vacío = no se mira.",
+    )
+    total_vetoed_schemas: str = Field(
+        DEFAULT_TOTAL_VETOED_SCHEMAS,
+        description="Esquemas, separados por comas, que el login total NO lee nunca "
+                    "(F-136). Ver DEFAULT_TOTAL_VETOED_SCHEMAS.",
     )
     # --- Troceo del build de stg.plan_mensual (F-019) ----------------------
     # El 2026-08-09 ese build llenó el disco del servidor compartido (93,4 %) y
@@ -383,6 +409,11 @@ class PostgresSettings(BaseSettings):
     def restricted_schema_list(self) -> list[str]:
         """`restricted_schemas` como lista, sin blancos ni entradas vacías (F-135)."""
         return [s.strip() for s in self.restricted_schemas.split(",") if s.strip()]
+
+    @property
+    def total_vetoed_schema_list(self) -> list[str]:
+        """`total_vetoed_schemas` como lista, sin blancos ni entradas vacías (F-136)."""
+        return [s.strip() for s in self.total_vetoed_schemas.split(",") if s.strip()]
 
     @property
     def conninfo(self) -> str:

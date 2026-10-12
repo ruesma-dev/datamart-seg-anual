@@ -9,6 +9,15 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-13 · F-136 · EN IMPLEMENTACIÓN (implementer), `in_progress`
+
+> Spec aprobada el 2026-10-13 con D1-D14 recomendadas; ampliación del mismo día: D13 pasa a
+> «diccionario v50» (`R-CONTABILIDAD-RESTRINGIDA` reescrita, avisos en las fichas). Informe
+> final en `progress/impl_F-136.md`. Nada se ejecuta contra Azure: rotación y alta son MANUAL.
+
+- Tarea en curso: T2 (T1 hecha).
+- Desviaciones: ninguna por ahora.
+
 ## 2026-10-12 · F-136 · SPEC ESCRITA (spec-author), pendiente de aprobación del humano
 
 > Rama `feature/F-136-usuario-mcp-total`. Spec en `specs/F-136-usuario-mcp-total/`, informe y
