@@ -45,7 +45,9 @@ nativos de PostgreSQL con contraseña, y la contraseña en Key Vault**.
 |---|---|---|
 | `sigrid_dm_etl` | Grupo, `NOLOGIN` | **Propietario** de la base y de todos sus objetos |
 | `sigrid_dm_app` | `LOGIN` + contraseña | El ETL: el puesto del humano y el job de F-003. Miembro de `sigrid_dm_etl` |
-| `mcp_sigrid_dm_ro` | `LOGIN` + contraseña | Solo lectura, para el MCP (F-006) |
+| `mcp_sigrid_dm_ro` | `LOGIN` + contraseña | Solo lectura, el ESTÁNDAR: el MCP (F-006) y Power BI. Sin `raw` ni `contabilidad_restringida` desde F-135 |
+| `sigrid_dm_restringido_ro` | Grupo, `NOLOGIN` | El rol AUTORIZADO (F-135): lee la contabilidad completa, `contabilidad_restringida` |
+| `mcp_sigrid_dm_total` | `LOGIN` + contraseña, solo en `kv-mcp-bbdd-dev` (`pg-password-total`) | El acceso TOTAL del MCP (F-136): miembro de los dos anteriores, sin GRANT propios y **nunca `raw`**. Alta y rotación: **§12** |
 
 Por qué un grupo propietario y no un rol a secas: los objetos se crean siempre
 como `sigrid_dm_etl` gracias a `PG_SET_ROLE`. Si mañana entra un segundo
@@ -441,3 +443,264 @@ WHERE grantee = 'mcp_sigrid_dm_ro'
   AND table_schema = 'raw'
   AND table_name IN ('emp', 'res');
 ```
+
+## 12. Rotación de contraseñas y alta del login total (F-136)
+
+Una sola sesión de **Windows PowerShell 5.1**, **de día** y sin imprimir nunca un
+valor. Rota las contraseñas de `sigrid_dm_app` y `mcp_sigrid_dm_ro`, expuestas
+en la terminal el 2026-10-12, y da de alta `mcp_sigrid_dm_total`, el acceso
+TOTAL del MCP: lee lo de `mcp_sigrid_dm_ro` más `contabilidad_restringida`, y
+**nunca `raw`**. Elegir quién conecta con él es la F-008 de `mcp-bbdd`.
+
+Reglas de esta sección, todas aprendidas en la incidencia del 2026-10-12:
+
+- `psql` con las **opciones delante** y la cadena de conexión al final: en
+  Windows deja de leer opciones tras la cadena, las ignora y las imprime.
+- Ninguna contraseña en la línea de órdenes de `psql`: `02_roles.sql` las lee
+  del entorno con `\getenv`.
+- `az keyvault secret set` siempre con `-o none` (si no, la CLI devuelve el
+  valor) y `az keyvault secret show` siempre asignado a una variable.
+- **El vault antes que la base**: si la sesión muere a medias, el valor bueno
+  ya está en el vault y P3 + P4 lo recargan.
+
+| Secreto | Login | Quién lo usa |
+|---|---|---|
+| `kv-datamart-seg-dev/pg-sigrid-dm-app` | `sigrid_dm_app` | el job (referencia al vault), el `.env` del puesto y `.env.azure.bak` |
+| `kv-datamart-seg-dev/pg-mcp-sigrid-dm-ro` | `mcp_sigrid_dm_ro` | copia de referencia; Power BI lo tiene tecleado |
+| `kv-mcp-bbdd-dev/pg-password` | `mcp_sigrid_dm_ro` | el MCP en Azure y el `.env` de `mcp-bbdd`. El MISMO valor que el anterior |
+| `kv-mcp-bbdd-dev/pg-password-total` | `mcp_sigrid_dm_total` | el MCP, cuando despliegue su F-008. Solo en este vault |
+
+### P0 · Puerta (solo lectura)
+
+Entre las 07:00 y las 21:00 UTC (lejos de la nocturna de las 00:00), sin
+ninguna ejecución del job en curso, con el job ya en la imagen que lleva F-136,
+`psql` 15 o posterior y el rol `Key Vault Secrets Officer` en los dos vaults
+(si un `set` responde `Forbidden`, se para aquí).
+
+```powershell
+$rgJ = "rg-datamart-seg-dev"
+$job = "caj-datamart-seg-dev"
+[DateTime]::UtcNow.ToString("HH:mm")
+az containerapp job execution list -g $rgJ -n $job -o table
+az containerapp job show -g $rgJ -n $job --query "properties.template.containers[0].image" -o tsv
+psql --version
+```
+
+### P1 · Variables
+
+Desde la raíz del repositorio, en la rama o la versión que lleva F-136.
+
+```powershell
+$env:PG_ADMIN_USER = "<administrador del servidor>"
+$kvDm  = "kv-datamart-seg-dev"
+$kvMcp = "kv-mcp-bbdd-dev"
+$pgh   = "psql-albaranes-rs9k2.postgres.database.azure.com"
+$dsn   = "host=$pgh dbname=sigrid_dm user=$env:PG_ADMIN_USER sslmode=require"
+$roles = "infra\sql\02_roles.sql"
+$q     = @("--query", "value", "-o", "tsv")
+# 64 caracteres hexadecimales: sin + / = ' que rompan una cadena de conexión o el .env
+function Nueva-Clave {
+    $b = New-Object byte[] 32
+    [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b)
+    ($b | ForEach-Object { $_.ToString("x2") }) -join ""
+}
+```
+
+### P2 · El vault primero
+
+Tres valores nuevos, en memoria. El del estándar va a los DOS vaults con el
+mismo valor. Hasta que P4 termine, no se reinicia nada: el job y el MCP leerían
+un valor que la base aún no tiene.
+
+```powershell
+$v = Nueva-Clave
+az keyvault secret set --vault-name $kvDm --name pg-sigrid-dm-app --value $v -o none
+if ($LASTEXITCODE -ne 0) { throw "P2: pg-sigrid-dm-app" }
+$v = Nueva-Clave
+az keyvault secret set --vault-name $kvDm --name pg-mcp-sigrid-dm-ro --value $v -o none
+if ($LASTEXITCODE -ne 0) { throw "P2: pg-mcp-sigrid-dm-ro" }
+az keyvault secret set --vault-name $kvMcp --name pg-password --value $v -o none
+if ($LASTEXITCODE -ne 0) { throw "P2: pg-password" }
+$v = Nueva-Clave
+az keyvault secret set --vault-name $kvMcp --name pg-password-total --value $v -o none
+if ($LASTEXITCODE -ne 0) { throw "P2: pg-password-total" }
+$v = $null
+```
+
+### P3 · Releer del vault al entorno
+
+Lo que se lleva a la base es lo que hay en el vault, no lo que había en memoria.
+
+```powershell
+$env:APP_PWD = az keyvault secret show --vault-name $kvDm --name pg-sigrid-dm-app @q
+$env:MCP_PWD = az keyvault secret show --vault-name $kvMcp --name pg-password @q
+$env:TOTAL_PWD = az keyvault secret show --vault-name $kvMcp --name pg-password-total @q
+$copia = az keyvault secret show --vault-name $kvDm --name pg-mcp-sigrid-dm-ro @q
+if ($copia -ne $env:MCP_PWD) { throw "P3: las dos copias del estándar no coinciden" }
+$copia = $null
+foreach ($n in "APP_PWD", "MCP_PWD", "TOTAL_PWD") {
+    if ((Get-Item "Env:$n").Value.Length -ne 64) { throw "P3: $n no mide 64" }
+}
+```
+
+### P4 · La base
+
+`psql` pide la contraseña del administrador (no se ve al teclearla).
+
+```powershell
+psql -X -v ON_ERROR_STOP=1 -f $roles $dsn
+```
+
+Esperado: `sigrid_dm_app: contraseña fijada` y lo mismo para `mcp_sigrid_dm_ro` y
+`mcp_sigrid_dm_total`; `COMMIT`; los cinco roles con `rolsuper = f`; el total con
+exactamente dos pertenencias (`hereda = t`, `set_role = f`), `raw = f`,
+`contabilidad_restringida = t`, `contabilidad = t`, `conecta = t` y cero filas
+de privilegios propios; y las comprobaciones de F-135. Desde aquí, cada cliente
+con el valor viejo falla al abrir conexión: P6, P7 y P8 sin pausa.
+
+### P5 · Fuera del entorno
+
+```powershell
+Remove-Item Env:APP_PWD, Env:MCP_PWD, Env:TOTAL_PWD
+```
+
+### P6 · El MCP
+
+Grupo y nombre en `azure-apps/mcp_bbdd.md`. Lee `pg-password` por referencia al
+vault al arrancar: se reinicia su revisión activa y se comprueba que responde.
+Si su log dice `password authentication failed`, la referencia aún sirve la
+versión vieja: esperar un par de minutos y reiniciar otra vez.
+
+```powershell
+$rgM = "rg-mcp-bbdd-dev"
+$app = "ca-mcp-bbdd-dev"
+$rev = az containerapp show -g $rgM -n $app --query properties.latestReadyRevisionName -o tsv
+az containerapp revision restart -g $rgM -n $app --revision $rev -o none
+az containerapp logs show -g $rgM -n $app --tail 50
+```
+
+### P7 · El puesto
+
+El humano pone el valor nuevo en el `PG_PASSWORD` del `.env` del datamart por el
+portapapeles, sin verlo; si el historial del portapapeles (Win+V) está activo,
+borra después esa entrada. Borra `.env.azure.bak` (D12): es una copia muerta con
+la contraseña vieja de `sigrid_dm_app`. Lo mismo con el `.env` de `mcp-bbdd`,
+que usa el estándar (`$kvMcp`, `pg-password`).
+
+```powershell
+$v = az keyvault secret show --vault-name $kvDm --name pg-sigrid-dm-app @q
+Set-Clipboard -Value $v
+$v = $null
+# pegar en PG_PASSWORD del .env y guardar; después vaciar el portapapeles
+Set-Clipboard -Value " "
+python main.py check-pg
+Remove-Item .env.azure.bak
+```
+
+### P8 · Power BI
+
+En el servicio, en cada modelo semántico que lea `sigrid_dm`: Configuración →
+Credenciales del origen de datos → `mcp_sigrid_dm_ro` con el valor nuevo (por el
+portapapeles, como en P7, desde `pg-mcp-sigrid-dm-ro`); después «Actualizar
+ahora» y comprobar que termina bien. Lo mismo en los Power BI Desktop que tengan
+la credencial guardada (Configuración del origen de datos → Editar permisos).
+
+### P9 · La vieja ya no entra
+
+La versión ANTERIOR de cada secreto rotado tiene que ser rechazada. Si P2 se
+repitió, la que vale es la de antes de la primera vez. Las versiones se ordenan
+en PowerShell: nunca con un `--query` que lleve `&`, `|` o `(`, que rompen `az.cmd`.
+
+```powershell
+function Version-Anterior($kv, $nombre) {
+    $js = az keyvault secret list-versions --vault-name $kv --name $nombre -o json
+    $vs = ($js -join "`n") | ConvertFrom-Json
+    ($vs | Sort-Object { [DateTime]$_.attributes.created } -Descending)[1].id
+}
+$dsnApp = "host=$pgh dbname=sigrid_dm user=sigrid_dm_app sslmode=require"
+$dsnMcp = "host=$pgh dbname=sigrid_dm user=mcp_sigrid_dm_ro sslmode=require"
+$env:PGPASSWORD = az keyvault secret show --id (Version-Anterior $kvDm pg-sigrid-dm-app) @q
+psql -X -c "SELECT 1" $dsnApp
+$env:PGPASSWORD = az keyvault secret show --id (Version-Anterior $kvMcp pg-password) @q
+psql -X -c "SELECT 1" $dsnMcp
+Remove-Item Env:PGPASSWORD
+```
+
+Esperado en los dos: `password authentication failed`.
+
+### P10 · Negativa y positiva del total
+
+Con el login total real (R26 y R27). Al acabar, se cierra la ventana: así no
+queda ninguna variable de esta sesión.
+
+```powershell
+$dsnT = "host=$pgh dbname=sigrid_dm user=mcp_sigrid_dm_total sslmode=require"
+$env:PGPASSWORD = az keyvault secret show --vault-name $kvMcp --name pg-password-total @q
+foreach ($t in "apu", "pag", "asi", "rac", "hmores", "con", "apa") {
+    psql -X -c "SELECT 1 FROM raw.$t LIMIT 1" $dsnT
+}
+psql -X -c "CREATE TABLE contabilidad.f136_x (x int)" $dsnT
+psql -X -c "SELECT count(*) FROM contabilidad_restringida.mayor" $dsnT
+psql -X -c "SELECT count(*) FROM contabilidad.mayor" $dsnT
+Remove-Item Env:PGPASSWORD
+psql -X -c "SELECT count(*) FROM raw.apu" $dsn
+```
+
+Esperado: `permission denied for schema raw` en las siete de `raw`;
+`permission denied for schema contabilidad` en el `CREATE TABLE`; el recuento de
+`contabilidad_restringida.mayor` igual al de `raw.apu` (este, como
+administrador y en el mismo momento); `contabilidad.mayor` legible.
+
+### P11 · La nocturna, a mano
+
+```powershell
+python main.py apply-grants
+```
+
+Esperado: SUCCESS y, en su fila de `_meta.etl_runs`, `verificacion`,
+`verificacion_total` y `acceso_total` a `ok`.
+
+### P12 · El job
+
+Una ejecución puntual de `check-pg` con su secreto (no toca la programada); si
+no, la nocturna siguiente. **Al día siguiente**, sin hacer nada a mano, la
+nocturna tiene que dejar `apply_grants` en SUCCESS con los tres `ok` (R29).
+
+```powershell
+az containerapp job start -g $rgJ -n $job --command "python" --args "main.py,check-pg" -o none
+az containerapp job execution list -g $rgJ -n $job -o table
+```
+
+```sql
+-- al día siguiente, con cualquier login que lea _meta
+SELECT started_at, status, metadata->>'verificacion' AS verificacion,
+       metadata->>'verificacion_total' AS verificacion_total,
+       metadata->>'acceso_total' AS acceso_total
+FROM _meta.etl_runs
+WHERE step = 'apply_grants'
+ORDER BY started_at DESC
+LIMIT 3;
+```
+
+### P13 · Las copias muertas
+
+Las copias de F-005 en el vault de `albaranes` ya son valores muertos. Se listan
+por NOMBRE; borrarlas pide autorización expresa del humano en ese momento
+(vault de otro proyecto, D12).
+
+```powershell
+az keyvault secret list --vault-name kv-albaranes-rs9k2 --query "[].name" -o tsv
+```
+
+### Vuelta atrás
+
+- **P2 o P3 fallan**: la base no ha cambiado. Se repite desde P2 (o desde P3 si
+  el vault ya tiene los cuatro); la versión vieja sigue en el vault por si hiciera
+  falta volver.
+- **P4 falla**: si fue en la guarda, la base no ha cambiado; si fue después, los
+  `ALTER ROLE` van antes del `BEGIN` y pueden haber entrado. En los dos casos se
+  repite P4 con el entorno aún cargado: el fichero es reejecutable.
+- **Se perdió la sesión entre P2 y P6**: P1 + P3 + P4 recargan del vault, que
+  siempre tiene el valor bueno, y se sigue en P5.
+- **Un cliente no conecta tras P6-P8**: tiene el valor viejo. El bueno está en el
+  vault; nunca se vuelve a la contraseña expuesta.

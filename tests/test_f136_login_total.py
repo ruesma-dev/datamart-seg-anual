@@ -845,3 +845,150 @@ def test_f136_r21_provision_exige_las_tres_y_no_las_pasa() -> None:
         )
         assert llamada.startswith("psql -X "), f"sin -X (psqlrc) : {llamada}"
     assert TOTAL in texto, "el rótulo de roles nombra el total"
+
+
+# ===========================================================================
+# R22 y R25 · el procedimiento MANUAL del runbook, §12 (T7)
+# ===========================================================================
+
+
+def _seccion_12() -> str:
+    texto = RUNBOOK.read_text(encoding="utf-8")
+    assert "\n## 12. " in texto, "falta la §12 del runbook"
+    return texto.split("\n## 12. ", 1)[1].split("\n## ", 1)[0]
+
+
+def _bloques_de_codigo(texto: str) -> list[str]:
+    bloques: list[str] = []
+    actual: list[str] | None = None
+    for linea in texto.splitlines():
+        if linea.lstrip().startswith("```"):
+            if actual is None:
+                actual = []
+            else:
+                bloques.append("\n".join(actual))
+                actual = None
+            continue
+        if actual is not None:
+            actual.append(linea)
+    return bloques
+
+
+def _lineas_de_codigo_del_runbook() -> list[str]:
+    """Las líneas de los bloques de código: la prosa puede citar los comandos."""
+    return [
+        linea for bloque in _bloques_de_codigo(RUNBOOK.read_text(encoding="utf-8"))
+        for linea in bloque.splitlines()
+    ]
+
+
+def test_f136_r22_todo_show_es_una_asignacion() -> None:
+    import re
+
+    lineas = [
+        linea for linea in _lineas_de_codigo_del_runbook()
+        if "az keyvault secret show" in linea and not linea.lstrip().startswith("#")
+    ]
+    assert lineas, "el runbook no lee ningún secreto: ¿se ha movido el procedimiento?"
+    for linea in lineas:
+        assert re.match(r"^\s*\$[\w:]+\s*=\s*az keyvault secret show\b", linea), (
+            f"un `show` sin asignar imprime el valor: {linea.strip()}"
+        )
+
+
+def test_f136_r22_todo_set_lleva_o_none() -> None:
+    lineas = [
+        linea for linea in _lineas_de_codigo_del_runbook()
+        if "az keyvault secret set" in linea and not linea.lstrip().startswith("#")
+    ]
+    assert len(lineas) >= 6, "§4 (dos) y §12 P2 (cuatro)"
+    for linea in lineas:
+        assert linea.rstrip().endswith("-o none"), f"un `set` sin -o none devuelve el valor: {linea}"
+
+
+def test_f136_r22_lineas_cortas_en_la_seccion_12() -> None:
+    largas = [
+        linea for bloque in _bloques_de_codigo(_seccion_12()) for linea in bloque.splitlines()
+        if len(linea) > 100
+    ]
+    assert largas == []
+
+
+def test_f136_r22_sin_query_que_rompa_az_cmd() -> None:
+    """`az.cmd` en Windows parte un `--query` con `&`, `|` o `(`."""
+    import re
+
+    for bloque in _bloques_de_codigo(_seccion_12()):
+        for consulta in re.findall(r'--query\s+"([^"]*)"', bloque):
+            assert not set(consulta) & set("&|("), consulta
+
+
+def test_f136_r25_el_procedimiento_en_orden() -> None:
+    seccion = _seccion_12()
+    pasos = [f"### P{n} " for n in range(14)]
+    posiciones = [seccion.find(p) for p in pasos]
+    assert -1 not in posiciones, [p for p, pos in zip(pasos, posiciones) if pos == -1]
+    assert posiciones == sorted(posiciones), "P0 a P13, en orden"
+    assert "### Vuelta atrás" in seccion
+    assert "PowerShell 5.1" in seccion
+
+
+def _paso_12(seccion: str, n: int) -> str:
+    return seccion.split(f"### P{n} ", 1)[1].split("\n### ", 1)[0]
+
+
+def test_f136_r25_vault_primero_con_los_cuatro_secretos() -> None:
+    seccion = _seccion_12()
+    p2 = _paso_12(seccion, 2)
+    for vault, secreto in (
+        ("$kvDm", "pg-sigrid-dm-app"), ("$kvDm", "pg-mcp-sigrid-dm-ro"),
+        ("$kvMcp", "pg-password"), ("$kvMcp", "pg-password-total"),
+    ):
+        assert f"--vault-name {vault} --name {secreto} --value $v -o none" in p2, secreto
+    assert p2.count("$LASTEXITCODE") == 4
+    assert p2.rstrip("`\n ").endswith("$v = $null")
+    estandar = p2.split("pg-mcp-sigrid-dm-ro --value $v", 1)[1].split("Nueva-Clave", 1)[0]
+    assert "--name pg-password --value $v" in estandar, "el estándar: el MISMO valor en los dos vaults"
+    p1 = _paso_12(seccion, 1)
+    assert '$kvDm  = "kv-datamart-seg-dev"' in p1 and '$kvMcp = "kv-mcp-bbdd-dev"' in p1
+    assert "RandomNumberGenerator" in p1 and '"x2"' in p1
+
+
+def test_f136_r25_releer_ejecutar_borrar_y_reiniciar() -> None:
+    seccion = _seccion_12()
+    p3 = _paso_12(seccion, 3)
+    for variable in ("APP_PWD", "MCP_PWD", "TOTAL_PWD"):
+        assert f"$env:{variable} = az keyvault secret show" in p3
+    assert "-ne $env:MCP_PWD" in p3 and "64" in p3, "las dos copias del estándar y la longitud"
+    assert "psql -X -v ON_ERROR_STOP=1 -f $roles $dsn" in _paso_12(seccion, 4)
+    assert "Remove-Item Env:APP_PWD, Env:MCP_PWD, Env:TOTAL_PWD" in _paso_12(seccion, 5)
+    p6 = _paso_12(seccion, 6)
+    assert "az containerapp revision restart" in p6 and "ca-mcp-bbdd-dev" in p6
+    p7 = _paso_12(seccion, 7)
+    for cosa in (".env", ".env.azure.bak", "mcp-bbdd", "python main.py check-pg", "Set-Clipboard"):
+        assert cosa in p7, cosa
+    assert "Power BI" in _paso_12(seccion, 8)
+
+
+def test_f136_r26_r28_las_pruebas_del_procedimiento() -> None:
+    seccion = _seccion_12()
+    p9 = _paso_12(seccion, 9)
+    assert "list-versions" in p9 and "ConvertFrom-Json" in p9
+    assert "password authentication failed" in p9
+    assert "Remove-Item Env:PGPASSWORD" in p9
+    p10 = _paso_12(seccion, 10)
+    assert 'foreach ($t in "apu", "pag", "asi", "rac", "hmores", "con", "apa")' in p10
+    assert "permission denied" in p10 and "CREATE TABLE contabilidad." in p10
+    assert "contabilidad_restringida.mayor" in p10 and "contabilidad.mayor" in p10
+    assert "raw.apu" in p10 and "Remove-Item Env:PGPASSWORD" in p10
+    assert "python main.py apply-grants" in _paso_12(seccion, 11)
+    p12 = _paso_12(seccion, 12)
+    assert '--args "main.py,check-pg"' in p12 and "verificacion_total" in p12
+    assert "kv-albaranes-rs9k2" in _paso_12(seccion, 13)
+
+
+def test_f136_r25_la_tabla_de_roles_tiene_los_cinco() -> None:
+    texto = RUNBOOK.read_text(encoding="utf-8")
+    tabla = texto.split("## 1. Autenticación", 1)[1].split("\n## ", 1)[0]
+    for rol in (DUENO, "sigrid_dm_app", ESTANDAR, AUTORIZADO, TOTAL):
+        assert f"| `{rol}` |" in tabla, rol
