@@ -210,3 +210,170 @@ def test_f136_cliente_sql_esquemas_sin_usage_es_la_del_diseno() -> None:
         "SELECT n.nspname FROM pg_namespace n WHERE n.nspname = ANY(%s) "
         "AND NOT has_schema_privilege(%s, n.oid, 'USAGE') ORDER BY 1"
     )
+
+
+# ===========================================================================
+# El paso (T3-T4): cliente falso que apunta lo que se le pide
+# ===========================================================================
+
+
+class _ClienteFalso:
+    def __init__(
+        self,
+        existen: tuple[str, ...] = (ESTANDAR, AUTORIZADO, TOTAL),
+        indebidas: dict[str, list[str]] | None = None,
+        sin_usage: list[str] | None = None,
+        falla_en: str = "",
+    ) -> None:
+        self.existen = existen
+        self.indebidas = indebidas or {}
+        self.sin_usage = sin_usage or []
+        self.falla_en = falla_en
+        self.llamadas: list[tuple] = []
+
+    def _quizas_falla(self, que: str) -> None:
+        if self.falla_en == que:
+            raise RuntimeError(f"se cayó la conexión en {que}")
+
+    def role_exists(self, role):  # noqa: ANN001, ANN201
+        self.llamadas.append(("role_exists", role))
+        return role in self.existen
+
+    def apply_readonly_grants(self, readonly_role, owner_role, schemas, excluded_tables=(),
+                              vetoed_schemas=()):  # noqa: ANN001, ANN201
+        self.llamadas.append(("general", readonly_role))
+        return ["G1", "G2"]
+
+    def apply_restricted_grants(self, role, owner_role, schemas):  # noqa: ANN001, ANN201
+        self.llamadas.append(("autorizado", role))
+        return ["A1"]
+
+    def apply_veto(self, role, owner_role, schemas):  # noqa: ANN001, ANN201
+        self.llamadas.append(("veto", role, owner_role, list(schemas)))
+        self._quizas_falla("veto")
+        return ["V1", "V2", "V3"]
+
+    def lecturas_indebidas(self, role, schemas, tables):  # noqa: ANN001, ANN201
+        self.llamadas.append(("verifica", role, list(schemas), list(tables)))
+        return list(self.indebidas.get(role, []))
+
+    def esquemas_sin_usage(self, role, schemas):  # noqa: ANN001, ANN201
+        self.llamadas.append(("usage", role, list(schemas)))
+        self._quizas_falla("usage")
+        return list(self.sin_usage)
+
+
+def _settings(**pg: object):  # noqa: ANN202
+    from types import SimpleNamespace
+
+    base: dict[str, object] = {
+        "readonly_role": ESTANDAR,
+        "set_role": DUENO,
+        "consumption_schema_list": ["mart", "contabilidad"],
+        "excluded_table_list": ["raw.emp"],
+        "vetoed_schema_list": [RESTR, "raw"],
+        "restricted_role": AUTORIZADO,
+        "restricted_schema_list": [RESTR],
+        "total_role": TOTAL,
+        "total_vetoed_schema_list": ["raw"],
+    }
+    base.update(pg)
+    return SimpleNamespace(postgres=SimpleNamespace(**base))
+
+
+def _paso(cliente: _ClienteFalso, **pg: object):  # noqa: ANN202
+    from etl_sigrid.application.steps.apply_grants_step import ApplyGrantsStep
+
+    return ApplyGrantsStep(_settings(**pg), client=cliente).run()
+
+
+class _Log:
+    def __init__(self) -> None:
+        self.avisos: list[tuple[str, dict]] = []
+        self.errores: list[tuple[str, dict]] = []
+
+    def info(self, *a: object, **k: object) -> None: ...
+
+    def warning(self, evento: str, **datos: object) -> None:
+        self.avisos.append((evento, datos))
+
+    def error(self, evento: str, **datos: object) -> None:
+        self.errores.append((evento, datos))
+
+
+@pytest.fixture
+def log(monkeypatch: pytest.MonkeyPatch) -> _Log:
+    from etl_sigrid.application.steps import apply_grants_step
+
+    falso = _Log()
+    monkeypatch.setattr(apply_grants_step, "logger", falso)
+    return falso
+
+
+# --- R2-R4 · guardas antes de abrir conexión (T3) --------------------------
+
+
+@pytest.mark.parametrize(
+    ("campo", "variable"),
+    [("readonly_role", "PG_READONLY_ROLE"), ("restricted_role", "PG_RESTRICTED_ROLE"),
+     ("set_role", "PG_SET_ROLE")],
+)
+def test_f136_r2_total_igual_a_otro_rol_para_en_seco(campo: str, variable: str) -> None:
+    cliente = _ClienteFalso()
+    otros = {"readonly_role": ESTANDAR, "restricted_role": AUTORIZADO, "set_role": DUENO}
+    resultado = _paso(cliente, total_role=f" {otros[campo]} ")
+    assert resultado.status.name == "FAILED"
+    assert cliente.llamadas == [], "ni una sentencia, ni una pregunta al servidor"
+    mensaje = resultado.error_message or ""
+    assert "PG_TOTAL_ROLE" in mensaje and variable in mensaje
+    for otra in {"PG_READONLY_ROLE", "PG_RESTRICTED_ROLE", "PG_SET_ROLE"} - {variable}:
+        assert otra not in mensaje, "nombra la variable que choca, no las demás"
+    assert resultado.finished_at is not None
+
+
+def test_f136_r2_un_total_vacio_no_choca_con_un_autorizado_vacio() -> None:
+    cliente = _ClienteFalso()
+    resultado = _paso(cliente, total_role="  ", restricted_role="", set_role="")
+    assert resultado.status.name == "SUCCESS"
+
+
+@pytest.mark.parametrize(
+    ("cambios", "esperado"),
+    [
+        ({"total_vetoed_schema_list": ["raw", RESTR]}, RESTR),  # en lo restringido
+        ({"total_vetoed_schema_list": ["raw", "mart"], "vetoed_schema_list": [RESTR, "raw", "mart"],
+          "consumption_schema_list": ["mart"]}, None),  # rompe antes la guarda de F-135
+        ({"total_vetoed_schema_list": ["raw", "stg"]}, "stg"),  # no vetado al general
+        ({"total_vetoed_schema_list": ["raw", "contabilidad"]}, "contabilidad"),  # en consumo
+    ],
+)
+def test_f136_r3_vetados_del_total_incoherentes_para_en_seco(
+    cambios: dict, esperado: str | None
+) -> None:
+    cliente = _ClienteFalso()
+    resultado = _paso(cliente, **cambios)
+    assert resultado.status.name == "FAILED"
+    assert cliente.llamadas == []
+    if esperado:
+        mensaje = resultado.error_message or ""
+        assert "PG_TOTAL_VETOED_SCHEMAS" in mensaje
+        assert f"({esperado})" in mensaje, "la lista de esquemas en conflicto, y solo ellos"
+
+
+def test_f136_r3_un_raw_en_lo_restringido_tambien_lo_para() -> None:
+    """El caso que motiva D4: `raw` añadido a lo restringido lo heredaría el total."""
+    cliente = _ClienteFalso()
+    resultado = _paso(cliente, restricted_schema_list=[RESTR, "raw"])
+    assert resultado.status.name == "FAILED"
+    assert cliente.llamadas == []
+    assert "PG_TOTAL_VETOED_SCHEMAS" in (resultado.error_message or "")
+    assert "(raw)" in (resultado.error_message or "")
+
+
+def test_f136_r4_sin_rol_estandar_no_pregunta_por_el_total() -> None:
+    cliente = _ClienteFalso()
+    resultado = _paso(cliente, readonly_role="", total_role=ESTANDAR,
+                      total_vetoed_schema_list=["mart"])
+    assert resultado.status.name == "SUCCESS"
+    assert cliente.llamadas == []
+    assert resultado.rows_processed == 0

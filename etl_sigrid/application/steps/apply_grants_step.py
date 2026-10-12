@@ -123,6 +123,37 @@ class ApplyGrantsStep(PipelineStep):
                 "no se ha ejecutado nada.",
             )
 
+        # F-136, R2: el login total no puede ser ninguno de los otros roles: le
+        # vetaríamos `raw` al dueño, o le daríamos al general lo restringido.
+        total = (pg_settings.total_role or "").strip()
+        total_vetados = list(pg_settings.total_vetoed_schema_list)
+        for variable, otro in (
+            ("PG_READONLY_ROLE", rol),
+            ("PG_RESTRICTED_ROLE", autorizado),
+            ("PG_SET_ROLE", dueno),
+        ):
+            if total and total == otro:
+                return self._fallo(
+                    result,
+                    f"PG_TOTAL_ROLE ('{total}') coincide con {variable}: el login total "
+                    "tiene que ser un login propio (F-136); no se ha ejecutado nada.",
+                )
+        # F-136, R3: lo vetado al total, vetado también al general y fuera de lo
+        # restringido y del consumo. Un `raw` añadido a lo restringido lo
+        # heredaría el total por pertenencia sin que nadie lo viera.
+        conflicto_total = [
+            s for s in total_vetados
+            if s in restringidos or s in consumo or s not in vetados
+        ]
+        if conflicto_total:
+            return self._fallo(
+                result,
+                "PG_TOTAL_VETOED_SCHEMAS tiene esquemas que el login total heredaría "
+                f"({', '.join(conflicto_total)}): cada uno tiene que estar en "
+                "PG_VETOED_SCHEMAS y fuera de PG_RESTRICTED_SCHEMAS y de "
+                "PG_CONSUMPTION_SCHEMAS (F-136); no se ha ejecutado nada.",
+            )
+
         pg = self._client or build_postgres_client(self._settings)
 
         try:

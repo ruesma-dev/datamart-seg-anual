@@ -15,8 +15,11 @@
 > «diccionario v50» (`R-CONTABILIDAD-RESTRINGIDA` reescrita, avisos en las fichas). Informe
 > final en `progress/impl_F-136.md`. Nada se ejecuta contra Azure: rotación y alta son MANUAL.
 
-- Tarea en curso: T3 (T1-T2 hechas).
-- Desviaciones: ninguna por ahora.
+- Tarea en curso: T4 (T1-T3 hechas).
+- Desviación menor (T3): además del `_settings` de `test_f135_grants.py`, los
+  settings falsos de `test_f005_grants.py` y `test_f068_exclusion_lectura_mcp.py` ganan
+  `total_role=""` y `total_vetoed_schema_list=[]` (sin cambiar aserciones): el paso lee
+  esos campos y un `SimpleNamespace` sin ellos da `AttributeError`.
 
 ## 2026-10-12 · F-136 · SPEC ESCRITA (spec-author), pendiente de aprobación del humano
 

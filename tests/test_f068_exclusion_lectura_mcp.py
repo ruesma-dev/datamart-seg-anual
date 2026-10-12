@@ -359,6 +359,9 @@ def test_f068_r7_el_paso_pasa_la_lista_de_exclusion_al_cliente() -> None:
             vetoed_schema_list=[],
             restricted_role="",
             restricted_schema_list=[],
+            # F-136: sin login total
+            total_role="",
+            total_vetoed_schema_list=[],
         )
     )
 
