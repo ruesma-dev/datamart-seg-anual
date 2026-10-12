@@ -72,3 +72,10 @@ Las contraseñas expuestas el 12-10 siguen valiendo hasta T15. La parte de códi
 bloquea la rotación en sí, pero P4 usa el `02_roles.sql` nuevo (`\getenv`, contraseñas
 opcionales y el total): si el humano quisiera rotar ANTES de que F-136 esté aprobada, la vía
 es el `02_roles.sql` actual con las opciones delante, y la del total queda para después.
+
+## 6. Aprobación del humano (2026-10-13)
+
+«apruebo con las recomendadas»: D1-D14 con la opción recomendada de design §8. Precisión del
+líder: D11 (`pg-password-total` solo en `kv-mcp-bbdd-dev`) NO la había decidido antes el humano,
+como decía el borrador; la propuso el líder en la ficha y el humano la aprueba ahora con el resto.
+D12: borrar las copias de `kv-albaranes-rs9k2` sigue pidiendo autorización expresa en el momento.

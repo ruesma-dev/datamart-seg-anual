@@ -209,8 +209,8 @@ Líneas cortas, todo por variables, ningún valor en pantalla. Pasos (el runbook
   `infra/16_*.ps1` (código con secretos de otro vault para una operación anual).
 - **D10** Orden y ventana: **imagen → rotación + alta de día (P0) → nocturna (R29) → F-008**;
   vault antes que base.
-- **D11** Nombre del secreto: **`pg-password-total`**, solo en `kv-mcp-bbdd-dev` (lo decidió el
-  humano: sin copia en `kv-datamart-seg-dev`).
+- **D11** Nombre del secreto: **`pg-password-total`**, solo en `kv-mcp-bbdd-dev` (aprobada por el
+  humano el 2026-10-13: sin copia en `kv-datamart-seg-dev`).
 - **D12** Copias muertas: **borrar `.env.azure.bak` y, con autorización expresa, las de
   `kv-albaranes-rs9k2`** (vault de otro proyecto); o dejarlas.
 - **D13** Diccionario: **sin cambios en F-136**; ajustar `R-CONTABILIDAD-RESTRINGIDA` (sin
