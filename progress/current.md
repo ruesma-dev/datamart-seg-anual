@@ -9,7 +9,44 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-11 · F-135 · IMPLEMENTADA (T1-T14), a la espera del reviewer · `in_progress`
+## 2026-10-12 · F-135 · CERRADA (`done`, APROBADO en pasada 2) · DESPLEGADA el 12-10 (`r20261012-1945`, diccionario v49)
+
+> Merge en `main` `adec1c8` (y espejo en `dev`). Orden del humano: «despliega ya». El
+> paso 1 de la MANUAL (que ningún informe de Power BI lea `raw`) NO se comprobó: el humano
+> ordenó desplegar sin esa respuesta. Si algún informe lo lee, dará «permission denied».
+
+- **Imagen y job**: `r20261012-1945` desde `main`; el job la lleva (`az containerapp job show`).
+- **Línea base «antes»** (18:00 UTC, solo lectura): `contabilidad.mayor` 2.176.231 apuntes,
+  debe 11.791.680.576,62, haber 11.791.680.586,62, saldo -3.108.795,83; `saldos_cuenta_mes`
+  401.672 con las mismas sumas; `plan_cuentas` 79.048; `raw.apu` 2.176.231. Base 37,54 GB.
+- **`build-contabilidad`** SUCCESS en **566,7 s** (antes ~590 s): completo 306 s, general
+  177 s. Filas: plan 79.048, mayor 2.176.231, saldos 401.672 (restringida); plan 79.048,
+  mayor 2.120.712, saldos 389.862, `apuntes_restringidos_mes` 1.283 (general). Base 38,41 GB
+  (+0,87 GB). **`apply-grants`** SUCCESS, `verificacion = ok`, aviso esperado: el rol
+  autorizado no existe aún.
+- **Copia completa = antes** (paso 7): las cuatro cifras de mayor y saldos y el recuento del
+  plan, IDÉNTICOS en `contabilidad_restringida`; 55.519 restringidos; 2.120.712 + 55.519 =
+  2.176.231. `apuntes_restringidos_mes` suma 55.519.
+- **Prueba negativa por el CATÁLOGO** (no con el login real, que solo tiene el humano):
+  `mcp_sigrid_dm_ro` sin USAGE en `raw` ni en `contabilidad_restringida`, 0 tablas legibles
+  en ambos; sí lee `contabilidad.mayor` y `apuntes_restringidos_mes`. En el general, 0
+  apuntes de las cuentas de personal y 0 saldos de cuentas restringidas; 521 cuentas
+  marcadas `restringida`. Por el MCP: 0 apuntes de personal en 0,9 s; `raw` y
+  `contabilidad_restringida` los rechaza su lista blanca.
+- **Diccionario v49** publicado (212 objetos, 1.699 columnas, 22 reglas, hash `0b3b980fd848`),
+  `check-diccionario` OK, MCP reiniciado (`ca-mcp-bbdd-dev--0000014`); `contexto_bbdd` sirve
+  la v49 con `R-CONTABILIDAD-RESTRINGIDA`.
+- **Pendiente del HUMANO**: `infra/sql/02_roles.sql` como administrador (crea
+  `sigrid_dm_restringido_ro`; hasta entonces solo el administrador y el dueño leen el
+  completo); prueba negativa con el login real `mcp_sigrid_dm_ro` (paso 8) y positiva (paso 9);
+  confirmar Power BI y `raw` (paso 1); D10 y D11 a Juan.
+- **Pendiente del LÍDER (13-10, T18)**: nocturna con la imagen nueva: `apply_grants` SUCCESS con
+  `verificacion = ok`, duración total frente a ~4 h 40 min (margen al tope de 5 h) y repetir la
+  comprobación de catálogo.
+
+### Historia de la feature (antes del cierre)
+
+### 2026-10-11 · F-135 · IMPLEMENTADA (T1-T14), a la espera del reviewer · `in_progress`
 
 > Rama `feature/F-135-restringir-personal-contabilidad`, desde `ffadfb2`. Spec aprobada
 > el 2026-10-11 con D1-D12 recomendadas y la precisión del humano (`spec_F-135.md` §9).
@@ -40,7 +77,7 @@
   humano (F-108) siguen siendo seis; la del plan la vigila `check-unicidad` en el general,
   que tiene los mismos nodos.
 
-## 2026-10-09 · F-135 · SPEC ESCRITA, pendiente de aprobación del humano · `pending`
+### 2026-10-09 · F-135 · SPEC ESCRITA, pendiente de aprobación del humano · `pending`
 
 > Spec-author. Rama `feature/F-135-restringir-personal-contabilidad` (desde `main`
 > `75389c5`). Spec en `specs/F-135-restringir-personal-contabilidad/` (requirements 149,
