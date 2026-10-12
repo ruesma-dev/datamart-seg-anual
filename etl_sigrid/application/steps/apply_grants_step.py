@@ -21,6 +21,23 @@ de empleados) después de conceder su esquema. Es TEMPORAL —el humano ya decid
 levantarlo cuando el MCP tenga control por usuario— y vive aquí precisamente
 porque este paso corre cada noche: hecho a mano contra la base, el propio
 `GRANT SELECT ON ALL TABLES IN SCHEMA raw` de este paso lo desharía.
+
+Desde F-135 (2026-10-11) hace tres cosas más, en este orden:
+
+  1. ANTES de abrir conexión, si un esquema está a la vez en la lista de
+     consumo y en la de VETADOS (`PG_VETOED_SCHEMAS`: la contabilidad completa
+     y `raw`), o si un esquema del rol autorizado no está vetado, termina en
+     FAILED sin ejecutar nada. Es la guarda contra un `.env` viejo que aún
+     liste `raw`: ya pasó con `personal`, y aquí reabriría la nómina en
+     silencio.
+  2. Tras los GRANT del rol general, le VETA esos esquemas (tablas, USAGE y
+     privilegio por defecto) y concede la contabilidad completa al rol
+     AUTORIZADO (`PG_RESTRICTED_ROLE`). Si ese rol no existe, avisa y sigue:
+     su ausencia no expone nada.
+  3. COMPRUEBA en el catálogo que el rol general no lee ningún esquema vetado
+     ni tabla excluida. Si lee algo, FAILED con la lista: una concesión hecha
+     a mano por otro concedente no la revoca la nocturna (la lección de
+     F-068), y sin esta comprobación pasaría inadvertida.
 """
 
 from __future__ import annotations
@@ -32,6 +49,7 @@ from etl_sigrid.application.steps.base import PipelineStep
 from etl_sigrid.domain.entities import StepResult, StepStatus
 from etl_sigrid.infrastructure.logging_config import get_logger
 from etl_sigrid.infrastructure.postgres.client_factory import build_postgres_client
+from etl_sigrid.infrastructure.postgres.grants import esquemas_en_conflicto
 
 if TYPE_CHECKING:  # pragma: no cover - solo para anotaciones
     from config.settings import Settings
@@ -78,10 +96,32 @@ class ApplyGrantsStep(PipelineStep):
         # empleados y el MCP no sabe todavía quién pregunta. El REVOKE viaja
         # AQUÍ, dentro del paso que corre cada noche, y no como una orden
         # suelta contra la base: una revocación a mano la deshace la primera
-        # nocturna que pase, porque este paso hace `GRANT SELECT ON ALL TABLES
-        # IN SCHEMA raw`. El porqué y la condición de reversión, en
+        # nocturna que pase. El porqué y la condición de reversión, en
         # `config/settings.py` (DEFAULT_EXCLUDED_TABLES).
         excluidas = list(pg_settings.excluded_table_list)
+        consumo = list(pg_settings.consumption_schema_list)
+        vetados = list(pg_settings.vetoed_schema_list)
+        restringidos = list(pg_settings.restricted_schema_list)
+        autorizado = (pg_settings.restricted_role or "").strip()
+        dueno = (pg_settings.set_role or "").strip()
+
+        # F-135, R17: una configuración contradictoria para ANTES de tocar nada
+        conflicto = esquemas_en_conflicto(consumo, vetados)
+        if conflicto:
+            return self._fallo(
+                result,
+                f"PG_CONSUMPTION_SCHEMAS incluye esquemas vetados ({', '.join(conflicto)}): "
+                "un .env viejo los reabriría al rol general. Quítalos de "
+                "PG_CONSUMPTION_SCHEMAS (F-135); no se ha ejecutado nada.",
+            )
+        sin_vetar = [s for s in restringidos if s not in vetados]
+        if sin_vetar:
+            return self._fallo(
+                result,
+                f"PG_RESTRICTED_SCHEMAS tiene esquemas que no están en PG_VETOED_SCHEMAS "
+                f"({', '.join(sin_vetar)}): el rol general podría leerlos (F-135); "
+                "no se ha ejecutado nada.",
+            )
 
         pg = self._client or build_postgres_client(self._settings)
 
@@ -98,12 +138,30 @@ class ApplyGrantsStep(PipelineStep):
                 result.finished_at = datetime.utcnow()
                 return result
 
-            sentencias = pg.apply_readonly_grants(
+            sentencias = list(pg.apply_readonly_grants(
                 readonly_role=rol,
-                owner_role=(pg_settings.set_role or "").strip(),
-                schemas=pg_settings.consumption_schema_list,
+                owner_role=dueno,
+                schemas=consumo,
                 excluded_tables=excluidas,
-            )
+                vetoed_schemas=vetados,
+            ))
+
+            # F-135, R15: el rol autorizado. Sin él no se expone nada: se avisa.
+            if not autorizado:
+                estado_autorizado = "(sin configurar)"
+            elif pg.role_exists(autorizado):
+                sentencias += pg.apply_restricted_grants(autorizado, dueno, restringidos)
+                estado_autorizado = autorizado
+            else:
+                logger.warning(
+                    "apply_grants_rol_autorizado_inexistente",
+                    role=autorizado,
+                    detalle="créalo con infra/sql/02_roles.sql",
+                )
+                estado_autorizado = f"{autorizado} (no existe)"
+
+            # F-135, R18: la postcondición, preguntada al catálogo
+            indebidas = pg.lecturas_indebidas(rol, vetados, excluidas)
         except Exception as e:  # el resto del pipeline ya ha terminado bien
             logger.error("apply_grants_fallido", role=rol, error=str(e))
             result.status = StepStatus.FAILED
@@ -111,9 +169,30 @@ class ApplyGrantsStep(PipelineStep):
             result.finished_at = datetime.utcnow()
             return result
 
+        result.metadata["esquemas"] = consumo
+        result.metadata["tablas_excluidas"] = excluidas
+        result.metadata["vetados"] = vetados
+        result.metadata["rol_autorizado"] = estado_autorizado
+        if indebidas:
+            result.metadata["verificacion"] = indebidas
+            return self._fallo(
+                result,
+                f"el rol '{rol}' sigue leyendo lo vetado: {', '.join(indebidas)}. "
+                "Es una concesión que esta nocturna no puede revocar (a PUBLIC, o de "
+                "un concedente que no es el dueño): ejecuta el punto 5 ter de "
+                "infra/sql/02_roles.sql y, si sigue, revoca la de PUBLIC (F-135, F-068).",
+            )
+        result.metadata["verificacion"] = "ok"
+
         result.status = StepStatus.SUCCESS
         result.rows_processed = len(sentencias)
-        result.metadata["esquemas"] = pg_settings.consumption_schema_list
-        result.metadata["tablas_excluidas"] = excluidas
+        result.finished_at = datetime.utcnow()
+        return result
+
+    @staticmethod
+    def _fallo(result: StepResult, mensaje: str) -> StepResult:
+        logger.error("apply_grants_fallido", error=mensaje)
+        result.status = StepStatus.FAILED
+        result.error_message = mensaje
         result.finished_at = datetime.utcnow()
         return result

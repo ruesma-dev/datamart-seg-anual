@@ -9,6 +9,78 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-11 · F-135 · IMPLEMENTADA (T1-T14), a la espera del reviewer · `in_progress`
+
+> Rama `feature/F-135-restringir-personal-contabilidad`, desde `ffadfb2`. Spec aprobada
+> el 2026-10-11 con D1-D12 recomendadas y la precisión del humano (`spec_F-135.md` §9).
+> Informe final: `progress/impl_F-135.md`.
+
+- **`init.sh` de arranque**: un solo KO, `test_f006_dataclasses_inmutables` (342 passed
+  hasta ahí), y lo provoqué YO: creé `domain/restriccion_personal.py` (con un
+  `@dataclass`) mientras la suite corría, después de que el test fijara su lista. Ese
+  fichero, relanzado solo, pasa (179 passed). Se relanza `init.sh` entero tras T1.
+- **Estado**: T1-T14 hechas, un commit por tarea (+ `azure-apps` `3110470`, sin push).
+  `init.sh` VERDE (7.486 passed, cobertura 100 % de 135 líneas); mutación 25/25 muertos,
+  0 supervivientes; SQL y permisos probados en un PostgreSQL 16.15 local; T14 contra
+  Azure en solo lectura: 55.519 restringidos, 0 CR visibles. Quedan T15-T18 (MANUAL del
+  humano, en orden, en `progress/impl_F-135.md` §8) y el review.
+- **Aviso**: el contraste T14 (`SELECT` READ ONLY, 206 s) se lanzó a las 02:07 UTC, dentro
+  de la ventana nocturna; no escribió nada, pero compitió por CPU con la nocturna.
+- **Interpretación (no desviación)**: la precisión del humano pide que la copia completa
+  tenga «las mismas columnas» que la `contabilidad` de hoy. Se conservan TODAS las de hoy,
+  con el mismo nombre, orden y cálculo; `mayor` añade al final las tres de R5
+  (`restringido`, `motivo_restriccion`, `saldo_acumulado_visible`), que la spec aprobada
+  pide y que el build general necesita. `plan_cuentas` y `saldos_cuenta_mes` restringidos,
+  idénticos a los de hoy.
+- **Desviación justificada**: la spec dice `version: 48` del diccionario; F-090 ya
+  publicó la 48 el 2026-10-10, así que F-135 sube a **49**. Recuentos del diccionario
+  tras F-135: **212 objetos y 1699 columnas descritas** (3 fichas nuevas en
+  `contabilidad_restringida` y `contabilidad.apuntes_restringidos_mes`).
+- Las fichas del completo NO declaran `claves_alternativas`: las seis aprobadas por el
+  humano (F-108) siguen siendo seis; la del plan la vigila `check-unicidad` en el general,
+  que tiene los mismos nodos.
+
+## 2026-10-09 · F-135 · SPEC ESCRITA, pendiente de aprobación del humano · `pending`
+
+> Spec-author. Rama `feature/F-135-restringir-personal-contabilidad` (desde `main`
+> `75389c5`). Spec en `specs/F-135-restringir-personal-contabilidad/` (requirements 149,
+> design 238, tasks 19 tareas); mediciones en `progress/spec_F-135.md` (solo recuentos y
+> agregados, medidas en Azure con `filas_solo_lectura` y sin bootstrap: ni un GRANT ni
+> un REVOKE). `init.sh` de arranque: pytest VERDE (7.143 passed, 40 min 43 s); su único
+> KO fue la puerta de tamaño sobre el `requirements.md` a medio escribir (151 > 150),
+> ya corregido.
+>
+> **AVISO, `init.sh` de cierre (sobre `27cf43e`) en ROJO por causa AJENA a F-135**:
+> tamaño OK (149/150, 238/250), pero pytest se para en
+> `tests/test_f085_diccionario.py::test_f085_r28_azure_apps` («azure-apps no dice
+> "72 tablas"»). Motivo: el commit `fc40216` de `azure-apps` (18:22, **F-090**, desde
+> su worktree, sin fusionar) ya escribe «74 tablas», y `main` aún espera 72. No lo he
+> tocado (ni `azure-apps` ni el worktree de F-090). Se arregla al fusionar F-090 en
+> `main`, o el líder decide antes. Toda rama que salga de `main` hasta entonces lo verá.
+
+- **Lo medido que cambia el problema**: lo restringido (criterio V2) son **55.504
+  apuntes (2,55 % del mayor), 8.791 asientos, 25 empresas**. Pero además de
+  `contabilidad`, el rol general lee en `raw` **37.048 efectos de pago de nómina de
+  1.015 trabajadores, 34.191 con su cuenta bancaria (`raw.pag`)**, 100.502 repartos
+  analíticos de esos apuntes (`raw.apa`), `raw.rac`, `raw.con`, `raw.asi` y `raw.hmores`.
+  `retenciones` solo toca 8 apuntes (de proveedor); `compras`, `mart`, `cierre`: nada.
+- **Propuesta**: contabilidad completa en `contabilidad_restringida` (grupo `NOLOGIN`
+  `sigrid_dm_restringido_ro`) y `contabilidad` general filtrada y materializada;
+  `raw` fuera entero del rol general; `apply_grants` veta y VERIFICA cada noche.
+- **Decisiones abiertas para el humano** (`design.md` §8, con cifras y recomendación):
+  D1 criterio (V2 recomendado, +4.258 apuntes sobre el literal de Juan); D2 mecanismo
+  (copia física, +0,75 GB y +3-5 min estimados); D3 `raw` fuera entero (ANTES: confirmar
+  que ningún informe de Power BI lee `raw`); D4 `retenciones` sin tocar; D5 solo
+  recuentos de lo que queda fuera, sin importes; D6 enmascarar los nombres de 521
+  cuentas; D7 nombres de esquema y rol; D9 570 solo dentro de los asientos de nómina.
+- **Para Juan**: D8 quién es «ese rol» y por qué canal; D10 el coste por persona que ya
+  publica `personal` (mismo dato que `raw.reshor`, revocada); D12 si las 62 cuentas 4751
+  con nombre de persona son de trabajadores.
+- **Acceptance de F-135 ajustado** (criterio 2): añade `raw.con`, `rac` y `pag` (lo
+  medido) y deja la excepción de `retenciones` a la D4. `status` sin tocar.
+- **Fuera de este repositorio, anotado**: `mcp-bbdd` F-008 (rol según quién pregunta) y
+  F-087 (rol propio de Power BI). Hasta entonces el rol autorizado no lo usa ningún cliente.
+
 ## 2026-10-10 · F-090 · CERRADA (`done`, APROBADO en pasada 2) · DESPLEGADA el 10-10 (`r20261010-1309`)
 
 > **DESPLEGADA por el líder el 2026-10-10, por orden del humano** («integra, despliega, y si

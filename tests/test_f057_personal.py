@@ -1017,8 +1017,8 @@ def test_f057_r25_personal_en_esquemas_del_datamart() -> None:
 
     assert "personal" in ESQUEMAS_DEL_DATAMART
     # Once desde F-056, que anadio `contabilidad`; doce desde F-097
-    # (`descompuestos`).
-    assert len(ESQUEMAS_DEL_DATAMART) == 12
+    # (`descompuestos`); trece desde F-135 (`contabilidad_restringida`).
+    assert len(ESQUEMAS_DEL_DATAMART) == 13
 
 
 def test_f057_r25_el_fichero_de_provision_trae_los_diez_esquemas() -> None:
@@ -1032,15 +1032,18 @@ def test_f057_r25_el_fichero_de_provision_trae_los_diez_esquemas() -> None:
 
     crudo = (RAIZ / "infra" / "sql" / "02_roles.sql").read_text(encoding="utf-8")
     sql = _sin_comentarios(crudo)
-    esperado = set(ESQUEMAS_DEL_DATAMART)
+    # F-135: `contabilidad_restringida` es un esquema del datamart que el rol
+    # general NO recibe, igual que `raw` desde entonces (los dos, VETADOS).
+    esperado = set(ESQUEMAS_DEL_DATAMART) | {"contabilidad_restringida"}
+    vetados = {"raw", "contabilidad_restringida"}
 
     creados = set(re.findall(r"CREATE SCHEMA IF NOT EXISTS (\w+);", sql))
     assert creados == esperado, f"punto 4: crea {sorted(creados)} (R25)"
 
     concedidos = re.search(r"FOREACH esquema IN ARRAY ARRAY\[(.*?)\]", sql, re.DOTALL)
     assert concedidos, "falta el ARRAY del GRANT del punto 5"
-    assert set(re.findall(r"'(\w+)'", concedidos.group(1))) == esperado, (
-        "punto 5: el GRANT del MCP no cubre los diez esquemas (R25)"
+    assert set(re.findall(r"'(\w+)'", concedidos.group(1))) == esperado - vetados, (
+        "punto 5: el GRANT del MCP cubre los esquemas del datamart salvo los vetados (R25, F-135)"
     )
 
     comprobados = re.search(r"WHERE nspname IN \((.*?)\)", sql, re.DOTALL)

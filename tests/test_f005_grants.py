@@ -71,16 +71,22 @@ def test_f005_r14_la_lista_ampliada_incluye_los_esquemas_internos() -> None:
     """
     Decisión del humano de 2026-08-08: el MCP lee todo de momento. Con la lista
     por defecto de PG_CONSUMPTION_SCHEMAS, los esquemas internos también entran.
+
+    SALVO `raw` desde F-135 (2026-10-11, D3-A): trae el mayor, los pagos de
+    nómina y los repartos analíticos de personal, y queda VETADO al rol general.
     """
     from config.settings import DEFAULT_CONSUMPTION_SCHEMAS
 
     esquemas = [s.strip() for s in DEFAULT_CONSUMPTION_SCHEMAS.split(",")]
     for esquema in (*ESQUEMAS_CONSUMO, *ESQUEMAS_INTERNOS):
-        assert esquema in esquemas
+        if esquema == "raw":
+            assert esquema not in esquemas, "F-135: raw fuera del rol general"
+        else:
+            assert esquema in esquemas
 
     sentencias = build_readonly_grant_statements("mcp_ro", "sigrid_dm_etl", esquemas)
     texto = "\n".join(sentencias)
-    assert 'GRANT SELECT ON ALL TABLES IN SCHEMA "raw" TO "mcp_ro"' in texto
+    assert '"raw"' not in texto
     assert 'GRANT SELECT ON ALL TABLES IN SCHEMA "_meta" TO "mcp_ro"' in texto
 
 
@@ -236,6 +242,7 @@ class _ClienteFalso:
         owner_role: str,
         schemas: object,
         excluded_tables: object = (),
+        vetoed_schemas: object = (),
     ) -> list[str]:
         esquemas = list(schemas)  # type: ignore[call-overload]
         excluidas = list(excluded_tables)  # type: ignore[call-overload]
@@ -244,6 +251,16 @@ class _ClienteFalso:
         return build_readonly_grant_statements(
             readonly_role, owner_role, esquemas, excluded_tables=excluidas
         )
+
+    # F-135: el rol autorizado y la verificación del catálogo. Esta batería
+    # fija el camino de F-005; lo de F-135 vive en `test_f135_grants.py`.
+    def apply_restricted_grants(self, role: str, owner_role: str, schemas: object) -> list[str]:
+        self.llamadas.append("apply_restricted_grants")
+        return []
+
+    def lecturas_indebidas(self, role: str, schemas: object, tables: object) -> list[str]:
+        self.llamadas.append("lecturas_indebidas")
+        return []
 
 
 def _settings_falso(**postgres: object) -> SimpleNamespace:
@@ -255,6 +272,10 @@ def _settings_falso(**postgres: object) -> SimpleNamespace:
         # F-068: el step lee la lista de tablas excluidas. Aquí va vacía a
         # propósito: lo que fija esta batería es el camino sin exclusiones.
         "excluded_table_list": [],
+        # F-135: sin vetos ni rol autorizado, el camino de F-005 tal cual.
+        "vetoed_schema_list": [],
+        "restricted_role": "",
+        "restricted_schema_list": [],
     }
     base.update(postgres)
     return SimpleNamespace(postgres=SimpleNamespace(**base))

@@ -24,6 +24,13 @@ Cuatro familias:
    esquemas de consumo, `ESQUEMAS_DEL_DATAMART`, `check-declarados`.
 4. El diccionario (R27-R30): tres fichas, la regla dura y las fichas de `raw`
    que decian cosas falsas.
+
+F-135 (2026-10-11): los tres `CREATE` de F-056 (01-03) escriben ahora en
+`contabilidad_restringida` (la contabilidad COMPLETA, solo para el rol
+autorizado) y la `contabilidad` general sale de ellos en 04-07. Este fichero
+sigue comprobando LO MISMO sobre 01-03, con el esquema cambiado; el mayor
+completo gana dos CTE (`asientos_personal`, `marcados`) y tres columnas al
+final, fijados aqui y requisito a requisito en `tests/test_f135_sql.py`.
 """
 
 from __future__ import annotations
@@ -50,6 +57,15 @@ PLAN = "01_plan_cuentas.sql"
 MAYOR = "02_mayor.sql"
 SALDOS = "03_saldos_cuenta_mes.sql"
 FICHEROS = [SETUP, PLAN, MAYOR, SALDOS]
+#: F-135: los cuatro de la contabilidad GENERAL, detras de los de F-056
+FICHEROS_F135 = [
+    "04_plan_cuentas_general.sql", "05_mayor_general.sql", "06_saldos_general.sql",
+    "07_apuntes_restringidos_mes.sql",
+]
+#: F-135: donde escriben 01-03 (la contabilidad COMPLETA)
+ESQ = "contabilidad_restringida"
+#: F-135: las tres columnas que el mayor COMPLETO anade al final
+EXTRA_MAYOR = ["restringido", "motivo_restriccion", "saldo_acumulado_visible"]
 
 TABLAS = ("plan_cuentas", "mayor", "saldos_cuenta_mes")
 
@@ -111,8 +127,8 @@ def _bloque(nombre: str, desde: str, hasta: str | None = None) -> str:
 
 
 def _create(nombre: str, tabla: str) -> str:
-    """El `CREATE TABLE contabilidad.<tabla> AS ...` hasta su `;`."""
-    return _bloque(nombre, f"CREATE TABLE contabilidad.{tabla} AS", ";")
+    """El `CREATE TABLE contabilidad_restringida.<tabla> AS ...` hasta su `;`."""
+    return _bloque(nombre, f"CREATE TABLE {ESQ}.{tabla} AS", ";")
 
 
 def _cte(nombre: str, cte: str) -> str:
@@ -181,7 +197,7 @@ def test_f056_r1_esquema_y_paso_propio() -> None:
         "la vista maestro.centros_coste es SQL puro sobre raw: declarar "
         "build_maestros ataria la contabilidad a otro esquema (design)"
     )
-    assert [s.sql_file for s in build_contabilidad_step.SUB_PASOS] == FICHEROS
+    assert [s.sql_file for s in build_contabilidad_step.SUB_PASOS] == FICHEROS + FICHEROS_F135
     for sub in build_contabilidad_step.SUB_PASOS:
         assert (DIR_CON / sub.sql_file).exists(), f"{sub.sql_file} declarado y no existe"
 
@@ -207,7 +223,7 @@ def test_f056_r2_solo_raw_y_el_puente() -> None:
         texto = _sql(nombre)
         # «FROM esquema.tabla alias»: el alias descarta el `IS DISTINCT FROM pad.ide`
         esquemas = set(re.findall(r"(?:FROM|JOIN)\s+(\w+)\.\w+ \w+", texto))
-        assert esquemas <= {"raw", "contabilidad", "maestro"}, f"{nombre} lee {sorted(esquemas)}"
+        assert esquemas <= {"raw", ESQ, "maestro"}, f"{nombre} lee {sorted(esquemas)}"
         assert set(re.findall(r"(?:FROM|JOIN)\s+maestro\.(\w+)", texto)) <= {"centros_coste"}
         for vetado in ("stg.", "mart.", "cierre.", "compras.", "retenciones.", "personal."):
             assert not re.search(rf"(?<![\w]){re.escape(vetado)}", texto), f"{nombre} nombra {vetado}"
@@ -297,16 +313,19 @@ def test_f056_r3_el_step_encadena_y_cuenta(monkeypatch: pytest.MonkeyPatch) -> N
 
         def count_rows(self, schema: str, table: str) -> int:
             self.contados.append((schema, table))
-            return {"plan_cuentas": 5, "mayor": 7, "saldos_cuenta_mes": 11}[table]
+            return {"plan_cuentas": 5, "mayor": 7, "saldos_cuenta_mes": 11,
+                    "apuntes_restringidos_mes": 13}[table]
 
     pg = _PgFalso()
     monkeypatch.setattr(build_contabilidad_step, "build_postgres_client", lambda _s: pg)
     resultado = BuildContabilidadStep(SimpleNamespace()).run()
 
     assert resultado.status == StepStatus.SUCCESS
-    assert pg.ejecutados == FICHEROS
-    assert pg.contados == [("contabilidad", t) for t in TABLAS]
-    assert resultado.rows_processed == 23
+    assert pg.ejecutados == FICHEROS + FICHEROS_F135
+    assert pg.contados == [(ESQ, t) for t in TABLAS] + [
+        ("contabilidad", t) for t in (*TABLAS, "apuntes_restringidos_mes")
+    ]
+    assert resultado.rows_processed == 23 + 23 + 13
     assert resultado.finished_at is not None
     assert resultado.error_message is None
 
@@ -365,6 +384,10 @@ def test_f056_r3_el_log_de_cada_sub_paso(monkeypatch: pytest.MonkeyPatch) -> Non
         ("contabilidad_substep_done", "plan_cuentas", 9),
         ("contabilidad_substep_done", "mayor", 9),
         ("contabilidad_substep_done", "saldos_cuenta_mes", 9),
+        ("contabilidad_substep_done", "plan_cuentas_general", 9),
+        ("contabilidad_substep_done", "mayor_general", 9),
+        ("contabilidad_substep_done", "saldos_general", 9),
+        ("contabilidad_substep_done", "apuntes_restringidos_mes", 9),
     ], "setup no cuenta filas: su log dice 0, no lo que valga por defecto"
     assert {d["duration_s"] for _, d in registro.info_} == {1.23}, "segundos con dos decimales"
 
@@ -452,9 +475,13 @@ def test_f056_r3_sub_pasos_y_sus_tablas() -> None:
     ]
     assert declarados == [
         ("setup", SETUP, None, None),
-        ("plan_cuentas", PLAN, "contabilidad", "plan_cuentas"),
-        ("mayor", MAYOR, "contabilidad", "mayor"),
-        ("saldos_cuenta_mes", SALDOS, "contabilidad", "saldos_cuenta_mes"),
+        ("plan_cuentas", PLAN, ESQ, "plan_cuentas"),
+        ("mayor", MAYOR, ESQ, "mayor"),
+        ("saldos_cuenta_mes", SALDOS, ESQ, "saldos_cuenta_mes"),
+        ("plan_cuentas_general", FICHEROS_F135[0], "contabilidad", "plan_cuentas"),
+        ("mayor_general", FICHEROS_F135[1], "contabilidad", "mayor"),
+        ("saldos_general", FICHEROS_F135[2], "contabilidad", "saldos_cuenta_mes"),
+        ("apuntes_restringidos_mes", FICHEROS_F135[3], "contabilidad", "apuntes_restringidos_mes"),
     ]
 
 
@@ -522,12 +549,12 @@ def test_f056_r6_dos_ramas_grupos_y_auxiliares_sin_filtrar() -> None:
 
 def test_f056_r7_clave_primaria_unica_por_empresa_y_clave_legible() -> None:
     texto = _sql(PLAN)
-    assert "ALTER TABLE contabilidad.plan_cuentas ADD PRIMARY KEY (cuenta_id);" in texto
+    assert f"ALTER TABLE {ESQ}.plan_cuentas ADD PRIMARY KEY (cuenta_id);" in texto
     assert (
-        "CREATE UNIQUE INDEX uq_con_plan_empresa_codigo ON contabilidad.plan_cuentas "
+        f"CREATE UNIQUE INDEX uq_con_plan_empresa_codigo ON {ESQ}.plan_cuentas "
         "(empresa_id, codigo_cuenta);"
     ) in texto
-    assert "CREATE INDEX idx_con_plan_padre ON contabilidad.plan_cuentas (cuenta_padre_id);" in texto
+    assert f"CREATE INDEX idx_con_plan_padre ON {ESQ}.plan_cuentas (cuenta_padre_id);" in texto
     assert "n.empresa_id::TEXT || '-' || n.codigo_cuenta AS clave_cuenta" in _final(PLAN, "plan_cuentas")
     assert "c.ide AS cuenta_id" in _cte(PLAN, "nodos"), "cuenta_id es el con.ide (R7)"
 
@@ -612,19 +639,22 @@ def test_f056_r13_una_fila_por_apunte_sin_filtrar() -> None:
         "ni WHERE ni JOIN que filtre: un apunte sin asiento sigue dentro (R13)"
     )
     assert "a.ide AS apunte_id" in apuntes
-    assert "ALTER TABLE contabilidad.mayor ADD PRIMARY KEY (apunte_id);" in _sql(MAYOR)
-    for cte in ("fechados", "clasificados", "saldos"):
+    assert f"ALTER TABLE {ESQ}.mayor ADD PRIMARY KEY (apunte_id);" in _sql(MAYOR)
+    for cte in ("fechados", "clasificados", "saldos", "marcados"):
         assert " WHERE " not in _cte(MAYOR, cte), f"el CTE {cte} filtra apuntes"
-    assert " WHERE " not in _final(MAYOR, "mayor")
+    # F-135: el final lleva un FILTER (WHERE ...) en la ventana del acumulado
+    # visible, que no filtra filas: lo que no puede tener es un WHERE propio
+    clausulas_final = _contrato_real(f"{ESQ}.mayor")[-1][2]
+    assert not any(c.startswith("WHERE ") for c in clausulas_final), "el mayor completo filtra"
 
 
 def test_f056_r14_guarda_de_recuento_con_las_dos_cifras() -> None:
     texto = _sql(MAYOR)
     guarda = _bloque(MAYOR, "DO $$", "END $$;")
-    assert texto.index("DO $$") > texto.index("CREATE TABLE contabilidad.mayor AS"), (
+    assert texto.index("DO $$") > texto.index(f"CREATE TABLE {ESQ}.mayor AS"), (
         "es una POSTcondicion: va detras del CREATE"
     )
-    assert "SELECT count(*) INTO v_mayor FROM contabilidad.mayor;" in guarda
+    assert f"SELECT count(*) INTO v_mayor FROM {ESQ}.mayor;" in guarda
     assert "SELECT count(*) INTO v_apu FROM raw.apu;" in guarda
     assert "IF v_mayor <> v_apu THEN RAISE EXCEPTION 'mayor: " in guarda
     assert "tiene % filas y raw.apu tiene %" in guarda and "v_mayor, v_apu;" in guarda, (
@@ -646,10 +676,14 @@ def test_f056_r16_empresa_del_asiento_y_cuenta_del_plan() -> None:
     apuntes = _cte(MAYOR, "apuntes")
     assert "asi.emp AS empresa_id" in apuntes, "la empresa es la del ASIENTO (R16)"
     assert "NULLIF(a.cueide, 0) AS cuenta_id" in apuntes, "cueide = 0 -> cuenta NULL, apunte dentro"
+    # F-135: la union con el plan pasa al CTE `marcados` (alias `s` en el final)
+    marcados = _cte(MAYOR, "marcados")
+    assert f"LEFT JOIN {ESQ}.plan_cuentas pc ON pc.cuenta_id = s.cuenta_id" in marcados
     final = _final(MAYOR, "mayor")
-    assert "LEFT JOIN contabilidad.plan_cuentas pc ON pc.cuenta_id = s.cuenta_id" in final
+    assert "FROM marcados s " in final
     for col in ("codigo_cuenta", "nombre_cuenta", "clave_cuenta"):
-        assert f"pc.{col}," in final, f"{col} sale del plan (R16)"
+        assert f"pc.{col}," in marcados, f"{col} sale del plan (R16)"
+        assert f"s.{col}," in final
 
 
 def test_f056_r17_importes_numeric_y_signo_deudor() -> None:
@@ -734,23 +768,28 @@ def test_f056_r23_columnas_del_apunte() -> None:
 def test_f056_r24_ninguna_union_multiplica() -> None:
     """Cada JOIN del mayor va por PK o contra un conjunto con una fila por clave."""
     uniones = {
-        c for _, _, clausulas in _contrato_real("contabilidad.mayor")
+        c for _, _, clausulas in _contrato_real(f"{ESQ}.mayor")
         for c in clausulas if "JOIN " in c.split(" ON ", 1)[0]
     }
     assert uniones == {
         "LEFT JOIN raw.con asi ON asi.ide = a.asiide",
         "LEFT JOIN cierres ci ON ci.cuenta_id = f.cuenta_id AND ci.ejercicio = f.ejercicio - 1",
-        "LEFT JOIN contabilidad.plan_cuentas pc ON pc.cuenta_id = s.cuenta_id",
+        f"LEFT JOIN {ESQ}.plan_cuentas pa ON pa.cuenta_id = f.cuenta_id",
+        f"LEFT JOIN {ESQ}.plan_cuentas pc ON pc.cuenta_id = s.cuenta_id",
+        "LEFT JOIN asientos_personal ap ON ap.asiento_id = s.asiento_id",
         "LEFT JOIN maestro.centros_coste cc ON cc.centro_coste_id = s.centro_coste_id",
         "LEFT JOIN raw.con ter ON ter.ide = s.tercero_id",
     }, "cada union por PK (asiento, cuenta, tercero), centro unico (F-073) o conjunto DISTINCT"
+    assert "GROUP BY f.asiento_id" in _cte(MAYOR, "asientos_personal"), (
+        "F-135: una fila por asiento, la union no multiplica"
+    )
     assert "SELECT DISTINCT" in _cte(MAYOR, "cierres"), "el conjunto de cierres es DISTINCT"
     for indice in (
-        "CREATE INDEX idx_con_mayor_empresa_cuenta_fecha ON contabilidad.mayor (empresa_id, codigo_cuenta, fecha);",
-        "CREATE INDEX idx_con_mayor_cuenta_fecha ON contabilidad.mayor (cuenta_id, fecha);",
-        "CREATE INDEX idx_con_mayor_asiento ON contabilidad.mayor (asiento_id);",
-        "CREATE INDEX idx_con_mayor_obra ON contabilidad.mayor (obra_id);",
-        "CREATE INDEX idx_con_mayor_tercero ON contabilidad.mayor (tercero_id);",
+        f"CREATE INDEX idx_con_mayor_empresa_cuenta_fecha ON {ESQ}.mayor (empresa_id, codigo_cuenta, fecha);",
+        f"CREATE INDEX idx_con_mayor_cuenta_fecha ON {ESQ}.mayor (cuenta_id, fecha);",
+        f"CREATE INDEX idx_con_mayor_asiento ON {ESQ}.mayor (asiento_id);",
+        f"CREATE INDEX idx_con_mayor_obra ON {ESQ}.mayor (obra_id);",
+        f"CREATE INDEX idx_con_mayor_tercero ON {ESQ}.mayor (tercero_id);",
     ):
         assert indice in _sql(MAYOR), f"falta el indice: {indice}"
 
@@ -763,9 +802,9 @@ def test_f056_r24_ninguna_union_multiplica() -> None:
 def test_f056_r25_desde_el_mayor_con_el_importe_por_clase() -> None:
     mensual = _cte(SALDOS, "mensual")
     assert mensual.strip().endswith(
-        "FROM contabilidad.mayor m GROUP BY COALESCE(m.cuenta_id, 0), m.empresa_id, m.ejercicio, m.mes"
+        f"FROM {ESQ}.mayor m GROUP BY COALESCE(m.cuenta_id, 0), m.empresa_id, m.ejercicio, m.mes"
     )
-    assert set(re.findall(r"(?:FROM|JOIN)\s+(\w+\.\w+)", _sql(SALDOS))) == {"contabilidad.mayor"}
+    assert set(re.findall(r"(?:FROM|JOIN)\s+(\w+\.\w+)", _sql(SALDOS))) == {f"{ESQ}.mayor"}
     for expresion in (
         "COALESCE(m.cuenta_id, 0) AS cuenta_id",
         "COUNT(*) AS num_apuntes",
@@ -784,10 +823,10 @@ def test_f056_r25_desde_el_mayor_con_el_importe_por_clase() -> None:
         assert expresion in mensual, f"falta «{expresion}» (R25)"
     texto = _sql(SALDOS)
     assert (
-        "ALTER TABLE contabilidad.saldos_cuenta_mes ADD PRIMARY KEY (cuenta_id, empresa_id, ejercicio, mes);"
+        f"ALTER TABLE {ESQ}.saldos_cuenta_mes ADD PRIMARY KEY (cuenta_id, empresa_id, ejercicio, mes);"
     ) in texto, "la empresa va en la clave: los apuntes sin cuenta caen en varias el mismo mes"
     assert (
-        "CREATE INDEX idx_con_saldos_empresa_ejercicio ON contabilidad.saldos_cuenta_mes "
+        f"CREATE INDEX idx_con_saldos_empresa_ejercicio ON {ESQ}.saldos_cuenta_mes "
         "(empresa_id, ejercicio, mes);"
     ) in texto
 
@@ -812,11 +851,11 @@ def test_f056_r2_ficheros_con_cabecera_y_ruta(nombre: str) -> None:
                                                  (SALDOS, "saldos_cuenta_mes")])
 def test_f056_r13_tablas_idempotentes(nombre: str, tabla: str) -> None:
     texto = _sql(nombre)
-    assert f"DROP TABLE IF EXISTS contabilidad.{tabla} CASCADE;" in texto
-    assert texto.index(f"DROP TABLE IF EXISTS contabilidad.{tabla}") < texto.index(
-        f"CREATE TABLE contabilidad.{tabla} AS"
+    assert f"DROP TABLE IF EXISTS {ESQ}.{tabla} CASCADE;" in texto
+    assert texto.index(f"DROP TABLE IF EXISTS {ESQ}.{tabla}") < texto.index(
+        f"CREATE TABLE {ESQ}.{tabla} AS"
     )
-    assert f"COMMENT ON TABLE contabilidad.{tabla} IS" in texto
+    assert f"COMMENT ON TABLE {ESQ}.{tabla} IS" in texto
 
 
 # ===========================================================================
@@ -873,7 +912,9 @@ def _consultas_de(texto: str, ini: int, fin: int) -> list[tuple[bool, list[str],
         s = ini + m.start()
         nivel = prof[s]
         q_fin = s
-        while q_fin < fin and not (texto[q_fin] == ")" and prof[q_fin] < nivel) and not (
+        # F-135: un `)` DENTRO de un literal (prof -1, la regex '^(640|...)')
+        # no cierra la consulta
+        while q_fin < fin and not (texto[q_fin] == ")" and 0 <= prof[q_fin] < nivel) and not (
             prof[q_fin] == nivel and texto.startswith(" UNION ALL ", q_fin)
         ):
             q_fin += 1
@@ -919,7 +960,7 @@ def _columnas_de(objeto: str) -> list[str]:
 
 
 CONTRATO_SQL: dict[str, list[tuple[bool, list[str], list[str]]]] = {
-    'contabilidad.plan_cuentas': [
+    'contabilidad_restringida.plan_cuentas': [
         (
             False,
             [
@@ -1005,7 +1046,7 @@ CONTRATO_SQL: dict[str, list[tuple[bool, list[str], list[str]]]] = {
             ],
         ),
     ],
-    'contabilidad.mayor': [
+    'contabilidad_restringida.mayor': [
         (
             False,
             [
@@ -1072,6 +1113,33 @@ CONTRATO_SQL: dict[str, list[tuple[bool, list[str], list[str]]]] = {
         (
             False,
             [
+                'f.asiento_id',
+            ],
+            [
+                'LEFT JOIN contabilidad_restringida.plan_cuentas pa ON pa.cuenta_id = f.cuenta_id',
+                'WHERE f.asiento_id IS NOT NULL',
+                'GROUP BY f.asiento_id',
+                "HAVING bool_and(f.clase_bruta = 'NORMAL') AND bool_or(COALESCE(pa.codigo_cuenta ~ \'^(640|641|642|643|644|645|649|465|466|476|460|461|544|4753)\', f.cuenta_id IS NOT NULL) OR f.concepto ~* \'\\mn[oóÓ]minas?\\M\')",
+            ],
+        ),
+        (
+            False,
+            [
+                's.*',
+                'pc.codigo_cuenta',
+                'pc.nombre_cuenta',
+                'pc.clave_cuenta',
+                "COALESCE(pc.codigo_cuenta ~ \'^(640|641|642|643|644|645|649|465|466|476|460|461|544|4753)\', s.cuenta_id IS NOT NULL) AS es_cuenta_restringida",
+                '(ap.asiento_id IS NOT NULL) AS es_asiento_personal',
+            ],
+            [
+                'LEFT JOIN contabilidad_restringida.plan_cuentas pc ON pc.cuenta_id = s.cuenta_id',
+                'LEFT JOIN asientos_personal ap ON ap.asiento_id = s.asiento_id',
+            ],
+        ),
+        (
+            False,
+            [
                 's.apunte_id',
                 's.asiento_id',
                 's.codigo_asiento',
@@ -1083,9 +1151,9 @@ CONTRATO_SQL: dict[str, list[tuple[bool, list[str], list[str]]]] = {
                 's.mes',
                 's.empresa_id',
                 's.cuenta_id',
-                'pc.codigo_cuenta',
-                'pc.nombre_cuenta',
-                'pc.clave_cuenta',
+                's.codigo_cuenta',
+                's.nombre_cuenta',
+                's.clave_cuenta',
                 's.concepto',
                 's.documento',
                 's.punteo',
@@ -1102,15 +1170,17 @@ CONTRATO_SQL: dict[str, list[tuple[bool, list[str], list[str]]]] = {
                 "cc.empresa::TEXT || '-' || cc.codigo_obra AS clave_obra",
                 's.tercero_id',
                 'ter.res AS tercero_nombre',
+                '(s.es_cuenta_restringida OR s.es_asiento_personal) AS restringido',
+                "CASE WHEN s.es_cuenta_restringida AND s.codigo_cuenta IS NULL THEN 'CUENTA_SIN_RESOLVER' WHEN s.es_cuenta_restringida THEN 'CUENTA' WHEN s.es_asiento_personal THEN 'ASIENTO_PERSONAL' END AS motivo_restriccion",
+                'CASE WHEN s.es_cuenta_restringida OR s.es_asiento_personal THEN NULL ELSE SUM(s.importe_saldo) FILTER ( WHERE NOT (s.es_cuenta_restringida OR s.es_asiento_personal) ) OVER ( PARTITION BY s.cuenta_id ORDER BY s.fecha, s.codigo_asiento, s.posicion, s.apunte_id ) END::NUMERIC(18, 2) AS saldo_acumulado_visible',
             ],
             [
-                'LEFT JOIN contabilidad.plan_cuentas pc ON pc.cuenta_id = s.cuenta_id',
                 'LEFT JOIN maestro.centros_coste cc ON cc.centro_coste_id = s.centro_coste_id',
                 'LEFT JOIN raw.con ter ON ter.ide = s.tercero_id',
             ],
         ),
     ],
-    'contabilidad.saldos_cuenta_mes': [
+    'contabilidad_restringida.saldos_cuenta_mes': [
         (
             False,
             [
@@ -1154,7 +1224,7 @@ CONTRATO_SQL: dict[str, list[tuple[bool, list[str], list[str]]]] = {
 }
 
 
-@pytest.mark.parametrize("objeto", sorted(f"contabilidad.{t}" for t in TABLAS))
+@pytest.mark.parametrize("objeto", sorted(f"{ESQ}.{t}" for t in TABLAS))
 def test_f056_contrato_expresion_a_expresion(objeto: str) -> None:
     real = _contrato_real(objeto)
     esperado = CONTRATO_SQL[objeto]
@@ -1170,14 +1240,16 @@ def test_f056_contrato_control_el_parser_ve_lo_que_debe() -> None:
     total = sum(len(i) for q in CONTRATO_SQL.values() for _, i, _ in q)
     clausulas = sum(len(c) for q in CONTRATO_SQL.values() for _, _, c in q)
     assert total >= 100 and clausulas >= 15
-    plan = _contrato_real("contabilidad.plan_cuentas")
+    plan = _contrato_real(f"{ESQ}.plan_cuentas")
     assert len(plan) == 5, "grupos, empresas, las dos ramas de nodos y el final"
     assert plan[3][2] == ["JOIN raw.con c ON c.ide = cu.ide"], "la rama de cua es su propio SELECT"
 
 
 @pytest.mark.parametrize("tabla", TABLAS)
 def test_f056_contrato_columnas_publicadas(tabla: str) -> None:
-    assert _columnas_de(f"contabilidad.{tabla}") == COLUMNAS[tabla]
+    # F-135: el mayor COMPLETO conserva las de hoy y anade tres al final
+    extra = EXTRA_MAYOR if tabla == "mayor" else []
+    assert _columnas_de(f"{ESQ}.{tabla}") == COLUMNAS[tabla] + extra
 
 
 # ===========================================================================
@@ -1192,7 +1264,12 @@ def test_f056_r27_fichas_con_grano_claves_y_columnas(tabla: str) -> None:
     assert ficha["grano"] and ficha["descripcion"]
     assert ficha["paso_etl"] == "build_contabilidad"
     assert ficha["refresco"] == "nocturno"
-    assert list(ficha["columnas"]) == COLUMNAS[tabla], (
+    # F-135: la ficha es la de la contabilidad GENERAL, que anade columnas
+    # al final (lo que falta, solo recuentos); la del completo, en
+    # `tests/test_f135_sql.py`
+    extra = {"plan_cuentas": ["restringida"],
+             "saldos_cuenta_mes": ["num_apuntes_restringidos", "incompleto"]}.get(tabla, [])
+    assert list(ficha["columnas"]) == COLUMNAS[tabla] + extra, (
         f"las columnas de la ficha de {tabla} no son las del SQL (R27)"
     )
     for nombre, columna in ficha["columnas"].items():
@@ -1262,7 +1339,8 @@ def test_f056_r29_global_esquema_regla_y_version() -> None:
     reglas = {r["codigo"]: r for r in glob["reglas"]}
     regla = reglas["R-SALDO-CONTABLE"]
     assert regla["severidad"] == "bloqueante"
-    assert set(regla["ambito"]) == {f"contabilidad.{t}" for t in TABLAS}
+    # F-135: la trampa vale igual en la contabilidad completa
+    assert set(regla["ambito"]) == {f"{e}.{t}" for t in TABLAS for e in ("contabilidad", ESQ)}
     texto = regla["regla"] + regla["motivo"]
     for termino in ("importe_saldo", "saldo_acumulado", "CIERRE", "APERTURA", "REGULARIZACION"):
         assert termino in texto, f"R-SALDO-CONTABLE no dice «{termino}»"
