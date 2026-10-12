@@ -3,12 +3,13 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **123 features**, 69 abiertas, 54 terminadas.
+Resumen: **124 features**, 70 abiertas, 54 terminadas.
 
 ## Trabajo abierto
 
 | # | Feature | Prioridad | Estado | Rigor | Rama |
 |---|---|---|---|---|---|
+| F-136 | Usuario de base de acceso TOTAL para el MCP (mcp_sigrid_dm_total) y rotación de las contraseñas expuestas | 1 | pendiente | critico | `feature/F-136-usuario-mcp-total` |
 | F-129 | El objetivo del comparativo se mide contra la oferta de referencia del propio comparativo (oficina técnica o planificado ABC), no contra el descompuesto: hoy casa el 29 % | 2 | pendiente | critico | `feature/F-129-objetivo-contra-oferta-referencia` |
 | F-128 | Los importes de cabecera de la factura de proveedor (base, IVA, retención, total y total a pagar) y su pestaña de recargos y retenciones (dcfrec), para cuadrar la retención practicada contra el mayor de retenciones | 3 | pendiente | estandar | `feature/F-128-importes-cabecera-factura` |
 | F-127 | El mayor analítico: los apuntes de la contabilidad analítica (apa) y sus saldos por cuenta analítica y mes, con las cuentas de contrapartida (CP) de los trabajadores | 4 | pendiente | critico | `feature/F-127-mayor-analitico` |
@@ -139,6 +140,12 @@ Resumen: **123 features**, 69 abiertas, 54 terminadas.
 | F-052 | La obra 0599 no esta en el datamart: 104.366 filas de presupuesto se caen por un arbol de partidas roto | 42 | critico |
 
 ## Detalle
+
+### F-136 · Usuario de base de acceso TOTAL para el MCP (mcp_sigrid_dm_total) y rotación de las contraseñas expuestas
+
+estado **pendiente** · prioridad 1 · rigor `critico` · SDD sí · rama `feature/F-136-usuario-mcp-total`
+
+Nace el 2026-10-12, el día del despliegue de F-135. El humano fija quién ve la contabilidad completa: «tenemos que tener rol total juan, antonio de vicente y yo pablo gris. el resto el standar», y «total no incluye raw. siempre fuera». Hoy el MCP sabe quién pregunta (Entra, oid y UPN) pero conecta siempre con `mcp_sigrid_dm_ro`, así que los tres ven la contabilidad general (ver progress/explore_identidad_mcp.md). La solución tiene dos mitades: ESTA (el usuario de base) y la F-008 de `mcp-bbdd` (dos conexiones y la elección por identidad, con la lista de oid en la configuración del contenedor). AQUÍ: (1) login `mcp_sigrid_dm_total` en `infra/sql/02_roles.sql`, miembro de `mcp_sigrid_dm_ro` y de `sigrid_dm_restringido_ro`: lee lo mismo que el estándar más `contabilidad_restringida`, y NUNCA `raw`; contraseña solo en Key Vault (la del MCP, `kv-mcp-bbdd-dev`); (2) `apply-grants` verifica cada noche en el catálogo que el total no lee `raw` y que el estándar sigue sin leer lo vetado (fail-closed, FAILED con la lista); (3) ROTACIÓN de las contraseñas de `sigrid_dm_app` y `mcp_sigrid_dm_ro`, expuestas el 2026-10-12 en la terminal y en la conversación al lanzar `02_roles.sql` (incidencia en progress/current.md): valores nuevos en `kv-datamart-seg-dev` (`pg-sigrid-dm-app`, `pg-mcp-sigrid-dm-ro`) y `kv-mcp-bbdd-dev/pg-password`, `02_roles.sql`, reiniciar el MCP, credencial de Power BI y .env local del humano; procedimiento MANUAL con `psql` en Windows con las OPCIONES ANTES de la cadena de conexión (si no, las ignora y las imprime). Power BI (informes publicados o Desktop de los tres) queda para F-087 según responda el humano.
 
 ### F-129 · El objetivo del comparativo se mide contra la oferta de referencia del propio comparativo (oficina técnica o planificado ABC), no contra el descompuesto: hoy casa el 29 %
 
