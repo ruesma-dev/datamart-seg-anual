@@ -15,7 +15,7 @@
 > «diccionario v50» (`R-CONTABILIDAD-RESTRINGIDA` reescrita, avisos en las fichas). Informe
 > final en `progress/impl_F-136.md`. Nada se ejecuta contra Azure: rotación y alta son MANUAL.
 
-- Tarea en curso: T2 (T1 hecha).
+- Tarea en curso: T3 (T1-T2 hechas).
 - Desviaciones: ninguna por ahora.
 
 ## 2026-10-12 · F-136 · SPEC ESCRITA (spec-author), pendiente de aprobación del humano
