@@ -377,3 +377,169 @@ def test_f136_r4_sin_rol_estandar_no_pregunta_por_el_total() -> None:
     assert resultado.status.name == "SUCCESS"
     assert cliente.llamadas == []
     assert resultado.rows_processed == 0
+
+
+
+# --- R5-R11 · el bloque del total (T4) -------------------------------------
+
+_CAMINO_ESTANDAR = [
+    ("role_exists", ESTANDAR),
+    ("general", ESTANDAR),
+    ("role_exists", AUTORIZADO),
+    ("autorizado", AUTORIZADO),
+]
+
+
+def test_f136_r7_camino_normal_en_orden_y_sin_grant_al_total() -> None:
+    cliente = _ClienteFalso()
+    resultado = _paso(cliente)
+    assert resultado.status.name == "SUCCESS"
+    assert cliente.llamadas == _CAMINO_ESTANDAR + [
+        ("role_exists", TOTAL),
+        ("veto", TOTAL, DUENO, ["raw"]),
+        ("verifica", TOTAL, ["raw"], ["raw.emp"]),
+        ("usage", TOTAL, ["mart", "contabilidad", RESTR]),
+        ("verifica", ESTANDAR, [RESTR, "raw"], ["raw.emp"]),
+    ], "el veto del total va DESPUÉS de las concesiones al estándar y al autorizado"
+    assert not any(c[0] in ("general", "autorizado") and c[1] == TOTAL for c in cliente.llamadas), (
+        "ningún GRANT al total: lee por pertenencia"
+    )
+    assert resultado.metadata["rol_total"] == TOTAL
+    assert resultado.metadata["verificacion_total"] == "ok"
+    assert resultado.metadata["acceso_total"] == "ok"
+    assert resultado.metadata["verificacion"] == "ok"
+
+
+def test_f136_r11_rows_processed_suma_el_veto_del_total() -> None:
+    resultado = _paso(_ClienteFalso())
+    assert resultado.rows_processed == 2 + 1 + 3
+
+
+def test_f136_r5_sin_total_configurado_no_se_toca(log: _Log) -> None:
+    cliente = _ClienteFalso()
+    resultado = _paso(cliente, total_role="  ")
+    assert resultado.status.name == "SUCCESS"
+    assert cliente.llamadas == _CAMINO_ESTANDAR + [("verifica", ESTANDAR, [RESTR, "raw"], ["raw.emp"])]
+    assert resultado.metadata["rol_total"] == "(sin configurar)"
+    assert resultado.metadata["verificacion_total"] == "no aplica"
+    assert resultado.metadata["acceso_total"] == "no aplica"
+    assert resultado.rows_processed == 3
+    assert log.avisos == []
+
+
+def test_f136_r6_total_inexistente_avisa_y_sigue(log: _Log) -> None:
+    cliente = _ClienteFalso(existen=(ESTANDAR, AUTORIZADO))
+    resultado = _paso(cliente)
+    assert resultado.status.name == "SUCCESS"
+    assert cliente.llamadas == _CAMINO_ESTANDAR + [
+        ("role_exists", TOTAL),
+        ("verifica", ESTANDAR, [RESTR, "raw"], ["raw.emp"]),
+    ], "ninguna sentencia ni pregunta sobre un login que no existe"
+    assert log.avisos == [("apply_grants_login_total_inexistente",
+                           {"role": TOTAL, "detalle": "créalo con infra/sql/02_roles.sql"})]
+    assert resultado.metadata["rol_total"] == f"{TOTAL} (no existe)"
+    assert resultado.metadata["verificacion_total"] == "no aplica"
+    assert resultado.metadata["acceso_total"] == "no aplica"
+    assert resultado.rows_processed == 3
+
+
+def test_f136_r8_si_el_total_lee_algo_vetado_falla_con_la_lista() -> None:
+    cliente = _ClienteFalso(indebidas={TOTAL: ["raw (USAGE)", "raw.apu (SELECT)"]})
+    resultado = _paso(cliente)
+    assert resultado.status.name == "FAILED"
+    mensaje = resultado.error_message or ""
+    assert f"'{TOTAL}'" in mensaje and "raw (USAGE), raw.apu (SELECT)" in mensaje
+    assert f"'{ESTANDAR}' sigue leyendo" not in mensaje, "el estándar no lee nada"
+    assert "5 quater" in mensaje and "02_roles.sql" in mensaje
+    assert resultado.metadata["verificacion_total"] == ["raw (USAGE)", "raw.apu (SELECT)"]
+    assert resultado.metadata["verificacion"] == "ok"
+    assert resultado.metadata["rol_total"] == TOTAL
+    assert resultado.finished_at is not None
+
+
+def test_f136_r8_las_excluidas_tambien_cuentan() -> None:
+    """`PG_EXCLUDED_TABLES` se le pregunta también al total (R8)."""
+    cliente = _ClienteFalso()
+    _paso(cliente, excluded_table_list=["raw.emp", "raw.res"])
+    assert ("verifica", TOTAL, ["raw"], ["raw.emp", "raw.res"]) in cliente.llamadas
+
+
+def test_f136_r9_los_dos_leen_algo_un_solo_mensaje_con_las_dos_listas() -> None:
+    cliente = _ClienteFalso(indebidas={ESTANDAR: ["raw.pag (SELECT)"], TOTAL: ["raw (USAGE)"]})
+    resultado = _paso(cliente)
+    assert resultado.status.name == "FAILED"
+    mensaje = resultado.error_message or ""
+    assert f"'{ESTANDAR}' sigue leyendo lo vetado: raw.pag (SELECT)" in mensaje
+    assert f"'{TOTAL}' lee lo vetado: raw (USAGE)" in mensaje
+    assert resultado.metadata["verificacion"] == ["raw.pag (SELECT)"]
+    assert resultado.metadata["verificacion_total"] == ["raw (USAGE)"]
+
+
+def test_f136_r9_solo_el_estandar_el_mensaje_de_f135_no_cambia() -> None:
+    cliente = _ClienteFalso(indebidas={ESTANDAR: ["raw (USAGE)"]})
+    resultado = _paso(cliente)
+    mensaje = resultado.error_message or ""
+    assert resultado.status.name == "FAILED"
+    assert mensaje.startswith(f"el rol '{ESTANDAR}' sigue leyendo lo vetado: raw (USAGE). ")
+    assert f"'{TOTAL}'" not in mensaje
+    assert resultado.metadata["verificacion_total"] == "ok"
+
+
+def test_f136_r10_al_total_le_falta_lectura_avisa_sin_fallar(log: _Log) -> None:
+    cliente = _ClienteFalso(sin_usage=[RESTR])
+    resultado = _paso(cliente)
+    assert resultado.status.name == "SUCCESS", "D5: que lea de menos no expone nada"
+    assert resultado.metadata["acceso_total"] == [RESTR]
+    assert resultado.metadata["verificacion_total"] == "ok"
+    assert len(log.avisos) == 1
+    evento, datos = log.avisos[0]
+    assert evento == "apply_grants_login_total_incompleto"
+    assert datos["role"] == TOTAL and datos["faltan"] == [RESTR]
+    assert "5 quater" in str(datos["detalle"])
+
+
+def test_f136_r10_incompleto_y_ademas_lee_lo_vetado() -> None:
+    cliente = _ClienteFalso(sin_usage=["mart"], indebidas={TOTAL: ["raw (USAGE)"]})
+    resultado = _paso(cliente)
+    assert resultado.status.name == "FAILED"
+    assert resultado.metadata["acceso_total"] == ["mart"]
+
+
+def test_f136_paso_el_total_se_mira_aunque_falte_el_autorizado(log: _Log) -> None:
+    cliente = _ClienteFalso(existen=(ESTANDAR, TOTAL), sin_usage=[RESTR])
+    resultado = _paso(cliente)
+    assert resultado.status.name == "SUCCESS"
+    assert ("veto", TOTAL, DUENO, ["raw"]) in cliente.llamadas
+    assert resultado.metadata["acceso_total"] == [RESTR]
+    assert [e for e, _ in log.avisos] == [
+        "apply_grants_rol_autorizado_inexistente", "apply_grants_login_total_incompleto",
+    ]
+
+
+def test_f136_paso_sin_estandar_sale_antes_y_no_mira_el_total() -> None:
+    cliente = _ClienteFalso(existen=(AUTORIZADO, TOTAL))
+    resultado = _paso(cliente)
+    assert resultado.status.name == "SUCCESS"
+    assert cliente.llamadas == [("role_exists", ESTANDAR)]
+
+
+@pytest.mark.parametrize("donde", ["veto", "usage"])
+def test_f136_paso_un_fallo_del_cliente_en_el_total_es_failed(donde: str) -> None:
+    cliente = _ClienteFalso(falla_en=donde)
+    resultado = _paso(cliente)
+    assert resultado.status.name == "FAILED"
+    assert f"se cayó la conexión en {donde}" in (resultado.error_message or "")
+    assert ("verifica", ESTANDAR, [RESTR, "raw"], ["raw.emp"]) not in cliente.llamadas
+
+
+def test_f136_paso_sin_nombres_a_mano_y_docstring() -> None:
+    from etl_sigrid.application.steps import apply_grants_step
+
+    fuente = Path(apply_grants_step.__file__).read_text(encoding="utf-8")
+    ejecutable = "\n".join(f for f in fuente.splitlines() if not f.lstrip().startswith("#"))
+    codigo = ejecutable.split('"""', 2)[2]
+    assert TOTAL not in codigo, "el nombre sale de PG_TOTAL_ROLE, no del paso"
+    for campo in ("total_role", "total_vetoed_schema_list"):
+        assert campo in codigo
+    doc = apply_grants_step.__doc__ or ""
+    assert "F-136" in doc and "total" in doc

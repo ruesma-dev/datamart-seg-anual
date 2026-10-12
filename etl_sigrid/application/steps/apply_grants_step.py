@@ -38,6 +38,21 @@ Desde F-135 (2026-10-11) hace tres cosas más, en este orden:
      ni tabla excluida. Si lee algo, FAILED con la lista: una concesión hecha
      a mano por otro concedente no la revoca la nocturna (la lección de
      F-068), y sin esta comprobación pasaría inadvertida.
+
+Desde F-136 (2026-10-13) mira además el login de acceso TOTAL del MCP
+(`PG_TOTAL_ROLE`), miembro del rol general y del autorizado:
+
+  - ANTES de abrir conexión, FAILED si el total coincide con otro rol (R2) o si
+    algún esquema que se le veta (`PG_TOTAL_VETOED_SCHEMAS`, `raw`) no está
+    vetado al general o está en lo restringido o en el consumo (R3): lo
+    heredaría por pertenencia.
+  - NO le concede nada: lee por pertenencia. Tras las concesiones le VETA lo
+    suyo, comprueba en el catálogo que no lo lee (FAILED con la lista, en el
+    mismo mensaje que el general si los dos leen algo) y que llega a todo lo
+    que debe (si no, solo aviso: leer de menos no expone nada).
+  - Si el total no existe, avisa y sigue, como con el autorizado. La nocturna
+    no puede darle las pertenencias (no tiene ADMIN OPTION): eso es
+    `infra/sql/02_roles.sql`, punto 5 quater.
 """
 
 from __future__ import annotations
@@ -191,6 +206,26 @@ class ApplyGrantsStep(PipelineStep):
                 )
                 estado_autorizado = f"{autorizado} (no existe)"
 
+            # F-136: el login TOTAL. Lee por pertenencia (al general y al
+            # autorizado), así que NO se le concede nada: solo se le veta lo
+            # suyo, DESPUÉS de las concesiones, y se pregunta al catálogo.
+            indebidas_total: list[str] = []
+            faltan_total: list[str] = []
+            if not total:
+                estado_total = "(sin configurar)"
+            elif pg.role_exists(total):
+                sentencias += pg.apply_veto(total, dueno, total_vetados)  # R7
+                indebidas_total = pg.lecturas_indebidas(total, total_vetados, excluidas)  # R8
+                faltan_total = pg.esquemas_sin_usage(total, consumo + restringidos)  # R10
+                estado_total = total
+            else:
+                logger.warning(
+                    "apply_grants_login_total_inexistente",
+                    role=total,
+                    detalle="créalo con infra/sql/02_roles.sql",
+                )
+                estado_total = f"{total} (no existe)"
+
             # F-135, R18: la postcondición, preguntada al catálogo
             indebidas = pg.lecturas_indebidas(rol, vetados, excluidas)
         except Exception as e:  # el resto del pipeline ya ha terminado bien
@@ -204,16 +239,42 @@ class ApplyGrantsStep(PipelineStep):
         result.metadata["tablas_excluidas"] = excluidas
         result.metadata["vetados"] = vetados
         result.metadata["rol_autorizado"] = estado_autorizado
+        result.metadata["verificacion"] = indebidas or "ok"
+        result.metadata["rol_total"] = estado_total
+        if estado_total == total:
+            result.metadata["verificacion_total"] = indebidas_total or "ok"
+            result.metadata["acceso_total"] = faltan_total or "ok"
+        else:
+            result.metadata["verificacion_total"] = "no aplica"
+            result.metadata["acceso_total"] = "no aplica"
+
+        # F-136, R10 (D5): que el total lea DE MENOS no expone nada; se avisa.
+        if faltan_total:
+            logger.warning(
+                "apply_grants_login_total_incompleto",
+                role=total,
+                faltan=faltan_total,
+                detalle="le falta una pertenencia: punto 5 quater de infra/sql/02_roles.sql",
+            )
+
+        # F-135 R18 y F-136 R8-R9: un único FAILED que nombra a cada login con lo suyo
+        motivos: list[str] = []
         if indebidas:
-            result.metadata["verificacion"] = indebidas
-            return self._fallo(
-                result,
+            motivos.append(
                 f"el rol '{rol}' sigue leyendo lo vetado: {', '.join(indebidas)}. "
                 "Es una concesión que esta nocturna no puede revocar (a PUBLIC, o de "
                 "un concedente que no es el dueño): ejecuta el punto 5 ter de "
-                "infra/sql/02_roles.sql y, si sigue, revoca la de PUBLIC (F-135, F-068).",
+                "infra/sql/02_roles.sql y, si sigue, revoca la de PUBLIC (F-135, F-068)."
             )
-        result.metadata["verificacion"] = "ok"
+        if indebidas_total:
+            motivos.append(
+                f"el login total '{total}' lee lo vetado: {', '.join(indebidas_total)}. "
+                f"Tiene que ser miembro SOLO de '{rol}' y '{autorizado}' (punto 5 quater "
+                "de infra/sql/02_roles.sql) y sin concesiones propias ni de PUBLIC "
+                "(punto 5 ter) (F-136)."
+            )
+        if motivos:
+            return self._fallo(result, " ".join(motivos))
 
         result.status = StepStatus.SUCCESS
         result.rows_processed = len(sentencias)
