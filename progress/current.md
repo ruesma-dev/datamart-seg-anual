@@ -9,7 +9,7 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-12 · F-135 · CERRADA (`done`, APROBADO en pasada 2) · DESPLEGADA el 12-10 (`r20261012-1945`, diccionario v49)
+## 2026-10-12 · F-135 · CERRADA (`done`, APROBADO en pasada 2) · DESPLEGADA Y VERIFICADA el 12-10 (`r20261012-1945`, diccionario v49) · solo queda T18 (la nocturna del 13-10)
 
 > Merge en `main` `adec1c8` (y espejo en `dev`). Orden del humano: «despliega ya». El
 > paso 1 de la MANUAL (que ningún informe de Power BI lea `raw`) NO se comprobó: el humano
@@ -54,8 +54,12 @@
   `02_roles.sql` con valores nuevos + `kv-datamart-seg-dev` (`pg-sigrid-dm-app`,
   `pg-mcp-sigrid-dm-ro`) + `kv-mcp-bbdd-dev/pg-password` + reiniciar el MCP + credencial de los
   conjuntos de datos de Power BI + `.env` local del humano.
-- **Pendiente del HUMANO**: confirmar Power BI y `raw` (paso 1, no comprobado antes del
-  despliegue); D10 y D11 a Juan; la rotación de arriba.
+- **CERRADA por el humano el 12-10**, «cierra la feature a expensas de que este la carga
+  nocturna»: la única condición abierta es T18 (abajo). Power BI y `raw` (paso 1): **ignorado de
+  momento por decisión del humano** («de momento ignora bi»). D11 resuelta el 12-10: acceso
+  total para Juan Romero, Antonio de Vicente y Pablo Gris, el resto el estándar, `raw` siempre
+  fuera → **F-136** (este repositorio) y F-008 de `mcp-bbdd`. La rotación de contraseñas pasa a
+  F-136. D10 (coste por persona en `personal`) queda como pregunta a Juan, fuera de F-135.
 - **Pendiente del LÍDER (13-10, T18)**: nocturna con la imagen nueva: `apply_grants` SUCCESS con
   `verificacion = ok`, duración total frente a ~4 h 40 min (margen al tope de 5 h) y repetir la
   comprobación de catálogo.
