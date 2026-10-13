@@ -191,7 +191,7 @@ opción A** (tabla única + vista de compras; bajas marcadas con regla dura; esq
 `tesoreria_restringida`; cobros ya con su cobertura; solo recuentos para el estándar; unión
 de los cuatro criterios y los 429 autónomos visibles; remesa mixta a NULL; delante de compras
 sin `depends_on`; nombres). Texto íntegro con las alternativas: `progress/spec_F-037.md` §4.
-**Abiertas: D4 (remedida) y D11 (nueva).**
+**D4 (remedida) y D11 (nueva): APROBADAS con la opción A**, «si» (2026-10-13), a la pregunta «¿Apruebas D4-A y D11-A?». Todas las decisiones cerradas.
 
 **D4 · Obra, remedida con el contrato** (`progress/spec_F-037.md` §5). Escalones probados en
 pagos no personales: 1) centro → obra; 2) contrato de la factura (`dcf.ctride` y los de sus
@@ -232,7 +232,7 @@ efecto), y en sentido contrario 2,2 M€ de previstos vencidos hace más de 2 a�
 (41.884 pagos y 2.106 cobros; con vencimiento anterior a 2020, 27): `fecha_real` vacía en un efecto
 REALIZADO no es una falta, y por eso el estado lee `est` (R3). La ficha lo dice.
 
-**D11 · NUEVA, para que la decida el humano: el previsto antiguo.** (A) **Recomendada**:
+**D11 · NUEVA: el previsto antiguo. APROBADA la A.** (A) **Recomendada**:
 columna `previsto_antiguo` (PREVISTO con vencimiento anterior a la fecha del build menos 2
 años; hoy 2.361 pagos, 3,9 M€, y 398 cobros, 2,2 M€) y regla dura: la cartera de un flujo de
 caja es `PREVISTO AND NOT previsto_antiguo`; lo antiguo es deuda por depurar en Sigrid, no

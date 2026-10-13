@@ -1,8 +1,8 @@
 <!-- specs/F-037-tesoreria/requirements.md -->
 # F-037 · Fase 1: la cartera de cobros y pagos, sin obras
 
-Mediciones: `progress/spec_F-037.md`. Decisiones en `design.md` §8: D1-D3 y D5-D10 APROBADAS
-(2026-10-13); D4 y D11 abiertas, y aquí va su opción recomendada. **Alcance.** Cada efecto de `raw.pag` y `raw.cob` tal cual: es un HECHO, no un cálculo.
+Mediciones: `progress/spec_F-037.md`. Decisiones en `design.md` §8: D1-D11 APROBADAS con la opción A
+(2026-10-13). **Alcance.** Cada efecto de `raw.pag` y `raw.cob` tal cual: es un HECHO, no un cálculo.
 **FUERA, y se dice en la ficha**: la fase 2 (devengo pendiente de `stg.plan_mensual`,
 plazos de `auxpag`/`auxefp`, retención de `ctrrec`) y cualquier conversión devengo → caja,
 que es una hipótesis y la pone la IA en la consulta, declarándola.
@@ -123,7 +123,7 @@ R25. Regla dura `R-TESORERIA-ESTADO`: nunca se suma `BAJA`; «fecha real vacía�
 «previsto» (desde 2020 lo pagado por remesa queda `est = 10` sin fecha real); la cartera
 prevista es `estado_tesoreria = 'PREVISTO'`, y un previsto vencido es deuda sin puntear.
 
-R25 bis (DONDE el humano apruebe D11-A). Cada efecto debe llevar `previsto_antiguo` = PREVISTO
+R25 bis (D11-A, aprobada). Cada efecto debe llevar `previsto_antiguo` = PREVISTO
 con vencimiento anterior a la fecha del build menos 2 años (función de dominio), y la regla
 dura debe decir que la cartera de un flujo de caja excluye lo antiguo.
 

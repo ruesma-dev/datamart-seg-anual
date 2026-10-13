@@ -92,7 +92,7 @@ CASCADE` cada noche, se llevaría la vista `compras.vencimientos` y todo lo que 
 Por eso las tablas de `tesoreria` siguen el patrón de `personal` (`CREATE IF NOT EXISTS` +
 `TRUNCATE` + `INSERT`, R14).
 
-## 3. Aprobación del humano (2026-10-13) y lo que queda abierto
+## 3. Aprobación del humano (2026-10-13): todas las decisiones cerradas
 
 Cita, transmitida por el líder: «la obra se puede sacar de los contratos, revisa si asi ayuda
 a machear mas obras. amplia la explicacion del contraste con contabilidad. puede ser que
@@ -100,10 +100,11 @@ venga de que los efectos antiguos no estaban bien (nos paso antes con las retenc
 demas ok».
 
 - **APROBADAS con la opción A**: D1, D2, D3, D5, D6, D7, D8, D9 y D10.
-- **D4 remedida** (§5): el contrato no ayuda (+6 efectos). Sigue abierta con la
-  recomendación A (solo el centro).
+- **D4 remedida** (§5): el contrato no ayuda (+6 efectos). **APROBADA con la opción A**
+  (solo el centro), «si» (2026-10-13), a la pregunta «¿Apruebas D4-A y D11-A?».
 - **D11 NUEVA** (§6): columna `previsto_antiguo` (más de 2 años vencido sin puntear) y regla
-  dura. Recomendación A; la decide el humano.
+  dura. **APROBADA con la opción A**, en la misma respuesta.
+- **Spec completa: F-037 pasa a `spec_ready`.**
 - Fuera del repositorio, sin cambios: lista blanca de `mcp-bbdd`; comprobar en el despliegue
   que el job no fija `PG_*_SCHEMAS`.
 

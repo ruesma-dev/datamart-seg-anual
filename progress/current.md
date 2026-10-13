@@ -9,7 +9,7 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-13 · F-037 (fase 1, cartera de cobros y pagos) · SPEC ESCRITA (spec-author), pendiente de aprobación del humano
+## 2026-10-13 · F-037 (fase 1, cartera de cobros y pagos) · SPEC APROBADA (`spec_ready`) · implementer lanzado
 
 > Rama `feature/F-037-tesoreria` desde `main` (`41b40f7`). Spec en `specs/F-037-tesoreria/`;
 > mediciones de solo lectura en Azure e informe en `progress/spec_F-037.md`.
@@ -26,6 +26,8 @@
   3,9 M€ de pagos que la contabilidad no sostiene en 223 cuentas). Contraste con la
   contabilidad explicado en design §8 bis y `spec_F-037.md` §6. Fuera del repositorio: la
   lista blanca de `mcp-bbdd` debe admitir `tesoreria`.
+- **13-10, «si» del humano a D4-A y D11-A**: todas las decisiones cerradas; F-037 `spec_ready`
+  y se lanza el implementer en la rama.
 
 ## 2026-10-13 · F-136 · CERRADA (`done`, APROBADO en pasada 2) · orden del humano «vamos con la prueba»: merge y despliegue; la rotación y el alta (runbook §12) son MANUAL
 
