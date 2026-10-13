@@ -230,3 +230,32 @@ def test_f037_docs_azure_apps() -> None:
     assert "tesoreria" in mcp and "datamart_seg_anual.md" in mcp, (
         "mcp_bbdd.md enlaza al contrato de lista blanca, sin copiarlo"
     )
+
+
+# ===========================================================================
+# R19 · check-declarados y check-unicidad conocen los objetos nuevos
+# ===========================================================================
+
+def test_f037_r19_check_declarados_cuenta_los_objetos_nuevos() -> None:
+    from tests.test_f006_cobertura import _inventario_del_repositorio
+
+    publicados = {(o.esquema, o.objeto): o.tipo for o in _inventario_del_repositorio()}
+    for (esquema, objeto), tipo in {
+        ("tesoreria", "efectos"): "tabla",
+        ("tesoreria", "efectos_restringidos_mes"): "tabla",
+        ("tesoreria_restringida", "efectos"): "tabla",
+        ("tesoreria", "fn_fecha"): "funcion",
+        ("tesoreria", "fn_serie"): "funcion",
+        ("compras", "vencimientos"): "vista",
+    }.items():
+        assert publicados.get((esquema, objeto)) == tipo, f"{esquema}.{objeto}"
+
+
+def test_f037_r19_check_unicidad_comprueba_sus_claves() -> None:
+    from etl_sigrid.infrastructure.postgres.unicidad_sql import consultas_de_unicidad
+
+    claves = {(c.objeto, tuple(c.clave)) for c in consultas_de_unicidad(_dicc())}
+    assert ("tesoreria.efectos", ("efecto_id",)) in claves
+    assert ("tesoreria_restringida.efectos", ("efecto_id",)) in claves
+    assert ("tesoreria.efectos_restringidos_mes",
+            ("empresa_id", "sentido", "anio", "mes", "estado_tesoreria")) in claves

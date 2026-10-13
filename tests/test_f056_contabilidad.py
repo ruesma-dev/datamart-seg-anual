@@ -1409,7 +1409,7 @@ def test_f056_r32_documentacion() -> None:
                     "El plan de cuentas son prefijos", "SALDO_INICIAL"):
         assert termino in arquitectura, f"ARCHITECTURE.md no dice «{termino}»"
     claude = DOC_CLAUDE.read_text(encoding="utf-8")
-    assert "`personal/`, `contabilidad/`, `auxiliar/`" in claude, (
+    assert "`personal/`, `contabilidad/`, `tesoreria/`" in claude, (  # F-037 mete tesoreria/
         "la lista de capas del mapa de sql/ de CLAUDE.md gana contabilidad/"
     )
     import main
