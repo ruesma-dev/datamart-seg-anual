@@ -1732,3 +1732,32 @@ administrador; imagen y job; `build-contabilidad` + `apply-grants`; copia = ante
 negativa y positiva; diccionario v49 y MCP. Riesgo: +4-7 min sobre una nocturna de ~4 h 40 min
 (el job corta a las 5 h). Fuera: `mcp-bbdd` (conectar con el rol autorizado) y F-087.
 Preguntas para Juan: quién tiene «ese rol» y si el coste por persona de `personal` se restringe.
+
+F-135 se da por CERRADA el 2026-10-13 (T18: nocturna del 13-10 en verde, 4 h 52 min frente a un
+tope real del job de 7 h, no 5 h). Lo de Power BI pasa a F-087 por orden del humano.
+
+## F-136 · Login de acceso TOTAL para el MCP y rotación de las contraseñas expuestas · 2026-10-13
+
+Rama `feature/F-136-usuario-mcp-total`. `sdd=true`, rigor `critico`, prioridad 1. Nace de la
+petición del humano de dar contabilidad completa a tres personas (el resto, estándar; `raw`
+siempre fuera) y de la incidencia del 12-10 (dos contraseñas impresas en la terminal porque
+`psql` en Windows ignora las opciones puestas detrás de la cadena de conexión). APROBADA en
+pasada 2 (`progress/review_F-136.md`; la 1 pidió el patrón `--yaml` en el `check-pg` puntual
+y que la §4 del runbook no leyera un secreto que no crea). Spec aprobada con D1-D14
+recomendadas; D13 ampliada a diccionario v50 a petición de `mcp-bbdd`.
+
+Hecho: login `mcp_sigrid_dm_total` en `02_roles.sql` (miembro del estándar y de
+`sigrid_dm_restringido_ro` con `INHERIT TRUE, SET FALSE`, `raw` vetado); contraseñas por
+`\getenv`, opcionales y nunca en pantalla ni en la línea de órdenes de `psql`;
+`apply_grants` veta `raw` al total cada noche y falla si lee algo vetado (total ausente =
+aviso); opciones de `psql` delante en `15_provision_db.ps1` y el runbook; runbook §12 con la
+rotación y el alta en una sola sesión; diccionario v50 (`R-CONTABILIDAD-RESTRINGIDA` manda a
+`contabilidad` por defecto, aviso en las fichas de `contabilidad_restringida`); contrato del
+total para la F-008 de `mcp-bbdd` en `azure-apps`.
+
+Verificado: `init.sh` 7.587 passed, cobertura 100 % (60/60), mutación 15/15; script probado en
+PostgreSQL 16 real con el `psql.exe` 16.4 de Windows (0 apariciones de la contraseña).
+
+QUEDA (MANUAL): imagen, job y diccionario v50; rotación y alta del total (runbook §12) de día;
+`check-pg` puntual (P12); credencial de Power BI; nocturna siguiente; copias muertas (D12).
+Fuera: F-008 de `mcp-bbdd` (elegir conexión por oid) y F-087.

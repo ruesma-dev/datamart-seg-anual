@@ -9,7 +9,7 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-13 · F-136 · APROBADA por el reviewer en pasada 2 (`progress/review_F-136.md`), `in_progress` hasta el merge y el despliegue que ordene el humano
+## 2026-10-13 · F-136 · CERRADA (`done`, APROBADO en pasada 2) · orden del humano «vamos con la prueba»: merge y despliegue; la rotación y el alta (runbook §12) son MANUAL
 
 > Spec aprobada el 2026-10-13 con D1-D14 recomendadas; ampliación del mismo día: D13 pasa a
 > «diccionario v50» (`R-CONTABILIDAD-RESTRINGIDA` reescrita, avisos en las fichas). Informe
@@ -38,7 +38,7 @@
   Sobre todo D6 (`\getenv`), D7 (contraseñas opcionales), D10 (orden: imagen → rotación de día
   → nocturna → F-008) y D12 (borrar `.env.azure.bak` y las copias de `kv-albaranes-rs9k2`).
 
-## 2026-10-12 · F-135 · CERRADA (`done`, APROBADO en pasada 2) · DESPLEGADA el 12-10 (`r20261012-1945`, diccionario v49)
+## 2026-10-12 · F-135 · CERRADA DEL TODO el 13-10 (T18 en verde; Power BI pasa a F-087) · DESPLEGADA el 12-10 (`r20261012-1945`, diccionario v49)
 
 > Merge en `main` `adec1c8` (y espejo en `dev`). Orden del humano: «despliega ya». El
 > paso 1 de la MANUAL (que ningún informe de Power BI lea `raw`) NO se comprobó: el humano
