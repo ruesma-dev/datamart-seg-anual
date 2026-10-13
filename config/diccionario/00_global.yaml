@@ -551,7 +551,19 @@
 # empiezan por el aviso de acceso restringido y la del esquema nombra el login
 # total del MCP (`mcp_sigrid_dm_total`, F-136) junto al grupo autorizado.
 
-version: 50
+# version 51 (F-037, fase 1, 2026-10-13): LA CARTERA DE COBROS Y PAGOS. Dos
+# esquemas nuevos, patron de F-135: `tesoreria` (la GENERAL: `efectos`, una
+# fila por efecto de `raw.pag` y `raw.cob` sin los pagos de personal, y
+# `efectos_restringidos_mes`, solo recuentos) y `tesoreria_restringida` (la
+# COMPLETA, con `restringido` y `motivo_restriccion`, solo para el perfil total
+# del MCP). Reglas duras nuevas `R-TESORERIA-ESTADO` (BAJA no se suma, fecha
+# real vacia no es pendiente, el previsto antiguo no es caja) y
+# `R-TESORERIA-RESTRINGIDA` (hermana de `R-CONTABILIDAD-RESTRINGIDA`).
+# `compras.vencimientos` pasa a ser una VISTA de `tesoreria.efectos`, con las
+# mismas columnas; su frescura es la de `build_tesoreria`. `R-FRESCURA` alcanza
+# los dos esquemas nuevos.
+
+version: 51
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -571,31 +583,34 @@ titulo: Datamart de seguimiento anual de obra
 reglas:
 
   - codigo: R-FRESCURA
-    titulo: Siete esquemas pueden quedarse atras sin tumbar la noche
+    titulo: Ocho esquemas pueden quedarse atras sin tumbar la noche
     severidad: bloqueante
-    ambito: [cierre, compras, maestro, retenciones, personal, contabilidad, contabilidad_restringida, descompuestos]
+    ambito: [cierre, compras, maestro, retenciones, personal, contabilidad, contabilidad_restringida, tesoreria, tesoreria_restringida, descompuestos]
     regla: >-
-      Estos siete esquemas (ocho con `contabilidad_restringida`, que construye
-      el mismo `build_contabilidad`) SI se construyen cada noche dentro de `run-all`, y
-      los siete registran paso, asi que su fecha de build siempre es
+      Estos ocho esquemas (diez con `contabilidad_restringida` y
+      `tesoreria_restringida`, que construyen el mismo `build_contabilidad` y
+      el mismo `build_tesoreria`) SI se construyen cada noche dentro de
+      `run-all`, y los ocho registran paso, asi que su fecha de build siempre es
       consultable. Lo que no cambia es que su paso NO es dependencia de ningun
       otro: si `build_cierre`, `build_compras`, `build_maestros`,
-      `build_retenciones`, `build_personal`, `build_contabilidad` o
-      `build_descompuestos` falla (o su ingesta `ingest_descompuestos`, que lo
-      salta), la noche continua y termina, y ese esquema se queda con el dato
-      de una noche anterior mientras `raw`, `stg` y `mart` estan al dia. Toda
-      respuesta que salga de ellos DEBE citar su fecha de build: `SELECT * FROM
-      _meta.v_frescura WHERE paso = 'build_cierre'` (o `build_compras`,
-      `build_maestros`, `build_retenciones`, `build_personal`,
-      `build_contabilidad`, `build_descompuestos`). Que el pipeline sea uno
-      solo NO significa que todo el datamart tenga la misma frescura.
+      `build_retenciones`, `build_personal`, `build_contabilidad`,
+      `build_tesoreria` o `build_descompuestos` falla (o su ingesta
+      `ingest_descompuestos`, que lo salta), la noche continua y termina, y ese
+      esquema se queda con el dato de una noche anterior mientras `raw`, `stg` y
+      `mart` estan al dia. Toda respuesta que salga de ellos DEBE citar su fecha
+      de build: `SELECT * FROM _meta.v_frescura WHERE paso = 'build_cierre'` (o
+      `build_compras`, `build_maestros`, `build_retenciones`, `build_personal`,
+      `build_contabilidad`, `build_tesoreria`, `build_descompuestos`).
+      `compras.vencimientos` es una vista de `tesoreria.efectos`: su frescura
+      es la de `build_tesoreria`. Que el pipeline sea uno solo NO significa que
+      todo el datamart tenga la misma frescura.
     motivo: >-
       La composicion real esta en `main.build_pipeline_steps`, y sus pasos se
       llaman —con el mismo nombre que tienen en `_meta.v_frescura.paso`, que es
       donde se consulta su frescura— `ingest_raw`, `load_excel_aux`,
-      `build_stg`, `build_mart`, `build_maestros`, `build_compras`,
-      `build_retenciones`, `build_personal`, `build_contabilidad`,
-      `ingest_descompuestos`, `build_descompuestos`,
+      `build_stg`, `build_mart`, `build_maestros`, `build_tesoreria`,
+      `build_compras`, `build_retenciones`, `build_personal`,
+      `build_contabilidad`, `ingest_descompuestos`, `build_descompuestos`,
       `build_cierre`, `publicar_diccionario` y `apply_grants`. Hasta el 2026-08-28 cuatro de
       ellos se lanzaban A MANO y podian llevar semanas parados; peor aun, `mart`
       DESTRUIA cada noche `cierre.v_pbi_planif_vs_real` —cuelga de
@@ -603,9 +618,9 @@ reglas:
       CASCADE— y nadie la recreaba. `personal` (F-057, 2026-09-18) nacio ya
       dentro de la nocturna y con la misma propiedad, y esta vez a proposito:
       un fallo del SQL de personal no puede dejar al `mart` sin construir.
-      `contabilidad` (F-056, 2026-09-26) y `descompuestos` (F-097,
-      2026-09-28), igual. Dar un dato de cualquiera de los siete sin fecha es
-      dar una respuesta vieja con aplomo.
+      `contabilidad` (F-056, 2026-09-26), `descompuestos` (F-097,
+      2026-09-28) y `tesoreria` (F-037, 2026-10-13), igual. Dar un dato de
+      cualquiera de los ocho sin fecha es dar una respuesta vieja con aplomo.
 
   - codigo: R-IMPORTE-MES
     titulo: importe_mes no se suma entre meses; importe_origen ya es acumulado
@@ -838,6 +853,59 @@ reglas:
       2026-10-13 (F-136, diccionario v50): el MCP no filtra el catalogo ni el
       diccionario por perfil y el agente veia los dos esquemas; el titulo y la
       primera frase dicen ahora cual usar.
+
+  - codigo: R-TESORERIA-ESTADO
+    titulo: En la cartera de cobros y pagos BAJA no se suma, y fecha real vacia no es pendiente
+    severidad: bloqueante
+    ambito: [tesoreria, tesoreria_restringida, compras.vencimientos]
+    regla: >-
+      Filtra SIEMPRE por `estado_tesoreria`. BAJA (efecto dividido, agrupado o
+      anulado) NO se suma nunca: su dinero ya esta en los efectos hijos.
+      REALIZADO es lo pagado o cobrado y PREVISTO lo pendiente. NO uses
+      `fecha_real IS NULL` como «pendiente»: desde 2020 el pago por remesa
+      queda Pagado (estado 10) SIN fecha real, y esos efectos son REALIZADO.
+      La cartera de un flujo de caja es `estado_tesoreria = 'PREVISTO' AND NOT
+      previsto_antiguo`: el previsto vencido hace mas de 2 anos es deuda sin
+      puntear que hay que depurar en Sigrid, no caja; si lo incluyes, dilo. Un
+      PREVISTO vencido (y no antiguo) es una deuda que sigue viva o un efecto
+      sin puntear: no lo presentes como pagado. Para el neto de caja suma
+      `importe_flujo` (+ en COBRO, - en PAGO). Esto es CARTERA, no devengo:
+      convertir la planificacion de obra en caja es una hipotesis que tienes
+      que declarar. En `compras.vencimientos` el estado es `estado_pago` y la
+      baja `efecto_anulado`: la misma trampa con otros nombres.
+    motivo: >-
+      Medido el 2026-10-13 en solo lectura: 89.779 pagos y 8.548 cobros (35 %)
+      estan de baja; con ellos el cobro previsto seria 385,4 M EUR frente a los
+      47,5 del saldo de clientes. 41.884 pagos y 2.106 cobros estan Pagados sin
+      fecha real (casi todos desde 2020): con la fecha como criterio contarian
+      como previstos. Sin la baja, PAGO previsto 80,1 M EUR frente a 78,8 del
+      grupo 40+41, pero con 3,9 M EUR de previsto antiguo que la contabilidad
+      no sostiene (223 cuentas cuadran al centimo solo sin el). Mismo patron
+      que F-094 en las retenciones: efectos antiguos no punteados.
+
+  - codigo: R-TESORERIA-RESTRINGIDA
+    titulo: Usa tesoreria; tesoreria_restringida es solo para el perfil total del MCP
+    severidad: bloqueante
+    ambito: [tesoreria, tesoreria_restringida]
+    regla: >-
+      Por defecto usa SIEMPRE `tesoreria`. `tesoreria_restringida` solo la lee
+      el perfil total del MCP (y el grupo `sigrid_dm_restringido_ro`); para
+      cualquier otro usuario devuelve «permission denied», y eso no se rodea:
+      no reintentes ni busques los pagos por otro camino (`raw` tampoco se
+      lee). Responde con `tesoreria` y di que la cartera no incluye los pagos
+      de personal; cuantos faltan por empresa y mes lo dice
+      `tesoreria.efectos_restringidos_mes` (solo recuentos, nunca importes). Si
+      el usuario no pide expresamente pagos de nomina, embargo o cuota, no vayas
+      a `tesoreria_restringida` aunque sea «la completa». Los dos esquemas NUNCA
+      se suman ni se unen: la completa ya contiene a la general y sumarlas
+      duplica lo visible.
+    motivo: >-
+      Decision del humano del 2026-10-13 (F-037): «los pagos de nominas deben
+      quedar restringidos», con el mismo espiritu que F-135 en la contabilidad.
+      Medido ese dia: 37.053 pagos de personal (nomina, embargo y cuota), y los
+      cuatro criterios -naturaleza, cuenta de personal, tercero empleado y
+      documento de nomina- coinciden exactamente; 0 cobros. El MCP no filtra el
+      catalogo ni el diccionario por perfil, asi que el titulo dice cual usar.
 
   - codigo: R-DESCOMPUESTO-ORIGEN
     titulo: Los descompuestos no se mezclan entre origenes ni entre versiones
@@ -1591,6 +1659,39 @@ esquemas:
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_contabilidad]
+
+  tesoreria:
+    titulo: La cartera de cobros y pagos (sin los pagos de personal)
+    para_que_sirve: >-
+      Cada efecto de cobro y de pago de Sigrid, tal cual: pagos a proveedores y
+      acreedores y cobros de clientes, con tercero, vencimiento, fecha real,
+      importe, medio de pago, estado PREVISTO/REALIZADO/BAJA y la obra de su
+      centro de coste (`tesoreria.efectos`). Responde «que vence este mes»,
+      «que nos deben los clientes» y es el ingrediente de un flujo de caja.
+      TRAMPAS antes de consultarlo (`R-TESORERIA-ESTADO`): BAJA no se suma,
+      `fecha_real` vacia no es pendiente y el previsto antiguo no es caja. Le
+      faltan los pagos de personal (`R-TESORERIA-RESTRINGIDA`): cuantos, en
+      `tesoreria.efectos_restringidos_mes`. Es cartera, no devengo: la
+      proyeccion de obra (fase 2) no existe, y los cobros van sin documento de
+      venta hasta F-040.
+    consumo_recomendado: true
+    refresco: nocturno
+    pasos_etl: [build_tesoreria]
+
+  tesoreria_restringida:
+    titulo: La cartera COMPLETA, con los pagos de personal (solo perfil total del MCP y rol autorizado)
+    para_que_sirve: >-
+      La misma cartera que `tesoreria` pero COMPLETA: con los pagos de nomina,
+      embargo y cuota (F-037), marcados con `restringido` y
+      `motivo_restriccion`. SOLO LA LEEN el perfil total del MCP (el login
+      `mcp_sigrid_dm_total`, F-136) y el grupo autorizado
+      `sigrid_dm_restringido_ro`; para el perfil estandar del MCP y para Power
+      BI esta vetada, y una consulta devuelve «permission denied». Por defecto
+      se usa `tesoreria` (`R-TESORERIA-RESTRINGIDA`); no se suma con ella, y
+      valen las mismas trampas del estado (`R-TESORERIA-ESTADO`).
+    consumo_recomendado: true
+    refresco: nocturno
+    pasos_etl: [build_tesoreria]
 
   descompuestos:
     titulo: De que se compone cada partida, por origen

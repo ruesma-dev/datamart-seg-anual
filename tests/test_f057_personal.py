@@ -1018,8 +1018,9 @@ def test_f057_r25_personal_en_esquemas_del_datamart() -> None:
 
     assert "personal" in ESQUEMAS_DEL_DATAMART
     # Once desde F-056, que anadio `contabilidad`; doce desde F-097
-    # (`descompuestos`); trece desde F-135 (`contabilidad_restringida`).
-    assert len(ESQUEMAS_DEL_DATAMART) == 13
+    # (`descompuestos`); trece desde F-135 (`contabilidad_restringida`); quince
+    # desde F-037 (`tesoreria` y `tesoreria_restringida`).
+    assert len(ESQUEMAS_DEL_DATAMART) == 15
 
 
 def test_f057_r25_el_fichero_de_provision_trae_los_diez_esquemas() -> None:

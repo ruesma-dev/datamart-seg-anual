@@ -13,7 +13,10 @@
 
 - Rama `feature/F-037-tesoreria`; `bash harness/init.sh` en verde al empezar (7.587 passed,
   30 min). Tarea en curso y desviaciones: aquí; informe final en `progress/impl_F-037.md`.
-- T1 hecha (dominio `etl_sigrid/domain/tesoreria.py`, RED pegada en el informe).
+- T1-T8 hechas (un commit por tarea). T9 (diccionario v51): recuentos del árbol tras F-037,
+  **217 objetos, 1795 columnas, 104 de consumo** (5 fichas nuevas en `tesoreria` y
+  `tesoreria_restringida`; `compras.vencimientos` pasa a vista).
+- Desviaciones: ver `progress/impl_F-037.md` § Decisiones.
 
 ## 2026-10-13 · F-037 (fase 1, cartera de cobros y pagos) · SPEC APROBADA (`spec_ready`) · implementer lanzado
 
