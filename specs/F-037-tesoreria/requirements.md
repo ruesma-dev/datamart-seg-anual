@@ -1,8 +1,8 @@
 <!-- specs/F-037-tesoreria/requirements.md -->
 # F-037 · Fase 1: la cartera de cobros y pagos, sin obras
 
-Mediciones: `progress/spec_F-037.md`. Decisiones D1-D10 en `design.md` §8: **los
-requisitos siguen la opción recomendada**. **Alcance.** Cada efecto de `raw.pag` y `raw.cob` tal cual: es un HECHO, no un cálculo.
+Mediciones: `progress/spec_F-037.md`. Decisiones en `design.md` §8: D1-D3 y D5-D10 APROBADAS
+(2026-10-13); D4 y D11 abiertas, y aquí va su opción recomendada. **Alcance.** Cada efecto de `raw.pag` y `raw.cob` tal cual: es un HECHO, no un cálculo.
 **FUERA, y se dice en la ficha**: la fase 2 (devengo pendiente de `stg.plan_mensual`,
 plazos de `auxpag`/`auxefp`, retención de `ctrrec`) y cualquier conversión devengo → caja,
 que es una hipótesis y la pone la IA en la consulta, declarándola.
@@ -52,17 +52,16 @@ remesa (código de `con`; fecha e importe de `raw.rpa` solo en `PAGO`), `restrin
 
 R8. La obra debe salir SOLO del puente centro → obra (`maestro.centros_coste` por
 `cenide`): `centro_coste_id`, `obra_id`, `codigo_obra`, `nombre_obra`; sin centro o con un
-centro que no es obra, NULL. Sin respaldo por líneas (D4). Medido: 77,9 % de pagos y 78,0 %
-de cobros con obra.
+centro que no es obra, NULL. Ni contrato ni líneas (D4: añadirían 6 y 112 efectos). Medido:
+77,9 % de pagos y 78,0 % de cobros con obra; 96,6 % de la cartera viva futura de pagos.
 
 R9. El sistema NO debe publicar la cuenta bancaria del tercero (`bancue`, `ban`, `bandig`,
 `cpa*`: 111.450 pagos la traen), ni `padide` ni `prpide` (vacíos o sin uso).
 
 ## La cartera general: `tesoreria`
 
-R10. El sistema debe publicar `tesoreria.efectos` con las filas de la completa que no son
-de personal y las mismas columnas en el mismo orden, sin `restringido` ni
-`motivo_restriccion`.
+R10. `tesoreria.efectos`: las filas de la completa que no son de personal, con sus mismas
+columnas en el mismo orden salvo `restringido` y `motivo_restriccion`.
 
 R11. SI la remesa de un efecto contiene algún efecto restringido, ENTONCES
 `tesoreria.efectos.importe_remesa` debe ser NULL (medido: 1 remesa mixta; su total
@@ -75,9 +74,8 @@ más los restringidos no suman el recuento de la completa, ENTONCES el SQL debe 
 R13. El sistema debe publicar `tesoreria.efectos_restringidos_mes` (empresa, sentido, año, mes
 de vencimiento, `estado_tesoreria`, `num_efectos`), SIN importes (D6).
 
-R14. Las tres tablas no se deben dropear cada noche: `CREATE TABLE IF NOT EXISTS` en el
-setup y `TRUNCATE` + `INSERT` en cada build (patrón de `personal`), para que las vistas que
-cuelgan de ellas sobrevivan.
+R14. Las tres tablas no se dropean: `CREATE TABLE IF NOT EXISTS` en el setup y `TRUNCATE` +
+`INSERT` en cada build (patrón de `personal`), para que sobrevivan las vistas que cuelgan.
 
 ## `compras.vencimientos` pasa a ser vista de la general (D1)
 
@@ -95,8 +93,7 @@ R17. El sistema debe tener el paso `build_tesoreria` (stage `build_aux`, `depend
 ["ingest_raw"]`) en `run-all` DELANTE de `build_compras`, y el comando
 `python main.py build-tesoreria`. Ningún paso lo declara en su `depends_on`.
 
-R18. SI falla un sub-paso, ENTONCES el paso debe terminar en FAILED con el nombre del
-sub-paso en el mensaje y la nocturna debe continuar.
+R18. SI falla un sub-paso, ENTONCES FAILED con su nombre en el mensaje, y la nocturna sigue.
 
 R19. `check-declarados` y `check-unicidad` deben conocer los objetos nuevos (con sus claves).
 
@@ -109,9 +106,8 @@ R21. CUANDO corre `apply_grants`, el rol estándar NO debe leer `tesoreria_restr
 (verificación en el catálogo; si la lee, FAILED con la lista) y el autorizado SÍ; el total
 la lee por pertenencia, sin GRANT propio, y sigue sin leer `raw`.
 
-R22. `infra/sql/02_roles.sql` debe vetar `tesoreria_restringida` al estándar y concederla
-al autorizado como hace con `contabilidad_restringida`; un test exige que sus listas casen
-con `settings.py`.
+R22. `infra/sql/02_roles.sql` debe vetar `tesoreria_restringida` al estándar y concederla al
+autorizado como a `contabilidad_restringida`; un test exige que sus listas casen con `settings.py`.
 
 R23. Prueba NEGATIVA con el login estándar real (`permission denied` en
 `tesoreria_restringida.efectos`; 0 filas con `natide <> 0` en `tesoreria.efectos`) y
@@ -124,27 +120,30 @@ R24. Fichas de `tesoreria.efectos`, `tesoreria.efectos_restringidos_mes` y
 `ESQUEMAS_DEL_DATAMART`; la ficha de `compras.vencimientos` pasa a vista y cita su origen.
 
 R25. Regla dura `R-TESORERIA-ESTADO`: nunca se suma `BAJA`; «fecha real vacía» no es
-«previsto»; la cartera prevista es `estado_tesoreria = 'PREVISTO'`, y un previsto con
-vencimiento pasado es un vencido sin puntear, no caja futura.
+«previsto» (desde 2020 lo pagado por remesa queda `est = 10` sin fecha real); la cartera
+prevista es `estado_tesoreria = 'PREVISTO'`, y un previsto vencido es deuda sin puntear.
 
-R26. La regla `R-CONTABILIDAD-RESTRINGIDA` (o una hermana) debe cubrir tesorería: la
-general no tiene los pagos de personal; los dos esquemas no se suman.
+R25 bis (DONDE el humano apruebe D11-A). Cada efecto debe llevar `previsto_antiguo` = PREVISTO
+con vencimiento anterior a la fecha del build menos 2 años (función de dominio), y la regla
+dura debe decir que la cartera de un flujo de caja excluye lo antiguo.
+
+R26. `R-CONTABILIDAD-RESTRINGIDA` (o una hermana) debe cubrir tesorería: la general no tiene
+los pagos de personal y los dos esquemas no se suman.
 
 R27. La ficha de `tesoreria.efectos` debe declarar: cobertura floja de cobros sin F-040
 (21.914 efectos, sin documento de venta); la duda de las retenciones de cliente de baja
 (F-094: 19,9 M€); que es caja/cartera y no devengo, y que la fase 2 no existe.
 
-R28. `docs/ARCHITECTURE.md`, `azure-apps/datamart_seg_anual.md` y el contrato para
-`mcp-bbdd` (`tesoreria` en la lista blanca de las dos conexiones, `tesoreria_restringida`
-solo en la total) deben actualizarse en el mismo trabajo.
+R28. `docs/ARCHITECTURE.md`, `azure-apps/datamart_seg_anual.md` y el contrato para `mcp-bbdd`
+(`tesoreria` en las dos listas blancas, `tesoreria_restringida` solo en la total), en el mismo trabajo.
 
 ## Verificación
 
-R29. El coste del paso en la ventana (hoy 4 h 52 min, tope del job 7 h) debe quedar medido
-en el primer build manual y anotado; estimado +1-3 min y +0,2 GB.
+R29. Coste en la ventana (hoy 4 h 52 min, tope 7 h) medido en el primer build; estimado +1-3 min, +0,2 GB.
 
-R30. Contraste MANUAL de solo lectura: `PAGO` `PREVISTO` de la general frente al saldo de
-las cuentas 40 y 41 en `contabilidad.mayor` (`importe_saldo`) (hoy 80,1 M€ frente a 78,8 M€), y
-`COBRO` `PREVISTO` frente a 43 (40,2 M€ frente a 47,5 M€); la diferencia se anota.
+R30. Contraste MANUAL de solo lectura tras el build, con su explicación (design §8 bis):
+PAGO previsto frente al saldo del grupo 40+41 (hoy 80,1 frente a 78,8 M€, con 3,9 M€ de
+previsto antiguo que la contabilidad no sostiene) y COBRO frente a 43 (40,2 frente a 47,5 M€;
+433+434 se facturan sin efecto). La ficha publica estas cifras y su porqué.
 
 R31. `bash harness/init.sh` en verde (pytest, cobertura, mutación sin supervivientes).

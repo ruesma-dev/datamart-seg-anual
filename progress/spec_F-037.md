@@ -2,7 +2,9 @@
 # F-037 · Informe del spec-author (fase 1: la cartera de cobros y pagos)
 
 Fecha: 2026-10-13. Rama `feature/F-037-tesoreria` desde `main` (`41b40f7`). Spec en
-`specs/F-037-tesoreria/` (requirements 149 líneas, design 247, tasks 17 tareas).
+`specs/F-037-tesoreria/` (requirements 148 líneas, design 249, tasks 17 tareas).
+Revisada el mismo día tras la respuesta del humano: aprobación en §3, D4 remedida en §5,
+contraste ampliado y D11 nueva en §6.
 
 Todas las cifras salen de lecturas de SOLO LECTURA contra Azure
 (`main._get_pg()`, `_bootstrap_done = True`, `filas_solo_lectura`), sobre la nocturna del
@@ -75,7 +77,7 @@ cliente, así que ahí la baja puede no ser fantasma (declarado en D2, no resuel
 - La unión `pag ∪ cob` con todas las uniones del diseño: **278.866 filas en 2,0 s** (lectura).
 - Estimado: **+1-3 min y +0,2 GB**. Se mide en el primer build manual (R29, T13).
 
-## 2. Lo que la spec decide (opción recomendada en cada D del design §8)
+## 2. Lo que la spec decide (opción recomendada en cada D; aprobación en §3)
 
 D1 `tesoreria` tabla única y `compras.vencimientos` vista suya (0 personales en facturas de
 compra) · D2 bajas publicadas y marcadas, mismo criterio en los dos sentidos, regla dura ·
@@ -90,12 +92,167 @@ CASCADE` cada noche, se llevaría la vista `compras.vencimientos` y todo lo que 
 Por eso las tablas de `tesoreria` siguen el patrón de `personal` (`CREATE IF NOT EXISTS` +
 `TRUNCATE` + `INSERT`, R14).
 
-## 3. Decisiones abiertas que necesita validar el humano
+## 3. Aprobación del humano (2026-10-13) y lo que queda abierto
 
-1. **D1-D10** del design §8, en especial D2 (las bajas de cobro con retención), D3 (esquema
-   propio frente a meterlo en `contabilidad_restringida`), D6 (solo recuentos para el
-   estándar) y D7 (los 429 pagos a autónomos con NIF de empleado).
-2. **Fuera del repositorio**: `mcp-bbdd` tiene que añadir `tesoreria` a su lista blanca (y
-   `tesoreria_restringida` a la conexión total) para que la IA la vea; aquí solo se escribe
-   el contrato en `azure-apps/datamart_seg_anual.md`.
-3. **Comprobar en el despliegue** que el job no fija `PG_*_SCHEMAS` en su entorno (design §7.1).
+Cita, transmitida por el líder: «la obra se puede sacar de los contratos, revisa si asi ayuda
+a machear mas obras. amplia la explicacion del contraste con contabilidad. puede ser que
+venga de que los efectos antiguos no estaban bien (nos paso antes con las retenciones) lo
+demas ok».
+
+- **APROBADAS con la opción A**: D1, D2, D3, D5, D6, D7, D8, D9 y D10.
+- **D4 remedida** (§5): el contrato no ayuda (+6 efectos). Sigue abierta con la
+  recomendación A (solo el centro).
+- **D11 NUEVA** (§6): columna `previsto_antiguo` (más de 2 años vencido sin puntear) y regla
+  dura. Recomendación A; la decide el humano.
+- Fuera del repositorio, sin cambios: lista blanca de `mcp-bbdd`; comprobar en el despliegue
+  que el job no fija `PG_*_SCHEMAS`.
+
+## 4. Texto de las decisiones tal como se presentaron (D1-D10, antes de la aprobación)
+
+**D1 · `compras.vencimientos`.** (A) **Recomendada**: `tesoreria` tabla única de efectos y
+`compras.vencimientos` vista suya con las mismas columnas (0 efectos de personal en facturas
+de compra, medido: no pierde ni una fila). (B) Dejar la tabla de F-080 y que `tesoreria`
+publique solo los demás efectos y una vista unión: dos SQL con la misma lógica de efecto,
+que es la duplicación que F-073 vino a evitar. (C) Dos tablas paralelas: descartada.
+
+**D2 · Bajas** (`con.fecbaj`: 89.779 pagos y 8.548 cobros, 35 %). (A) **Recomendada**:
+se publican todas, marcadas (`estado_tesoreria = 'BAJA'`, `efecto_anulado`), con la regla
+dura `R-TESORERIA-ESTADO`, y el mismo criterio en los dos sentidos. Lo respalda el contraste:
+PAGO previsto 80,1 M€ frente a 78,8 M€ del saldo 40+41; COBRO previsto 40,2 M€ frente a
+47,5 M€ del 43, cuando con las bajas serían 385 M€. Se declara la excepción medida: en
+cobros CON retención las bajas son 19,9 M€ y F-094 vio que la contabilidad sostiene 13,8 M€
+de retención de cliente, así que ahí la baja puede no ser fantasma (queda para otra feature).
+(B) No publicar las bajas: rompería `compras.vencimientos` (sus 76 k anulados son contrato
+de F-080). (C) En cobros ignorar `fecbaj` como hace `retenciones`: 325 M€ fantasma.
+
+**D3 · Dónde vive lo restringido.** (A) **Recomendada**: esquema propio
+`tesoreria_restringida`, el patrón «módulo + `_restringida`», legible para la IA y con
+permisos por esquema; cuesta tocar `settings`, `02_roles.sql`, `ESQUEMAS_DEL_DATAMART` y el
+contrato del MCP. (B) Dentro de `contabilidad_restringida` (`efectos_tesoreria`): 0 cambios
+de permisos, pero un módulo escribiría en el esquema de otro y el nombre mentiría.
+
+**D4 · Obra.** (A) **Recomendada**: solo el puente centro → obra (78 %), sin elaborar más.
+(B) La cascada de `retenciones` con respaldo por líneas del documento: más cobertura en
+facturas sin centro, más SQL y más dependencias (`v_src_lineas_*`); es fase 2.
+
+**D5 · Cobros sin F-040.** (A) **Recomendada**: publicarlos ya, con la cobertura declarada
+(21.914 efectos; 204 previstos futuros por 18,9 M€; sin documento de venta ni CIF).
+(B) Esperar a F-040 (prioridad 48).
+
+**D6 · Qué ve el estándar de lo restringido.** (A) **Recomendada**: solo recuentos
+(`efectos_restringidos_mes`), como D5 de F-135. (B) Importe por empresa y mes: es la nómina
+neta mensual, lo que se protege. (C) Nada: leería una cartera recortada sin saberlo.
+
+**D7 · Criterio de personal.** (A) **Recomendada**: la unión de los cuatro criterios más
+el fallo cerrado (hoy idéntica a `natide <> 0`: 37.053), para que restrinja de más si un día
+divergen. (B) Solo `natide <> 0`: más simple, sin red si alguien olvida la naturaleza.
+**Lo que se queda visible, medido**: 429 pagos (1,08 M€) a 16 proveedores cuyo NIF es el de
+un empleado (autónomos que también son o fueron empleados). Son facturas de compra que
+`compras.facturas` ya enseña; restringir su efecto no protegería nada y quitaría filas a
+`compras.vencimientos`. Recomendado no restringirlos; si el humano dice que sí, es un quinto
+criterio (cruce con `raw.emp`) y `compras.vencimientos` pierde esas filas.
+
+**D8 · Remesa mixta.** (A) **Recomendada**: `importe_remesa` a NULL en la general (1 remesa
+hoy, también en `compras.vencimientos`). (B) Recalcularla con lo visible: un número que no
+es el de Sigrid con el nombre del de Sigrid.
+
+**D9 · Orden con compras.** (A) **Recomendada**: delante en la lista, sin `depends_on`.
+(B) `build_compras` depende de `build_tesoreria`: un fallo de tesorería tumbaría compras.
+
+**D10 · Nombres.** `tesoreria.efectos`, `estado_tesoreria` (`PREVISTO`/`REALIZADO`/`BAJA`), `importe_flujo`.
+
+## 5. D4 remedida: ¿la obra del contrato ayuda? (2026-10-13, solo lectura)
+
+Pregunta del humano: «la obra se puede sacar de los contratos, revisa si así ayuda a machear
+más obras». **Respuesta medida: no ayuda.** Se probó en cascada, solo cuando el centro no da
+obra, con los mismos enlaces que ya usan `compras.fact_compras_linea` (F-067) y
+`compras.v_control_forma_pago` (F-080): contrato de la cabecera (`dcf.ctride`, 86.515 de
+167.211 facturas lo traen) y contratos de las líneas (directo, por albarán o por línea de
+albarán) → `compras.contratos.obra_id` (19.101 de 19.111 contratos con obra, todas en
+`maestro.obras`). Después, la obra de la cabecera (`dcf.obride`) y la de las líneas
+(`factura_lineas.obra_id`, el respaldo de F-094).
+
+| pagos no personales (219.899) | efectos | importe | cartera viva futura (7.933, 55,0 M€) |
+|---|---|---|---|
+| 1 · centro → obra | 200.143 (91,0 %) | 1.024,9 M€ | 7.665 · 52,9 M€ (96,6 %) |
+| 2 · contrato | 6 | 0,07 M€ | 0 |
+| 3 · cabecera / líneas | 112 (+3 con varias obras) | 0,26 M€ | 0 |
+| sin obra | 19.635 | 126,4 M€ | 268 · 2,1 M€ |
+
+Por qué no hay más: los pagos sin obra son 12.891 sin documento (94,4 M€: pagos sueltos),
+1.612 facturas imputadas a centros de estructura (códigos `GG`, `0001`, `0003`...: 22,2 M€;
+no son de obra y no deben tenerla) y 5.129 facturas sin centro, sin contrato y sin obra en
+cabecera ni líneas (9,7 M€). Los 37.053 de personal no tienen obra (ni deben).
+
+**Ambigüedades y discrepancias** (cuando hay dos fuentes): contrato ≠ centro en 323 efectos;
+25 efectos con centro cuyas facturas cuelgan de contratos de varias obras; cabecera ≠ centro
+en 495 de 190.255 (0,26 %). Manda el centro: es la imputación del propio efecto.
+
+**Cobros**: ninguna vía. Las facturas de venta no se ingieren (F-040; los cobros cuelgan de
+documentos `tip = 11` sin tabla en `raw`); `con.obr` está vacío en todos los documentos y
+efectos de `pag` y `cob`; y «cliente con una sola obra en `maestro.obras`» resolvería 38
+cobros sin centro (ninguno previsto), una conjetura y no un dato. Cobertura actual de cobros:
+17.102 de 21.914 (78,0 %), y de la cartera viva futura, 201 de 204.
+
+**Recomendación**: A, solo el centro. El contrato añade 6 efectos y exigiría escribir una
+regla de precedencia para 323 discrepancias.
+
+## 6. El contraste con la contabilidad, ampliado
+
+**Hipótesis del humano**: los efectos antiguos no se mantuvieron bien (previstos sin puntear,
+bajas fantasma), como pasó con las retenciones. **Precedente**: F-094 (`progress/history.md`,
+«Retenciones infladas 4,3 veces»): el estado leía solo `fecrea` y contaba vivos los agrupados
+y anulados; y `progress/explore_retenciones_contabilidad_fin_obra.md`: por proveedor cuadraban
+1.027 de 1.268, pero «los grandes descuadran (historia anterior a 2016, prescripciones,
+reclasificaciones)». Aquí las bajas ya están fuera (criterio F-094); lo que queda son los
+previstos viejos.
+
+### El previsto por antigüedad (hoy, sin personal)
+| | futuro | vencido < 1 año | 1-2 años | 2-5 años | > 5 años |
+|---|---|---|---|---|---|
+| PAGO | 7.933 · 55,0 M€ | 2.278 · 20,4 M€ | 969 · 0,8 M€ | 1.093 · 0,7 M€ | 1.268 · 3,1 M€ |
+| COBRO | 204 · 18,9 M€ | 298 · 15,6 M€ | 115 · 3,5 M€ | 171 · 2,0 M€ | 227 · 0,2 M€ |
+
+Por año de vencimiento, el PAGO previsto con vencimiento ≤ 2015 son 504 efectos (2,69 M€),
+497 de ellos creados antes de 2016. Por año de creación del efecto, lo creado antes de 2016
+sigue previsto en 524 pagos (2,70 M€) y 110 cobros (0,35 M€). Por estado de Sigrid, lo
+vencido hace más de 2 años está en Pendiente (1,19 M€), Aprobado (2,44 M€), Emitido, En
+cartera y 4 Remesados (0,15 M€, todos de más de 5 años).
+
+### Por qué PAGO cuadra «casi» (80,1 frente a 78,8 M€): dos errores que se compensan
+- **(+) Previsto antiguo que la contabilidad no sostiene.** Cuadre por CUENTA del efecto
+  (`pag.cueide`, la auxiliar del proveedor) contra su saldo (`importe_saldo`): **815 cuentas
+  cuadran al céntimo (8,2 M€)**; **223 cuadran al céntimo solo si se quitan sus previstos
+  vencidos hace más de 2 años (2,77 M€)**; 166 tienen previsto y saldo 0 (7,05 M€); 434 tienen
+  saldo y ningún previsto; 625 descuadran (61,8 M€ previstos frente a 39,0 de saldo). Las 223
+  son la hipótesis del humano, medida.
+- **(−) Saldo sin efecto**: anticipos (407, 0,70 M€), 415 (0,56), 419 (0,23) y facturas aún sin efecto.
+- **Por qué no se puede cuadrar cuenta a cuenta**: al emitir un pagaré la deuda pasa de
+  400/410 a 401/411 (5,36 + 24,27 = 29,6 M€ de saldo) y el efecto conserva su cuenta de origen
+  (77,1 de los 80,1 M€ previstos llevan cuenta 400, 403 o 410). Lo previsto Emitido/En
+  cartera/Remesado son 34,3 M€; lo Pendiente/Aprobado, 45,7 M€ frente a 400+403+410 = 47,2 M€.
+  Por eso el contraste honrado es el del grupo 40+41 entero, con estas dos partidas explicadas.
+- Sin el antiguo (> 2 años): 76,2 M€ frente a 78,8 M€; la diferencia restante (−2,6 M€) es
+  saldo sin efecto, no efecto sin saldo.
+
+### Por qué COBRO no cuadra (40,2 frente a 47,5 M€)
+- 433 (clientes empresas del grupo) y 434 (asociadas) suman **12,0 M€** de saldo y solo
+  **1,1 M€** de efectos: se facturan sin generar efecto de cobro. Es la mayor parte del hueco.
+- 430: 34,1 M€ de saldo frente a 37,8 M€ de efectos; la diferencia se parece al previsto
+  vencido hace más de 2 años (2,2 M€).
+- Las bajas de cobro (345 M€ pendientes) son fantasma en el conjunto (con ellas, 385 M€
+  frente a 47,5); la excepción de los cobros con retención sigue declarada (D2, F-094).
+
+### Otro hallazgo con fecha: `est = 10` sin fecha real, desde 2020
+41.884 pagos (312,4 M€) y 2.106 cobros (467,2 M€) están Pagados/Cobrados en Sigrid SIN
+`fecrea`; por año de vencimiento son 23 pagos y 4 cobros antes de 2020 y miles cada año
+después (pagos: 350 en 2020, 6.920 en 2021, 8.174 en 2024). Es un cambio de práctica (el pago
+por remesa marca el estado y no puntea la fecha), no un error antiguo: por eso el estado lee
+`est` y la ficha dirá que `fecha_real` vacía no significa pendiente.
+
+### Recomendación nueva (D11, la decide el humano)
+**A**: columna `previsto_antiguo` (PREVISTO vencido hace más de 2 años a la fecha del build:
+hoy 2.361 pagos, 3,9 M€, y 398 cobros, 2,2 M€) + regla dura: un flujo de caja usa `PREVISTO
+AND NOT previsto_antiguo`; lo antiguo es deuda por depurar en Sigrid. B: solo la regla.
+C: un estado `SOSPECHOSO` (descartada: reclasifica un hecho de Sigrid). Umbral: 2 años, el
+que hace cuadrar las 223 cuentas.

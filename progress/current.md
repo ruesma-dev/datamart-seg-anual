@@ -20,9 +20,11 @@
 - Pagos de personal (decisión del humano): `natide <> 0` (NOMINAS/EMBARGO/CUOTAS) coincide
   exactamente con cuenta 465/475/466, tercero empleado y documento de nómina: 37.053 pagos,
   0 cobros. El estándar solo ve recuentos.
-- **Decisiones abiertas para el humano: D1-D10** (design §8; resumen en `spec_F-037.md` §3),
-  sobre todo D2 (bajas de cobro con retención), D3 (esquema propio), D6 y D7 (429 pagos a
-  autónomos con NIF de empleado, recomendado dejarlos visibles). Fuera del repositorio: la
+- **13-10, respuesta del humano**: D1-D3 y D5-D10 APROBADAS con la opción A («lo demas ok»).
+  **Abiertas**: D4 remedida (la obra del contrato añade 6 efectos: se recomienda solo el
+  centro) y **D11 nueva** (columna `previsto_antiguo`, más de 2 años vencido sin puntear:
+  3,9 M€ de pagos que la contabilidad no sostiene en 223 cuentas). Contraste con la
+  contabilidad explicado en design §8 bis y `spec_F-037.md` §6. Fuera del repositorio: la
   lista blanca de `mcp-bbdd` debe admitir `tesoreria`.
 
 ## 2026-10-13 · F-136 · CERRADA (`done`, APROBADO en pasada 2) · orden del humano «vamos con la prueba»: merge y despliegue; la rotación y el alta (runbook §12) son MANUAL

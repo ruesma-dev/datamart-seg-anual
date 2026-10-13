@@ -33,8 +33,7 @@ por el MCP sin cambiar su `config.yaml`, memoria «servidor MCP»), y el rol pro
   `02_efectos_general.sql`, `03_efectos_restringidos_mes.sql` (§4).
 - `application/steps/build_tesoreria_step.py` — `SUB_PASOS` como `build_contabilidad_step.py`.
 - `config/diccionario/tesoreria.yaml` y `tesoreria_restringida.yaml`.
-- `tests/test_f037_dominio.py`, `tests/test_f037_sql.py`, `tests/test_f037_paso.py`,
-  `tests/test_f037_grants.py`, `tests/test_f037_diccionario.py`.
+- `tests/test_f037_{dominio,sql,paso,grants,diccionario}.py`.
 
 **Modificar**
 - `sql/compras/05_vencimientos.sql` — de `CREATE TABLE AS` a `CREATE VIEW` sobre
@@ -83,6 +82,7 @@ otra feature), `sql/compras/06_pago_factura.sql` (lee la vista igual que la tabl
 - `es_efecto_restringido(e) -> bool`.
 - `estado_tesoreria(est, fecrea, fecbaj) -> str` (R3): `None` y 0 cuentan como «sin valor».
 - `importe_flujo(sentido, importe) -> Decimal` (R4); sentido desconocido → `ValueError`.
+  Si D11-A: `es_previsto_antiguo(estado, vencimiento, fecha_build) -> bool` (2 años).
 
 El SQL no lo llama: lleva los mismos literales y `test_f037_sql.py` los compara (F-135).
 
@@ -119,7 +119,8 @@ importe_flujo, estado_tesoreria, estado_codigo, estado_sigrid, efecto_anulado,
 fecha_anulacion, medio_pago_id, medio_pago, naturaleza_pago_id, naturaleza_pago,
 cuenta_contable_id, cuenta_contable, cuenta_contable_nombre, banco_id, banco, sucursal_id,
 sucursal, retencion_id, centro_coste_id, obra_id, codigo_obra, nombre_obra, remesa_id,
-codigo_remesa, fecha_remesa, importe_remesa, restringido, motivo_restriccion`
+codigo_remesa, fecha_remesa, importe_remesa, [previsto_antiguo, si D11-A,] restringido,
+motivo_restriccion`
 
 ### 4.3 `02_efectos_general.sql` y `03_efectos_restringidos_mes.sql`
 `02`: `TRUNCATE tesoreria.efectos; INSERT ... SELECT` de todas las columnas salvo las dos
@@ -172,76 +173,77 @@ No hace falta para que funcione (lo hace `apply_grants`); se re-ejecuta para que
 
 ## 7. Despliegue (MANUAL, en este orden, tras el review)
 
-1. Comprobar que el job de Azure no fija `PG_CONSUMPTION_SCHEMAS`, `PG_VETOED_SCHEMAS` ni
-   `PG_RESTRICTED_SCHEMAS` en su entorno (`az containerapp job show`, solo nombres): si los
-   fija, el defecto nuevo no entra y hay que cambiarlos allí.
+1. Que el job no fije `PG_CONSUMPTION_SCHEMAS`, `PG_VETOED_SCHEMAS` ni `PG_RESTRICTED_SCHEMAS`
+   (`az containerapp job show`, solo nombres); si los fija, hay que cambiarlos allí.
 2. Imagen con tag fechado y job apuntado a ella (comprobar el tag del job).
 3. `02_roles.sql` como administrador.
 4. Desde el puesto: `build-tesoreria` (anotar duración), `build-compras`, `apply-grants`.
 5. R16, R23 y R30; `publicar-diccionario` y los tres `check-*`; reiniciar el MCP y avisar a
    `mcp-bbdd` del contrato. 6. Al día siguiente, sin tocar nada: `apply_grants` ok y R23 negativa.
 
-## 8. Decisiones abiertas para el humano
+## 8. Decisiones
 
-**D1 · `compras.vencimientos`.** (A) **Recomendada**: `tesoreria` tabla única de efectos y
-`compras.vencimientos` vista suya con las mismas columnas (0 efectos de personal en facturas
-de compra, medido: no pierde ni una fila). (B) Dejar la tabla de F-080 y que `tesoreria`
-publique solo los demás efectos y una vista unión: dos SQL con la misma lógica de efecto,
-que es la duplicación que F-073 vino a evitar. (C) Dos tablas paralelas: descartada.
+**Aprobación del humano (2026-10-13)**, por el líder: «la obra se puede sacar de los
+contratos, revisa si asi ayuda a machear mas obras. amplia la explicacion del contraste con
+contabilidad. puede ser que venga de que los efectos antiguos no estaban bien (nos paso antes
+con las retenciones) lo demas ok». **D1, D2, D3, D5, D6, D7, D8, D9 y D10 APROBADAS con la
+opción A** (tabla única + vista de compras; bajas marcadas con regla dura; esquema
+`tesoreria_restringida`; cobros ya con su cobertura; solo recuentos para el estándar; unión
+de los cuatro criterios y los 429 autónomos visibles; remesa mixta a NULL; delante de compras
+sin `depends_on`; nombres). Texto íntegro con las alternativas: `progress/spec_F-037.md` §4.
+**Abiertas: D4 (remedida) y D11 (nueva).**
 
-**D2 · Bajas** (`con.fecbaj`: 89.779 pagos y 8.548 cobros, 35 %). (A) **Recomendada**:
-se publican todas, marcadas (`estado_tesoreria = 'BAJA'`, `efecto_anulado`), con la regla
-dura `R-TESORERIA-ESTADO`, y el mismo criterio en los dos sentidos. Lo respalda el contraste:
-PAGO previsto 80,1 M€ frente a 78,8 M€ del saldo 40+41; COBRO previsto 40,2 M€ frente a
-47,5 M€ del 43, cuando con las bajas serían 385 M€. Se declara la excepción medida: en
-cobros CON retención las bajas son 19,9 M€ y F-094 vio que la contabilidad sostiene 13,8 M€
-de retención de cliente, así que ahí la baja puede no ser fantasma (queda para otra feature).
-(B) No publicar las bajas: rompería `compras.vencimientos` (sus 76 k anulados son contrato
-de F-080). (C) En cobros ignorar `fecbaj` como hace `retenciones`: 325 M€ fantasma.
+**D4 · Obra, remedida con el contrato** (`progress/spec_F-037.md` §5). Escalones probados en
+pagos no personales: 1) centro → obra; 2) contrato de la factura (`dcf.ctride` y los de sus
+líneas, directo o por albarán, como `compras.fact_compras_linea`) → `compras.contratos.obra_id`;
+3) obra de la cabecera o de las líneas de la factura.
 
-**D3 · Dónde vive lo restringido.** (A) **Recomendada**: esquema propio
-`tesoreria_restringida`, el patrón «módulo + `_restringida`», legible para la IA y con
-permisos por esquema; cuesta tocar `settings`, `02_roles.sql`, `ESQUEMAS_DEL_DATAMART` y el
-contrato del MCP. (B) Dentro de `contabilidad_restringida` (`efectos_tesoreria`): 0 cambios
-de permisos, pero un módulo escribiría en el esquema de otro y el nombre mentiría.
+| pagos no personales | efectos | importe | cartera viva futura |
+|---|---|---|---|
+| 1 · centro | 200.143 (91,0 %) | 1.024,9 M€ | 7.665 · 52,9 M€ (96,6 %) |
+| 2 · contrato (si el centro no da) | **6** | 0,07 M€ | 0 |
+| 3 · cabecera o líneas | 112 (+3 ambiguas) | 0,26 M€ | 0 |
+| sin obra | 19.635 | 126,4 M€ | 268 · 2,1 M€ |
 
-**D4 · Obra.** (A) **Recomendada**: solo el puente centro → obra (78 %), sin elaborar más.
-(B) La cascada de `retenciones` con respaldo por líneas del documento: más cobertura en
-facturas sin centro, más SQL y más dependencias (`v_src_lineas_*`); es fase 2.
+Los sin obra NO tienen obra que encontrar: 12.891 pagos sin documento (94,4 M€),
+1.612 facturas a centros de estructura (`GG`, `0001`...: 22,2 M€) y 5.129 facturas sin
+centro, sin contrato y sin obra en cabecera ni líneas (9,7 M€). Discrepancias cuando hay dos
+fuentes: centro ≠ contrato en 323 efectos (25 más con contratos de varias obras) y centro ≠
+cabecera en 495 de 190.255; manda el centro, que es la imputación del propio efecto.
+**Cobros**: sin vía; las ventas no se ingieren (F-040), `con.obr` está vacío en efectos y documentos,
+y «cliente con una sola obra» resolvería 38 efectos, ninguno previsto (y es una conjetura).
+**Recomendación: A, solo el centro** (el contrato no ayuda: +6 efectos y una regla de
+precedencia más). (B) Centro y después contrato: +6 efectos, +66 k€.
 
-**D5 · Cobros sin F-040.** (A) **Recomendada**: publicarlos ya, con la cobertura declarada
-(21.914 efectos; 204 previstos futuros por 18,9 M€; sin documento de venta ni CIF).
-(B) Esperar a F-040 (prioridad 48).
+## 8 bis. El contraste con la contabilidad (ampliado; detalle en `progress/spec_F-037.md` §6)
 
-**D6 · Qué ve el estándar de lo restringido.** (A) **Recomendada**: solo recuentos
-(`efectos_restringidos_mes`), como D5 de F-135. (B) Importe por empresa y mes: es la nómina
-neta mensual, lo que se protege. (C) Nada: leería una cartera recortada sin saberlo.
+**PAGO previsto 80,1 M€ frente a 78,8 M€ de 40+41 no es un cuadre: son dos errores que se
+compensan.** (+) 3,9 M€ de previstos **vencidos hace más de 2 años** (3,1 M€ de más de 5) que
+la contabilidad ya no sostiene: en 223 cuentas de proveedor el saldo cuadra al céntimo SOLO si
+se quitan (2,77 M€); son la hipótesis del humano, medida, y el mismo patrón de F-094 (efectos
+no punteados; «los grandes descuadran: historia anterior a 2016»). (−) Saldo sin efecto:
+anticipos (407), 415, 419 y facturas aún sin efectos. La comparación cuenta a cuenta solo
+vale en 815 cuentas (8,2 M€, cuadre exacto): al emitir un pagaré la deuda pasa de 400/410 a
+401/411 (29,6 M€ de saldo) y el efecto conserva la cuenta de origen; por eso el contraste es
+del grupo 40+41 entero. **COBRO previsto 40,2 M€ frente a 47,5 M€ de 43**: 433+434 (empresas
+del grupo y asociadas) suman 12,0 M€ en contabilidad y 1,1 M€ en efectos (se facturan sin
+efecto), y en sentido contrario 2,2 M€ de previstos vencidos hace más de 2 años.
+**Otro hallazgo con fecha**: desde 2020 el pago por remesa deja `est = 10` SIN `fecrea`
+(41.884 pagos y 2.106 cobros; con vencimiento anterior a 2020, 27): `fecha_real` vacía en un efecto
+REALIZADO no es una falta, y por eso el estado lee `est` (R3). La ficha lo dice.
 
-**D7 · Criterio de personal.** (A) **Recomendada**: la unión de los cuatro criterios más
-el fallo cerrado (hoy idéntica a `natide <> 0`: 37.053), para que restrinja de más si un día
-divergen. (B) Solo `natide <> 0`: más simple, sin red si alguien olvida la naturaleza.
-**Lo que se queda visible, medido**: 429 pagos (1,08 M€) a 16 proveedores cuyo NIF es el de
-un empleado (autónomos que también son o fueron empleados). Son facturas de compra que
-`compras.facturas` ya enseña; restringir su efecto no protegería nada y quitaría filas a
-`compras.vencimientos`. Recomendado no restringirlos; si el humano dice que sí, es un quinto
-criterio (cruce con `raw.emp`) y `compras.vencimientos` pierde esas filas.
-
-**D8 · Remesa mixta.** (A) **Recomendada**: `importe_remesa` a NULL en la general (1 remesa
-hoy, también en `compras.vencimientos`). (B) Recalcularla con lo visible: un número que no
-es el de Sigrid con el nombre del de Sigrid.
-
-**D9 · Orden con compras.** (A) **Recomendada**: delante en la lista, sin `depends_on`.
-(B) `build_compras` depende de `build_tesoreria`: un fallo de tesorería tumbaría compras.
-
-**D10 · Nombres.** `tesoreria.efectos`, `estado_tesoreria` (`PREVISTO`/`REALIZADO`/`BAJA`), `importe_flujo`.
+**D11 · NUEVA, para que la decida el humano: el previsto antiguo.** (A) **Recomendada**:
+columna `previsto_antiguo` (PREVISTO con vencimiento anterior a la fecha del build menos 2
+años; hoy 2.361 pagos, 3,9 M€, y 398 cobros, 2,2 M€) y regla dura: la cartera de un flujo de
+caja es `PREVISTO AND NOT previsto_antiguo`; lo antiguo es deuda por depurar en Sigrid, no
+caja. Precedente: `retenciones.movimientos.vencida_sin_liquidar`. (B) Solo la regla: la IA
+filtra con `CURRENT_DATE` y puede olvidarlo. (C) Un estado `SOSPECHOSO`: reclasificaría un
+hecho de Sigrid con un criterio nuestro. Umbral de 2 años: el de las 223 cuentas que cuadran.
 
 ## 9. Riesgos
 
 - **Primer despliegue**: `05` necesita `tesoreria.efectos`; si se lanza `build-compras`
   antes que `build-tesoreria`, falla en 05 y deja la tabla de ayer (transacción). Orden §7.
-- **Un `.env` o un job con las listas de esquemas fijadas** no recibe el defecto nuevo: la
-  restringida queda sin conceder a nadie (falla cerrado, no abierto). Paso 1 de §7.
-- **Vista en vez de tabla**: la ficha pasa a `tipo: vista`; ningún SQL del repositorio hace
-  `ALTER`/`TRUNCATE` sobre `compras.vencimientos` (buscado).
-- **Bajas de cobro con retención** (D2): pueden no ser fantasma; declarado, no resuelto.
+- **Listas de esquemas fijadas en un `.env` o en el job**: la restringida no se concede a nadie (falla cerrado).
+- **Bajas de cobro con retención** (D2) y **previstos antiguos** (D11): declarados, no resueltos.
 - **Lo que no arregla**: hasta que `mcp-bbdd` amplíe su lista blanca el MCP no ve `tesoreria`.
