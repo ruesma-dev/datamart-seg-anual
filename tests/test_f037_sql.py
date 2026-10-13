@@ -557,3 +557,128 @@ def test_f037_r13_sin_vencimiento_es_cero_y_no_null() -> None:
     assert "COALESCE(EXTRACT(MONTH FROM r.fecha_vencimiento)::INT, 0) AS mes" in compacto
     assert "COALESCE(r.empresa_id, 0) AS empresa_id" in compacto
     assert "GROUP BY 1, 2, 3, 4, 5" in compacto
+
+
+# ===========================================================================
+# 05 · `compras.vencimientos` pasa a ser vista de la general (R15, R16, D1)
+# ===========================================================================
+
+def test_f037_r15_la_vista_publica_la_lista_de_f080() -> None:
+    """Mismas columnas, nombres y orden que la tabla de F-080 (lista medida)."""
+    from tests.test_f080_sql import COLUMNAS_TABLA_F080, _columnas_de_la_vista
+
+    assert _columnas_de_la_vista() == [c for c, _t in COLUMNAS_TABLA_F080]
+
+
+def test_f037_r15_los_tipos_de_la_general_son_los_de_f080() -> None:
+    """La vista hereda el tipo de `tesoreria.efectos`: tiene que ser el de F-080."""
+    from tests.test_f080_sql import COLUMNAS_TABLA_F080
+
+    compacto = _ejecutable(RUTA_SETUP)
+    m = re.search(r"CREATE TABLE IF NOT EXISTS tesoreria\.efectos \((.*?)\);", compacto)
+    assert m
+    tipos = {}
+    for trozo in re.split(r",(?![^()]*\))", m.group(1)):
+        partes = trozo.strip().split(" ", 1)
+        tipos[partes[0]] = partes[1].replace(" NOT NULL", "").replace(" PRIMARY KEY", "").strip()
+    traduccion = {
+        "INTEGER": "integer", "TEXT": "text", "DATE": "date", "BOOLEAN": "boolean",
+        "NUMERIC": "numeric", "NUMERIC(18,2)": "numeric(18,2)",
+    }
+    def _pg(tipo: str) -> str:
+        m_var = re.fullmatch(r"VARCHAR\((\d+)\)", tipo)
+        return f"character varying({m_var.group(1)})" if m_var else traduccion[tipo]
+    origen = re.search(
+        r"CREATE VIEW compras\.vencimientos AS SELECT (.*?) FROM tesoreria\.efectos",
+        _ejecutable(RUTA_VENCIMIENTOS),
+    ).group(1)
+    pares = [t.strip().split(" AS ") for t in origen.split(",")]
+    for (columna_general, columna_vista), (esperada, tipo_f080) in zip(
+        pares, COLUMNAS_TABLA_F080, strict=True
+    ):
+        assert columna_vista == esperada
+        assert _pg(tipos[columna_general]) == tipo_f080, columna_vista
+
+
+def test_f037_r15_la_vista_filtra_pago_y_factura_de_compra() -> None:
+    compacto = _ejecutable(RUTA_VENCIMIENTOS)
+    assert "FROM tesoreria.efectos WHERE sentido = 'PAGO' AND es_factura_compra;" in compacto
+    assert "tesoreria_restringida" not in compacto, "la vista lee la GENERAL"
+
+
+def test_f037_r16_borra_tabla_o_vista_segun_relkind() -> None:
+    compacto = _ejecutable(RUTA_VENCIMIENTOS)
+    assert "WHERE n.nspname = 'compras' AND c.relname = 'vencimientos';" in compacto
+    assert "IF v_relkind IN ('r', 'p') THEN EXECUTE 'DROP TABLE compras.vencimientos CASCADE';" in compacto
+    assert "ELSIF v_relkind = 'v' THEN EXECUTE 'DROP VIEW compras.vencimientos CASCADE';" in compacto
+    assert compacto.index("DO $$") < compacto.index("CREATE VIEW compras.vencimientos AS")
+
+
+def test_f037_r16_sin_indices_ni_tabla_en_05() -> None:
+    """Los índices los lleva `tesoreria.efectos`; una vista no los admite."""
+    compacto = _ejecutable(RUTA_VENCIMIENTOS)
+    assert "CREATE INDEX" not in compacto
+    assert "ADD PRIMARY KEY" not in compacto
+    assert "CREATE TABLE" not in compacto
+    assert "COMMENT ON VIEW compras.vencimientos IS" in compacto
+
+
+def test_f037_r16_06_sigue_leyendo_la_vista_tal_cual() -> None:
+    texto = _sql(DIRECTORIO_SQL / "compras" / "06_pago_factura.sql")
+    assert "FROM compras.vencimientos" in texto
+    assert "tesoreria" not in texto, "06 no cambia: lee la vista como leía la tabla"
+
+
+# ===========================================================================
+# Trasladadas de `test_f080_sql.py` (T5): la semántica del efecto, ahora en 01
+# ===========================================================================
+
+def test_f037_f080_la_cuenta_contable_sale_de_con_y_no_de_cua() -> None:
+    """`raw.cua` no tiene `cod` ni `res`: unirse a ella daría una columna vacía."""
+    assert "raw.cua" not in _sin_comentarios(_sql(RUTA_COMPLETO))
+
+
+@pytest.mark.parametrize(
+    "crudo", ["fecrea_efecto", "fecbaj_efecto", "tip_tercero"]
+)
+def test_f037_f080_ninguna_fecha_cruda_se_publica(crudo: str) -> None:
+    """Las fechas AAAAMMDD crudas viajan dentro del CTE para el estado, pero no
+    se publican: un entero AAAAMMDD se ordena bien y se resta mal (R9 de F-080)."""
+    assert crudo not in COLUMNAS_COMPLETO
+    compacto = _sin_comment_on(RUTA_COMPLETO)
+    insert = re.search(r"INSERT INTO tesoreria_restringida\.efectos \((.*?)\)", compacto).group(1)
+    assert crudo not in insert
+    final = compacto[compacto.index("FROM marcados m") - 2500:]
+    assert f"m.{crudo}" not in final
+
+
+def test_f037_f080_el_punteo_no_distingue_nada() -> None:
+    """`pag.pun` vale 0 en todos los efectos (R10 de F-080)."""
+    assert "p.pun" not in _sin_comentarios(_sql(RUTA_COMPLETO))
+
+
+@pytest.mark.parametrize("derivacion", ["row_number", "lpad", "ordinal_efecto"])
+def test_f037_f080_no_se_deriva_el_ordinal_del_efecto(derivacion: str) -> None:
+    """DA-8 de F-080: el código del efecto se LEE de `con.cod`."""
+    assert derivacion not in _sin_comentarios(_sql(RUTA_COMPLETO)).lower()
+
+
+def test_f037_f080_la_serie_no_sale_de_con_serie() -> None:
+    """`con.serie` vale 0 en todos los efectos (R38 de F-080)."""
+    assert "c.serie" not in _ejecutable(RUTA_COMPLETO)
+
+
+@pytest.mark.parametrize("parseo", ["substring", "left(", "split_part", "regexp_match"])
+def test_f037_f080_no_hay_una_segunda_derivacion_de_la_serie(parseo: str) -> None:
+    assert parseo not in _sin_comentarios(_sql(RUTA_COMPLETO)).lower()
+
+
+def test_f037_f080_sin_autojoin_para_adivinar_el_origen() -> None:
+    ejecutable = _sin_comentarios(_sql(RUTA_COMPLETO))
+    assert not re.search(r"JOIN\s+(compras\.vencimientos|tesoreria\.efectos)", ejecutable, re.I)
+
+
+def test_f037_f080_la_remesa_de_pago_no_tiene_codigo_en_rpa() -> None:
+    """`rpa.cod` no existe: el código de la remesa está en `raw.con` (R41)."""
+    assert not re.search(r"\br\.cod\b", _ejecutable(RUTA_COMPLETO))
+    assert "rc.cod AS codigo_remesa" in _rama("PAGO")
