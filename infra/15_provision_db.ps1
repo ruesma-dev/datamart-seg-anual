@@ -49,8 +49,9 @@ Write-Host ("  Servidor        : {0}" -f $PG_SERVER)
 Write-Host ("  Base a crear    : {0}" -f $CFG.pgDatabase)
 Write-Host ("  Roles           : {0} (grupo), {1} (ETL), {2} (solo lectura)" -f `
     $CFG.pgSetRole, $CFG.pgUser, $CFG.pgReadonlyRole)
-Write-Host "                    sigrid_dm_restringido_ro (grupo autorizado, F-135)"
-Write-Host "                    mcp_sigrid_dm_total (acceso total del MCP, F-136)"
+# Los otros dos los crea 02_roles.sql con su nombre: aqui no se escribe ningun
+# nombre de recurso (F-003, R1), solo se dice que existen.
+Write-Host "                    + grupo autorizado (F-135) y login de acceso total del MCP (F-136)"
 Write-Host ""
 
 if (-not $AdminUser) {

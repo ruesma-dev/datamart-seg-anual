@@ -844,7 +844,9 @@ def test_f136_r21_provision_exige_las_tres_y_no_las_pasa() -> None:
             f"la contraseña llega a psql por herencia del entorno, no por argumento: {llamada}"
         )
         assert llamada.startswith("psql -X "), f"sin -X (psqlrc) : {llamada}"
-    assert TOTAL in texto, "el rótulo de roles nombra el total"
+    # Sin el nombre literal: test_f003 prohíbe cualquier valor de $CFG en un .ps1,
+    # y `sigrid_dm` (pgDatabase) va dentro del nombre de cada rol.
+    assert "login de acceso total del MCP (F-136)" in codigo, "el rótulo de roles nombra el total"
 
 
 # ===========================================================================
