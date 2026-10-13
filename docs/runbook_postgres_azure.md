@@ -486,6 +486,12 @@ $job = "caj-datamart-seg-dev"
 az containerapp job execution list -g $rgJ -n $job -o table
 az containerapp job show -g $rgJ -n $job --query "properties.template.containers[0].image" -o tsv
 psql --version
+# solo LECTURA del parámetro: si carga pgaudit, un ALTER ROLE ... PASSWORD podría quedar
+# en su log de auditoría según pgaudit.log; entonces se para y se consulta antes de P4
+$rgP = "rg-albaranes-dev"
+$srv = "psql-albaranes-rs9k2"
+$prm = "shared_preload_libraries"
+az postgres flexible-server parameter show -g $rgP -s $srv -n $prm --query value -o tsv
 ```
 
 ### P1 · Variables
@@ -538,7 +544,7 @@ $env:APP_PWD = az keyvault secret show --vault-name $kvDm --name pg-sigrid-dm-ap
 $env:MCP_PWD = az keyvault secret show --vault-name $kvMcp --name pg-password @q
 $env:TOTAL_PWD = az keyvault secret show --vault-name $kvMcp --name pg-password-total @q
 $copia = az keyvault secret show --vault-name $kvDm --name pg-mcp-sigrid-dm-ro @q
-if ($copia -ne $env:MCP_PWD) { throw "P3: las dos copias del estándar no coinciden" }
+if ($copia -cne $env:MCP_PWD) { throw "P3: las dos copias del estándar no coinciden" }
 $copia = $null
 foreach ($n in "APP_PWD", "MCP_PWD", "TOTAL_PWD") {
     if ((Get-Item "Env:$n").Value.Length -ne 64) { throw "P3: $n no mide 64" }
@@ -571,7 +577,9 @@ Remove-Item Env:APP_PWD, Env:MCP_PWD, Env:TOTAL_PWD
 Grupo y nombre en `azure-apps/mcp_bbdd.md`. Lee `pg-password` por referencia al
 vault al arrancar: se reinicia su revisión activa y se comprueba que responde.
 Si su log dice `password authentication failed`, la referencia aún sirve la
-versión vieja: esperar un par de minutos y reiniciar otra vez.
+versión vieja: una referencia sin versión puede tardar del orden de 30 minutos
+en servir la nueva (o hasta el siguiente reinicio de la revisión). Esperar y
+reiniciar otra vez; nunca volver a la contraseña expuesta.
 
 ```powershell
 $rgM = "rg-mcp-bbdd-dev"
@@ -641,7 +649,7 @@ $env:PGPASSWORD = az keyvault secret show --vault-name $kvMcp --name pg-password
 foreach ($t in "apu", "pag", "asi", "rac", "hmores", "con", "apa") {
     psql -X -c "SELECT 1 FROM raw.$t LIMIT 1" $dsnT
 }
-psql -X -c "CREATE TABLE contabilidad.f136_x (x int)" $dsnT
+psql -X -c "BEGIN" -c "CREATE TABLE contabilidad.f136_x (x int)" -c "ROLLBACK" $dsnT
 psql -X -c "SELECT count(*) FROM contabilidad_restringida.mayor" $dsnT
 psql -X -c "SELECT count(*) FROM contabilidad.mayor" $dsnT
 Remove-Item Env:PGPASSWORD
@@ -649,7 +657,7 @@ psql -X -c "SELECT count(*) FROM raw.apu" $dsn
 ```
 
 Esperado: `permission denied for schema raw` en las siete de `raw`;
-`permission denied for schema contabilidad` en el `CREATE TABLE`; el recuento de
+`permission denied for schema contabilidad` en el `CREATE TABLE` (el `ROLLBACK` cierra la transacción); el recuento de
 `contabilidad_restringida.mayor` igual al de `raw.apu` (este, como
 administrador y en el mismo momento); `contabilidad.mayor` legible.
 

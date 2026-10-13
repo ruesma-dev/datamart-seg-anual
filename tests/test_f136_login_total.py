@@ -961,7 +961,7 @@ def test_f136_r25_releer_ejecutar_borrar_y_reiniciar() -> None:
     p3 = _paso_12(seccion, 3)
     for variable in ("APP_PWD", "MCP_PWD", "TOTAL_PWD"):
         assert f"$env:{variable} = az keyvault secret show" in p3
-    assert "-ne $env:MCP_PWD" in p3 and "64" in p3, "las dos copias del estándar y la longitud"
+    assert "-cne $env:MCP_PWD" in p3 and "64" in p3, "las dos copias del estándar y la longitud"
     assert "psql -X -v ON_ERROR_STOP=1 -f $roles $dsn" in _paso_12(seccion, 4)
     assert "Remove-Item Env:APP_PWD, Env:MCP_PWD, Env:TOTAL_PWD" in _paso_12(seccion, 5)
     p6 = _paso_12(seccion, 6)
@@ -1033,6 +1033,23 @@ def test_f136_r25_la_seccion_4_no_toca_el_vault_del_mcp() -> None:
     for cosa in ("kv-mcp-bbdd-dev", "pg-password", "TOTAL_PWD"):
         assert cosa not in codigo, f"la §4 vuelve a tocar {cosa}"
     assert "§12, P2-P3" in seccion4
+
+
+def test_f136_r25_recomendaciones_de_la_revision() -> None:
+    """Revisión, pasada 1: -cne (PowerShell compara sin mayúsculas), el CREATE TABLE
+    negativo dentro de una transacción que se deshace, pgaudit mirado en P0 y la
+    espera real de una referencia a Key Vault sin versión."""
+    seccion = _seccion_12()
+    assert "-cne $env:MCP_PWD" in _paso_12(seccion, 3)
+    assert '-ne $env:MCP_PWD' not in seccion
+    assert ('psql -X -c "BEGIN" -c "CREATE TABLE contabilidad.f136_x (x int)" -c "ROLLBACK" $dsnT'
+            in _paso_12(seccion, 10))
+    p0 = _paso_12(seccion, 0)
+    assert "shared_preload_libraries" in p0 and "pgaudit" in p0
+    assert "parameter show" in p0 and "parameter set" not in seccion
+    for n in (6, 12):
+        assert "30 minutos" in _paso_12(seccion, n), f"P{n}"
+    assert "un par de minutos" not in seccion
 
 
 def test_f136_r25_la_tabla_de_roles_tiene_los_cinco() -> None:
