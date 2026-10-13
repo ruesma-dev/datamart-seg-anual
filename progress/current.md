@@ -16,9 +16,23 @@
   (212 objetos, 1.699 columnas, 22 reglas, hash `41027816f442`), `check-diccionario` OK, MCP
   reiniciado (`ca-mcp-bbdd-dev--0000014`) y `contexto_bbdd` sirve la v50 con la regla nueva.
   `azure-apps` `8a73342` (sin push).
-- **Pendiente del HUMANO, hoy de día**: runbook §12 P0-P11 (rotación + alta del total), P12
-  (`check-pg` puntual con `--yaml`), Power BI (P8), D12. **Del LÍDER**: la nocturna del 14-10
-  (R29: los tres «ok» en `apply_grants`) y avisar a `mcp-bbdd` de la v50.
+- **ROTACIÓN DESCARTADA por el humano** (13-10: «no voy a rotar ahora ni nunca. ignora la
+  rotacion»): las contraseñas de `sigrid_dm_app` y `mcp_sigrid_dm_ro` expuestas el 12-10 siguen
+  vigentes por decisión suya. P2-P3 del estándar, P6-P9, P12 y D12 no se ejecutan.
+- **ALTA DEL TOTAL Y PRUEBAS, 13-10 ~08:45 UTC, TODO EN VERDE** (humano, solo el total):
+  `pg-password-total` creado en `kv-mcp-bbdd-dev` (64 caracteres, sin mostrarlo);
+  `02_roles.sql` → «SIN CAMBIOS» en `sigrid_dm_app` y `mcp_sigrid_dm_ro`, «fijada» en el total,
+  `COMMIT`; cinco roles sin `rolsuper`; el total en los dos grupos con `hereda = t`,
+  `set_role = f`; `raw = f`, `contabilidad_restringida = t`, `contabilidad = t`, `conecta = t`;
+  0 privilegios propios; el estándar sigue sin leer `raw` ni `contabilidad_restringida`.
+  **Negativa** con el login total real: `permission denied for schema raw` en apu, pag, asi,
+  rac, hmores, con y apa; `permission denied for schema contabilidad` en el `CREATE TABLE`.
+  **Positiva**: `contabilidad_restringida.mayor` 2.176.274 (= `raw.apu` de la nocturna del
+  13-10), `contabilidad.mayor` 2.120.755 (55.519 restringidos, como el 12-10).
+  **P11** (líder): `apply-grants` SUCCESS, 46 sentencias, `verificacion`,
+  `verificacion_total` y `acceso_total` = `ok`; veto de `raw` al total aplicado.
+- **Pendiente del LÍDER**: la nocturna del 14-10 (R29: los tres «ok» sin nada a mano). El
+  total no lo usa nadie hasta la F-008 de `mcp-bbdd`.
 
 > Spec aprobada el 2026-10-13 con D1-D14 recomendadas; ampliación del mismo día: D13 pasa a
 > «diccionario v50» (`R-CONTABILIDAD-RESTRINGIDA` reescrita, avisos en las fichas). Informe
