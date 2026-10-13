@@ -30,16 +30,13 @@ en este fichero. `.env` y `.env.azure.bak` no se han tocado ni leído.
 - **R3 se evalúa aunque `PG_TOTAL_ROLE` esté vacío**, como dice design §3 (d) literalmente.
 - **El aviso del FAILED del total nombra a los dos grupos** («miembro SOLO de …»): es la pista
   para arreglarlo. El mensaje de F-135 queda idéntico cuando solo falla el estándar.
-- **`02_roles.sql`**: el veto del total va en un `FOREACH vetado_total` propio dentro de los dos
-  `DO` del 5 ter (los tests de F-135 cuentan exactamente sus dos `FOREACH vetado`); el alta del
-  total pone `ALTER ROLE … WITH LOGIN NOCREATEDB NOCREATEROLE` (las contraseñas ya no son
-  obligatorias y no deben ser lo único que asegura `LOGIN`).
-- **Runbook**: `--value $v` sigue en la línea de órdenes de `az` (inevitable con la CLI, como en
-  design P2); lo que ya no ocurre es que el valor llegue a `psql` ni a la pantalla.
-- **Diccionario**: texto en ASCII sin tildes, como el resto del diccionario; el título de la regla
-  mide 79 caracteres (el más largo publicado mide 87; el validador no fija tope). El `motivo`
-  conserva «Correo de Juan Romero …» porque es procedencia de F-135 y su test lo exige; el
-  perfil total no se nombra por personas (test).
+- **`02_roles.sql`**: veto del total en un `FOREACH vetado_total` propio en los dos `DO` del 5 ter
+  (F-135 cuenta sus dos `FOREACH vetado`); `LOGIN` asegurado aparte (la contraseña es opcional).
+- **Runbook**: `--value $v` sigue en la línea de órdenes de `az` (inevitable, como en design P2);
+  el valor ya no llega a `psql` ni a la pantalla.
+- **Diccionario**: ASCII sin tildes, como el resto; título de 79 caracteres (el mayor publicado,
+  87). El `motivo` conserva la procedencia de F-135 (su test la exige); el perfil total no se
+  nombra por personas (test).
 
 ## 3. Fase RED (comando exacto y salida real, antes del código)
 
@@ -165,20 +162,15 @@ DELANTE y la cadena al final, ningún valor en pantalla, `-o none` en cada `secr
    Publicar el diccionario v50: `python main.py publicar-diccionario`; luego
    `python main.py check-diccionario` y reiniciar el MCP (cachea el diccionario).
 2. **T15 · §12 P0-P11, en una sola sesión**:
-   - P0 puerta: hora UTC, ninguna ejecución del job en curso, imagen con F-136, `psql --version` ≥ 15.
-   - P1 variables (`$kvDm`, `$kvMcp`, `$dsn` con `$env:PG_ADMIN_USER`, `$q`, `Nueva-Clave`).
-   - P2 vault primero: `pg-sigrid-dm-app`; `pg-mcp-sigrid-dm-ro` y `pg-password` con el MISMO
-     valor; `pg-password-total`; `$LASTEXITCODE` tras cada uno; `$v = $null`.
-   - P3 releer del vault a `APP_PWD`, `MCP_PWD`, `TOTAL_PWD`; comparar las dos copias; 64 caracteres.
-   - P4 `psql -X -v ON_ERROR_STOP=1 -f $roles $dsn` → tres «contraseña fijada» y `COMMIT`.
-   - P5 `Remove-Item Env:APP_PWD, Env:MCP_PWD, Env:TOTAL_PWD`.
-   - P6 reiniciar la revisión activa de `ca-mcp-bbdd-dev` y comprobar que responde.
-   - P7 `.env` del datamart por el portapapeles; `python main.py check-pg`;
-     **borrar `.env.azure.bak` (D12)**; el `.env` de `mcp-bbdd` con el estándar.
-   - P8 credencial de Power BI (servicio y Desktop) y «Actualizar ahora».
-   - P9 la versión ANTERIOR de cada secreto rotado → `password authentication failed`.
-   - P10 negativa y positiva del total (R26-R27) y `Remove-Item Env:PGPASSWORD`; cerrar la ventana.
-   - P11 `python main.py apply-grants` → SUCCESS y los tres «ok».
+   P0 puerta (hora UTC, job sin ejecución en curso y con la imagen de F-136, `psql` ≥ 15,
+   `shared_preload_libraries` LEÍDO: si carga `pgaudit`, parar) · P1 variables · P2 vault
+   primero (cuatro `set -o none`; el estándar, mismo valor en los dos vaults) · P3 releer al
+   entorno, `-cne` entre copias y 64 caracteres · P4 `psql -X -v ON_ERROR_STOP=1 -f $roles
+   $dsn` (tres «fijada», `COMMIT`) · P5 `Remove-Item Env:…` · P6 reiniciar el MCP (la
+   referencia al vault puede tardar ~30 min) · P7 `.env` por portapapeles, `check-pg`,
+   **borrar `.env.azure.bak` (D12)**, `.env` de `mcp-bbdd` · P8 Power BI · P9 la versión
+   ANTERIOR rechazada · P10 negativa (con `BEGIN`/`ROLLBACK`) y positiva del total ·
+   P11 `python main.py apply-grants` → SUCCESS y los tres «ok».
    Resultados, SIN valores, en `progress/current.md`.
 3. **T16 · P12**: ejecución puntual de `check-pg` con el patrón `--yaml` de §12 P12 (plantilla
    del job con `job show --query properties.template -o json`, solo `command`/`args` cambiados,
@@ -189,14 +181,11 @@ DELANTE y la cadena al final, ningún valor en pantalla, `-o none` en cada `secr
 
 ## 6. Fuera de alcance y riesgos
 
-- La F-008 de `mcp-bbdd` (dos conexiones, lista de oid, lista blanca) y F-087 (Power BI): solo su
-  contrato, en `azure-apps`. Hasta F-008, el MCP rechaza `contabilidad_restringida` por su lista
-  blanca y no por `permission denied` (desajuste aceptado por el humano).
-- D6-E (verificador SCRAM en el puesto): el log del servidor guarda el texto de un `ALTER ROLE`
-  que FALLE (medido en T10). Lo acotan la guarda R18 y los valores hexadecimales.
-- `01_create_database.sql` en PG16 con administrador no superusuario (hallazgo de T10): no afecta
-  a Azure hoy; si se quisiera reprovisionar desde cero, es otra feature.
-- Las contraseñas expuestas el 2026-10-12 siguen valiendo hasta T15.
+- F-008 de `mcp-bbdd` y F-087: solo su contrato, en `azure-apps`. Hasta F-008 el MCP rechaza
+  `contabilidad_restringida` por su lista blanca (desajuste aceptado por el humano).
+- D6-E: el log del servidor guarda un `ALTER ROLE` que FALLE (medido en T10); lo acota la guarda.
+- `01_create_database.sql` en PG16 con administrador no superusuario: otra feature. Las
+  contraseñas expuestas el 2026-10-12 siguen valiendo hasta T15.
 
 ## 7. Evidencias
 
@@ -209,12 +198,23 @@ DELANTE y la cadena al final, ningún valor en pantalla, `-o none` en cada `secr
 | Tiempo de la suite | 800 s en `init.sh` (13 min 20 s); línea base de mutación ~605 s por worktree |
 | Tamaño | requirements 148/150, design 244/250, impl 203/220 |
 
-- **Mutación, cómo se llegó**: la 1.ª campaña abortó (la suite limpia, ~18 min con cobertura, no
-  cabe en los 600 s de línea base por defecto) y la 2.ª, por el árbol sin commitear; la 3.ª
-  encontró la **base en rojo** en el worktree: `test_f003_r1` (el rótulo de
-  `15_provision_db.ps1` escribía nombres de rol que contienen `sigrid_dm`, valor de `$CFG`) y
-  `test_backlog_md` (BACKLOG.md sin regenerar). Arreglado en `974ff68` (el rótulo ya no nombra
-  roles; el test R21 se ajustó a ello) y la 4.ª, con `--timeout 2400 --workers 4` (timeout
-  FIJADO a mano, no derivado), dio el resultado de arriba.
+- **Mutación**: abortaron la 1.ª (línea base > 600 s), la 2.ª (árbol sucio) y la 3.ª (base roja:
+  `test_f003_r1` por roles con `sigrid_dm` en el rótulo del `.ps1` y BACKLOG.md sin regenerar,
+  arreglado en `974ff68`); la 4.ª, con `--timeout 2400 --workers 4` FIJADO a mano, es la de arriba.
 - Tras la mutación solo cambiaron tests e informe (R23 ya no barre `mutacion_F-136.md`, con SHA
   de git que parecen claves; la traza RED de T8, que `test_f003_r4` cazó, va descrita).
+
+## 8. Pasada 2 (review 1 = CHANGES_REQUESTED, `e8c9e21`): un commit y un RED por cambio
+
+- `1d2761d` · **§12 P12 con `--yaml`**: plantilla del job (`job show --query properties.template
+  -o json`), nulos fuera, solo `command`/`args` del contenedor, fichero UTF-8 sin BOM
+  (`[IO.File]::WriteAllText`), `job start --yaml … -o none`, borrar el fichero; ídem §5.3 de
+  este informe. Tests `r25_p12_el_job_puntual_va_con_yaml` y `r25_ningun_job_start_con_command…`.
+  RED: los dos tests cazan la línea de P12 con `--command`/`--args` → `2 failed, 4 passed`.
+- `3b81ac5` · **§4 sin el vault del MCP**: fuera `TOTAL_PWD`/`kv-mcp-bbdd-dev`; remite a
+  «§12, P2-P3». RED: `AssertionError: la §4 vuelve a tocar kv-mcp-bbdd-dev` → `1 failed`.
+- `4492b4e` · **Recomendaciones**: P3 `-cne`; P10 `-c "BEGIN" -c "CREATE TABLE …" -c
+  "ROLLBACK"`; P0 lee `shared_preload_libraries` (`parameter show`, solo lectura) por `pgaudit`;
+  P6 y P12, «del orden de 30 minutos». RED: `assert '-cne $env:MCP_PWD' in …` → `1 failed`.
+- Sin tocar `infra/README.md` l. 313/322 ni el `$LASTEXITCODE` de `15_provision_db.ps1` (fuera).
+- Sin código de producción nuevo (mutación 15/15 y cobertura 60/60 valen). `init.sh`: 7.587 passed, LISTO.
