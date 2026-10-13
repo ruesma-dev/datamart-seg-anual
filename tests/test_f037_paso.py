@@ -175,6 +175,86 @@ def test_f037_r18_el_log_dice_las_filas_de_cada_sub_paso(instalar, monkeypatch) 
     assert all(isinstance(h["duration_s"], float) for h in hechos)
 
 
+class _Espia:
+    """Logger de mentira: apunta cada evento con sus campos."""
+
+    def __init__(self) -> None:
+        self.eventos: list[tuple[str, dict]] = []
+
+    def error(self, evento: str, **kw) -> None:
+        self.eventos.append((evento, kw))
+
+    def info(self, evento: str, **kw) -> None:
+        self.eventos.append((evento, kw))
+
+    def de(self, evento: str) -> list[dict]:
+        return [kw for ev, kw in self.eventos if ev == evento]
+
+
+def test_f037_r18_un_sub_paso_con_esquema_y_sin_tabla_no_cuenta(instalar, monkeypatch) -> None:
+    """El guardián `target_schema AND target_table`, ejercitado (mutación).
+
+    Los sub-pasos reales declaran los dos campos o ninguno, así que con `or` el
+    paso haría lo mismo: hace falta uno a medias para ver la diferencia. Con
+    `or`, contaría `tesoreria.None`.
+    """
+    pg = instalar(_PgFalso(filas=9))
+    espia = _Espia()
+    monkeypatch.setattr(modulo, "logger", espia)
+    monkeypatch.setattr(modulo, "SUB_PASOS", (
+        modulo._SubStep(name="a_medias", sql_file="00_setup.sql", target_schema="tesoreria"),
+        modulo._SubStep(name="a_medias_2", sql_file="00_setup.sql", target_table="efectos"),
+    ))
+    resultado = _paso().run()
+    assert resultado.status == StepStatus.SUCCESS
+    assert pg.contados == []
+    assert resultado.rows_processed == 0
+    assert [h["rows"] for h in espia.de("tesoreria_substep_done")] == [0, 0]
+
+
+class _RelojFalso:
+    """Un reloj que avanza 1,23456 s por lectura, para fijar el redondeo."""
+
+    instante = None
+
+    @classmethod
+    def utcnow(cls):
+        from datetime import datetime as _dt
+        from datetime import timedelta
+
+        if cls.instante is None:
+            cls.instante = _dt(2026, 10, 13, 2, 0, 0)
+        valor = cls.instante
+        cls.instante = cls.instante + timedelta(seconds=1.23456)
+        return valor
+
+
+def test_f037_r18_la_duracion_va_con_dos_decimales(instalar, monkeypatch) -> None:
+    """Con un reloj real la diferencia entre round(x, 2) y round(x, 3) no se ve."""
+    instalar(_PgFalso())
+    espia = _Espia()
+    monkeypatch.setattr(modulo, "logger", espia)
+    _RelojFalso.instante = None
+    monkeypatch.setattr(modulo, "datetime", _RelojFalso)
+    _paso().run()
+    duraciones = [h["duration_s"] for h in espia.de("tesoreria_substep_done")]
+    assert duraciones and all(d == round(d, 2) for d in duraciones)
+    assert 1.23 in duraciones, duraciones
+
+
+def test_f037_r18_la_duracion_del_fallo_es_la_del_sub_paso(instalar, monkeypatch) -> None:
+    """La duración registrada al fallar es t_fallo - t0, positiva y exacta."""
+    instalar(_PgFalso(falla_en="00_setup.sql"))
+    espia = _Espia()
+    monkeypatch.setattr(modulo, "logger", espia)
+    _RelojFalso.instante = None
+    monkeypatch.setattr(modulo, "datetime", _RelojFalso)
+    _paso().run()
+    fallo = espia.de("tesoreria_substep_failed")
+    assert len(fallo) == 1
+    assert fallo[0]["duration_s"] == pytest.approx(1.23456)
+
+
 # ===========================================================================
 # R17 · la nocturna: delante de compras, y nadie depende de él (D9)
 # ===========================================================================
