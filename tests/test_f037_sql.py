@@ -35,7 +35,7 @@ RUTA_VENCIMIENTOS = DIRECTORIO_SQL / "compras" / "05_vencimientos.sql"
 
 #: Los ficheros de `tesoreria`, en orden. Lo que vale para todos se comprueba
 #: sobre esta tupla.
-FICHEROS = (RUTA_SETUP, RUTA_COMPLETO)
+FICHEROS = (RUTA_SETUP, RUTA_COMPLETO, RUTA_GENERAL, RUTA_RESTRINGIDOS_MES)
 
 #: El orden de columnas de design §4.2 (con `previsto_antiguo`, D11-A).
 COLUMNAS_COMPLETO = (
@@ -136,6 +136,8 @@ def test_f037_r14_ningun_fichero_dropea_una_tabla(ruta: Path) -> None:
     ("ruta", "tabla"),
     [
         (RUTA_COMPLETO, "tesoreria_restringida.efectos"),
+        (RUTA_GENERAL, "tesoreria.efectos"),
+        (RUTA_RESTRINGIDOS_MES, "tesoreria.efectos_restringidos_mes"),
     ],
     ids=lambda x: x if isinstance(x, str) else x.name,
 )
@@ -460,3 +462,98 @@ def test_f037_r5_la_cabecera_cita_lo_que_lee_y_escribe() -> None:
     for leido in ("raw.pag", "raw.cob", "raw.con", "raw.conest", "raw.dcf",
                   "maestro.centros_coste", "tesoreria_restringida.efectos"):
         assert leido in texto
+
+
+# ===========================================================================
+# 02 · la cartera general (R10, R11, R12)
+# ===========================================================================
+
+def test_f037_r10_la_general_es_la_completa_sin_los_restringidos() -> None:
+    compacto = _sin_comment_on(RUTA_GENERAL)
+    m = re.search(r"INSERT INTO tesoreria\.efectos \((.*?)\)", compacto)
+    assert m
+    assert [c.strip() for c in m.group(1).split(",")] == list(COLUMNAS_GENERAL)
+    assert "FROM tesoreria_restringida.efectos r" in compacto
+    assert re.search(r"WHERE NOT r\.restringido;", compacto)
+    for prohibida in ("r.restringido,", "r.motivo_restriccion"):
+        assert prohibida not in compacto.split("WHERE NOT")[0]
+
+
+def test_f037_r10_el_select_de_la_general_respeta_el_orden() -> None:
+    """Cada columna sale con su nombre, en el orden del setup."""
+    compacto = _sin_comment_on(RUTA_GENERAL)
+    cuerpo = compacto[compacto.index("SELECT "):compacto.index(" FROM tesoreria_restringida.efectos r")]
+    salida = re.findall(r"(?:r\.(\w+)(?:,|$))|(?:AS (\w+)(?:,|$))", cuerpo + ",")
+    nombres = [a or b for a, b in salida]
+    assert nombres == list(COLUMNAS_GENERAL)
+
+
+def test_f037_r11_la_remesa_mixta_pierde_su_importe() -> None:
+    """Una remesa con algún efecto restringido: su total delataría la nómina (D8)."""
+    compacto = _sin_comment_on(RUTA_GENERAL)
+    assert (
+        "CASE WHEN r.remesa_id IN (SELECT x.remesa_id FROM tesoreria_restringida.efectos x "
+        "WHERE x.restringido AND x.remesa_id IS NOT NULL) THEN NULL "
+        "ELSE r.importe_remesa END AS importe_remesa"
+    ) in compacto
+
+
+def test_f037_r12_la_guarda_recalcula_el_criterio_desde_raw() -> None:
+    """0 filas de la general que cumplan el criterio, recalculado desde `raw`."""
+    compacto = _ejecutable(RUTA_GENERAL)
+    guarda = compacto[compacto.index("DO $$"):]
+    for origen in ("raw.pag", "raw.cob", "raw.con"):
+        assert origen in guarda, f"la guarda recalcula desde {origen}"
+    assert f"'{dom.REGEX_CUENTA_RESTRINGIDA}'" in guarda
+    assert f"= {dom.TIP_TERCERO_EMPLEADO}" in guarda
+    assert f"= {dom.TIP_DOCUMENTO_NOMINA}" in guarda
+    assert "natide" in guarda
+    assert "IS NOT NULL AND cue.cod IS NULL" in guarda, "también la cuenta que no resuelve"
+    assert guarda.count("RAISE EXCEPTION") >= 2
+
+
+def test_f037_r12_la_guarda_cuadra_los_recuentos() -> None:
+    compacto = _ejecutable(RUTA_GENERAL)
+    guarda = compacto[compacto.index("DO $$"):]
+    assert "SELECT count(*) INTO v_general FROM tesoreria.efectos;" in guarda
+    assert (
+        "SELECT count(*), count(*) FILTER (WHERE restringido) INTO v_completo, v_restringidos "
+        "FROM tesoreria_restringida.efectos;"
+    ) in guarda
+    assert "IF v_general + v_restringidos <> v_completo THEN RAISE EXCEPTION" in guarda
+    assert "IF v_personal <> 0 THEN RAISE EXCEPTION" in guarda
+
+
+def test_f037_r12_la_guarda_va_despues_del_insert() -> None:
+    compacto = _ejecutable(RUTA_GENERAL)
+    assert compacto.index("INSERT INTO tesoreria.efectos") < compacto.index("DO $$")
+
+
+# ===========================================================================
+# 03 · lo que falta, solo contado (R13, D6)
+# ===========================================================================
+
+def test_f037_r13_solo_recuentos_de_los_restringidos() -> None:
+    compacto = _sin_comment_on(RUTA_RESTRINGIDOS_MES)
+    m = re.search(r"INSERT INTO tesoreria\.efectos_restringidos_mes \((.*?)\)", compacto)
+    assert m
+    assert [c.strip() for c in m.group(1).split(",")] == [
+        "empresa_id", "sentido", "anio", "mes", "estado_tesoreria", "num_efectos",
+    ]
+    assert "count(*) AS num_efectos" in compacto
+    assert "WHERE r.restringido" in compacto
+    assert "FROM tesoreria_restringida.efectos r" in compacto
+
+
+@pytest.mark.parametrize("importe", ["importe", "sum(", "avg(", "max(", "min("])
+def test_f037_r13_ningun_importe(importe: str) -> None:
+    """D6: el importe por empresa y mes es la nómina neta mensual."""
+    assert importe not in _sin_comment_on(RUTA_RESTRINGIDOS_MES).lower()
+
+
+def test_f037_r13_sin_vencimiento_es_cero_y_no_null() -> None:
+    compacto = _sin_comment_on(RUTA_RESTRINGIDOS_MES)
+    assert "COALESCE(EXTRACT(YEAR FROM r.fecha_vencimiento)::INT, 0) AS anio" in compacto
+    assert "COALESCE(EXTRACT(MONTH FROM r.fecha_vencimiento)::INT, 0) AS mes" in compacto
+    assert "COALESCE(r.empresa_id, 0) AS empresa_id" in compacto
+    assert "GROUP BY 1, 2, 3, 4, 5" in compacto
