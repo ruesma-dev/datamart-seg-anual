@@ -15,7 +15,10 @@
 > «diccionario v50» (`R-CONTABILIDAD-RESTRINGIDA` reescrita, avisos en las fichas). Informe
 > final en `progress/impl_F-136.md`. Nada se ejecuta contra Azure: rotación y alta son MANUAL.
 
-- Tarea en curso: T11, mutación (T1-T10 bis hechas; azure-apps `234fe9a`).
+- **T1-T13 hechas** (`init.sh` en verde: 7.582 passed; cobertura de líneas cambiadas 100 %;
+  mutación 15/15 muertos). Informe: `progress/impl_F-136.md`. azure-apps `234fe9a` (sin push).
+- **Pendiente MANUAL del humano**: T14 despliegue (+ publicar diccionario v50), T15 rotación y
+  alta (runbook §12 P0-P11), T16 job y R29, T17 copias muertas (D12). Detalle en el informe §5.
 - Desviación menor (T3): además del `_settings` de `test_f135_grants.py`, los
   settings falsos de `test_f005_grants.py` y `test_f068_exclusion_lectura_mcp.py` ganan
   `total_role=""` y `total_vetoed_schema_list=[]` (sin cambiar aserciones): el paso lee

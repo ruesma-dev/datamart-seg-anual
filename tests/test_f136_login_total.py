@@ -1016,9 +1016,10 @@ def _ficheros_de_f136() -> list[Path]:
         RAIZ / "progress" / "spec_F-136.md",
     ]
     spec = sorted((RAIZ / "specs").glob("F-136-*/*.md"))
+    # `mutacion_F-136.md` no: lo escribe el arnés y lleva SHA de git y rutas de
+    # worktree, que el patrón de clave generada toma por secretos.
     informes = [
         ruta for ruta in (RAIZ / "progress" / "impl_F-136.md",
-                          RAIZ / "progress" / "mutacion_F-136.md",
                           RAIZ / "progress" / "review_F-136.md")
         if ruta.exists()
     ]
