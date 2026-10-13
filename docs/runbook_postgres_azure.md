@@ -666,8 +666,35 @@ Una ejecución puntual de `check-pg` con su secreto (no toca la programada); si
 no, la nocturna siguiente. **Al día siguiente**, sin hacer nada a mano, la
 nocturna tiene que dejar `apply_grants` en SUCCESS con los tres `ok` (R29).
 
+**Con `--yaml`, nunca con `--command`/`--args`**: sin `--image` esta CLI falla
+(«must have an 'Image' property», medido el 2026-10-02), con `--image` se pierden
+las variables y los secretos del job, y una ejecución que ignorase los cambios
+lanzaría la nocturna COMPLETA de día. Se toma la plantilla del job, se cambia
+solo el comando del contenedor y se lanza con ella. El fichero no lleva ningún
+valor secreto (solo `secretRef`) y se borra al acabar. Si `check-pg` da
+`password authentication failed`, la referencia al vault sin versión aún sirve
+la anterior: puede tardar del orden de 30 minutos; se repite después.
+
 ```powershell
-az containerapp job start -g $rgJ -n $job --command "python" --args "main.py,check-pg" -o none
+# las claves a null estorban al --yaml: se quitan (también dentro de los contenedores)
+function Sin-Nulos($o) {
+    foreach ($p in @($o.PSObject.Properties)) {
+        if ($null -eq $p.Value) { $o.PSObject.Properties.Remove($p.Name); continue }
+        if ($p.Value -is [PSCustomObject]) { Sin-Nulos $p.Value }
+        foreach ($e in @($p.Value)) { if ($e -is [PSCustomObject]) { Sin-Nulos $e } }
+    }
+}
+$js = az containerapp job show -g $rgJ -n $job --query properties.template -o json
+$tpl = ($js -join "`n") | ConvertFrom-Json
+Sin-Nulos $tpl
+$c = $tpl.containers[0]
+$c | Add-Member -Force -NotePropertyName command -NotePropertyValue @("python")
+$c | Add-Member -Force -NotePropertyName args -NotePropertyValue @("main.py", "check-pg")
+$yaml = Join-Path $env:TEMP "f136_check_pg.yaml"
+# JSON es YAML válido; WriteAllText escribe UTF-8 SIN BOM (Out-File de PS 5.1 lo pondría)
+[IO.File]::WriteAllText($yaml, ($tpl | ConvertTo-Json -Depth 20))
+az containerapp job start -g $rgJ -n $job --yaml $yaml -o none
+Remove-Item $yaml
 az containerapp job execution list -g $rgJ -n $job -o table
 ```
 

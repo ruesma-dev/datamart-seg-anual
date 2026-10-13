@@ -984,9 +984,44 @@ def test_f136_r26_r28_las_pruebas_del_procedimiento() -> None:
     assert "contabilidad_restringida.mayor" in p10 and "contabilidad.mayor" in p10
     assert "raw.apu" in p10 and "Remove-Item Env:PGPASSWORD" in p10
     assert "python main.py apply-grants" in _paso_12(seccion, 11)
-    p12 = _paso_12(seccion, 12)
-    assert '--args "main.py,check-pg"' in p12 and "verificacion_total" in p12
+    assert "verificacion_total" in _paso_12(seccion, 12)
     assert "kv-albaranes-rs9k2" in _paso_12(seccion, 13)
+
+
+def _comandos_job_start(texto: str) -> list[str]:
+    return [
+        linea for bloque in _bloques_de_codigo(texto) for linea in bloque.splitlines()
+        if "az containerapp job start" in linea and not linea.lstrip().startswith("#")
+    ]
+
+
+def test_f136_r25_p12_el_job_puntual_va_con_yaml() -> None:
+    """Revisión, pasada 1: `job start --command/--args` sin `--image` falla en esta CLI
+    («must have an 'Image' property») y, si ignorase los overrides, lanzaría la
+    nocturna completa de día. Design §6 P12 y D14: el patrón `--yaml`."""
+    p12 = _paso_12(_seccion_12(), 12)
+    arranques = _comandos_job_start(p12)
+    assert arranques, "P12 no lanza el job puntual"
+    for linea in arranques:
+        assert "--yaml" in linea and "--command" not in linea and "--args" not in linea, linea
+        assert linea.rstrip().endswith("-o none"), linea
+    for paso in ("--query properties.template -o json", "ConvertFrom-Json",
+                 '@("main.py", "check-pg")', "[IO.File]::WriteAllText", "Remove-Item $yaml"):
+        assert paso in p12, f"P12 sin «{paso}»"
+    assert p12.index("[IO.File]::WriteAllText") < p12.index("--yaml $yaml") < p12.index("Remove-Item $yaml")
+
+
+def test_f136_r25_ningun_job_start_con_command_en_el_runbook_ni_el_informe() -> None:
+    textos = {"runbook": RUNBOOK.read_text(encoding="utf-8")}
+    informe = RAIZ / "progress" / "impl_F-136.md"
+    if informe.exists():
+        textos["impl_F-136.md"] = informe.read_text(encoding="utf-8")
+    import re
+
+    for nombre, texto in textos.items():
+        # también partido en dos líneas, como en una lista del informe
+        malo = re.search(r"job start[^`\n]*\n?[^`\n]*--command", texto)
+        assert not malo, f"{nombre}: `job start --command` sin `--yaml`: {malo.group(0)}"
 
 
 def test_f136_r25_la_tabla_de_roles_tiene_los_cinco() -> None:

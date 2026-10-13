@@ -180,10 +180,10 @@ DELANTE y la cadena al final, ningún valor en pantalla, `-o none` en cada `secr
    - P10 negativa y positiva del total (R26-R27) y `Remove-Item Env:PGPASSWORD`; cerrar la ventana.
    - P11 `python main.py apply-grants` → SUCCESS y los tres «ok».
    Resultados, SIN valores, en `progress/current.md`.
-3. **T16 · P12**: `az containerapp job start -g rg-datamart-seg-dev -n caj-datamart-seg-dev
-   --command "python" --args "main.py,check-pg" -o none` (o la nocturna); al día siguiente R29
-   en `_meta.etl_runs` (consulta en §12 P12): `verificacion`, `verificacion_total` y
-   `acceso_total` = ok, sin nada a mano.
+3. **T16 · P12**: ejecución puntual de `check-pg` con el patrón `--yaml` de §12 P12 (plantilla
+   del job con `job show --query properties.template -o json`, solo `command`/`args` cambiados,
+   fichero sin BOM, `job start --yaml <fichero> -o none`, borrar el fichero), o la nocturna; al
+   día siguiente R29 en `_meta.etl_runs` (consulta en §12 P12): los tres = ok, sin nada a mano.
 4. **T17 · P13**: `az keyvault secret list --vault-name kv-albaranes-rs9k2 --query "[].name" -o tsv`;
    borrar las copias de F-005 SOLO con autorización expresa (vault de otro proyecto).
 
