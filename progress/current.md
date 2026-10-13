@@ -9,6 +9,22 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-13 · F-037 (fase 1, cartera de cobros y pagos) · SPEC ESCRITA (spec-author), pendiente de aprobación del humano
+
+> Rama `feature/F-037-tesoreria` desde `main` (`41b40f7`). Spec en `specs/F-037-tesoreria/`;
+> mediciones de solo lectura en Azure e informe en `progress/spec_F-037.md`.
+
+- Esquema `tesoreria` (general) + `tesoreria_restringida` (completa): una fila por efecto de
+  `raw.pag` y `raw.cob` con sentido, tercero, importe, vencimiento, fecha real, medio de pago,
+  estado PREVISTO/REALIZADO/BAJA. `compras.vencimientos` pasa a ser vista de la general.
+- Pagos de personal (decisión del humano): `natide <> 0` (NOMINAS/EMBARGO/CUOTAS) coincide
+  exactamente con cuenta 465/475/466, tercero empleado y documento de nómina: 37.053 pagos,
+  0 cobros. El estándar solo ve recuentos.
+- **Decisiones abiertas para el humano: D1-D10** (design §8; resumen en `spec_F-037.md` §3),
+  sobre todo D2 (bajas de cobro con retención), D3 (esquema propio), D6 y D7 (429 pagos a
+  autónomos con NIF de empleado, recomendado dejarlos visibles). Fuera del repositorio: la
+  lista blanca de `mcp-bbdd` debe admitir `tesoreria`.
+
 ## 2026-10-13 · F-136 · CERRADA (`done`, APROBADO en pasada 2) · orden del humano «vamos con la prueba»: merge y despliegue; la rotación y el alta (runbook §12) son MANUAL
 
 - **DESPLEGADA el 13-10** (líder): merge `9ee509c` en `main` (espejo en `dev`); imagen
