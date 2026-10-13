@@ -2140,6 +2140,22 @@
       "rigor": "critico",
       "priority": 1,
       "branch": "feature/F-136-usuario-mcp-total"
+    },
+    {
+      "id": "F-137",
+      "title": "Las órdenes manuales de infra con los patrones que funcionan: job puntual con --yaml en infra/README.md y 15_provision_db.ps1 parando si falla 01_create_database.sql",
+      "description": "Nace el 2026-10-13 de la review de F-136 (pasada 1, recomendaciones fuera de alcance), registrada por orden del humano («6, haz feature nueva»). DOS FALLOS EN DOCUMENTACIÓN Y SCRIPTS DE INFRA QUE NO SE VEN HASTA QUE SE USAN: (1) `infra/README.md` (apartados «qué build corrió» y «Probar la alerta», hacia las líneas 313 y 322) manda lanzar el job puntual con `az containerapp job start ... --command \"python\" --args \"main.py,...\"` SIN `--image`: con la CLI de este puesto falla con «must have an 'Image' property» (medido el 2026-10-02), con `--image` se pierden las variables y los secretos del job, y una CLI que ignorase los cambios lanzaría la nocturna COMPLETA en pleno día. El patrón bueno es el `--yaml` de `docs/runbook_postgres_azure.md` §12 P12 (plantilla del job, solo command/args cambiados, fichero sin BOM, borrado al acabar), probado en PowerShell 5.1 por la review de F-136. (2) `infra/15_provision_db.ps1` ejecuta `01_create_database.sql` y sigue a `02_roles.sql` sin mirar `$LASTEXITCODE`: si el primero falla, el segundo corre contra una base que puede no existir y el error real queda tapado. ALCANCE: solo esos dos puntos; ninguna ejecución contra Azure (son órdenes MANUALES del humano).",
+      "acceptance": [
+        "Ningún `az containerapp job start` con `--command`/`--args` en `infra/README.md`, el runbook ni `infra/*.ps1`: los dos casos del README usan el patrón `--yaml` de runbook §12 P12 (o remiten a él) y un test lo vigila en todo el árbol",
+        "`infra/15_provision_db.ps1` para con un mensaje claro si `01_create_database.sql` (o cualquier `psql`) termina con código distinto de 0, con un test que lo fije",
+        "Opciones de `psql` delante de la cadena de conexión y ninguna contraseña en la línea de órdenes en todo lo que se toque (reglas de F-136)",
+        "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 9,
+      "branch": "feature/F-137-ordenes-infra-patrones-buenos"
     }
   ]
 }

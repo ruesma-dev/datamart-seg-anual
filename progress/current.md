@@ -33,6 +33,9 @@
   `verificacion_total` y `acceso_total` = `ok`; veto de `raw` al total aplicado.
 - **Pendiente del LÍDER**: la nocturna del 14-10 (R29: los tres «ok» sin nada a mano). El
   total no lo usa nadie hasta la F-008 de `mcp-bbdd`.
+- **13-10, decisiones del humano**: D10 de F-135 (restringir el coste por persona de
+  `personal`) «de momento no»: no se pregunta a Juan ni se abre feature. Los dos arreglos de
+  infra que la review de F-136 dejó fuera pasan a **F-137** (pending, prioridad 9).
 
 > Spec aprobada el 2026-10-13 con D1-D14 recomendadas; ampliación del mismo día: D13 pasa a
 > «diccionario v50» (`R-CONTABILIDAD-RESTRINGIDA` reescrita, avisos en las fichas). Informe
