@@ -1024,6 +1024,17 @@ def test_f136_r25_ningun_job_start_con_command_en_el_runbook_ni_el_informe() -> 
         assert not malo, f"{nombre}: `job start --command` sin `--yaml`: {malo.group(0)}"
 
 
+def test_f136_r25_la_seccion_4_no_toca_el_vault_del_mcp() -> None:
+    """Revisión, pasada 1: la §4 leía `pg-password-total`, que no crea. Una sola fuente
+    del procedimiento para el vault del MCP: la §12, P2-P3."""
+    texto = RUNBOOK.read_text(encoding="utf-8")
+    seccion4 = texto.split("\n## 4. ", 1)[1].split("\n## ", 1)[0]
+    codigo = "\n".join(_bloques_de_codigo(seccion4))
+    for cosa in ("kv-mcp-bbdd-dev", "pg-password", "TOTAL_PWD"):
+        assert cosa not in codigo, f"la §4 vuelve a tocar {cosa}"
+    assert "§12, P2-P3" in seccion4
+
+
 def test_f136_r25_la_tabla_de_roles_tiene_los_cinco() -> None:
     texto = RUNBOOK.read_text(encoding="utf-8")
     tabla = texto.split("## 1. Autenticación", 1)[1].split("\n## ", 1)[0]

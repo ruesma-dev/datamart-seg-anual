@@ -103,8 +103,11 @@ Ninguna contraseña se escribe en el repositorio, ni en `specs/`, ni en
 `progress/`, ni en `.env.example`, ni en un `.ps1`.
 
 Desde F-136 (2026-10-13) se generan y se cargan en **Windows PowerShell 5.1**,
-sin que el valor pase nunca por la pantalla. Para ROTARLAS, o para dar de alta
-el login total, el procedimiento completo es el de la **§12**.
+sin que el valor pase nunca por la pantalla. Esta sección cubre SOLO los dos
+logins del vault del datamart. **Todo lo del vault del MCP** (`kv-mcp-bbdd-dev`:
+la copia del estándar y la contraseña del login total) y cualquier ROTACIÓN o
+alta del login total van por el procedimiento único de la **§12, P2-P3**: no se
+duplica aquí.
 
 ```powershell
 # Clave de 64 caracteres hexadecimales: sin + / = ' que rompan una cadena o el .env
@@ -124,10 +127,9 @@ az keyvault secret set --vault-name $kv --name pg-mcp-sigrid-dm-ro --value $v -o
 $v = $null
 
 # Releerlas a variables de entorno de ESTA sesión, sin imprimirlas: 02_roles.sql
-# las lee con \getenv. TOTAL_PWD, del vault del MCP (§12).
+# las lee con \getenv. La del login total: §12, P2-P3.
 $env:APP_PWD = az keyvault secret show --vault-name $kv --name pg-sigrid-dm-app @q
 $env:MCP_PWD = az keyvault secret show --vault-name $kv --name pg-mcp-sigrid-dm-ro @q
-$env:TOTAL_PWD = az keyvault secret show --vault-name kv-mcp-bbdd-dev --name pg-password-total @q
 ```
 
 Tres avisos que no son formalismo:
