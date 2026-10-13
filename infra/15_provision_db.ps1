@@ -10,9 +10,15 @@
 #
 # Uso:
 #   .\15_provision_db.ps1 -AdminUser <usuario>              # plan, sin tocar nada
-#   $env:APP_PWD = "<generada>"                             # ver el runbook: se
-#   $env:MCP_PWD = "<generada>"                             #   guardan en Key Vault
+#   (APP_PWD, MCP_PWD y TOTAL_PWD en el entorno, leidas de Key Vault: runbook
+#    secciones 4 y 12; nunca escritas a mano ni en un fichero)
 #   .\15_provision_db.ps1 -AdminUser <usuario> -Ejecutar
+#
+# psql: las OPCIONES van SIEMPRE delante de la cadena de conexion, que es lo
+# ultimo (F-136). En Windows psql deja de leer opciones tras la cadena: las
+# ignora y las imprime, y asi se expusieron dos contrasenas el 2026-10-12. Las
+# contrasenas NO van como argumento: 02_roles.sql las lee del entorno con
+# \getenv, y psql las hereda de esta sesion. -X: sin el psqlrc del usuario.
 #
 # Lo que este script NO hace, a proposito:
 #   - no crea reglas de firewall (las crea el humano, ver el runbook seccion 5);
@@ -43,6 +49,9 @@ Write-Host ("  Servidor        : {0}" -f $PG_SERVER)
 Write-Host ("  Base a crear    : {0}" -f $CFG.pgDatabase)
 Write-Host ("  Roles           : {0} (grupo), {1} (ETL), {2} (solo lectura)" -f `
     $CFG.pgSetRole, $CFG.pgUser, $CFG.pgReadonlyRole)
+# Los otros dos los crea 02_roles.sql con su nombre: aqui no se escribe ningun
+# nombre de recurso (F-003, R1), solo se dice que existen.
+Write-Host "                    + grupo autorizado (F-135) y login de acceso total del MCP (F-136)"
 Write-Host ""
 
 if (-not $AdminUser) {
@@ -66,7 +75,7 @@ Invoke-Az postgres flexible-server firewall-rule list -g $CFG.pgResourceGroup -n
 Write-Host ""
 Write-Host "--- Diagnostico de la base (solo lectura) ---" -ForegroundColor Cyan
 $dsnAdmin = "host=$($CFG.pgHost) dbname=postgres user=$AdminUser sslmode=require"
-psql "$dsnAdmin" -f (Join-Path $sqlDir "03_diagnostico.sql")
+psql -X -f (Join-Path $sqlDir "03_diagnostico.sql") "$dsnAdmin"
 
 if (-not $Ejecutar) {
     Write-Host ""
@@ -78,9 +87,9 @@ if (-not $Ejecutar) {
 }
 
 # --- 2. Comprobaciones antes de escribir ------------------------------------
-if (-not $env:APP_PWD -or -not $env:MCP_PWD) {
-    Write-Host "Faltan las contrasenas en el entorno: APP_PWD y MCP_PWD." -ForegroundColor Red
-    Write-Host "Generalas y guardalas en Key Vault ANTES (runbook seccion 4)."
+if (-not $env:APP_PWD -or -not $env:MCP_PWD -or -not $env:TOTAL_PWD) {
+    Write-Host "Faltan las contrasenas en el entorno: APP_PWD, MCP_PWD y TOTAL_PWD." -ForegroundColor Red
+    Write-Host "Generalas y guardalas en Key Vault ANTES (runbook secciones 4 y 12)."
     Write-Host "No se escriben nunca en un fichero del repositorio."
     exit 1
 }
@@ -88,14 +97,13 @@ if (-not $env:APP_PWD -or -not $env:MCP_PWD) {
 # --- 3. Creacion de la base y los roles -------------------------------------
 Write-Host ""
 Write-Host "--- 01_create_database.sql (rol de grupo + base) ---" -ForegroundColor Cyan
-psql "$dsnAdmin" -v ON_ERROR_STOP=1 -f (Join-Path $sqlDir "01_create_database.sql")
+psql -X -v ON_ERROR_STOP=1 -f (Join-Path $sqlDir "01_create_database.sql") "$dsnAdmin"
 
 Write-Host ""
 Write-Host "--- 02_roles.sql (roles de login, esquemas y permisos) ---" -ForegroundColor Cyan
 $dsnDb = "host=$($CFG.pgHost) dbname=$($CFG.pgDatabase) user=$AdminUser sslmode=require"
-psql "$dsnDb" -v ON_ERROR_STOP=1 `
-    -v app_pwd="$env:APP_PWD" -v mcp_pwd="$env:MCP_PWD" `
-    -f (Join-Path $sqlDir "02_roles.sql")
+# Las contrasenas las lee 02_roles.sql del entorno con \getenv: no van como argumento.
+psql -X -v ON_ERROR_STOP=1 -f (Join-Path $sqlDir "02_roles.sql") "$dsnDb"
 
 Write-Host ""
 Write-Host "Provision terminada. Siguiente paso del runbook: comprobar que las" -ForegroundColor Green

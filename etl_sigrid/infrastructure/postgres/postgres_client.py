@@ -184,6 +184,18 @@ SQL_LECTURAS_TABLAS = """
     ORDER BY 1
 """
 
+# F-136 (R10): los esquemas a los que un login NO llega. Es la comprobación de
+# que el login total lee lo que debe: su lectura es heredada (miembro del rol
+# general y del autorizado) y `has_schema_privilege` resuelve esa herencia y
+# PUBLIC. Los esquemas que no existen no salen: no hay nada que leer en ellos.
+SQL_ESQUEMAS_SIN_USAGE = """
+    SELECT n.nspname
+    FROM pg_namespace n
+    WHERE n.nspname = ANY(%s)
+      AND NOT has_schema_privilege(%s, n.oid, 'USAGE')
+    ORDER BY 1
+"""
+
 # Peso de cada obra = filas de raw.obrparpre que le tocan, ponderando la rama
 # master por el número de posiciones de su `planif`, que es lo que de verdad
 # explota el CROSS JOIN LATERAL. Las filas de reales (amb 3/7) no se explotan:
@@ -1398,6 +1410,49 @@ class PostgresClient:
             statements=len(sentencias),
         )
         return sentencias
+
+    def apply_veto(
+        self,
+        role: str,
+        owner_role: str,
+        schemas: Iterable[str],
+    ) -> list[str]:
+        """Veta `schemas` a `role` y devuelve lo ejecutado (F-136, R7).
+
+        Es el veto de `apply_readonly_grants` sin ningún GRANT delante: para el
+        login TOTAL, que lee por pertenencia y no recibe concesiones propias.
+        Solo sobre los esquemas que existen (un REVOKE sobre uno ausente falla,
+        y uno ausente no tiene nada que proteger); si no queda ninguno, ni
+        abre conexión.
+        """
+        existentes = set(self.list_schemas())
+        aplicables = [s for s in schemas if s in existentes]
+        sentencias = build_veto_statements(role, owner_role, aplicables)
+        if not sentencias:
+            return []
+        with self.connection() as conn, conn.cursor() as cur:
+            for stmt in sentencias:
+                cur.execute(stmt)
+        logger.info(
+            "grants_veto_aplicado",
+            role=role,
+            schemas=aplicables,
+            statements=len(sentencias),
+        )
+        return sentencias
+
+    def esquemas_sin_usage(self, role: str, schemas: Iterable[str]) -> list[str]:
+        """Los esquemas EXISTENTES de `schemas` en los que `role` no tiene USAGE (F-136, R10).
+
+        Vacía es lo correcto. Respeta la herencia y PUBLIC: dice lo que leería
+        el login de verdad. Solo consulta el catálogo; sin lista no conecta.
+        """
+        esquemas = list(schemas)
+        if not esquemas:
+            return []
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_ESQUEMAS_SIN_USAGE, (esquemas, role))
+            return [fila[0] for fila in cur.fetchall()]
 
     def lecturas_indebidas(
         self,

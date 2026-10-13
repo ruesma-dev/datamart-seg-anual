@@ -9,7 +9,36 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-12 · F-135 · CERRADA (`done`, APROBADO en pasada 2) · DESPLEGADA Y VERIFICADA el 12-10 (`r20261012-1945`, diccionario v49) · solo queda T18 (la nocturna del 13-10)
+## 2026-10-13 · F-136 · CERRADA (`done`, APROBADO en pasada 2) · orden del humano «vamos con la prueba»: merge y despliegue; la rotación y el alta (runbook §12) son MANUAL
+
+> Spec aprobada el 2026-10-13 con D1-D14 recomendadas; ampliación del mismo día: D13 pasa a
+> «diccionario v50» (`R-CONTABILIDAD-RESTRINGIDA` reescrita, avisos en las fichas). Informe
+> final en `progress/impl_F-136.md`. Nada se ejecuta contra Azure: rotación y alta son MANUAL.
+
+- **T1-T13 hechas** (`init.sh` en verde: 7.582 passed; cobertura de líneas cambiadas 100 %;
+  mutación 15/15 muertos). Informe: `progress/impl_F-136.md`. azure-apps `234fe9a` (sin push).
+- **Pendiente MANUAL del humano**: T14 despliegue (+ publicar diccionario v50), T15 rotación y
+  alta (runbook §12 P0-P11), T16 job y R29, T17 copias muertas (D12). Detalle en el informe §5.
+- Desviación menor (T3): además del `_settings` de `test_f135_grants.py`, los
+  settings falsos de `test_f005_grants.py` y `test_f068_exclusion_lectura_mcp.py` ganan
+  `total_role=""` y `total_vetoed_schema_list=[]` (sin cambiar aserciones): el paso lee
+  esos campos y un `SimpleNamespace` sin ellos da `AttributeError`.
+
+## 2026-10-12 · F-136 · SPEC ESCRITA (spec-author), pendiente de aprobación del humano
+
+> Rama `feature/F-136-usuario-mcp-total`. Spec en `specs/F-136-usuario-mcp-total/`, informe y
+> mediciones (solo lectura en Azure) en `progress/spec_F-136.md`.
+
+- Login `mcp_sigrid_dm_total` (miembro del estándar y del autorizado, `raw` vetado), verificado
+  cada noche por `apply_grants`; `02_roles.sql` con `\getenv` y contraseñas opcionales; runbook
+  §12 con la rotación + alta en una sola sesión (vault primero, nunca un valor en pantalla).
+- Hallazgo: `infra/15_provision_db.ps1` y el runbook llaman a `psql` con la cadena de conexión
+  DELANTE (el mismo fallo de la incidencia); R20 lo corrige y lo fija con un test.
+- **Decisiones abiertas para el humano: D1-D14** (design §8; resumen en `spec_F-136.md` §3).
+  Sobre todo D6 (`\getenv`), D7 (contraseñas opcionales), D10 (orden: imagen → rotación de día
+  → nocturna → F-008) y D12 (borrar `.env.azure.bak` y las copias de `kv-albaranes-rs9k2`).
+
+## 2026-10-12 · F-135 · CERRADA DEL TODO el 13-10 (T18 en verde; Power BI pasa a F-087) · DESPLEGADA el 12-10 (`r20261012-1945`, diccionario v49)
 
 > Merge en `main` `adec1c8` (y espejo en `dev`). Orden del humano: «despliega ya». El
 > paso 1 de la MANUAL (que ningún informe de Power BI lea `raw`) NO se comprobó: el humano
@@ -55,14 +84,17 @@
   `pg-mcp-sigrid-dm-ro`) + `kv-mcp-bbdd-dev/pg-password` + reiniciar el MCP + credencial de los
   conjuntos de datos de Power BI + `.env` local del humano.
 - **CERRADA por el humano el 12-10**, «cierra la feature a expensas de que este la carga
-  nocturna»: la única condición abierta es T18 (abajo). Power BI y `raw` (paso 1): **ignorado de
-  momento por decisión del humano** («de momento ignora bi»). D11 resuelta el 12-10: acceso
+  nocturna»: la única condición abierta era T18 (abajo). Power BI y `raw` (paso 1): **pasa a
+  F-087** («f135 bi sale a otra feature», 13-10). D11 resuelta el 12-10: acceso
   total para Juan Romero, Antonio de Vicente y Pablo Gris, el resto el estándar, `raw` siempre
   fuera → **F-136** (este repositorio) y F-008 de `mcp-bbdd`. La rotación de contraseñas pasa a
   F-136. D10 (coste por persona en `personal`) queda como pregunta a Juan, fuera de F-135.
-- **Pendiente del LÍDER (13-10, T18)**: nocturna con la imagen nueva: `apply_grants` SUCCESS con
-  `verificacion = ok`, duración total frente a ~4 h 40 min (margen al tope de 5 h) y repetir la
-  comprobación de catálogo.
+- **T18 HECHA (líder, 13-10, 05:00 UTC, solo lectura)**: la nocturna del 13-10 con la imagen
+  nueva, todos los pasos SUCCESS, de 00:00:20 a 04:51:58 UTC (**4 h 52 min**, tope del job
+  `replicaTimeout` = **7 h**, no 5 h como decía este punto). `apply_grants` SUCCESS, 43
+  sentencias, `verificacion = ok`, `rol_autorizado = sigrid_dm_restringido_ro`, vetados
+  `contabilidad_restringida` y `raw`. Catálogo: `mcp_sigrid_dm_ro` con USAGE en `contabilidad`
+  y `personal`, SIN USAGE en `raw` ni en `contabilidad_restringida`. `build_contabilidad` 18 min.
 
 ### Historia de la feature (antes del cierre)
 

@@ -602,12 +602,17 @@ fallo con cualquier tolerancia.
   nocturna—. Base propia y no esquema compartido: PostgreSQL
   no permite consultas entre bases, y esa es la frontera que impide que el rol
   de lectura vea `albaranes`.
-- **Cuatro roles.** `sigrid_dm_etl` (grupo `NOLOGIN`) es el propietario de todo;
+- **Cinco roles.** `sigrid_dm_etl` (grupo `NOLOGIN`) es el propietario de todo;
   `sigrid_dm_app` (login, contraseña en Key Vault) es el que usa el ETL y es
-  miembro del grupo; `mcp_sigrid_dm_ro` (login) es el rol GENERAL de solo
-  lectura, el del MCP y hoy también el de Power BI; y desde F-135
-  `sigrid_dm_restringido_ro` (grupo `NOLOGIN`, sin miembros todavía) es el rol
-  AUTORIZADO que lee la contabilidad completa. Autenticación por contraseña: habilitar Entra es una operación de
+  miembro del grupo; `mcp_sigrid_dm_ro` (login) es el rol GENERAL (estándar) de
+  solo lectura, el del MCP y hoy también el de Power BI; desde F-135
+  `sigrid_dm_restringido_ro` (grupo `NOLOGIN`) es el rol AUTORIZADO que lee la
+  contabilidad completa; y desde F-136 `mcp_sigrid_dm_total` (login, contraseña
+  SOLO en `kv-mcp-bbdd-dev/pg-password-total`) es el acceso TOTAL del MCP:
+  miembro de los dos anteriores (`WITH INHERIT TRUE, SET FALSE`, punto 5 quater
+  de `02_roles.sql`), lee lo de ambos y NUNCA `raw` (decisión del humano del
+  2026-10-12: «siempre fuera»). No tiene ningún GRANT propio: todo le llega por
+  pertenencia. Autenticación por contraseña: habilitar Entra es una operación de
   servidor y se descartó para no tocar las otras dos bases. El modo
   `PG_AUTH_MODE=entra` existe en el código, probado, pero inactivo.
 - **`PG_SET_ROLE=sigrid_dm_etl`** en cada sesión: los objetos deben tener
@@ -636,10 +641,24 @@ fallo con cualquier tolerancia.
   concesión que la nocturna no puede revocar (a PUBLIC, o de otro concedente)
   no pasa inadvertida. `infra/sql/02_roles.sql` hace lo mismo al provisionar,
   como administrador y como `sigrid_dm_etl` (punto 5 ter).
-- **Lo que NO es de este repositorio** (F-135): que el MCP conecte con el rol
-  autorizado según quién pregunta, y que su lista blanca admita
-  `contabilidad_restringida` (`mcp-bbdd`, su F-008); y que Power BI tenga rol
-  propio (F-087). Hasta entonces el rol autorizado existe pero ningún cliente lo
+- **El login total en `apply_grants`, desde F-136.** Lo nombra `PG_TOTAL_ROLE`
+  (por defecto `mcp_sigrid_dm_total`; el job no lleva variables nuevas) y lo que
+  no lee nunca, `PG_TOTAL_VETOED_SCHEMAS` (`raw`). Antes de abrir conexión,
+  FAILED si el total coincide con otro rol o si un esquema suyo vetado no está
+  vetado al general, o está en lo restringido o en el consumo (lo heredaría por
+  pertenencia). Con conexión, DESPUÉS de las concesiones: no le concede nada,
+  le veta `raw` (tablas, USAGE y privilegio por defecto), pregunta al catálogo
+  si lee algo de `raw` o de `PG_EXCLUDED_TABLES` (FAILED con la lista, en un
+  único mensaje con la del general si los dos leen algo; `verificacion_total`)
+  y si le falta USAGE en algún esquema de consumo o restringido (solo aviso,
+  `acceso_total`: leer de menos no expone nada). Si el total no existe, avisa y
+  sigue. La nocturna no puede darle las pertenencias (no tiene ADMIN OPTION
+  sobre los grupos): eso es `02_roles.sql`, que corre el humano (runbook §12).
+- **Lo que NO es de este repositorio** (F-135, F-136): que el MCP conecte con
+  el login total según quién pregunta (por oid, fuera de todo repositorio) y que
+  su lista blanca admita `contabilidad_restringida` (`mcp-bbdd`, su F-008, con el
+  contrato en `azure-apps/datamart_seg_anual.md`); y que Power BI tenga rol
+  propio (F-087). Hasta entonces el login total existe pero ningún cliente lo
   usa: nadie lee lo que no debía, y quien debe verlo lo tiene en Sigrid.
 - **La recuperación es volver a ejecutar el ETL, no restaurar**: el PITR es de
   servidor entero y arrastraría `albaranes` y `partes` al pasado.
