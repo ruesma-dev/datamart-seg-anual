@@ -164,7 +164,7 @@ GRANT CONNECT ON DATABASE sigrid_dm TO mcp_sigrid_dm_ro;
 GRANT CONNECT ON DATABASE sigrid_dm TO sigrid_dm_restringido_ro;
 
 -- 4. Esquemas del datamart. Los crea también el auto-bootstrap del ETL, pero
---    dejarlos aquí permite comprobar los once nada más provisionar.
+--    dejarlos aquí permite comprobar los quince nada más provisionar.
 SET ROLE sigrid_dm_etl;
 CREATE SCHEMA IF NOT EXISTS raw;
 CREATE SCHEMA IF NOT EXISTS stg;
@@ -186,6 +186,12 @@ CREATE SCHEMA IF NOT EXISTS contabilidad;
 CREATE SCHEMA IF NOT EXISTS contabilidad_restringida;
 -- F-097: los descompuestos de las partidas. Esquema propio por lo mismo.
 CREATE SCHEMA IF NOT EXISTS descompuestos;
+-- F-037: la cartera de cobros y pagos. La GENERAL (`tesoreria`, sin los pagos
+-- de personal) la lee el rol general; la COMPLETA (`tesoreria_restringida`,
+-- con nóminas, embargos y cuotas) solo el autorizado: se le VETA al general
+-- (punto 5 ter), como a `contabilidad_restringida`.
+CREATE SCHEMA IF NOT EXISTS tesoreria;
+CREATE SCHEMA IF NOT EXISTS tesoreria_restringida;
 RESET ROLE;
 
 -- 5. Permisos de lectura del MCP.
@@ -201,8 +207,9 @@ RESET ROLE;
 --    F-135 (2026-10-11): `raw` YA NO ESTÁ en esta lista (D3, variante A): trae
 --    el mayor, 37.048 efectos de pago de nómina con la cuenta bancaria del
 --    trabajador, los repartos analíticos de personal y las cabeceras de esos
---    asientos. Tampoco `contabilidad_restringida`. Los dos están VETADOS y el
---    punto 5 ter se los quita al rol general. La lista es exactamente
+--    asientos. Tampoco `contabilidad_restringida` ni, desde F-037,
+--    `tesoreria_restringida`. Los tres están VETADOS y el punto 5 ter se los
+--    quita al rol general. La lista es exactamente
 --    `DEFAULT_CONSUMPTION_SCHEMAS` de `config/settings.py` (un test lo vigila).
 --
 --    El punto 5 bis, de F-068, sigue quitando tablas sueltas de `raw` aunque
@@ -227,7 +234,7 @@ DECLARE
 BEGIN
     FOREACH esquema IN ARRAY ARRAY[
         'mart', 'cierre', 'compras', 'maestro', 'retenciones', 'personal',
-        'contabilidad', 'descompuestos', 'stg', 'aux', '_meta'
+        'contabilidad', 'tesoreria', 'descompuestos', 'stg', 'aux', '_meta'
     ]
     LOOP
         EXECUTE format('GRANT USAGE ON SCHEMA %I TO mcp_sigrid_dm_ro', esquema);
@@ -356,7 +363,9 @@ RESET ROLE;
 --    Origen: correo de Juan Romero del 2026-10-09, «hay que limitarla a todos
 --    los usuarios salvo a los que tenemos ese rol». La contabilidad completa
 --    vive en `contabilidad_restringida` y `raw` trae el mismo dato y más; los
---    dos quedan fuera del rol general. La lista es `DEFAULT_VETOED_SCHEMAS` de
+--    dos quedan fuera del rol general. F-037 (2026-10-13) añade
+--    `tesoreria_restringida`, la cartera completa con los pagos de nómina
+--    («los pagos de nominas deben quedar restringidos», decisión del humano). La lista es `DEFAULT_VETOED_SCHEMAS` de
 --    `config/settings.py` (un test lo vigila) y la sostiene cada noche
 --    `apply_grants`, que además COMPRUEBA en el catálogo que el rol general no
 --    los lee y falla si los lee.
@@ -375,7 +384,7 @@ DECLARE
     vetado text;
     vetado_total text;
 BEGIN
-    FOREACH vetado IN ARRAY ARRAY['contabilidad_restringida', 'raw']
+    FOREACH vetado IN ARRAY ARRAY['contabilidad_restringida', 'tesoreria_restringida', 'raw']
     LOOP
         -- en una base recién creada el esquema puede no existir todavía
         IF to_regnamespace(vetado) IS NOT NULL THEN
@@ -410,13 +419,17 @@ SET ROLE sigrid_dm_etl;
 GRANT USAGE ON SCHEMA contabilidad_restringida TO sigrid_dm_restringido_ro;
 GRANT SELECT ON ALL TABLES IN SCHEMA contabilidad_restringida TO sigrid_dm_restringido_ro;
 ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl IN SCHEMA contabilidad_restringida GRANT SELECT ON TABLES TO sigrid_dm_restringido_ro;
+-- F-037: y la cartera completa de cobros y pagos, igual.
+GRANT USAGE ON SCHEMA tesoreria_restringida TO sigrid_dm_restringido_ro;
+GRANT SELECT ON ALL TABLES IN SCHEMA tesoreria_restringida TO sigrid_dm_restringido_ro;
+ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl IN SCHEMA tesoreria_restringida GRANT SELECT ON TABLES TO sigrid_dm_restringido_ro;
 
 DO $$
 DECLARE
     vetado text;
     vetado_total text;
 BEGIN
-    FOREACH vetado IN ARRAY ARRAY['contabilidad_restringida', 'raw']
+    FOREACH vetado IN ARRAY ARRAY['contabilidad_restringida', 'tesoreria_restringida', 'raw']
     LOOP
         IF to_regnamespace(vetado) IS NOT NULL THEN
             EXECUTE format(
@@ -475,7 +488,7 @@ GRANT sigrid_dm_restringido_ro TO mcp_sigrid_dm_total WITH INHERIT TRUE, SET FAL
 COMMIT;
 
 -- 6. Comprobaciones. Deben salir: los cinco roles (`rolsuper = f` en todos),
---    sigrid_dm_app dentro de sigrid_dm_etl, y los trece esquemas.
+--    sigrid_dm_app dentro de sigrid_dm_etl, y los quince esquemas.
 SELECT rolname, rolcanlogin, rolsuper, rolcreatedb, rolcreaterole
 FROM pg_roles
 WHERE rolname IN ('sigrid_dm_etl', 'sigrid_dm_app', 'mcp_sigrid_dm_ro',
@@ -492,7 +505,8 @@ SELECT nspname AS esquema, pg_catalog.pg_get_userbyid(nspowner) AS propietario
 FROM pg_namespace
 WHERE nspname IN ('raw', 'stg', 'aux', 'mart', '_meta',
                   'cierre', 'compras', 'maestro', 'retenciones', 'personal',
-                  'contabilidad', 'contabilidad_restringida', 'descompuestos')
+                  'contabilidad', 'contabilidad_restringida', 'descompuestos',
+                  'tesoreria', 'tesoreria_restringida')
 ORDER BY nspname;
 
 -- F-068: las tablas excluidas NO deben aparecer aquí. CERO filas es el
@@ -505,21 +519,22 @@ WHERE grantee = 'mcp_sigrid_dm_ro'
 ORDER BY table_name, privilege_type;
 
 -- F-135: el rol GENERAL no lee ningún esquema vetado. CERO filas en la primera
--- consulta y `lee = f` en las dos filas de la segunda es el resultado correcto.
+-- consulta y `lee = f` en las tres filas de la segunda es el resultado correcto.
 SELECT table_schema, table_name, privilege_type
 FROM information_schema.table_privileges
 WHERE grantee = 'mcp_sigrid_dm_ro'
-  AND table_schema IN ('contabilidad_restringida', 'raw')
+  AND table_schema IN ('contabilidad_restringida', 'tesoreria_restringida', 'raw')
 ORDER BY table_schema, table_name, privilege_type;
 
 SELECT nspname, has_schema_privilege('mcp_sigrid_dm_ro', nspname, 'USAGE') AS lee
 FROM pg_namespace
-WHERE nspname IN ('contabilidad_restringida', 'raw')
+WHERE nspname IN ('contabilidad_restringida', 'tesoreria_restringida', 'raw')
 ORDER BY nspname;
 
 -- F-136: el login TOTAL. Deben salir EXACTAMENTE dos pertenencias
 -- (`mcp_sigrid_dm_ro` y `sigrid_dm_restringido_ro`, hereda = t, set_role = f);
--- `raw = f`, `contabilidad_restringida = t`, `contabilidad = t` y `conecta = t`;
+-- `raw = f`, `contabilidad_restringida = t`, `contabilidad = t`,
+-- `tesoreria_restringida = t` (F-037) y `conecta = t`;
 -- y CERO filas en la última: no tiene ninguna concesión propia.
 SELECT g.rolname AS grupo, m.inherit_option AS hereda, m.set_option AS set_role,
        m.admin_option AS admin
@@ -533,6 +548,8 @@ SELECT has_schema_privilege('mcp_sigrid_dm_total', 'raw', 'USAGE') AS raw,
        has_schema_privilege('mcp_sigrid_dm_total', 'contabilidad_restringida', 'USAGE')
            AS contabilidad_restringida,
        has_schema_privilege('mcp_sigrid_dm_total', 'contabilidad', 'USAGE') AS contabilidad,
+       has_schema_privilege('mcp_sigrid_dm_total', 'tesoreria_restringida', 'USAGE')
+           AS tesoreria_restringida,
        has_database_privilege('mcp_sigrid_dm_total', current_database(), 'CONNECT') AS conecta;
 
 SELECT table_schema, table_name, privilege_type

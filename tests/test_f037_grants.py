@@ -15,8 +15,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 RAIZ = Path(__file__).resolve().parents[1]
 GENERAL = "tesoreria"
 RESTR_T = "tesoreria_restringida"
@@ -103,34 +101,34 @@ class _ClienteFalso:
         self.sin_usage = sin_usage or []
         self.llamadas: list[tuple] = []
 
-    def role_exists(self, role):  # noqa: ANN001, ANN201
+    def role_exists(self, role):
         self.llamadas.append(("role_exists", role))
         return role in (ESTANDAR, AUTORIZADO, TOTAL)
 
     def apply_readonly_grants(self, readonly_role, owner_role, schemas, excluded_tables=(),
-                              vetoed_schemas=()):  # noqa: ANN001, ANN201
+                              vetoed_schemas=()):
         self.llamadas.append(("general", readonly_role, owner_role, list(schemas),
                               list(vetoed_schemas)))
         return ["G"]
 
-    def apply_restricted_grants(self, role, owner_role, schemas):  # noqa: ANN001, ANN201
+    def apply_restricted_grants(self, role, owner_role, schemas):
         self.llamadas.append(("autorizado", role, owner_role, list(schemas)))
         return ["A"]
 
-    def apply_veto(self, role, owner_role, schemas):  # noqa: ANN001, ANN201
+    def apply_veto(self, role, owner_role, schemas):
         self.llamadas.append(("veto", role, owner_role, list(schemas)))
         return ["V"]
 
-    def lecturas_indebidas(self, role, schemas, tables):  # noqa: ANN001, ANN201
+    def lecturas_indebidas(self, role, schemas, tables):
         self.llamadas.append(("verifica", role, list(schemas)))
         return list(self.indebidas.get(role, []))
 
-    def esquemas_sin_usage(self, role, schemas):  # noqa: ANN001, ANN201
+    def esquemas_sin_usage(self, role, schemas):
         self.llamadas.append(("usage", role, list(schemas)))
         return list(self.sin_usage)
 
 
-def _paso(cliente: _ClienteFalso):  # noqa: ANN202
+def _paso(cliente: _ClienteFalso):
     """El paso con los DEFECTOS reales de `settings` (sin `.env`)."""
     from types import SimpleNamespace
 
@@ -232,3 +230,80 @@ def test_f037_r21_las_sentencias_reales_vetan_y_conceden_la_restringida() -> Non
         f'GRANT SELECT ON TABLES TO "{AUTORIZADO}"'
     ) in concesion
     assert grants.esquemas_en_conflicto(pg.consumption_schema_list, pg.vetoed_schema_list) == []
+
+
+# ===========================================================================
+# R22 · infra/sql/02_roles.sql casa con settings (T8)
+# ===========================================================================
+
+def _roles_sql() -> str:
+    return (RAIZ / "infra" / "sql" / "02_roles.sql").read_text(encoding="utf-8")
+
+
+def test_f037_r22_crea_los_dos_esquemas_como_dueno() -> None:
+    tramo = _roles_sql().split("SET ROLE sigrid_dm_etl;", 1)[1].split("RESET ROLE;", 1)[0]
+    assert "CREATE SCHEMA IF NOT EXISTS tesoreria;" in tramo
+    assert "CREATE SCHEMA IF NOT EXISTS tesoreria_restringida;" in tramo
+
+
+def test_f037_r22_tesoreria_en_el_bucle_de_consumo() -> None:
+    import re
+
+    from config.settings import DEFAULT_CONSUMPTION_SCHEMAS
+
+    bucle = re.search(r"FOREACH esquema IN ARRAY ARRAY\[(.*?)\]", _roles_sql(), re.DOTALL)
+    assert bucle
+    concedidos = re.findall(r"'(\w+)'", bucle.group(1))
+    assert concedidos == DEFAULT_CONSUMPTION_SCHEMAS.split(",")
+    assert GENERAL in concedidos and RESTR_T not in concedidos
+
+
+def test_f037_r22_la_restringida_vetada_al_estandar_con_los_dos_concedentes() -> None:
+    import re
+
+    from config.settings import DEFAULT_VETOED_SCHEMAS
+
+    listas = re.findall(r"FOREACH vetado IN ARRAY ARRAY\[(.*?)\]", _roles_sql(), re.DOTALL)
+    assert len(listas) == 2
+    for lista in listas:
+        esquemas = re.findall(r"'(\w+)'", lista)
+        assert esquemas == DEFAULT_VETOED_SCHEMAS.split(",")
+        assert RESTR_T in esquemas
+
+
+def test_f037_r22_la_restringida_no_se_veta_al_total() -> None:
+    import re
+
+    from config.settings import DEFAULT_TOTAL_VETOED_SCHEMAS
+
+    listas = re.findall(r"FOREACH vetado_total IN ARRAY ARRAY\[(.*?)\]", _roles_sql(), re.DOTALL)
+    assert len(listas) == 2
+    for lista in listas:
+        assert re.findall(r"'(\w+)'", lista) == DEFAULT_TOTAL_VETOED_SCHEMAS.split(",")
+
+
+def test_f037_r22_el_autorizado_recibe_la_restringida() -> None:
+    sql = _roles_sql()
+    tramo = sql.split("-- 5 ter.")[1].split("-- 5 quater.")[0]
+    for sentencia in (
+        f"GRANT USAGE ON SCHEMA {RESTR_T} TO sigrid_dm_restringido_ro;",
+        f"GRANT SELECT ON ALL TABLES IN SCHEMA {RESTR_T} TO sigrid_dm_restringido_ro;",
+        f"ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl IN SCHEMA {RESTR_T} "
+        "GRANT SELECT ON TABLES TO sigrid_dm_restringido_ro;",
+    ):
+        assert sentencia in tramo, f"falta: {sentencia}"
+    assert tramo.index(f"GRANT USAGE ON SCHEMA {RESTR_T}") > tramo.index("SET ROLE sigrid_dm_etl;")
+
+
+def test_f037_r22_las_comprobaciones_finales_miran_la_restringida() -> None:
+    sql = _roles_sql()
+    final = sql.split("\nCOMMIT;", 1)[1]
+    assert (
+        "WHERE grantee = 'mcp_sigrid_dm_ro'\n"
+        "  AND table_schema IN ('contabilidad_restringida', 'tesoreria_restringida', 'raw')"
+    ) in final
+    assert "WHERE nspname IN ('contabilidad_restringida', 'tesoreria_restringida', 'raw')" in final
+    assert "'tesoreria', 'tesoreria_restringida'" in final, "los esquemas del punto 6"
+    assert (
+        "has_schema_privilege('mcp_sigrid_dm_total', 'tesoreria_restringida', 'USAGE')" in final
+    )

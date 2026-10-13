@@ -593,7 +593,7 @@ def test_f135_r20_comprobacion_final() -> None:
     sql = _roles_sql()
     assert (
         "WHERE grantee = 'mcp_sigrid_dm_ro'\n"
-        "  AND table_schema IN ('contabilidad_restringida', 'raw')"
+        "  AND table_schema IN ('contabilidad_restringida', 'tesoreria_restringida', 'raw')"  # F-037
     ) in sql
     assert (
         "SELECT nspname, has_schema_privilege('mcp_sigrid_dm_ro', nspname, 'USAGE') AS lee"
