@@ -44,7 +44,7 @@
 
 **NO se tocan**
 - `grants.py`: `build_veto_statements` ya sirve tal cual para el total.
-- `config/diccionario/*` (D13), `build_contabilidad` y todo el SQL de capas.
+- `build_contabilidad` y todo el SQL de capas. (`config/diccionario/*` SÍ, desde la ampliación de D13.)
 - `infra/80_create_job.ps1`, `infra/env/dev.json`: el job no necesita variables nuevas (los
   defectos viven en el código) ni secretos nuevos; el total no es del job.
 - `.env` y `.env.*.bak`: los edita el HUMANO (regla dura). El repositorio `mcp-bbdd`.
@@ -183,7 +183,7 @@ Líneas cortas, todo por variables, ningún valor en pantalla. Pasos (el runbook
 - **Conexiones**: `max_connections = 50` (15 reservadas), 22 en uso el 12-10 a las 19:25 UTC
   en el servidor compartido: el segundo pool, pequeño (máximo 2).
 - **Orden**: F-136 desplegada y verificada ANTES que F-008. Rotar: `02_roles.sql` con
-  `TOTAL_PWD` + reiniciar el MCP. El diccionario se ajusta al desplegar F-008 (D13).
+  `TOTAL_PWD` + reiniciar el MCP. El diccionario v50 sale con F-136 (D13 ampliada).
 
 ## 8. Decisiones para el humano (recomendada en negrita)
 
@@ -213,8 +213,8 @@ Líneas cortas, todo por variables, ningún valor en pantalla. Pasos (el runbook
   humano el 2026-10-13: sin copia en `kv-datamart-seg-dev`).
 - **D12** Copias muertas: **borrar `.env.azure.bak` y, con autorización expresa, las de
   `kv-albaranes-rs9k2`** (vault de otro proyecto); o dejarlas.
-- **D13** Diccionario: **sin cambios en F-136**; ajustar `R-CONTABILIDAD-RESTRINGIDA` (sin
-  nombres de personas) cuando despliegue F-008.
+- **D13** Diccionario: ~~sin cambios~~ **v50 en F-136** (ampliación del humano del 2026-10-13,
+  R32-R33: regla reescrita y aviso en las fichas de lo restringido); se publica al desplegar.
 - **D14** Verificar el job tras rotar: **ejecución puntual de `check-pg`**; o esperar la nocturna.
 
 ## 9. Pruebas

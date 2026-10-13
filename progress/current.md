@@ -15,7 +15,7 @@
 > «diccionario v50» (`R-CONTABILIDAD-RESTRINGIDA` reescrita, avisos en las fichas). Informe
 > final en `progress/impl_F-136.md`. Nada se ejecuta contra Azure: rotación y alta son MANUAL.
 
-- Tarea en curso: ampliación D13 (diccionario v50), luego T11 (T1-T10 hechas; azure-apps `234fe9a`).
+- Tarea en curso: T11, mutación (T1-T10 bis hechas; azure-apps `234fe9a`).
 - Desviación menor (T3): además del `_settings` de `test_f135_grants.py`, los
   settings falsos de `test_f005_grants.py` y `test_f068_exclusion_lectura_mcp.py` ganan
   `total_role=""` y `total_vetoed_schema_list=[]` (sin cambiar aserciones): el paso lee

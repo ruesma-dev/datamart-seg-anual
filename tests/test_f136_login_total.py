@@ -1096,3 +1096,91 @@ def test_f136_r30_mcp_bbdd_solo_enlaza_al_contrato() -> None:
     texto = _azure_apps("mcp_bbdd.md")
     assert "datamart_seg_anual.md" in texto and TOTAL in texto
     assert texto.count("pg-password-total") <= 1, "enlaza al contrato, no lo copia"
+
+
+# ===========================================================================
+# R32-R33 · el diccionario v50 (T10 bis, ampliación de D13 del 2026-10-13)
+# ===========================================================================
+
+DICC = RAIZ / "config" / "diccionario"
+OBJETOS_RESTR = {"plan_cuentas": "plan_cuentas", "mayor": "mayor",
+                 "saldos_cuenta_mes": "saldos_cuenta_mes"}
+#: los tres del perfil total NO se nombran en el diccionario: se dice «perfil total del MCP»
+_NOMBRES_DEL_PERFIL_TOTAL = ("Antonio", "Vicente", "Pablo", "Gris")
+
+
+def _yaml_dicc(nombre: str) -> dict:
+    import yaml
+
+    return yaml.safe_load((DICC / nombre).read_text(encoding="utf-8"))
+
+
+def _regla_restringida() -> dict:
+    reglas = {r["codigo"]: r for r in _yaml_dicc("00_global.yaml")["reglas"]}
+    return reglas["R-CONTABILIDAD-RESTRINGIDA"]
+
+
+def test_f136_r32_version_50() -> None:
+    assert _yaml_dicc("00_global.yaml")["version"] == 50
+
+
+def test_f136_r32_el_titulo_se_explica_solo() -> None:
+    """Solo los títulos van en las instrucciones de arranque del MCP."""
+    titulo = _regla_restringida()["titulo"]
+    assert titulo.startswith("Usa contabilidad;"), titulo
+    assert "contabilidad_restringida" in titulo and "perfil total" in titulo
+    assert len(titulo) <= 87, "no más largo que el título más largo ya publicado"
+
+
+def test_f136_r32_la_regla_manda_lo_que_pidio_el_humano() -> None:
+    import re
+
+    texto = re.sub(r"\s+", " ", _regla_restringida()["regla"])
+    for termino in (
+        "Por defecto usa SIEMPRE `contabilidad`",
+        "perfil total del MCP",
+        "sigrid_dm_restringido_ro",
+        "«permission denied»",
+        "no es un fallo ni algo que haya que rodear",
+        "no reintentes con otra sintaxis ni busques la misma informacion por otro camino",
+        "responde con `contabilidad`",
+        "`incompleto`", "`num_apuntes_restringidos`", "`contabilidad.apuntes_restringidos_mes`",
+        "el detalle requiere acceso restringido",
+        "no pide expresamente informacion de personal",
+    ):
+        assert termino in texto, f"la regla no dice «{termino}»"
+
+
+@pytest.mark.parametrize("objeto", sorted(OBJETOS_RESTR))
+def test_f136_r33_cada_ficha_empieza_por_el_aviso(objeto: str) -> None:
+    import re
+
+    descripcion = _yaml_dicc("contabilidad_restringida.yaml")["objetos"][objeto]["descripcion"]
+    # en un `>-` de YAML, la línea en blanco entre párrafos queda como UN salto
+    primera = re.sub(r"\s+", " ", descripcion.split("\n", 1)[0])
+    assert primera.startswith("**ACCESO RESTRINGIDO: solo el perfil total del MCP.**"), primera
+    assert "permission denied" in primera
+    assert f"`contabilidad.{OBJETOS_RESTR[objeto]}`" in primera
+
+
+def test_f136_r33_la_ficha_del_esquema_nombra_el_login_total() -> None:
+    import re
+
+    entrada = _yaml_dicc("00_global.yaml")["esquemas"][RESTR]
+    texto = re.sub(r"\s+", " ", entrada["para_que_sirve"])
+    assert "sigrid_dm_restringido_ro" in texto and f"`{TOTAL}`" in texto
+    assert "perfil total del MCP" in texto
+    cabecera = (DICC / "contabilidad_restringida.yaml").read_text(encoding="utf-8").split("version:")[0]
+    assert TOTAL in cabecera, "el comentario de cabecera del fichero, al día"
+
+
+def test_f136_r32_r33_sin_nombres_oid_ni_upn() -> None:
+    textos = [
+        (DICC / "contabilidad_restringida.yaml").read_text(encoding="utf-8"),
+        str(_regla_restringida()),
+        str(_yaml_dicc("00_global.yaml")["esquemas"][RESTR]),
+    ]
+    for texto in textos:
+        for nombre in _NOMBRES_DEL_PERFIL_TOTAL:
+            assert nombre not in texto, nombre
+        assert _hallazgos(texto) == []

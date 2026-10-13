@@ -79,3 +79,14 @@ es el `02_roles.sql` actual con las opciones delante, y la del total queda para 
 líder: D11 (`pg-password-total` solo en `kv-mcp-bbdd-dev`) NO la había decidido antes el humano,
 como decía el borrador; la propuso el líder en la ficha y el humano la aprueba ahora con el resto.
 D12: borrar las copias de `kv-albaranes-rs9k2` sigue pidiendo autorización expresa en el momento.
+
+## 7. Ampliación del humano (2026-10-13): D13 cambia
+
+D13 pasa de «diccionario sin cambios en F-136» a **«diccionario v50 en F-136»**. Motivo, en
+palabras del humano: «como los nombres se ven, la IA no se equivoque de esquema». En la F-008 de
+`mcp-bbdd` el MCP no filtra el catálogo ni el diccionario por perfil: `contabilidad_restringida`
+entra en su lista blanca para todos y al perfil estándar lo frena PostgreSQL con `permission
+denied`. Se añaden R32 (reescrita) y R33, y la tarea T10 bis; T12 cambia de «el diccionario no
+cambia» a «solo cambian `00_global.yaml` y `contabilidad_restringida.yaml`». Publicar la v50 es
+parte del despliegue, nunca de un agente. Desajuste aceptado: si la v50 sale antes que F-008, el
+MCP rechaza `contabilidad_restringida` por su lista blanca y no por `permission denied`.

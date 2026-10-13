@@ -540,7 +540,18 @@
 # esquema nuevo. `raw` sale del rol general. La ficha de
 # `retenciones.apuntes_contables` declara su excepcion (D4).
 
-version: 49
+# version 50 (F-136, 2026-10-13): USA `contabilidad`; LA RESTRINGIDA ES SOLO DEL
+# PERFIL TOTAL DEL MCP. Ampliacion del humano: «como los nombres se ven, la IA
+# no se equivoque de esquema». El MCP no filtra el catalogo ni el diccionario
+# por perfil, asi que `R-CONTABILIDAD-RESTRINGIDA` se reescribe con un titulo
+# que lo dice solo (los titulos van en las instrucciones de arranque del MCP):
+# `contabilidad` por defecto; un «permission denied» en
+# `contabilidad_restringida` no se rodea, se responde con `contabilidad`
+# avisando de lo que falta. Las tres fichas de `contabilidad_restringida`
+# empiezan por el aviso de acceso restringido y la del esquema nombra el login
+# total del MCP (`mcp_sigrid_dm_total`, F-136) junto al grupo autorizado.
+
+version: 50
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -777,12 +788,25 @@ reglas:
       da 5.345.557,80, lo mismo que la pantalla de Sigrid.
 
   - codigo: R-CONTABILIDAD-RESTRINGIDA
-    titulo: A la contabilidad general le falta la informacion de personal, y esta marcado
+    titulo: Usa contabilidad; contabilidad_restringida es solo para el perfil total del MCP
     severidad: bloqueante
     ambito: [contabilidad, contabilidad_restringida]
     regla: >-
-      `contabilidad` es la contabilidad GENERAL: le faltan los apuntes de
-      PERSONAL -los asientos de nomina enteros (todos sus apuntes NORMAL y
+      Por defecto usa SIEMPRE `contabilidad`. `contabilidad_restringida` solo la
+      lee el perfil total del MCP (y el grupo `sigrid_dm_restringido_ro`); para
+      cualquier otro usuario devuelve «permission denied». Eso no es un fallo
+      ni algo que haya que rodear: no reintentes con otra sintaxis ni busques la
+      misma informacion por otro camino (`raw` tampoco se lee). Ante ese error,
+      responde con `contabilidad` y di que la cifra no incluye los apuntes de
+      personal -mira `incompleto` y `num_apuntes_restringidos` en
+      `contabilidad.saldos_cuenta_mes` y `contabilidad.apuntes_restringidos_mes`
+      para cuantos faltan- y que el detalle requiere acceso restringido. Si el
+      usuario no pide expresamente informacion de personal (nominas, cuentas de
+      trabajadores, embargos), no vayas a `contabilidad_restringida` aunque sea
+      «la completa».
+
+      Por que: `contabilidad` es la contabilidad GENERAL y le faltan los apuntes
+      de PERSONAL -los asientos de nomina enteros (todos sus apuntes NORMAL y
       alguno en una cuenta de personal o con «nomina» en el concepto: la caja,
       el banco y el IVA de ese asiento tambien) y todos los de las cuentas de
       personal (prefijos 640, 641, 642, 643, 644, 645, 649, 465, 466, 476, 460,
@@ -795,10 +819,7 @@ reglas:
       fila le faltan `num_apuntes_restringidos` apuntes y su saldo esta
       recortado; (2) `contabilidad.apuntes_restringidos_mes` dice cuantos
       apuntes y asientos faltan por empresa y mes (solo recuentos, nunca
-      importes). El detalle completo vive en `contabilidad_restringida`, que
-      solo lee el rol autorizado `sigrid_dm_restringido_ro`; el rol del MCP y
-      de Power BI no lo lee y una consulta contra el devuelve «permission
-      denied», que no es un fallo. El mayor completo se lee SOLO de
+      importes). Quien SI tiene el perfil total lee el mayor completo SOLO de
       `contabilidad_restringida.mayor`: los dos esquemas NUNCA se suman ni se
       unen, porque el completo ya contiene al general y sumarlos duplica lo
       visible. Excepcion: `retenciones` no se recorta (8 apuntes de retencion
@@ -813,7 +834,10 @@ reglas:
       mayor), 8.791 asientos, 25 empresas; restringir el asiento entero oculta
       tambien unos 7.270 apuntes que no son de personal (remesas que pagan a la
       vez nominas y proveedores) y deja 6.063 filas de saldos incompletas. Lo
-      afinara Juan. Aprobado por el humano el 2026-10-11 (F-135).
+      afinara Juan. Aprobado por el humano el 2026-10-11 (F-135). Reescrita el
+      2026-10-13 (F-136, diccionario v50): el MCP no filtra el catalogo ni el
+      diccionario por perfil y el agente veia los dos esquemas; el titulo y la
+      primera frase dicen ahora cual usar.
 
   - codigo: R-DESCOMPUESTO-ORIGEN
     titulo: Los descompuestos no se mezclan entre origenes ni entre versiones
@@ -1549,16 +1573,19 @@ esquemas:
     pasos_etl: [build_contabilidad]
 
   contabilidad_restringida:
-    titulo: La contabilidad COMPLETA, con la informacion de personal (solo rol autorizado)
+    titulo: La contabilidad COMPLETA, con la informacion de personal (solo perfil total del MCP y rol autorizado)
     para_que_sirve: >-
       La misma contabilidad que `contabilidad` -plan de cuentas, mayor y
       saldos por cuenta y mes, desde 2008 y en las 38 empresas- pero COMPLETA:
       con los asientos de nomina, las cuentas de trabajadores, sus prestamos,
       anticipos y embargos (F-135). Es lo que `contabilidad` publicaba hasta el
       2026-10-11, con las mismas filas, columnas y cifras, mas la marca
-      `restringido` en el mayor. SOLO LO LEE el rol autorizado
-      `sigrid_dm_restringido_ro` (grupo sin login; sus miembros los decide
-      Negocio): para el rol del MCP y de Power BI esta vetado. No se suma con
+      `restringido` en el mayor. SOLO LO LEEN el perfil total del MCP (el
+      login `mcp_sigrid_dm_total`, F-136) y el grupo autorizado
+      `sigrid_dm_restringido_ro` (sin login; sus miembros los decide Negocio):
+      para el perfil estandar del MCP y para Power BI esta vetado, y una
+      consulta devuelve «permission denied». Por defecto se usa `contabilidad`
+      (`R-CONTABILIDAD-RESTRINGIDA`). No se suma con
       `contabilidad` (`R-CONTABILIDAD-RESTRINGIDA`), y vale la misma trampa del
       saldo (`R-SALDO-CONTABLE`).
     consumo_recomendado: true
