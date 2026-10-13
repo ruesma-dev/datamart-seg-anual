@@ -1056,3 +1056,43 @@ def test_f136_r23_el_barrido_caza_lo_que_debe() -> None:
     for legitimo in ("$env:TOTAL_PWD", "PASSWORD :'total_pwd'", "pg-password-total",
                      "az keyvault secret show --vault-name $kvMcp --name pg-password @q"):
         assert _hallazgos(legitimo) == [], legitimo
+
+
+# ===========================================================================
+# R30-R31 · documentación (T9)
+# ===========================================================================
+
+AZURE_APPS = RAIZ.parent / "azure-apps"
+
+
+def test_f136_r31_arquitectura_cinco_roles_y_la_comprobacion_del_total() -> None:
+    texto = (RAIZ / "docs" / "ARCHITECTURE.md").read_text(encoding="utf-8")
+    assert "**Cinco roles.**" in texto and "**Cuatro roles.**" not in texto
+    roles = texto.split("**Cinco roles.**", 1)[1].split("\n- **", 1)[0]
+    assert TOTAL in roles and "pg-password-total" in roles
+    for cosa in ("PG_TOTAL_ROLE", "PG_TOTAL_VETOED_SCHEMAS", "verificacion_total",
+                 "acceso_total", "5 quater"):
+        assert cosa in texto, f"ARCHITECTURE no explica {cosa}"
+
+
+def _azure_apps(nombre: str) -> str:
+    ruta = AZURE_APPS / nombre
+    if not ruta.exists():  # pragma: no cover - solo en un puesto sin el repositorio hermano
+        pytest.skip(f"no está {ruta}: azure-apps es otro repositorio")
+    return ruta.read_text(encoding="utf-8")
+
+
+def test_f136_r30_azure_apps_describe_el_contrato_del_total() -> None:
+    texto = _azure_apps("datamart_seg_anual.md")
+    for cosa in (TOTAL, "pg-password-total", "kv-mcp-bbdd-dev", "contabilidad_restringida",
+                 "F-008", "F-136"):
+        assert cosa in texto, f"datamart_seg_anual.md no cita {cosa}"
+    contrato = texto.split("F-136", 1)[1]
+    assert "raw" in contrato and "permission denied" in contrato, "qué NO lee el total"
+    assert "SET ROLE" in contrato and "máximo 2" in contrato
+
+
+def test_f136_r30_mcp_bbdd_solo_enlaza_al_contrato() -> None:
+    texto = _azure_apps("mcp_bbdd.md")
+    assert "datamart_seg_anual.md" in texto and TOTAL in texto
+    assert texto.count("pg-password-total") <= 1, "enlaza al contrato, no lo copia"
