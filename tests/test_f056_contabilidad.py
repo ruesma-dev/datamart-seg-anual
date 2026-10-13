@@ -1415,8 +1415,8 @@ def test_f056_r32_documentacion() -> None:
     import main
 
     documentacion = main.run_all.__doc__ or ""
-    # Siete desde F-097, que anadio `descompuestos`.
-    assert "siete build" in documentacion and "contabilidad" in documentacion
+    # Siete desde F-097, que anadio `descompuestos`; ocho desde F-037 (`tesoreria`).
+    assert "ocho build" in documentacion and "contabilidad" in documentacion
     assert "siete build" in (main.build_pipeline_steps.__doc__ or "") or "sexto" in (
         main.build_pipeline_steps.__doc__ or ""
     )

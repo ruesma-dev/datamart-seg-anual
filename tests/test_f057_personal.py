@@ -935,8 +935,9 @@ def test_f057_r25_run_all_declara_sus_build() -> None:
     assert "cuatro build" not in documentacion
     assert "cinco build" not in documentacion
     assert "seis build" not in documentacion
-    # Siete desde F-097, que anadio `descompuestos`.
-    assert "siete build" in documentacion
+    # Siete desde F-097, que anadio `descompuestos`; ocho desde F-037 (`tesoreria`).
+    assert "siete build" not in documentacion
+    assert "ocho build" in documentacion
     assert "personal" in documentacion
 
 
