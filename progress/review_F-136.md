@@ -1,12 +1,42 @@
 <!-- progress/review_F-136.md -->
-Revisión completa (pasada 1) · `main...d3a3893` (merge-base `dc1797b`) · 2026-10-13
+Revisión incremental desde e8c9e21 (pasada 2) · delta `e8c9e21..fa4f52a` · 2026-10-13
 
-# F-136 · Review · CHANGES_REQUESTED (RECHAZADO)
+# F-136 · Review · APPROVED (APROBADO)
 
-**Veredicto: CHANGES_REQUESTED.** El código, `02_roles.sql`, los tests, la mutación y el diccionario v50
-están bien y los he verificado por mi cuenta, también contra PostgreSQL 16 real. Lo que falla es el
-**procedimiento MANUAL del runbook**: el paso P12 de la §12 no se puede seguir tal cual, y la §4 lee un
-secreto que no crea. Son dos arreglos de documentación, sin tocar código (ver «Cambios requeridos»).
+**Veredicto: APPROVED** (pasada 2). Los dos cambios de la pasada 1 están resueltos y las recomendaciones
+de §12, aplicadas. Lo aprobado hasta `d3a3893` queda dado por bueno. El delta solo toca el runbook,
+`tests/test_f136_login_total.py` y `progress/impl_F-136.md`: **ningún fichero del alcance de la mutación**
+(RM1: la campaña de `974ff68` sigue valiendo, como la cobertura de 60/60).
+
+## Pasada 2 · verificación ejecutada (resultado real)
+
+- `bash harness/init.sh` sobre `fa4f52a`: **exit 0, ENTORNO LISTO**. **7.587 passed, 238 skipped, 0
+  failed** (843 s). `PUERTA COBERTURA` [OK] 100,0 % (60/60). `PUERTA TAMAÑO` [OK].
+- **Cambio 1, P12 con `--yaml`** (`1d2761d`). He ejecutado el bloque de P12 **tal cual**, extraído del
+  runbook, en **Windows PowerShell 5.1.26100** con un `az` simulado (sin Azure) que devuelve una plantilla
+  ficticia con nulos, un `env` con `value` y otro con `secretRef`, `resources` y `probes`. Resultado:
+  - `Sin-Nulos` quita los nulos de primer nivel y los de dentro de los contenedores y del `env`;
+  - `command = ["python"]` y `args = ["main.py","check-pg"]` salen como **arrays JSON**, sin el
+    envoltorio `value/Count` de PS 5.1;
+  - el fichero sale **sin BOM** y **se borra** después del `start`;
+  - el secreto va solo como `secretRef`. Una plantilla de Container Apps no lleva valores secretos (viven
+    en `configuration.secrets`, que no se lee).
+  `-o none` en el `start`, sin `--command`/`--args`. Los tests nuevos `r25_p12_*` y
+  `r25_ningun_job_start_con_command_*` también barren el informe. RED pegada en `impl_F-136.md` §8.
+- **Cambio 2, §4** (`3b81ac5`). La §4 ya no toca `kv-mcp-bbdd-dev`, `pg-password` ni `TOTAL_PWD`, y
+  remite a «§12, P2-P3» (test `r25_la_seccion_4_*`). Una provisión desde cero no queda rota: si falta
+  `TOTAL_PWD`, `15_provision_db.ps1 -Ejecutar` para con «APP_PWD, MCP_PWD y TOTAL_PWD ... runbook
+  secciones 4 y 12», y §12 P1-P3 carga las tres.
+- **Recomendaciones** (`4492b4e`): P3 `-cne`; P10 `BEGIN` / `CREATE TABLE` / `ROLLBACK`; P0 lee
+  `shared_preload_libraries` con `parameter show`, solo lectura (un test veta `parameter set`); P6 y P12
+  avisan de una espera «del orden de 30 minutos». Quedan fuera, con razón: `infra/README.md` y el
+  `$LASTEXITCODE` de `15_provision_db.ps1`.
+- **Secretos**: barrido del delta y de sus mensajes de commit (GUID, correo/UPN, IPv4, cadenas tipo
+  clave): **limpio**. El barrido R23 de los tests pasa, también sobre este informe. Nada contra Azure.
+- **Checkpoints**: los de la pasada 1 siguen en `[x]`. C4: los MANUAL de P12 traen ahora su comando
+  correcto. C5: un commit por cambio, árbol limpio.
+
+## Pasada 1 (completa, `main...d3a3893`): CHANGES_REQUESTED
 
 **Nivel de rigor: `critico`** (declarado en `features.json`). Exige fase RED, cobertura ≥ 80 % de lo
 cambiado, mutación con cero supervivientes y las MANUAL con su comando exacto.
@@ -21,47 +51,25 @@ cambiado, mutación con cero supervivientes y las MANUAL con su comando exacto.
   reejecutada: 3.189 s según el informe** (> 60 s). En su lugar, **RM4** sobre una copia (`git archive`) en
   mi scratchpad, con `test_f136` y `test_f135`: `l.161 or→and` (R3), `l.244 ==→!=` y `l.1455
   fila[0]→fila[1]`, los tres **MUERTOS** (1 fallo cada uno). Control sin mutar: 128 passed.
-- **PostgreSQL 16.15 real** (contenedor desechable, ya borrado), administrador **no superusuario**
-  (`CREATEROLE CREATEDB`), `psql.exe` 16.4 de Windows y opciones delante. Valores aleatorios de usar y
-  tirar, que no salen de la máquina:
-  - **R18** (base nueva, sin `TOTAL_PWD`): `exit=3`, error «falta TOTAL_PWD», **ningún rol creado**.
-  - **1.ª ejecución**: `exit=0`, tres «fijada», `COMMIT`; el total con dos pertenencias (`hereda t`,
-    `set_role f`), `raw f`, `contabilidad_restringida t`, `contabilidad t`, `conecta t`, 0 propios.
-    **2.ª sin variables**: tres «SIN CAMBIOS»; los tres logins siguen entrando.
-  - **R24** (login sin `CREATEROLE`, `-b -e`): `exit=3` y **0 apariciones** del valor en stdout+stderr.
-    **Control** sin las tres `\set` de silencio: **1 aparición** (la prueba muerde). En el log del
-    SERVIDOR sí aparece: riesgo residual de design §5, aceptado.
-  - **Negativa** del total: `permission denied` en `raw` (apu, pag), CREATE en `contabilidad`, INSERT en
-    `mayor` y `SET ROLE`. **Positiva**: `contabilidad_restringida.mayor` 5 = `raw.apu` 5.
-  - **`apply_grants` con el cliente REAL**: normal → SUCCESS, 46 sentencias, tres «ok»; PUBLIC en `raw`
-    → FAILED con las **dos** listas en un mensaje (R9); total sin el autorizado → SUCCESS y
-    `acceso_total = [contabilidad_restringida]`; total miembro del dueño → FAILED solo con el total;
-    concesión del dueño al total → el veto la quita, SUCCESS; deshecho → SUCCESS.
+- **PostgreSQL 16.15 real** (contenedor desechable, ya borrado; administrador no superusuario; `psql.exe`
+  16.4). R18: sin `TOTAL_PWD` da `exit=3` y no crea ningún rol. 1.ª ejecución: tres «fijada»; el total
+  con dos pertenencias (`hereda t`, `set_role f`), `raw f` y 0 propios. 2.ª: tres «SIN CAMBIOS». **R24**:
+  0 apariciones del valor con `-b -e` y 1 en el control sin las `\set` (el log del servidor sí lo guarda:
+  riesgo de design §5). Negativa y positiva del total: OK. `apply_grants` con el cliente real: ok ×3;
+  PUBLIC → FAILED con las dos listas; sin el autorizado → `acceso_total`; miembro del dueño → FAILED.
 - **Secretos** (GUID, correo/UPN, IPv4, `user=` no genérico, cadenas tipo clave, `print(`, TODO) en el
   diff, los commits y `234fe9a` de `azure-apps` (`master`, sin push): **limpio**; ni oid, ni UPN, ni nombre
   del administrador. `.env` y `.env.azure.bak` sin leer ni tocar. **Nada contra Azure.**
 
 ## Lo pedido «con especial cuidado»
 
-- **`02_roles.sql`**: correcto. `\set ON_ERROR_STOP`, `ECHO none`, `VERBOSITY terse` y `SHOW_CONTEXT
-  never` van ANTES de `\getenv`. Las contraseñas son opcionales, con «fijada / SIN CAMBIOS». La guarda R18
-  va antes de crear nada. Al total se le veta `raw` con los dos concedentes (5 ter). El 5 quater, con
-  `WITH INHERIT TRUE, SET FALSE`, va dentro de la transacción y después del 5 ter. Ningún otro `GRANT …
-  TO` al total. Ninguna contraseña viaja en la línea de órdenes de `psql`: todo por `\getenv`.
-  `15_provision_db.ps1` y todo el runbook ponen las opciones delante; `-X`; exige `TOTAL_PWD`.
-- **`apply_grants`**: total ausente = aviso y SUCCESS (D2); veto de `raw` tras las concesiones, sin
-  GRANT al total; FAILED si lee lo vetado; R2/R3 sin conexión. F-135 igual: sus tests solo ganan dos
-  campos en el settings falso, sin tocar aserciones, y el mensaje del estándar sale idéntico.
-- **Diccionario v50**: el título de la regla dice cuál usar; manda `contabilidad` por defecto, prohíbe
-  rodear el `permission denied`, cita `incompleto`, `num_apuntes_restringidos` y
-  `apuntes_restringidos_mes`, y no va a lo restringido sin petición expresa de personal. Las tres fichas
-  EMPIEZAN por «ACCESO RESTRINGIDO» y la del esquema nombra el login total. **«Correo de Juan Romero»
-  en `motivo`: aceptable**: es la procedencia de la decisión de F-135, ya publicada en la v49, y no dice
-  quién tiene el perfil total, que es lo que R32 protege (el test que veta a los tres pasa).
-- **Runbook §12**: el resto de pasos son seguibles en PS 5.1. Cada `set` lleva `-o none`, cada `show`
-  está asignado y las líneas miden ≤ 100. P9 ordena en PowerShell (`ConvertFrom-Json` + `Sort-Object`),
-  y P3 compara las dos copias y mide 64 (lo que además caza un `\r` colado). **Fallan P12 y la §4**:
-  cambios 1 y 2.
+- **`02_roles.sql`**: silencio antes de `\getenv`, contraseñas opcionales, guarda R18, `raw` vetado al
+  total con dos concedentes, 5 quater `WITH INHERIT TRUE, SET FALSE` dentro de la transacción y ningún
+  otro GRANT al total; ninguna contraseña en la línea de órdenes; opciones de `psql` delante en todo.
+- **`apply_grants`**: D2 (aviso y SUCCESS), veto tras las concesiones, FAILED si lee lo vetado, R2/R3
+  sin conexión; F-135 sin cambios de aserción y con el mensaje idéntico.
+- **Diccionario v50**: cumple R32-R33. **«Correo de Juan Romero» en `motivo`: aceptable**: es la
+  procedencia de F-135, ya publicada en la v49, y no dice quién tiene el perfil total (lo que R32 protege).
 
 ## Checkpoints
 
@@ -107,25 +115,13 @@ cambiado, mutación con cero supervivientes y las MANUAL con su comando exacto.
 | R30-R31 | `r30_*` (2), `r31_*` |
 | R32-R33 | `r32_*` (3), `r33_*` (2), `r32_r33_sin_nombres_oid_ni_upn` |
 
-## Cambios requeridos
+## Cambios requeridos de la pasada 1 (resueltos en la pasada 2)
 
-1. **`docs/runbook_postgres_azure.md` §12 P12 (≈ l. 670)**, y lo mismo en `progress/impl_F-136.md` §5,
-   punto 3. El runbook escribe `az containerapp job start ... --command "python" --args
-   "main.py,check-pg"` sin `--image`. Con la CLI de este puesto eso **falla** con «must have an 'Image'
-   property» (medido el 2026-10-02 en este proyecto: memoria «job puntual sin ingesta, con --yaml»). Y una
-   CLI que ignore los overrides sin `--image` haría algo peor: lanzaría el comando por defecto del job, la
-   nocturna completa con ingesta, en pleno día. Design §6 P12 y D14 mandan el patrón **`--yaml`**. Hay que
-   reescribir P12 con él, en PS 5.1 y en líneas ≤ 100: `job show --query properties.template -o json`
-   → `ConvertFrom-Json` → cambiar solo `containers[0].command`/`args` → fichero sin BOM
-   (`[IO.File]::WriteAllText`) → `job start --yaml <fichero> -o none` → borrar el fichero (solo lleva
-   `secretRef`, nunca valores). Y un test en `r25_*`/`r22_*` que falle si P12 usa `--command` sin `--yaml`.
-2. **`docs/runbook_postgres_azure.md` §4 (l. 130)**: lee `pg-password-total` de `kv-mcp-bbdd-dev`,
-   pero la §4 no lo crea, ni tampoco la copia `pg-password` del estándar. En una provisión desde cero,
-   `TOTAL_PWD` llegaría vacía y `15_provision_db.ps1 -Ejecutar` pararía. Dos salidas: generar y guardar
-   esos dos secretos en la propia §4 (con `-o none` y el mismo valor del estándar en los dos vaults), o
-   quitar esa línea y remitir de forma explícita a §12 P2-P3 para todo lo del vault del MCP.
+1. Runbook §12 P12: `job start --command/--args` sin `--image` falla en esta CLI («must have an 'Image'
+   property») o lanzaría la nocturna completa; design §6 y D14 mandan `--yaml`.
+2. Runbook §4: leía `pg-password-total` del vault del MCP sin crearlo; remitir a §12 P2-P3.
 
-## Recomendaciones (no bloquean)
+## Recomendaciones de la pasada 1 (las de §12, aplicadas en la pasada 2)
 
 - P3: `-cne` en vez de `-ne` (PowerShell compara sin mayúsculas). P10: el `CREATE TABLE` negativo entre
   `-c "BEGIN"` y `-c "ROLLBACK"`. P0: mirar en lectura si carga `pgaudit` (`shared_preload_libraries`).
