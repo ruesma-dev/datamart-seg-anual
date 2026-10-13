@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **124 features**, 69 abiertas, 55 terminadas.
+Resumen: **125 features**, 70 abiertas, 55 terminadas.
 
 ## Trabajo abierto
 
@@ -16,6 +16,7 @@ Resumen: **124 features**, 69 abiertas, 55 terminadas.
 | F-126 | La cuenta analítica de cada línea de albarán y factura, y el control de las compras imputadas a una cuenta distinta de la que les toca por catálogo | 6 | pendiente | estandar | `feature/F-126-analitica-lineas-compra` |
 | F-131 | Las cantidades del documento de planificación de compras (DPC) por línea: llevado a comparativo, contratado, pendiente de comparativo y pendiente de contrato | 7 | pendiente | estandar | `feature/F-131-cantidades-dpc` |
 | F-130 | Las condiciones y el texto de la oferta y del comparativo (forma de pago, recargos y retenciones de dcorec, cláusulas), y si pasan igual al contrato y a las facturas | 8 | pendiente | estandar | `feature/F-130-condiciones-y-texto-oferta` |
+| F-137 | Las órdenes manuales de infra con los patrones que funcionan: job puntual con --yaml en infra/README.md y 15_provision_db.ps1 parando si falla 01_create_database.sql | 9 | pendiente | estandar | `feature/F-137-ordenes-infra-patrones-buenos` |
 | F-037 | Esquema tesoreria: el flujo de caja que hoy se tira | 10 | pendiente | critico | `feature/F-037-tesoreria` |
 | F-133 | Los procesos de los ALBARANES (con proformas y notas) en el historial de procesos: quién los comprueba y contabiliza y cuándo | 11 | pendiente | estandar | `feature/F-133-procesos-albaranes` |
 | F-134 | Quién registró cada albarán, factura y contrato y cuándo: el empleado de la cabecera y la fecha y hora de alta | 11 | pendiente | estandar | `feature/F-134-empleado-alta-documento` |
@@ -182,6 +183,12 @@ Nace el 2026-10-07 de los correos de **Juan Romero** (Dir. Administración y Con
 estado **pendiente** · prioridad 8 · rigor `estandar` · SDD sí · rama `feature/F-130-condiciones-y-texto-oferta`
 
 Nace el 2026-10-07 de los correos de **Juan Romero** (Dir. Administración y Control de Costes) del 2026-10-06, cuatro peticiones seguidas sobre el datamart en uso; el humano aprobó el reparto y el orden el 2026-10-07. Correo «Datamart: comparativos — análisis obra 0720 y lo que falta por publicar», puntos 4b y 4c. ================ LO QUE PIDE: (b) la pestaña Condiciones de la oferta: forma de pago de la cabecera (`dco`) y recargos/retenciones (`dcorec`). Están en `raw` (F-066) pero no en `compras.comparativo_ofertas`. Servirían para comprobar que las condiciones de la oferta pasan igual al contrato y a las facturas. (c) la ventana Texto del comparativo y de la oferta (cláusulas): hoy `compras.documento_texto` solo cubre facturas y contratos. ================ LO QUE HAY: el contrato ya publica su retención de garantía y su forma de pago (F-067, `compras.contratos`); `ctrrec` está en `raw`; el lado de la factura (`dcfrec`) lo publica F-128. DEPENDE de F-128 para la comparación con la factura.
+
+### F-137 · Las órdenes manuales de infra con los patrones que funcionan: job puntual con --yaml en infra/README.md y 15_provision_db.ps1 parando si falla 01_create_database.sql
+
+estado **pendiente** · prioridad 9 · rigor `estandar` · SDD no · rama `feature/F-137-ordenes-infra-patrones-buenos`
+
+Nace el 2026-10-13 de la review de F-136 (pasada 1, recomendaciones fuera de alcance), registrada por orden del humano («6, haz feature nueva»). DOS FALLOS EN DOCUMENTACIÓN Y SCRIPTS DE INFRA QUE NO SE VEN HASTA QUE SE USAN: (1) `infra/README.md` (apartados «qué build corrió» y «Probar la alerta», hacia las líneas 313 y 322) manda lanzar el job puntual con `az containerapp job start ... --command "python" --args "main.py,..."` SIN `--image`: con la CLI de este puesto falla con «must have an 'Image' property» (medido el 2026-10-02), con `--image` se pierden las variables y los secretos del job, y una CLI que ignorase los cambios lanzaría la nocturna COMPLETA en pleno día. El patrón bueno es el `--yaml` de `docs/runbook_postgres_azure.md` §12 P12 (plantilla del job, solo command/args cambiados, fichero sin BOM, borrado al acabar), probado en PowerShell 5.1 por la review de F-136. (2) `infra/15_provision_db.ps1` ejecuta `01_create_database.sql` y sigue a `02_roles.sql` sin mirar `$LASTEXITCODE`: si el primero falla, el segundo corre contra una base que puede no existir y el error real queda tapado. ALCANCE: solo esos dos puntos; ninguna ejecución contra Azure (son órdenes MANUALES del humano).
 
 ### F-037 · Esquema tesoreria: el flujo de caja que hoy se tira
 
