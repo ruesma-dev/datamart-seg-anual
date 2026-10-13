@@ -9,7 +9,7 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-13 · F-136 · EN IMPLEMENTACIÓN (implementer), `in_progress`
+## 2026-10-13 · F-136 · APROBADA por el reviewer en pasada 2 (`progress/review_F-136.md`), `in_progress` hasta el merge y el despliegue que ordene el humano
 
 > Spec aprobada el 2026-10-13 con D1-D14 recomendadas; ampliación del mismo día: D13 pasa a
 > «diccionario v50» (`R-CONTABILIDAD-RESTRINGIDA` reescrita, avisos en las fichas). Informe
@@ -85,9 +85,12 @@
   conjuntos de datos de Power BI + `.env` local del humano.
 - **Pendiente del HUMANO**: confirmar Power BI y `raw` (paso 1, no comprobado antes del
   despliegue); D10 y D11 a Juan; la rotación de arriba.
-- **Pendiente del LÍDER (13-10, T18)**: nocturna con la imagen nueva: `apply_grants` SUCCESS con
-  `verificacion = ok`, duración total frente a ~4 h 40 min (margen al tope de 5 h) y repetir la
-  comprobación de catálogo.
+- **T18 HECHA (líder, 13-10, 05:00 UTC, solo lectura)**: la nocturna del 13-10 con la imagen
+  nueva, todos los pasos SUCCESS, de 00:00:20 a 04:51:58 UTC (**4 h 52 min**, tope del job
+  `replicaTimeout` = **7 h**, no 5 h como decía este punto). `apply_grants` SUCCESS, 43
+  sentencias, `verificacion = ok`, `rol_autorizado = sigrid_dm_restringido_ro`, vetados
+  `contabilidad_restringida` y `raw`. Catálogo: `mcp_sigrid_dm_ro` con USAGE en `contabilidad`
+  y `personal`, SIN USAGE en `raw` ni en `contabilidad_restringida`. `build_contabilidad` 18 min.
 
 ### Historia de la feature (antes del cierre)
 
