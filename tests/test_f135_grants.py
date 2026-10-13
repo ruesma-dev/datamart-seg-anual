@@ -357,6 +357,9 @@ def _settings(**pg: object) -> SimpleNamespace:
         "vetoed_schema_list": [RESTR, "raw"],
         "restricted_role": AUTORIZADO,
         "restricted_schema_list": [RESTR],
+        # F-136: sin login total, el paso es el de F-135 tal cual
+        "total_role": "",
+        "total_vetoed_schema_list": ["raw"],
     }
     base.update(pg)
     return SimpleNamespace(postgres=SimpleNamespace(**base))

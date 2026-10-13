@@ -276,6 +276,9 @@ def _settings_falso(**postgres: object) -> SimpleNamespace:
         "vetoed_schema_list": [],
         "restricted_role": "",
         "restricted_schema_list": [],
+        # F-136: sin login total, igual.
+        "total_role": "",
+        "total_vetoed_schema_list": [],
     }
     base.update(postgres)
     return SimpleNamespace(postgres=SimpleNamespace(**base))

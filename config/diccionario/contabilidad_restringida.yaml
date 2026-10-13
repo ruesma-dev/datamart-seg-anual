@@ -5,10 +5,12 @@
 # mismas filas, columnas y cifras que `contabilidad` publicaba hasta ese dia-
 # mas la marca de lo que es informacion de PERSONAL.
 #
-# SOLO LA LEE el grupo `sigrid_dm_restringido_ro` (y el dueno y el
-# administrador de la base). El rol general del MCP y de Power BI
+# SOLO LA LEEN el perfil total del MCP (el login `mcp_sigrid_dm_total`,
+# F-136, miembro del grupo) y el grupo `sigrid_dm_restringido_ro` (y el dueno y
+# el administrador de la base). El rol general del MCP y de Power BI
 # (`mcp_sigrid_dm_ro`) tiene el esquema VETADO: `apply_grants` se lo revoca y
-# lo comprueba cada noche. Origen: correo de Juan Romero (Dir. Administracion y
+# lo comprueba cada noche. Desde la v50 (F-136) cada ficha EMPIEZA por el aviso
+# de acceso restringido: el MCP no filtra el diccionario por perfil. Origen: correo de Juan Romero (Dir. Administracion y
 # Control de Costes) del 2026-10-09. Regla dura `R-CONTABILIDAD-RESTRINGIDA`.
 #
 # Lo construye `build_contabilidad` (01-03) y de aqui sale la contabilidad
@@ -26,8 +28,12 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
-      **SOLO PARA EL ROL AUTORIZADO** (`sigrid_dm_restringido_ro`, F-135): es
-      el plan COMPLETO, con el nombre de todas las cuentas, tambien las de
+      **ACCESO RESTRINGIDO: solo el perfil total del MCP.** Si no lo tienes, la
+      consulta devuelve «permission denied»: usa `contabilidad.plan_cuentas`
+      (`R-CONTABILIDAD-RESTRINGIDA`), sin reintentar ni buscar otro camino.
+
+      **SOLO PARA EL ROL AUTORIZADO** (`sigrid_dm_restringido_ro`, F-135, del
+      que es miembro el perfil total del MCP): es el plan COMPLETO, con el nombre de todas las cuentas, tambien las de
       personal (prestamos, anticipos y embargos a nombre de trabajadores). El
       rol general lee `contabilidad.plan_cuentas`, con esas 521 cuentas
       enmascaradas (`R-CONTABILIDAD-RESTRINGIDA`).
@@ -185,8 +191,12 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
-      **SOLO PARA EL ROL AUTORIZADO** (`sigrid_dm_restringido_ro`, F-135): es
-      el mayor COMPLETO, el que hasta el 2026-10-11 publicaba
+      **ACCESO RESTRINGIDO: solo el perfil total del MCP.** Si no lo tienes, la
+      consulta devuelve «permission denied»: usa `contabilidad.mayor`
+      (`R-CONTABILIDAD-RESTRINGIDA`), sin reintentar ni buscar otro camino.
+
+      **SOLO PARA EL ROL AUTORIZADO** (`sigrid_dm_restringido_ro`, F-135, del
+      que es miembro el perfil total del MCP): es el mayor COMPLETO, el que hasta el 2026-10-11 publicaba
       `contabilidad.mayor`, con las mismas filas, columnas y cifras, y tres
       columnas mas al final que marcan lo que es de PERSONAL: los asientos de
       nomina enteros y las cuentas de trabajadores (55.504 apuntes, el 2,55 %,
@@ -418,8 +428,12 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
-      **SOLO PARA EL ROL AUTORIZADO** (`sigrid_dm_restringido_ro`, F-135): son
-      los saldos COMPLETOS, los que hasta el 2026-10-11 publicaba
+      **ACCESO RESTRINGIDO: solo el perfil total del MCP.** Si no lo tienes, la
+      consulta devuelve «permission denied»: usa `contabilidad.saldos_cuenta_mes`
+      (`R-CONTABILIDAD-RESTRINGIDA`), sin reintentar ni buscar otro camino.
+
+      **SOLO PARA EL ROL AUTORIZADO** (`sigrid_dm_restringido_ro`, F-135, del
+      que es miembro el perfil total del MCP): son los saldos COMPLETOS, los que hasta el 2026-10-11 publicaba
       `contabilidad.saldos_cuenta_mes`, con las mismas filas, columnas y
       cifras. Los generales solo suman lo visible y marcan con `incompleto` el
       mes al que le falta algo (`R-CONTABILIDAD-RESTRINGIDA`).
