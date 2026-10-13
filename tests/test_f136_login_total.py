@@ -992,3 +992,67 @@ def test_f136_r25_la_tabla_de_roles_tiene_los_cinco() -> None:
     tabla = texto.split("## 1. Autenticación", 1)[1].split("\n## ", 1)[0]
     for rol in (DUENO, "sigrid_dm_app", ESTANDAR, AUTORIZADO, TOTAL):
         assert f"| `{rol}` |" in tabla, rol
+
+
+# ===========================================================================
+# R23 · ni contraseña, ni oid, ni UPN en lo que toca F-136 (T8)
+# ===========================================================================
+
+#: un oid de Entra (y cualquier GUID: suscripción, tenant)
+_PATRON_GUID = r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"
+#: un UPN o un correo: algo@dominio.tld
+_PATRON_UPN = r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+"
+
+
+def _ficheros_de_f136() -> list[Path]:
+    fijos = [
+        RAIZ / "infra" / "sql" / "02_roles.sql",
+        RAIZ / "infra" / "15_provision_db.ps1",
+        RAIZ / "docs" / "runbook_postgres_azure.md",
+        RAIZ / "docs" / "ARCHITECTURE.md",
+        RAIZ / ".env.example",
+        RAIZ / "progress" / "spec_F-136.md",
+    ]
+    spec = sorted((RAIZ / "specs").glob("F-136-*/*.md"))
+    informes = [
+        ruta for ruta in (RAIZ / "progress" / "impl_F-136.md",
+                          RAIZ / "progress" / "mutacion_F-136.md",
+                          RAIZ / "progress" / "review_F-136.md")
+        if ruta.exists()
+    ]
+    return fijos + spec + informes
+
+
+def _hallazgos(texto: str) -> list[str]:
+    import re
+
+    from tests.test_f005_grants import buscar_secretos
+
+    return (
+        buscar_secretos(texto)
+        + re.findall(_PATRON_GUID, texto)
+        + re.findall(_PATRON_UPN, texto)
+    )
+
+
+def test_f136_r23_los_ficheros_vigilados_existen() -> None:
+    ficheros = _ficheros_de_f136()
+    assert all(ruta.exists() for ruta in ficheros)
+    assert len([r for r in ficheros if "specs" in r.parts]) == 3, "requirements, design y tasks"
+
+
+@pytest.mark.parametrize("ruta", _ficheros_de_f136(), ids=lambda r: r.name)
+def test_f136_r23_sin_secretos_oid_ni_upn(ruta: Path) -> None:
+    assert _hallazgos(ruta.read_text(encoding="utf-8-sig")) == []
+
+
+def test_f136_r23_el_barrido_caza_lo_que_debe() -> None:
+    """Muestras SINTÉTICAS, construidas aquí para no dejar ninguna en el árbol."""
+    guid = "-".join("0" * n for n in (8, 4, 4, 4, 12)).replace("0", "a", 1)
+    upn = "nombre" + "@" + "empresa.es"
+    hexa = "ab12" * 16  # la forma de Nueva-Clave: 64 hexadecimales
+    for muestra in (guid, upn, hexa, "PASSWORD 'algo'", "password=algo"):
+        assert _hallazgos(f"texto {muestra} texto"), muestra
+    for legitimo in ("$env:TOTAL_PWD", "PASSWORD :'total_pwd'", "pg-password-total",
+                     "az keyvault secret show --vault-name $kvMcp --name pg-password @q"):
+        assert _hallazgos(legitimo) == [], legitimo
