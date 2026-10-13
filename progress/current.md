@@ -9,7 +9,7 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-13 · F-037 · IMPLEMENTACIÓN EN CURSO (`in_progress`, implementer)
+## 2026-10-14 · F-037 · IMPLEMENTADA (`in_progress`, pendiente del reviewer) · informe `progress/impl_F-037.md`
 
 - Rama `feature/F-037-tesoreria`; `bash harness/init.sh` en verde al empezar (7.587 passed,
   30 min). Tarea en curso y desviaciones: aquí; informe final en `progress/impl_F-037.md`.
@@ -17,6 +17,12 @@
   **217 objetos, 1795 columnas, 104 de consumo** (5 fichas nuevas en `tesoreria` y
   `tesoreria_restringida`; `compras.vencimientos` pasa a vista).
 - Desviaciones: ver `progress/impl_F-037.md` § Decisiones.
+- T10-T12 y T17 hechas: docs (azure-apps commit local `a781704`, sin push), mutación 45/45
+  muertos (campaña paralela NO VÁLIDA por expirar la base de cierre; los 45 reverificados en
+  serie), contraste de solo lectura en Azure conforme con la spec, `init.sh` verde (7.826
+  passed, cobertura 100 % de 136 líneas). **Pendiente MANUAL**: T13-T16 (despliegue en el
+  orden de design §7, pruebas con los logins reales, `publicar-diccionario` v51, aviso a
+  `mcp-bbdd` de la lista blanca).
 
 ## 2026-10-13 · F-037 (fase 1, cartera de cobros y pagos) · SPEC APROBADA (`spec_ready`) · implementer lanzado
 

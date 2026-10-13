@@ -178,4 +178,23 @@ cobro con retención (19,9 M€, declarada); `mcp-bbdd` (lista blanca) y el rol 
 
 ## Evidencias
 
-PENDIENTE: se completa al terminar la campaña de mutación y `bash harness/init.sh`.
+Medidas el 2026-10-14, sobre el HEAD `1903619` (todo commiteado).
+
+| Evidencia | Resultado real |
+|---|---|
+| `bash harness/init.sh` | **ENTORNO LISTO** (salida 0): todas las puertas en `[OK]`; ruff 271 avisos de deuda previa (273 al empezar) |
+| Tests ejecutados (suite completa, dentro de `init.sh`) | **7.826 passed, 242 skipped, 0 failed** |
+| Tiempo de la suite | **1.144 s (19 min 04 s)** con medición de cobertura |
+| Tests de la feature | `test_f037_{dominio,sql,paso,grants,diccionario}.py`: 72 + 96 + 19 + 16 + 23 = 226 passed |
+| Cobertura de líneas cambiadas | **PUERTA COBERTURA: 100,0 % de 136 líneas (136/136)**, umbral 80 %, nivel crítico |
+| Tamaño | requirements 149/150, design 249/250, impl dentro de 220 |
+| Mutación (`domain/tesoreria.py` + `build_tesoreria_step.py`, campaña completa) | **45 generados, 45 muertos, 0 supervivientes** |
+
+Mutación, con su matiz (detalle en `progress/mutacion_F-037.md`): la campaña paralela
+(`--timeout 2400 --workers 4`, línea base ~715 s por worker) dio 43 muertos, 0 supervivientes y 2
+`timeout`, y el arnés la declaró **NO VÁLIDA** porque la línea base de cierre agotó 12.000 s (la
+campaña cruzó la noche: 23.686 s). Por eso se reevaluaron **los 45 en serie**, aplicando cada
+mutante en el árbol: 42 los matan los tests de F-037 (los 2 `timeout` mueren en 0,1 s), y los 3
+restantes —las banderas `slots`/`frozen` de las dos dataclases— los mata la guarda genérica
+`tests/test_f006_dataclasses_inmutables.py`, que forma parte de la suite. Ningún superviviente
+que analizar ni justificación pendiente del humano.
