@@ -556,7 +556,7 @@
       "acceptance": [
         "Definida en detalle por specs/F-037-tesoreria/ (sdd=true)"
       ],
-      "status": "spec_ready",
+      "status": "in_progress",
       "sdd": true,
       "rigor": "critico",
       "priority": 1,

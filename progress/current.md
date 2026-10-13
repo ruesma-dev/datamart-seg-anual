@@ -9,6 +9,12 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-13 · F-037 · IMPLEMENTACIÓN EN CURSO (`in_progress`, implementer)
+
+- Rama `feature/F-037-tesoreria`; `bash harness/init.sh` en verde al empezar (7.587 passed,
+  30 min). Tarea en curso y desviaciones: aquí; informe final en `progress/impl_F-037.md`.
+- T1 hecha (dominio `etl_sigrid/domain/tesoreria.py`, RED pegada en el informe).
+
 ## 2026-10-13 · F-037 (fase 1, cartera de cobros y pagos) · SPEC APROBADA (`spec_ready`) · implementer lanzado
 
 > Rama `feature/F-037-tesoreria` desde `main` (`41b40f7`). Spec en `specs/F-037-tesoreria/`;
