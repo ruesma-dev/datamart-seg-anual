@@ -59,49 +59,60 @@ def _clave_orden(feature: dict) -> tuple:
     return (prioridad, feature.get("id", ""))
 
 
-def _tabla(features: list[dict], con_estado: bool = True) -> list[str]:
-    if not con_estado:
-        cabecera = "| # | Feature | Prioridad | Rigor |"
-        separador = "|---|---|---|---|"
-    else:
-        cabecera = "| # | Feature | Prioridad | Estado | Rigor | Rama |"
-        separador = "|---|---|---|---|---|---|"
-    filas = [cabecera, separador]
+# Una sección por estado, en el orden en que se leen: lo que se está
+# haciendo, lo que está listo para empezar, lo que espera algo, el backlog y
+# lo terminado. Cada sección va ordenada por prioridad.
+_SECCIONES = (
+    ("in_progress", "En curso", "_Ninguna feature en curso._"),
+    ("spec_ready", "Spec lista", "_Ninguna feature con la spec lista._"),
+    ("blocked", "Bloqueadas", "_Ninguna feature bloqueada._"),
+    ("pending", "Backlog", "_El backlog está vacío._"),
+    ("done", "Terminadas", "_Todavía no hay features terminadas._"),
+)
+
+
+def _tabla(features: list[dict], con_estado: bool = False, con_rama: bool = True) -> list[str]:
+    columnas = ["#", "Feature", "Prioridad"]
+    if con_estado:
+        columnas.append("Estado")
+    columnas.append("Rigor")
+    if con_rama:
+        columnas.append("Rama")
+    filas = [
+        "| %s |" % " | ".join(columnas),
+        "|%s" % ("---|" * len(columnas)),
+    ]
     for f in features:
+        celdas = [_celda(f.get("id")), _celda(f.get("title")), _celda(f.get("priority"))]
         if con_estado:
-            filas.append(
-                "| %s | %s | %s | %s | %s | %s |" % (
-                    _celda(f.get("id")),
-                    _celda(f.get("title")),
-                    _celda(f.get("priority")),
-                    _ETIQUETA_ESTADO.get(f.get("status"), _celda(f.get("status"))),
-                    _celda(f.get("rigor")),
-                    "`%s`" % _celda(f["branch"]) if f.get("branch") else "",
-                )
-            )
-        else:
-            filas.append(
-                "| %s | %s | %s | %s |" % (
-                    _celda(f.get("id")),
-                    _celda(f.get("title")),
-                    _celda(f.get("priority")),
-                    _celda(f.get("rigor")),
-                )
-            )
+            celdas.append(_ETIQUETA_ESTADO.get(f.get("status"), _celda(f.get("status"))))
+        celdas.append(_celda(f.get("rigor")))
+        if con_rama:
+            celdas.append("`%s`" % _celda(f["branch"]) if f.get("branch") else "")
+        filas.append("| %s |" % " | ".join(celdas))
     return filas
 
 
 def construir(datos: dict) -> str:
     features = datos.get("features", [])
-    # Las abiertas se listan por PRIORIDAD, que es como las lee el humano.
-    # El orden por estado (blocked > in_progress > spec_ready > pending) lo
-    # usa el líder para elegir la siguiente tarea, no esta tabla; aquí el
-    # estado es una columna más.
+    # Una tabla por estado, cada una por PRIORIDAD, que es como las lee el
+    # humano. El orden entre estados para elegir la siguiente tarea
+    # (blocked > in_progress > spec_ready > pending) lo aplica el líder, no
+    # este fichero.
+    por_estado = {
+        estado: sorted(
+            (f for f in features if f.get("status") == estado), key=_clave_orden
+        )
+        for estado, _, _ in _SECCIONES
+    }
+    conocidos = {estado for estado, _, _ in _SECCIONES}
+    # Un estado que no está en la lista no se pierde: sale en su propia tabla.
+    otros = sorted(
+        (f for f in features if f.get("status") not in conocidos), key=_clave_orden
+    )
+    hechas = por_estado["done"]
     abiertas = sorted(
         (f for f in features if f.get("status") != "done"), key=_clave_orden
-    )
-    hechas = sorted(
-        (f for f in features if f.get("status") == "done"), key=_clave_orden
     )
 
     lineas: list[str] = [
@@ -112,31 +123,33 @@ def construir(datos: dict) -> str:
         "`harness/features.json`. No lo edites a mano**: edita el JSON y "
         "vuelve a generarlo (lo hace solo `bash harness/init.sh`).",
         "",
-        "Resumen: **%d features**, %d abiertas, %d terminadas."
-        % (len(features), len(abiertas), len(hechas)),
+        "Resumen: **%d features**, %d abiertas (%d en curso, %d con la spec "
+        "lista, %d bloqueadas y %d en backlog) y %d terminadas."
+        % (
+            len(features),
+            len(abiertas),
+            len(por_estado["in_progress"]),
+            len(por_estado["spec_ready"]),
+            len(por_estado["blocked"]),
+            len(por_estado["pending"]),
+            len(hechas),
+        ),
         "",
     ]
 
-    en_curso = [f["id"] for f in features if f.get("status") == "in_progress"]
-    bloqueadas = [f["id"] for f in features if f.get("status") == "blocked"]
-    if en_curso:
-        lineas += ["En curso: **%s**." % ", ".join(en_curso), ""]
-    if bloqueadas:
-        lineas += ["Bloqueadas: **%s**." % ", ".join(bloqueadas), ""]
+    for estado, titulo, vacio in _SECCIONES:
+        lineas += ["## %s" % titulo, ""]
+        grupo = por_estado[estado]
+        if grupo:
+            lineas += _tabla(grupo, con_rama=estado != "done")
+        else:
+            lineas.append(vacio)
+        lineas.append("")
 
-    lineas += ["## Trabajo abierto", ""]
-    if abiertas:
-        lineas += _tabla(abiertas)
-    else:
-        lineas.append("_No queda trabajo abierto._")
-    lineas.append("")
-
-    lineas += ["## Terminadas", ""]
-    if hechas:
-        lineas += _tabla(hechas, con_estado=False)
-    else:
-        lineas.append("_Todavía no hay features terminadas._")
-    lineas.append("")
+    if otros:
+        lineas += ["## Otros estados", ""]
+        lineas += _tabla(otros, con_estado=True)
+        lineas.append("")
 
     lineas += ["## Detalle", ""]
     for f in abiertas + hechas:

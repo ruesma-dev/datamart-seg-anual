@@ -9,7 +9,35 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-14 · Backlog reordenado por orden del humano · BACKLOG.md con una tabla por estado
+
+- **Nuevas**: **F-138** (facturas liquidatorias, correo de Elena Díaz del 14-10; la marca es una
+  alarma de texto libre en `conala`, medida en Sigrid: 14.248 alarmas «LIQUIDA», 8.811 en facturas;
+  `conala` y `auxala` no se ingieren) con **prioridad 1**, y **F-139** (leer el contenido de los
+  gráficos asociados de facturas, ofertas y contratos; lo que F-090 dejó fuera; la spec decide
+  primero si vive en este ETL) con **prioridad 2**.
+- **F-128 ampliada** a toda la cabecera de `dcf` y de `dca` (albaranes, PROFORMAS y notas, con
+  `dcarec`), con **prioridad 3** (el humano: «f128, y sí vale la 3», «también debe incluir los
+  albaranes», «también proformas»). **F-138 ampliada** a albaranes y proformas («vamos con la f138,
+  también para albaranes y proformas, lanza spec»).
+- **`main` estaba en ROJO desde las 11:19** por un test de F-136 (R30) que contaba las menciones de
+  `pg-password-total` en `azure-apps/mcp_bbdd.md`: su F-008 lo nombra tres veces, legítimamente (es
+  su Key Vault). Con el visto bueno del humano, el test pasa a vigilar lo que sí sería copiar el
+  contrato: ninguna línea con `GRANT` y `mcp_sigrid_dm_total`, ni `SET ROLE` ni «máximo 2».
+- **El resto de abiertas, renumeradas de la 4 a la 71** en su orden anterior (empates por id).
+- **`BACKLOG.md`**: cinco tablas (En curso, Spec lista, Bloqueadas, Backlog y Terminadas).
+  `harness/backlog.py` y `tests/test_backlog_md.py` portados a `arnes-base` **1.7.15** (`5e90b27`)
+  pieza a pieza, como la 1.7.14: aquí el arnés sigue en la 1.7.7 y el instalador traería siete
+  versiones más que no se han pedido.
+
 ## 2026-10-14 · F-037 · CERRADA (`done`, APROBADO en pasada 2) · DESPLEGADA el 14-10 por orden del humano («adelante f37»)
+
+- **T14 HECHA (14-10)**: mcp-bbdd desplegó su F-021 (revisión `--0000017`, imagen
+  `r20261014-1342`) con `tesoreria` y `tesoreria_restringida` en la lista blanca común. Verificado
+  por el humano contra el servicio: cuenta total → `tesoreria_restringida.efectos` 279.006; cuenta
+  estándar → la restringida da `PERMISO_DENEGADO` y `tesoreria.efectos` 241.953. El líder lo
+  repitió por el conector (perfil total): 279.006 / 241.953 / 928, diccionario v51. Queda T16 (la
+  nocturna del 15-10).
 
 - **DESPLEGADA (líder, 14-10 ~07:40-08:00 UTC)**: merge `e05bad1` en `main` (árbol idéntico a la
   rama revisada; espejo en `dev`). T13: el job no fija `PG_*_SCHEMAS`; imagen `r20261014-0938`

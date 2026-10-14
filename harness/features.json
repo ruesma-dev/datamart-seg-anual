@@ -225,7 +225,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 58,
+      "priority": 52,
       "branch": "feature/F-017-cierre-costes-indirectos"
     },
     {
@@ -237,7 +237,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 62,
+      "priority": 56,
       "branch": "feature/F-018-validacion-cierre-mensual"
     },
     {
@@ -249,7 +249,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 68,
+      "priority": 62,
       "branch": "feature/F-002-plan-vigente"
     },
     {
@@ -268,7 +268,7 @@
       ],
       "status": "pending",
       "sdd": false,
-      "priority": 70,
+      "priority": 64,
       "branch": "feature/F-012-auditoria-costes-azure"
     },
     {
@@ -293,7 +293,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 71,
+      "priority": 65,
       "branch": "feature/F-013-carga-excels-aux"
     },
     {
@@ -305,7 +305,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 72,
+      "priority": 66,
       "branch": "feature/F-010-carga-excels-auxiliares"
     },
     {
@@ -317,7 +317,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 73,
+      "priority": 67,
       "branch": "feature/F-007-disparo-manual-web"
     },
     {
@@ -330,7 +330,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 59,
+      "priority": 53,
       "branch": "feature/F-022-desempate-obrfasamb"
     },
     {
@@ -380,7 +380,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 63,
+      "priority": 57,
       "branch": "feature/F-028-puerta-stg-distingue-fallo"
     },
     {
@@ -404,7 +404,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 52,
+      "priority": 47,
       "branch": "feature/F-029-mutacion-fiable"
     },
     {
@@ -421,7 +421,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 60,
+      "priority": 54,
       "branch": "feature/F-030-reglas-negocio-compartidas"
     },
     {
@@ -439,7 +439,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 55,
+      "priority": 49,
       "branch": "feature/F-031-alerta-no-se-resuelve"
     },
     {
@@ -456,7 +456,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 74,
+      "priority": 68,
       "branch": "feature/F-032-limpieza-secretos-y-puesto"
     },
     {
@@ -473,7 +473,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 64,
+      "priority": 58,
       "branch": "feature/F-033-azure-apps-al-dia"
     },
     {
@@ -490,7 +490,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 66,
+      "priority": 60,
       "branch": "feature/F-026-rbac-propagacion"
     },
     {
@@ -546,7 +546,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 19,
+      "priority": 21,
       "branch": "feature/F-036-oficios"
     },
     {
@@ -602,7 +602,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 45,
+      "priority": 41,
       "branch": "feature/F-039-vistas-puente"
     },
     {
@@ -615,7 +615,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 48,
+      "priority": 44,
       "branch": "feature/F-040-ingresos"
     },
     {
@@ -633,7 +633,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "critico",
-      "priority": 41,
+      "priority": 38,
       "branch": "feature/F-041-mutacion-fiable"
     },
     {
@@ -666,7 +666,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 43,
+      "priority": 39,
       "branch": "feature/F-043-secreto-versionado"
     },
     {
@@ -698,7 +698,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 44,
+      "priority": 40,
       "branch": "feature/F-046-contraste-desgloses"
     },
     {
@@ -729,7 +729,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 47,
+      "priority": 43,
       "branch": "feature/F-048-guardian-secretos-poroso"
     },
     {
@@ -745,7 +745,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 49,
+      "priority": 45,
       "branch": "feature/F-049-sello-pendiente-mutacion"
     },
     {
@@ -761,7 +761,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 56,
+      "priority": 50,
       "branch": "feature/F-050-fases-duplicadas-sigrid"
     },
     {
@@ -797,7 +797,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 54,
+      "priority": 48,
       "branch": "feature/F-053-desempate-obras-duplicadas"
     },
     {
@@ -815,7 +815,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "documental",
-      "priority": 51,
+      "priority": 46,
       "branch": "feature/F-054-conocimiento-de-negocio"
     },
     {
@@ -833,7 +833,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 17,
+      "priority": 18,
       "branch": "feature/F-055-mundo-proveedor"
     },
     {
@@ -883,7 +883,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 46,
+      "priority": 42,
       "branch": "feature/F-058-estados-financieros"
     },
     {
@@ -896,7 +896,7 @@
         "Resuelto y escrito como se identifica al mismo tercero entre empresas distintas, que tienen subcuentas distintas",
         "Documentado en el diccionario que significa 'posicion' y 'pendiente' aqui, para que el MCP no lo confunda con lo que publica compras"
       ],
-      "priority": 57,
+      "priority": 51,
       "rigor": "estandar",
       "branch": "feature/F-060-posicion-terceros",
       "status": "pending",
@@ -913,7 +913,7 @@
         "Contrastado contra el coste de personal que hoy publica el seguimiento, con las diferencias explicadas",
         "Publicados los movimientos y el saldo de las cuentas analiticas de contrapartida de los recursos (peticion de Juan Romero del 24-09), con lo que queda por repartir a obra, y medido y declarado si el asiento de nominas entra o no en esas cuentas"
       ],
-      "priority": 61,
+      "priority": 55,
       "rigor": "critico",
       "branch": "feature/F-061-coste-personal-obra",
       "status": "pending",
@@ -929,7 +929,7 @@
         "Validado por Administracion contra al menos una declaracion real ya presentada",
         "Documentado que este objeto NO sustituye a la declaracion oficial y para que sirve exactamente"
       ],
-      "priority": 65,
+      "priority": 59,
       "rigor": "estandar",
       "branch": "feature/F-062-impuestos",
       "status": "pending",
@@ -945,7 +945,7 @@
         "Contrastado contra el total que la analitica reparte como GENERALES, con la diferencia cuantificada por ano Y EXPLICADA: que parte es gasto no repartido, que parte es diferencia de criterio y que parte no cuadra",
         "NO se cambia el criterio de reparto en esta feature. Si la diferencia sugiere que deberia cambiarse, se lleva a Negocio como propuesta con el numero delante"
       ],
-      "priority": 67,
+      "priority": 61,
       "rigor": "critico",
       "branch": "feature/F-063-generales-reparto",
       "status": "pending",
@@ -962,7 +962,7 @@
         "Distinguidos los apuntes manuales de los generados por documento, con su volumen",
         "El aviso que se pasa a F-058 dice que parte del gasto NO DEBE atribuirse a obra por ser estructura, y que parte falta por error"
       ],
-      "priority": 69,
+      "priority": 63,
       "rigor": "estandar",
       "branch": "feature/F-064-control-interno-contable",
       "status": "pending",
@@ -982,7 +982,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 39,
+      "priority": 36,
       "branch": "feature/F-065-creditos-cpu-tras-la-ventana"
     },
     {
@@ -1058,7 +1058,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 40,
+      "priority": 37,
       "branch": "feature/F-069-mejoras-arnes-review-f066"
     },
     {
@@ -1076,7 +1076,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 32,
+      "priority": 29,
       "branch": "feature/F-070-auditoria-calidad-diccionario"
     },
     {
@@ -1152,7 +1152,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 37,
+      "priority": 34,
       "branch": "feature/F-075-alcance-de-las-puertas"
     },
     {
@@ -1172,7 +1172,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 30,
+      "priority": 28,
       "branch": "feature/F-076-ambitos-certificacion"
     },
     {
@@ -1187,7 +1187,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 34,
+      "priority": 31,
       "branch": "feature/F-077-flag-reconstruir-todo-sin-test"
     },
     {
@@ -1284,7 +1284,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 35,
+      "priority": 32,
       "branch": "feature/F-082-supervivientes-f025"
     },
     {
@@ -1365,7 +1365,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "critico",
-      "priority": 33,
+      "priority": 30,
       "branch": "feature/F-087-rol-propio-de-power-bi"
     },
     {
@@ -1384,7 +1384,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 36,
+      "priority": 33,
       "branch": "feature/F-088-guardian-de-recuentos-y-la-guarda-que-falta"
     },
     {
@@ -1442,7 +1442,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 29,
+      "priority": 27,
       "branch": "feature/F-091-factura-asiento"
     },
     {
@@ -1465,7 +1465,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 5,
+      "priority": 6,
       "branch": "feature/F-092-productos-y-centro-de-coste"
     },
     {
@@ -1485,7 +1485,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 24,
+      "priority": 25,
       "branch": "feature/F-093-obra-de-cabecera"
     },
     {
@@ -1533,7 +1533,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 18,
+      "priority": 19,
       "branch": "feature/F-096-plan-mensual-sin-tope"
     },
     {
@@ -1565,7 +1565,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 20,
+      "priority": 22,
       "branch": "feature/F-098-fases-por-ambito-y-controles"
     },
     {
@@ -1581,7 +1581,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 22,
+      "priority": 24,
       "branch": "feature/F-099-expedientes-obra"
     },
     {
@@ -1631,7 +1631,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 16,
+      "priority": 17,
       "branch": "feature/F-104-retenciones-cliente"
     },
     {
@@ -1648,7 +1648,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 21,
+      "priority": 23,
       "branch": "feature/F-105-log-sigrid-usuarios"
     },
     {
@@ -1664,7 +1664,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 15,
+      "priority": 16,
       "branch": "feature/F-106-obras-por-empresa"
     },
     {
@@ -1745,7 +1745,7 @@
       "status": "spec_ready",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 12,
+      "priority": 13,
       "branch": "feature/F-111-nombres-partida-por-ancestro"
     },
     {
@@ -1793,7 +1793,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 14,
+      "priority": 15,
       "branch": "feature/F-114-avisos-mcp-rescatados"
     },
     {
@@ -1811,7 +1811,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 77,
+      "priority": 71,
       "branch": "feature/F-117-obras-ciegas-en-master"
     },
     {
@@ -1843,7 +1843,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 38,
+      "priority": 35,
       "branch": "feature/F-119-cartera-de-obra"
     },
     {
@@ -1858,7 +1858,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 75,
+      "priority": 69,
       "branch": "feature/F-115-tiemod-inexistente"
     },
     {
@@ -1873,7 +1873,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 76,
+      "priority": 70,
       "branch": "feature/F-116-ingesta-descompuestos-error-por-version"
     },
     {
@@ -1906,7 +1906,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 13,
+      "priority": 14,
       "branch": "feature/F-121-recurso-principal-auxiliar"
     },
     {
@@ -1921,7 +1921,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 18,
+      "priority": 20,
       "branch": "feature/F-122-lineas-sin-rendimiento"
     },
     {
@@ -1959,7 +1959,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 6,
+      "priority": 7,
       "branch": "feature/F-126-analitica-lineas-compra"
     },
     {
@@ -1979,17 +1979,20 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 4,
+      "priority": 5,
       "branch": "feature/F-127-mayor-analitico"
     },
     {
       "id": "F-128",
-      "title": "Los importes de cabecera de la factura de proveedor (base, IVA, retención, total y total a pagar) y su pestaña de recargos y retenciones (dcfrec), para cuadrar la retención practicada contra el mayor de retenciones",
-      "description": "Nace el 2026-10-07 de los correos de **Juan Romero** (Dir. Administración y Control de Costes) del 2026-10-06, cuatro peticiones seguidas sobre el datamart en uso; el humano aprobó el reparto y el orden el 2026-10-07. Correo «Datamart: importes de cabecera de factura para cuadrar retenciones». ================ LO QUE PIDE: en Sigrid la cabecera de la factura de proveedor tiene base imponible, IVA (si procede), retención, total factura y total a pagar (total factura − retención). La retención de cada factura es total factura − total a pagar, y Juan quiere contrastarla con el saldo del mayor de retenciones. Hoy no se puede: `compras.facturas` no publica ninguno de esos importes. El único cuadre es `retenciones.v_cuadre_proveedor` (F-095), saldo contable contra efectos de retención (_02); pero los efectos se dividen, se agrupan y se anulan, y ahí nacen los descuadres (efectos agrupados sin factura de origen). A 25-09 cuadraban 520 de 761 proveedores, con ~416.000 EUR de diferencia (8,78 M EUR en contabilidad frente a 8,36 M EUR en efectos). La cabecera de la factura es el dato original y serviría también para validar los propios efectos. Pide: (1) en `compras.facturas`, base imponible, IVA, retención, total documento y total a pagar; (2) la pestaña de recargos y retenciones de la factura (`dcfrec`): base, porcentaje y cuota de cada retención o recargo. ================ LO QUE HAY (comprobado el 2026-10-07): `dcf` se ingiere y `dcfrec` está en `raw` desde F-066; NO hace falta ingesta nueva. F-038 ya distinguió `dco.totdoc` (con IVA) de `dco.totbas` (sin IVA) en las ofertas: el mismo cuidado aquí. FRONTERAS: F-091 (factura -> asiento) tiene abierto el descuadre del 13,2 % entre el debe de los apuntes de 2025 y `dcf.totdoc`; F-095 es el cuadre contra efectos; F-130 reutiliza `dcfrec` para comparar condiciones oferta -> contrato -> factura.",
+      "title": "Toda la cabecera de la factura de proveedor y del albarán (con proformas): los importes (base, IVA, retención, total y total a pagar), sus recargos y retenciones (dcfrec, dcarec) y el resto de campos de `dcf` y `dca` que hoy no se publican",
+      "description": "Nace el 2026-10-07 de los correos de **Juan Romero** (Dir. Administración y Control de Costes) del 2026-10-06, cuatro peticiones seguidas sobre el datamart en uso; el humano aprobó el reparto y el orden el 2026-10-07. Correo «Datamart: importes de cabecera de factura para cuadrar retenciones». ================ LO QUE PIDE: en Sigrid la cabecera de la factura de proveedor tiene base imponible, IVA (si procede), retención, total factura y total a pagar (total factura − retención). La retención de cada factura es total factura − total a pagar, y Juan quiere contrastarla con el saldo del mayor de retenciones. Hoy no se puede: `compras.facturas` no publica ninguno de esos importes. El único cuadre es `retenciones.v_cuadre_proveedor` (F-095), saldo contable contra efectos de retención (_02); pero los efectos se dividen, se agrupan y se anulan, y ahí nacen los descuadres (efectos agrupados sin factura de origen). A 25-09 cuadraban 520 de 761 proveedores, con ~416.000 EUR de diferencia (8,78 M EUR en contabilidad frente a 8,36 M EUR en efectos). La cabecera de la factura es el dato original y serviría también para validar los propios efectos. Pide: (1) en `compras.facturas`, base imponible, IVA, retención, total documento y total a pagar; (2) la pestaña de recargos y retenciones de la factura (`dcfrec`): base, porcentaje y cuota de cada retención o recargo. ================ LO QUE HAY (comprobado el 2026-10-07): `dcf` se ingiere y `dcfrec` está en `raw` desde F-066; NO hace falta ingesta nueva. F-038 ya distinguió `dco.totdoc` (con IVA) de `dco.totbas` (sin IVA) en las ofertas: el mismo cuidado aquí. FRONTERAS: F-091 (factura -> asiento) tiene abierto el descuadre del 13,2 % entre el debe de los apuntes de 2025 y `dcf.totdoc`; F-095 es el cuadre contra efectos; F-130 reutiliza `dcfrec` para comparar condiciones oferta -> contrato -> factura. ================ AMPLIACIÓN DEL 2026-10-14, por orden del humano («añade también cargar toda la info de la cabecera de facturas», prioridad 3): además de los importes y de `dcfrec`, publicar TODA la información de la cabecera de la factura (`dcf`) que hoy no llega a `compras.facturas`. Primero un inventario de todos los campos de `dcf` (ingeridos y excluidos en `config/tables_sigrid.yaml`) frente a lo que ya publica `compras.facturas`; lo que falte se publica AL FINAL, o se dice por qué no (vacío, interno de Sigrid o ya publicado en otro objeto). FRONTERAS: F-093 pide la obra y el centro de coste de cabecera (`dcf.obride`, `dcf.cenide`) y F-134 el empleado y la hora (`dcf.empide`, `dcf.hor`), que son campos de la misma cabecera: la spec decide si esta feature los absorbe y cómo quedan aquellas dos. F-138 (liquidatorias) no depende de esto: la marca vive en las alarmas (`conala`), no en `dcf`. ================ SEGUNDA AMPLIACIÓN DEL 2026-10-14, por orden del humano («la f128 también debe incluir los albaranes», «f128, también proformas»): lo mismo para la cabecera del ALBARÁN, PROFORMAS INCLUIDAS (y notas): `dca` guarda con el mismo `tip = 14` los albaranes (serie `AC`), las proformas (serie `PROF`) y las notas (serie `NTC`), medido en F-093. Sus recargos y retenciones están en `dcarec` (41.453 filas, ya en `raw` y sin usar en ningún esquema, medido el 2026-10-14). Mismo inventario campo a campo de `dca` frente a `compras.albaranes`, y `compras.albaranes` comprobado que publica proformas y notas.",
       "acceptance": [
         "Medido en Sigrid qué campos de `dcf` son la base, el IVA, la retención, el total y el total a pagar, y comprobado con el dato que retención = total − total a pagar (o explicado dónde no)",
         "`compras.facturas` publica los cinco importes AL FINAL de la tabla, sin cambiar el grano ni ninguna columna actual, con ficha que diga cuál lleva IVA y cuál no",
         "Publicada la pestaña de recargos y retenciones (`dcfrec`) enlazada a `factura_id`: tipo, base, porcentaje y cuota, con su clave declarada y su cobertura medida",
+        "Inventario de TODOS los campos de `dcf` frente a `compras.facturas`: cada campo que falta se publica AL FINAL (sin cambiar el grano ni ninguna columna actual) con su cobertura medida y su ficha, o queda escrito por qué no se publica",
+        "Decidido en la spec, con F-093 y F-134, quién publica la obra y el centro de cabecera y el empleado y la hora de alta, sin publicar dos veces el mismo campo",
+        "Lo mismo para el ALBARÁN, con PROFORMAS y notas: inventario de `dca` frente a `compras.albaranes`, los campos que faltan AL FINAL sin cambiar el grano, y `dcarec` enlazada a `albaran_id` con su cobertura; medido por serie (AC, PROF, NTC)",
         "Existe un cuadre por proveedor y obra de la retención practicada en factura contra el mayor de retenciones, con las cifras medidas y comparado con `retenciones.v_cuadre_proveedor` (520 de 761 proveedores cuadrando el 25-09)",
         "Se responde por el MCP, sin explicarle nada: «¿qué facturas explican el descuadre de retenciones del proveedor X?»",
         "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
@@ -2015,7 +2018,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 2,
+      "priority": 4,
       "branch": "feature/F-129-objetivo-contra-oferta-referencia"
     },
     {
@@ -2031,7 +2034,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 8,
+      "priority": 9,
       "branch": "feature/F-130-condiciones-y-texto-oferta"
     },
     {
@@ -2047,7 +2050,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 7,
+      "priority": 8,
       "branch": "feature/F-131-cantidades-dpc"
     },
     {
@@ -2101,7 +2104,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 11,
+      "priority": 12,
       "branch": "feature/F-134-empleado-alta-documento"
     },
     {
@@ -2154,8 +2157,43 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 9,
+      "priority": 10,
       "branch": "feature/F-137-ordenes-infra-patrones-buenos"
+    },
+    {
+      "id": "F-138",
+      "title": "Las facturas, albaranes y proformas liquidatorias: las alarmas de los documentos de Sigrid (conala) y la marca «liquidatoria» de cada documento",
+      "description": "Nace el 2026-10-14 de un correo de **Elena Díaz** (Departamento de Control de Costes) titulado «facturas liquidatorias», pasado por el humano: «apúntalo como feature, prioridad 1». El correo NO trae texto: solo una captura de Sigrid de la factura **FR26/10035** (ZANELA FERREIRA, obra 0722) con una ventana de ALARMA de tipo «03 · INFORMATIVA» cuyo texto es «FACTURA LIQUIDATORIA». ================ LO QUE ENSEÑA LA CAPTURA: en Sigrid la liquidatoria NO es un campo de la factura sino una **alarma de texto libre** pegada al documento. Las alarmas viven en **`conala`** («Alarmas en conceptos»: `conide` -> `con`, `alaide` -> `auxala`, `alatip`, `fec1`, `fec2`, `tex`, `rol`, `usu`) y su catálogo en **`auxala`** («Alarmas (Clasificaciones)»: `cod`, `res`, `alatip`, `tipabr`, `tiplec`). **Ninguna de las dos se ingiere hoy.** ================ MEDIDO EN SIGRID EL 2026-10-14 (solo lectura, por `sigrid-api`): **46.239 alarmas**; por tipo, 03 INFORMATIVA 45.223, 02 AVISO ABONOS 343, 01 ALARMA FACT. POR INCIDENCIAS 23, 04 (sin nombre) 7 y **643 sin tipo**. **18.591 cuelgan de una factura** (`dcf`). **14.248 alarmas mencionan «LIQUIDA»**, sobre 14.232 documentos, de los que **8.811 son facturas**; el resto cuelga de otros documentos que hay que identificar (¿contratos?, ¿albaranes?). **EL TEXTO ES LIBRE Y VARÍA**: «FACTURA LIQUIDATORIA» 2.250, «LIQUIDATORIA» 2.109, «UNICA Y LIQUIDATORIA» 689, «FACTURA UNICA Y LIQUIDATORIA» 528, «FRA LIQUIDATORIA» 286, «ULTIMA Y LIQUIDATORIA» 278, «LIQUIDATORIA» con salto de línea 213, «FRA. UNICA Y LIQUIDATORIA» 159, «ÚNICA Y LIQUIDATORIA» 127…; y hay alarmas que remiten a otro sitio («VER TEXTO» 1.528, «VER NOTA» 944, «MIRAR TEXTO» 191), donde la marca puede estar en el texto del documento (`compras.documento_texto`, F-080). `fec1` sale a 0 en algún caso: hay que medir qué fecha es fiable. ================ PARA QUÉ: el correo no lo dice. Lo probable es saber qué facturas liquidan un contrato o subcontrato (ya no debería llegar ninguna más, y es cuando se libera la retención), pero **la spec lo confirma con Elena** antes de diseñar el uso. FRONTERAS: F-128 (cabecera de la factura) no lleva la marca; F-090 publicó el índice de adjuntos; F-084 la cadena contrato -> albarán -> factura, que es donde la liquidatoria tiene sentido (¿la última factura de cada contrato?). ================ AMPLIACIÓN DEL 2026-10-14, por orden del humano al lanzar la spec («vamos con la f138, también para albaranes y proformas»): la marca se publica también para ALBARANES y PROFORMAS (`dca`, series `AC` y `PROF`; las notas `NTC` las decide la spec). De las 14.248 alarmas «LIQUIDA», 5.437 no cuelgan de una factura: hay que medir cuántas son de albaranes y proformas y de qué otros documentos.",
+      "acceptance": [
+        "Confirmado con Elena Díaz para qué quiere la marca y qué pregunta tiene que responder, escrito en la spec",
+        "Ingeridas `conala` y `auxala` filtradas a los documentos que interesan (facturas, albaranes y proformas como mínimo; medido de qué documentos cuelgan las alarmas «LIQUIDA» que no son de factura), con el coste medido contra la ventana nocturna",
+        "Publicadas las alarmas de cada documento (documento, tipo de alarma, texto, fechas fiables) y una marca «es liquidatoria» por factura, albarán y proforma con su regla de normalización del texto escrita en la ficha, y medidos los casos dudosos (variantes, «VER TEXTO», «VER NOTA»)",
+        "Declarada la cobertura medida por tipo de documento (factura, albarán, proforma): cuántos marcados, por año, y cuántas alarmas «LIQUIDA» quedan fuera de la regla y por qué",
+        "Se responde por el MCP, sin explicarle nada: «¿qué facturas liquidatorias tiene la obra X?» y «¿qué contratos tienen ya su factura liquidatoria?»",
+        "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 1,
+      "branch": "feature/F-138-facturas-liquidatorias"
+    },
+    {
+      "id": "F-139",
+      "title": "Leer el contenido de los gráficos asociados de facturas, ofertas y contratos para contrastar el original contra lo registrado en Sigrid",
+      "description": "Nace el 2026-10-14 por orden del humano: «pon como prioridad 2 leer los gráficos asociados a facturas, ofertas y contratos». Es la «feature futura» que F-090 dejó FUERA por escrito: F-090 publicó el ÍNDICE de adjuntos (`compras.documento_adjuntos`, una fila por enlace documento <-> fichero, con `cod_repositorio` y `empresa_repositorio`), no el contenido. El binario está en la base documental `ruesma_rep` (su `dbo.gra`, 364.906 ficheros, ~165 GB) y lo sirve `sigrid-api` con `POST /api/documents/read` (`id_column: cod`), probado en F-090 con una factura. COBERTURA DE ADJUNTOS medida en F-090 (2026-10-09): facturas 62,8 % (96,1 % desde 2019), contratos 92,4 %, ofertas 25,1 %. LO QUE HABILITA, y era la petición 3 de Juan Romero del 2026-09-18: contrastar lo que el proveedor factura de verdad (importes, cantidades, precios, conceptos) contra lo registrado en Sigrid sin ir factura a factura; y en ofertas, el Excel del concurso real (ver F-129). ================ RIESGO QUE DECIDE LA SPEC ANTES DE NADA: **el LÍMITE DE RESPONSABILIDAD**. Leer PDF (texto, tablas, escaneos con OCR o extracción con un modelo) es otro dominio que el ETL del datamart y puede merecer proyecto propio, o vivir en `sigrid-api` o en `mcp-bbdd`. Si la spec concluye que no vive aquí, la feature se marca `blocked` y se propone al humano dónde vive. Otros riesgos a medir: el volumen (no se replica el binario en el Postgres compartido), el coste y la ventana nocturna (la lectura sería incremental), y los datos personales que puedan traer los ficheros.",
+      "acceptance": [
+        "Decidido en la spec, con el humano, dónde vive la lectura de los ficheros (este ETL, un proyecto propio, `sigrid-api` o `mcp-bbdd`), con el límite de responsabilidad por escrito; si no es aquí, la feature pasa a `blocked` con la propuesta",
+        "Medido sobre una muestra de facturas, ofertas y contratos qué formatos hay (PDF de texto, escaneado, Excel…) y qué se puede extraer de forma fiable de cada uno",
+        "Si vive aquí: publicado lo extraído de cada fichero enlazado a su documento por `compras.documento_adjuntos`, sin replicar el binario en el Postgres, con carga incremental y su coste medido contra la ventana nocturna",
+        "Existe un contraste factura del proveedor contra factura registrada (total, base, líneas) que marca las discrepancias con las cifras medidas, sin decidir por Negocio cuáles son legítimas",
+        "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 2,
+      "branch": "feature/F-139-leer-graficos-asociados"
     }
   ]
 }

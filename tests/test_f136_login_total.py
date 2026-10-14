@@ -1161,7 +1161,13 @@ def test_f136_r30_azure_apps_describe_el_contrato_del_total() -> None:
 def test_f136_r30_mcp_bbdd_solo_enlaza_al_contrato() -> None:
     texto = _azure_apps("mcp_bbdd.md")
     assert "datamart_seg_anual.md" in texto and TOTAL in texto
-    assert texto.count("pg-password-total") <= 1, "enlaza al contrato, no lo copia"
+    # Copiar el contrato es repetir sus cláusulas: los GRANT del rol total y
+    # el SET ROLE con su límite de conexiones. Nombrar `pg-password-total` no
+    # lo es: ese secreto vive en el Key Vault de mcp-bbdd y su documento lo
+    # describe, como manda azure-apps (lo hace tres veces desde su F-008).
+    copiadas = [linea for linea in texto.splitlines() if "GRANT" in linea and TOTAL in linea]
+    assert not copiadas, f"enlaza al contrato, no lo copia: {copiadas}"
+    assert "SET ROLE" not in texto and "máximo 2" not in texto, "enlaza al contrato, no lo copia"
 
 
 # ===========================================================================
