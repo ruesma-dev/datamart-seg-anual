@@ -280,13 +280,14 @@ def test_f006_r4_son_doce_esquemas_y_estos() -> None:
     silencio.
     """
     # Trece desde F-135 (2026-10-11), que anadio `contabilidad_restringida`;
-    # quince desde F-037 (2026-10-13): `tesoreria` y `tesoreria_restringida`.
-    assert len(ESQUEMAS_DEL_DATAMART) == 15
+    # quince desde F-037 (2026-10-13): `tesoreria` y `tesoreria_restringida`;
+    # dieciseis desde F-138 (2026-10-14): `compras_restringida`.
+    assert len(ESQUEMAS_DEL_DATAMART) == 16
     assert set(ESQUEMAS_DEL_DATAMART) == {
         "_meta", "raw", "stg", "aux", "mart",
         "cierre", "compras", "maestro", "retenciones", "personal",
         "contabilidad", "contabilidad_restringida", "descompuestos",
-        "tesoreria", "tesoreria_restringida",
+        "tesoreria", "tesoreria_restringida", "compras_restringida",
     }
 
 
