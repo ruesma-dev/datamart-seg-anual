@@ -79,6 +79,8 @@ def test_f006_r14_el_pipeline_nocturno_es_este_e_incluye_los_cinco() -> None:
         "build_stg",
         "build_mart",
         "build_maestros",
+        # F-037: la cartera de cobros y pagos, delante de compras.
+        "build_tesoreria",
         "build_compras",
         "build_retenciones",
         "build_personal",
@@ -92,7 +94,7 @@ def test_f006_r14_el_pipeline_nocturno_es_este_e_incluye_los_cinco() -> None:
     )
     for paso in ("build_cierre", "build_maestros", "build_compras",
                  "build_retenciones", "build_personal", "build_contabilidad",
-                 "build_descompuestos"):
+                 "build_descompuestos", "build_tesoreria"):
         assert paso in PASOS_NOCTURNOS
 
 

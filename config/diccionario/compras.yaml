@@ -1748,14 +1748,27 @@ objetos:
     ejemplos_preguntas: []
 
   vencimientos:
-    tipo: tabla
+    tipo: vista
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
       Los EFECTOS DE PAGO de la factura de compra: la pestana «Vencimientos» de
       la factura, fila a fila. Cuando vence cada pago, de cuanto es, en que
       estado esta, por que banco y cuenta sale, si esta en una remesa y si esta
-      anulado. **195.510 efectos sobre 165.737 facturas**, medido el 2026-09-11.
+      anulado. **195.510 efectos sobre 165.737 facturas**, medido el 2026-09-11;
+      197.190 el 2026-10-13.
+
+      **DESDE F-037 (2026-10-13) ES UNA VISTA de `tesoreria.efectos`**, la
+      cartera completa de cobros y pagos, filtrada a `sentido = 'PAGO'` y
+      `es_factura_compra`, con las MISMAS columnas, nombres y tipos que la
+      tabla de F-080. **Su frescura es la de `build_tesoreria`**, que la
+      construye cada noche delante de `build_compras`
+      (`SELECT * FROM _meta.v_frescura WHERE paso = 'build_tesoreria'`). Para
+      el estado PREVISTO/REALIZADO/BAJA ya resuelto, los cobros y los pagos que
+      no son de factura, se consulta `tesoreria.efectos`. Ningun efecto de
+      factura de compra es de personal, asi que la vista no pierde filas; solo
+      `importe_remesa` sale a NULL en la unica remesa que lleva tambien pagos
+      de nomina (6 efectos).
 
       **LA TRAMPA QUE MAS CARA SALE: SUMAR LOS IMPORTES DE TODOS LOS EFECTOS DE
       UNA FACTURA LA CUENTA HASTA TRES VECES.** El efecto nace partido en `_01`
@@ -1779,18 +1792,16 @@ objetos:
       saber que no existe en el origen, no buscarla aqui.
 
       **Solo la COMPRA.** Los efectos de otros documentos y los cobros
-      (`raw.cob`) no entran: la cartera completa de cobros y pagos es F-037 fase
-      1. **Deuda declarada con F-037 (R35)**: cuando llegue se decide si absorbe
-      esta tabla o la deja como vista suya; lo que no se hace es levantar una
-      segunda tabla de efectos en paralelo.
+      (`raw.cob`) no entran aqui: estan en `tesoreria.efectos`. **La deuda
+      declarada con F-037 (R35) esta saldada**: F-037 absorbio la tabla y la
+      dejo como vista suya, sin una segunda tabla de efectos en paralelo.
     grano: >-
       Una fila por efecto de pago (`raw.pag.ide`) cuyo documento sea una factura
-      de compra. `vencimiento_id` es CLAVE PRIMARIA DECLARADA, asi que el build
-      falla la noche en que el grano se rompa en vez de dejar que lo descubra
-      `check-unicidad` un mes despues. Una factura tiene de 1 a 16 efectos (16
-      es el maximo medido), asi que **contar filas de esta tabla no cuenta
-      facturas**: para eso, `COUNT(DISTINCT factura_id)` o
-      `compras.v_facturas_pago`.
+      de compra. `vencimiento_id` es el `efecto_id` de `tesoreria.efectos`, que
+      es CLAVE PRIMARIA DECLARADA alli, asi que el build falla la noche en que
+      el grano se rompa. Una factura tiene de 1 a 16 efectos (16 es el maximo
+      medido), asi que **contar filas de esta vista no cuenta facturas**: para
+      eso, `COUNT(DISTINCT factura_id)` o `compras.v_facturas_pago`.
     clave_negocio: [vencimiento_id]
     paso_etl: build_compras
     refresco: nocturno
@@ -1822,7 +1833,8 @@ objetos:
       serie_efecto:
         significado: >-
           Prefijo alfabetico del codigo del efecto, derivado con
-          `compras.fn_serie`: `FR` el efecto inicial, `DIV` una division, `AGR`
+          `tesoreria.fn_serie` (copia de `compras.fn_serie`): `FR` el efecto
+          inicial, `DIV` una division, `AGR`
           una agrupacion al remesar, `NO` un pago sin serie de factura. Sirve
           para saber POR QUE existe un efecto. No sale de la columna de serie
           del origen: **`con.serie` existe y vale 0 en los 255.148 efectos**,
@@ -1990,7 +2002,9 @@ objetos:
           efectos de la misma remesa, asi que sumarlo cuenta la remesa tantas
           veces como efectos lleve.
         agregacion: no_sumable
-        nulo_significa: El efecto no esta en ninguna remesa.
+        nulo_significa: >-
+          El efecto no esta en ninguna remesa, o la remesa lleva tambien pagos
+          de personal (1 remesa el 2026-10-13): su total delataria la nomina.
     relaciones:
       - de: factura_id
         a: compras.facturas.factura_id

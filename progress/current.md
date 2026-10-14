@@ -9,6 +9,108 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-14 · F-037 · CERRADA (`done`, APROBADO en pasada 2) · SIN FUSIONAR NI DESPLEGAR (espera orden del humano)
+
+- **Review pasada 2 (14-10): APROBADO** (`progress/review_F-037.md`): el delta desde la pasada 1
+  solo toca `progress/`; campaña de mutación VÁLIDA (45/45 muertos, 0 supervivientes, SHA
+  `b475edb`, 2 workers, 7.428 s); `init.sh` en verde sobre `1d1b9f6` (7.826 passed, cobertura
+  100 % de 136). Siguiente: con la orden del humano, merge a `main` (espejo en `dev`) y
+  despliegue según «Verificaciones MANUAL» de abajo (T13-T16); avisar a `mcp-bbdd` de que su
+  lista blanca común debe admitir `tesoreria` y `tesoreria_restringida`.
+
+- Rama `feature/F-037-tesoreria`; `bash harness/init.sh` en verde al empezar (7.587 passed,
+  30 min). Tarea en curso y desviaciones: aquí; informe final en `progress/impl_F-037.md`.
+- T1-T8 hechas (un commit por tarea). T9 (diccionario v51): recuentos del árbol tras F-037,
+  **217 objetos, 1795 columnas, 104 de consumo** (5 fichas nuevas en `tesoreria` y
+  `tesoreria_restringida`; `compras.vencimientos` pasa a vista).
+- Desviaciones: ver `progress/impl_F-037.md` § Decisiones.
+- T10-T12 y T17 hechas: docs (azure-apps commit local `a781704`, sin push), mutación 45/45
+  muertos (campaña paralela NO VÁLIDA por expirar la base de cierre; los 45 reverificados en
+  serie), contraste de solo lectura en Azure conforme con la spec, `init.sh` verde (7.826
+  passed, cobertura 100 % de 136 líneas). **Pendiente MANUAL**: T13-T16, con sus comandos
+  abajo.
+- **Review pasada 1 (14-10): CHANGES_REQUESTED solo por evidencia** (`progress/review_F-037.md`).
+  Ciclo de corrección: (1) repetir la campaña de mutación con `--workers 2` hasta un informe
+  VÁLIDO, sin tocar código; (2) esta lista de MANUAL con su comando exacto. Resultado en
+  `progress/impl_F-037.md` § Evidencias.
+
+### F-037 · Verificaciones MANUAL, con su comando exacto (tras el APROBADO y el merge)
+
+Variables de PowerShell que usan todos los pasos (nombres de recurso, ya en el runbook):
+`$rgJ = "rg-datamart-seg-dev"; $job = "caj-datamart-seg-dev"`. Los `psql` llevan las opciones
+DELANTE y la cadena al final (incidencia del 12-10); la contraseña la pide `psql`, nunca en la
+línea de órdenes. `<host>` es el servidor compartido; `<admin>`, su administrador.
+
+**T13 · Despliegue, design §7, EN ESTE ORDEN** (humano; R29):
+
+1. El job no fija las listas de esquemas (solo NOMBRES de variables):
+   `az containerapp job show -g $rgJ -n $job --query "properties.template.containers[0].env[].name" -o tsv`
+   → no aparece ninguna de `PG_CONSUMPTION_SCHEMAS`, `PG_VETOED_SCHEMAS`,
+   `PG_RESTRICTED_SCHEMAS`. Si alguna sale, se cambia allí antes de seguir.
+2. Imagen con tag fechado desde `main` y job apuntado a ella:
+   `powershell -NoProfile -File infra/70_build_image.ps1` →
+   `powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag rAAAAMMDD-hhmm publicado>` →
+   `az containerapp job show -g $rgJ -n $job --query "properties.template.containers[0].image" -o tsv`
+   (= ese tag).
+3. Roles como administrador (con `APP_PWD`/`MCP_PWD` en el entorno, runbook §4):
+   `psql -X -v ON_ERROR_STOP=1 -f infra/sql/02_roles.sql "host=<host> dbname=sigrid_dm user=<admin> sslmode=require"`
+   → `COMMIT`, los esquemas `tesoreria` y `tesoreria_restringida` en las comprobaciones finales.
+4. Desde el puesto, en este orden y anotando la duración del primero (R29: +1-3 min estimados):
+   `python main.py build-tesoreria` → `python main.py build-compras` → `python main.py apply-grants`
+   (SUCCESS y `verificacion = ok`).
+
+**T14 · Pruebas** (humano, tras T13; resultados a `progress/impl_F-037.md`):
+
+1. Negativa, login estándar real (`psql -X "host=<host> dbname=sigrid_dm user=mcp_sigrid_dm_ro sslmode=require"`):
+   `SELECT 1 FROM tesoreria_restringida.efectos LIMIT 1;` → «permission denied for schema
+   tesoreria_restringida».
+   `SELECT count(*) FROM tesoreria.efectos WHERE naturaleza_pago_id IS NOT NULL;` → **0**.
+2. Positiva, login total (`... user=mcp_sigrid_dm_total ...`):
+   `SELECT count(*), count(*) FILTER (WHERE restringido) FROM tesoreria_restringida.efectos;`
+   → total = `raw.pag` + `raw.cob` del mismo momento, que se lee con el administrador (el total
+   tiene `raw` vetado): `SELECT (SELECT count(*) FROM raw.pag) + (SELECT count(*) FROM raw.cob);`
+   (T12: 256.952 + 21.914 = 278.866; restringidos 37.053).
+3. R16, con el estándar: `SELECT count(*) FROM compras.vencimientos;` → el de antes del despliegue
+   (197.190 el 13-10, ± la variación diaria).
+4. R30, contraste de solo lectura (design §8 bis):
+   `SELECT sentido, previsto_antiguo, count(*), round(sum(importe)/1e6, 1) AS meur FROM tesoreria.efectos WHERE estado_tesoreria = 'PREVISTO' GROUP BY 1, 2 ORDER BY 1, 2;`
+   → PAGO 80,1 M€ en total (antiguo 2.361 / 3,9 M€); COBRO 40,2 M€ (antiguo 398 / 2,2 M€).
+   `SELECT left(codigo_cuenta, 2) AS grupo, round(sum(importe_saldo)/1e6, 1) AS meur FROM contabilidad.mayor WHERE left(codigo_cuenta, 2) IN ('40', '41', '43') GROUP BY 1 ORDER BY 1;`
+   → 40+41 ≈ −78,8 M€; 43 ≈ +47,5 M€ (± la variación diaria; la diferencia la explica la ficha).
+
+**T15 · Diccionario y MCP** (líder, tras T13), desde el puesto:
+`python main.py publicar-diccionario` (v51) → `python main.py check-diccionario` →
+`python main.py check-declarados` → `python main.py check-unicidad`, los cuatro en verde;
+reiniciar el MCP (`ca-mcp-bbdd-dev`) y comprobar que `contexto_bbdd` sirve la v51; avisar al
+humano de que `mcp-bbdd` debe añadir `tesoreria` a su lista blanca (`config.yaml`).
+
+**T16 · Al día siguiente, sin ejecutar nada a mano** (humano):
+`az containerapp job execution list -g $rgJ -n $job -o table` (la nocturna en Succeeded) y,
+con cualquier login que lea `_meta`:
+`SELECT started_at, status, metadata->>'verificacion' AS verificacion FROM _meta.etl_runs WHERE step = 'apply_grants' ORDER BY started_at DESC LIMIT 3;`
+→ SUCCESS y `ok`; y se repite la negativa de T14.1 con `mcp_sigrid_dm_ro` (mismo comando, mismo
+resultado: «permission denied» y 0).
+
+## 2026-10-13 · F-037 (fase 1, cartera de cobros y pagos) · SPEC APROBADA (`spec_ready`) · implementer lanzado
+
+> Rama `feature/F-037-tesoreria` desde `main` (`41b40f7`). Spec en `specs/F-037-tesoreria/`;
+> mediciones de solo lectura en Azure e informe en `progress/spec_F-037.md`.
+
+- Esquema `tesoreria` (general) + `tesoreria_restringida` (completa): una fila por efecto de
+  `raw.pag` y `raw.cob` con sentido, tercero, importe, vencimiento, fecha real, medio de pago,
+  estado PREVISTO/REALIZADO/BAJA. `compras.vencimientos` pasa a ser vista de la general.
+- Pagos de personal (decisión del humano): `natide <> 0` (NOMINAS/EMBARGO/CUOTAS) coincide
+  exactamente con cuenta 465/475/466, tercero empleado y documento de nómina: 37.053 pagos,
+  0 cobros. El estándar solo ve recuentos.
+- **13-10, respuesta del humano**: D1-D3 y D5-D10 APROBADAS con la opción A («lo demas ok»).
+  **Abiertas**: D4 remedida (la obra del contrato añade 6 efectos: se recomienda solo el
+  centro) y **D11 nueva** (columna `previsto_antiguo`, más de 2 años vencido sin puntear:
+  3,9 M€ de pagos que la contabilidad no sostiene en 223 cuentas). Contraste con la
+  contabilidad explicado en design §8 bis y `spec_F-037.md` §6. Fuera del repositorio: la
+  lista blanca de `mcp-bbdd` debe admitir `tesoreria`.
+- **13-10, «si» del humano a D4-A y D11-A**: todas las decisiones cerradas; F-037 `spec_ready`
+  y se lanza el implementer en la rama.
+
 ## 2026-10-13 · F-136 · CERRADA (`done`, APROBADO en pasada 2) · orden del humano «vamos con la prueba»: merge y despliegue; la rotación y el alta (runbook §12) son MANUAL
 
 - **DESPLEGADA el 13-10** (líder): merge `9ee509c` en `main` (espejo en `dev`); imagen
@@ -31,8 +133,11 @@
   13-10), `contabilidad.mayor` 2.120.755 (55.519 restringidos, como el 12-10).
   **P11** (líder): `apply-grants` SUCCESS, 46 sentencias, `verificacion`,
   `verificacion_total` y `acceso_total` = `ok`; veto de `raw` al total aplicado.
-- **Pendiente del LÍDER**: la nocturna del 14-10 (R29: los tres «ok» sin nada a mano). El
-  total no lo usa nadie hasta la F-008 de `mcp-bbdd`.
+- **R29 HECHA (líder, 14-10 07:27 UTC, solo lectura)**: nocturna del 14-10 con 122 pasos
+  SUCCESS (00:00-04:33 UTC); `apply_grants` SUCCESS a las 04:33 con `verificacion`,
+  `verificacion_total` y `acceso_total` = `ok`, sin nada a mano. F-136 cerrada del todo.
+  `mcp-bbdd` ya tiene su F-008 aprobada y el secreto `mcp-perfil-total-oids` (3 oid) creado el
+  13-10 por orden del humano; su despliegue y pruebas son de esa sesión.
 - **13-10, decisiones del humano**: D10 de F-135 (restringir el coste por persona de
   `personal`) «de momento no»: no se pregunta a Juan ni se abre feature. Los dos arreglos de
   infra que la review de F-136 dejó fuera pasan a **F-137** (pending, prioridad 9).

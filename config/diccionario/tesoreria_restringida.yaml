@@ -1,0 +1,285 @@
+# config/diccionario/tesoreria_restringida.yaml
+#
+# Fichas del esquema `tesoreria_restringida` (F-037, 2026-10-13): la cartera
+# COMPLETA de cobros y pagos -todos los efectos de `raw.pag` y `raw.cob`- con
+# la marca de los pagos de PERSONAL (nominas, embargos, cuotas).
+#
+# SOLO LA LEEN el perfil total del MCP (el login `mcp_sigrid_dm_total`, F-136)
+# y el grupo `sigrid_dm_restringido_ro`. El rol estandar del MCP y de Power BI
+# (`mcp_sigrid_dm_ro`) la tiene VETADA: `apply_grants` se la revoca y lo
+# comprueba cada noche. La ficha EMPIEZA por el aviso de acceso restringido
+# porque el MCP no filtra el diccionario por perfil. Decision del humano del
+# 2026-10-13: «los pagos de nominas deben quedar restringidos». Regla dura
+# `R-TESORERIA-RESTRINGIDA`.
+#
+# Lo construye `build_tesoreria` (01) y de aqui sale la general (02, 03).
+# Solo recuentos y agregados, ni nombres ni importes de nadie.
+
+version: 1
+esquema: tesoreria_restringida
+
+objetos:
+
+  efectos:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **ACCESO RESTRINGIDO: solo el perfil total del MCP.** Si no lo tienes, la
+      consulta devuelve «permission denied»: usa `tesoreria.efectos`
+      (`R-TESORERIA-RESTRINGIDA`), sin reintentar ni buscar otro camino.
+
+      **LA CARTERA COMPLETA DE COBROS Y PAGOS** (F-037): una fila por efecto de
+      `raw.pag` (PAGO) y `raw.cob` (COBRO), 256.952 + 21.914 el 2026-10-13, sin
+      filtrar nada, con `restringido` y `motivo_restriccion`. Es
+      `tesoreria.efectos` MAS los 37.053 pagos de personal (nominas, embargos y
+      cuotas: 33.990 de nomina, 3.062 de embargo, 1 de cuota). Los dos esquemas
+      NUNCA se suman ni se unen: la completa ya contiene a la general.
+
+      Valen las mismas trampas que en la general (`R-TESORERIA-ESTADO`): BAJA
+      no se suma, `fecha_real` vacia no es pendiente, y un flujo de caja usa
+      `estado_tesoreria = 'PREVISTO' AND NOT previsto_antiguo`. Los previstos
+      de personal (6.213) estan TODOS vencidos: son nominas pasadas sin
+      puntear, no caja futura. Es cartera, no devengo; la fase 2 no existe.
+    grano: >-
+      Una fila por efecto, identificada por `efecto_id` (el `ide` de `raw.pag`
+      o de `raw.cob`, unico entre los dos). Clave primaria declarada.
+    clave_negocio: [efecto_id]
+    paso_etl: build_tesoreria
+    refresco: nocturno
+    columnas:
+      efecto_id:
+        significado: >-
+          Identificador del efecto en Sigrid (`pag.ide` o `cob.ide`). Es tambien
+          el `ide` de su fila en `raw.con`: el efecto ES un documento.
+        agregacion: no_sumable
+      sentido:
+        significado: >-
+          PAGO (sale dinero: `raw.pag`, efecto de tipo 25) o COBRO (entra:
+          `raw.cob`, tipo 24).
+        valores: [PAGO, COBRO]
+      empresa_id:
+        significado: Empresa del efecto (`con.emp` de su propia ficha). Nunca vacia.
+        agregacion: no_sumable
+      codigo_efecto:
+        significado: >-
+          Codigo del efecto tal como lo ensena Sigrid (`FR26/06051_01`), literal
+          de `con.cod`: el sufijo viene almacenado, no se compone.
+      descripcion_efecto:
+        significado: Descripcion del efecto en Sigrid (`con.res`), texto libre del ERP.
+      serie_efecto:
+        significado: >-
+          Prefijo alfabetico del codigo del efecto (`tesoreria.fn_serie`, la
+          misma logica que `compras.fn_serie`): FR el inicial, DIV una division,
+          AGR una agrupacion al remesar. Dice POR QUE existe el efecto.
+      documento_id:
+        significado: >-
+          Documento del que nace el efecto (`conide`): la factura de compra en
+          la mayoria de pagos, el documento de venta en los cobros.
+        agregacion: no_sumable
+        nulo_significa: >-
+          El efecto no cuelga de ningun documento (23.897 pagos y 1.493 cobros:
+          pagos y cobros sueltos).
+      codigo_documento:
+        significado: Codigo del documento origen tal como se ve en Sigrid (`FR25/04222`).
+        nulo_significa: El efecto no cuelga de ningun documento.
+      tipo_documento:
+        significado: >-
+          Tipo de Sigrid (`con.tip`) del documento origen: 15 factura de compra,
+          11 documento de venta, 306 nomina (este no aparece en la general).
+        agregacion: no_sumable
+        nulo_significa: El efecto no cuelga de ningun documento.
+      es_factura_compra:
+        significado: >-
+          Cierto si el documento origen es una factura de compra (`raw.dcf`).
+          Es el filtro de la vista `compras.vencimientos`. Siempre falso en COBRO.
+      tercero_id:
+        significado: >-
+          Proveedor, acreedor o cliente del efecto (`entide`, un `con.ide`).
+        agregacion: no_sumable
+        nulo_significa: El efecto no tiene tercero informado.
+      tercero_nombre:
+        significado: Nombre del tercero (`con.res` de su ficha).
+        nulo_significa: El efecto no tiene tercero informado.
+      tercero_cif:
+        significado: CIF del proveedor (`raw.prv`). Solo en PAGO.
+        nulo_significa: >-
+          COBRO (los clientes no se ingieren con su CIF hasta F-040), o el
+          tercero del pago no esta en el maestro de proveedores `raw.prv`.
+      fecha_emision:
+        significado: Fecha de emision del efecto, ya tipada.
+        agregacion: no_sumable
+        nulo_significa: El efecto no tiene fecha de emision informada.
+      fecha_vencimiento:
+        significado: >-
+          Fecha en la que vence el efecto: el eje de cualquier pregunta de
+          «que vence en...» y de un flujo de caja.
+        agregacion: no_sumable
+        nulo_significa: El efecto no tiene vencimiento informado (57 en toda la cartera).
+      fecha_real:
+        significado: >-
+          Fecha real de pago o cobro, cuando esta punteada. NO es el estado:
+          desde 2020 el pago por remesa queda REALIZADO sin fecha real.
+        agregacion: no_sumable
+        nulo_significa: >-
+          Sin fecha real anotada. NO quiere decir que este pendiente: mira
+          `estado_tesoreria` (41.884 pagos y 2.106 cobros realizados no la
+          tienen).
+      importe:
+        significado: >-
+          Importe del efecto (`tot`), con el signo de origen (un abono es
+          negativo). No se suma sin filtrar `estado_tesoreria`: la BAJA repite
+          el dinero de sus hijos.
+        unidad: EUR
+        agregacion: suma
+      importe_flujo:
+        significado: >-
+          El importe con el signo de la caja: +importe en COBRO, -importe en
+          PAGO. Es la columna que se suma para un flujo de caja neto, siempre
+          con `estado_tesoreria` filtrado.
+        unidad: EUR
+        agregacion: suma
+      estado_tesoreria:
+        significado: >-
+          BAJA si el efecto esta dado de baja o sustituido (estado 14
+          Agrupados, 15 Divididos); si no, REALIZADO si tiene fecha real o
+          estado 10 (Pagado/Cobrado); si no, PREVISTO. BAJA gana. Igual en los
+          dos sentidos (criterio de F-094).
+        valores: [PREVISTO, REALIZADO, BAJA]
+      estado_codigo:
+        significado: Codigo del estado del efecto en Sigrid (`con.est`). 10 es Pagado/Cobrado.
+        agregacion: no_sumable
+      estado_sigrid:
+        significado: >-
+          Nombre del estado en Sigrid, leido de `raw.conest` con el tipo del
+          efecto (25 en pagos, 24 en cobros): Pendiente, Aprobado, Emitido, En
+          cartera, Remesado, Pagado, Devuelto, Agrupados, Divididos...
+        nulo_significa: El estado no existe en el catalogo de Sigrid.
+      efecto_anulado:
+        significado: >-
+          Cierto si el efecto tiene fecha de baja en Sigrid (`con.fecbaj`). Toda
+          fila anulada es BAJA, pero hay BAJA sin anular (estados 14 y 15).
+      fecha_anulacion:
+        significado: Fecha de baja del efecto, ya tipada.
+        agregacion: no_sumable
+        nulo_significa: El efecto no esta anulado.
+      medio_pago_id:
+        significado: Medio de pago del efecto (`efeide`, catalogo `raw.auxefp`).
+        agregacion: no_sumable
+        nulo_significa: El efecto no tiene medio de pago informado.
+      medio_pago:
+        significado: Nombre del medio de pago (TRANSFERENCIA, PAGARE, CONFIRMING, RECIBO...).
+        nulo_significa: El efecto no tiene medio de pago informado.
+      naturaleza_pago_id:
+        significado: >-
+          Naturaleza del pago (`natide`, catalogo `raw.auxnap`): NOMINAS,
+          EMBARGO o CUOTAS. Informada SOLO en los pagos de personal, y basta
+          para restringir el efecto (motivo NATURALEZA).
+        agregacion: no_sumable
+        nulo_significa: El efecto no tiene naturaleza, no es un pago de nomina, embargo ni cuota.
+      naturaleza_pago:
+        significado: Nombre de la naturaleza del pago (NOMINAS, EMBARGO o CUOTAS).
+        nulo_significa: El efecto no tiene naturaleza.
+      cuenta_contable_id:
+        significado: Cuenta contable del efecto (`cueide`), la auxiliar del tercero.
+        agregacion: no_sumable
+        nulo_significa: El efecto no tiene cuenta contable informada.
+      cuenta_contable:
+        significado: >-
+          Numero de la cuenta contable (`4100006400`), leido de `raw.con`. Es la
+          cuenta de ORIGEN: un pagare emitido sigue en la 400/410 aunque la
+          contabilidad ya lo tenga en la 401/411.
+        nulo_significa: El efecto no tiene cuenta contable informada.
+      cuenta_contable_nombre:
+        significado: Nombre de la cuenta contable, de `con.res`.
+        nulo_significa: El efecto no tiene cuenta contable informada.
+      banco_id:
+        significado: Entidad bancaria del efecto (`banban`, `ide` de `raw.auxban`).
+        agregacion: no_sumable
+        nulo_significa: El efecto no tiene banco informado.
+      banco:
+        significado: Nombre de la entidad bancaria, de `auxban.res`.
+        nulo_significa: El efecto no tiene banco informado.
+      sucursal_id:
+        significado: Sucursal bancaria (`bansuc`, otra union al mismo catalogo `raw.auxban`).
+        agregacion: no_sumable
+        nulo_significa: El efecto no tiene sucursal informada.
+      sucursal:
+        significado: Nombre de la sucursal, de `auxban.res`.
+        nulo_significa: El efecto no tiene sucursal informada.
+      retencion_id:
+        significado: >-
+          Retencion asociada al efecto (`retide`). Las retenciones de garantia
+          se consultan en el esquema `retenciones`.
+        agregacion: no_sumable
+        nulo_significa: El efecto no tiene retencion asociada.
+      centro_coste_id:
+        significado: Centro de coste del efecto (`cenide`), traducible con `maestro.centros_coste`.
+        agregacion: no_sumable
+        nulo_significa: El efecto no tiene centro de coste.
+      obra_id:
+        significado: >-
+          Obra del efecto, SOLO por su centro de coste (`maestro.centros_coste`).
+          Ni contrato ni lineas: anadirian 6 y 112 efectos (D4 de F-037).
+        agregacion: no_sumable
+        nulo_significa: >-
+          Sin centro, o con un centro que no es obra (estructura, delegacion):
+          pagos sueltos, facturas de estructura y la nomina. No hay obra que
+          buscar en otro sitio.
+      codigo_obra:
+        significado: Codigo de la obra del centro de coste.
+        nulo_significa: El efecto no tiene obra.
+      nombre_obra:
+        significado: Nombre de la obra del centro de coste.
+        nulo_significa: El efecto no tiene obra.
+      remesa_id:
+        significado: Remesa en la que va el efecto (`remide`).
+        agregacion: no_sumable
+        nulo_significa: El efecto no esta en ninguna remesa.
+      codigo_remesa:
+        significado: Codigo de la remesa (`RP26/0254`), leido de `raw.con`.
+        nulo_significa: El efecto no esta en ninguna remesa.
+      fecha_remesa:
+        significado: Fecha de la remesa de pago (`rpa.fecrem`). Solo PAGO.
+        agregacion: no_sumable
+        nulo_significa: Sin remesa, o remesa de cobro (sus datos no se ingieren).
+      importe_remesa:
+        significado: >-
+          Importe TOTAL de la remesa de pago, repetido en cada efecto de la
+          misma remesa: no es el importe del efecto y no se suma.
+        unidad: EUR
+        agregacion: no_sumable
+        nulo_significa: >-
+          Sin remesa, o remesa de cobro (sus datos no se ingieren). Aqui la
+          remesa mixta SI trae su total; en la general sale a NULL.
+      previsto_antiguo:
+        significado: >-
+          Cierto si el efecto es PREVISTO y vencio hace mas de 2 anos, a la
+          fecha del build. Deuda por depurar en Sigrid, no caja: un flujo de
+          caja la excluye.
+      restringido:
+        significado: >-
+          Cierto si el efecto es de PERSONAL y por eso NO esta en
+          `tesoreria.efectos`: 37.053 pagos y 0 cobros el 2026-10-13.
+      motivo_restriccion:
+        significado: >-
+          Por que se restringe, el primer criterio que casa en este orden:
+          NATURALEZA (nomina, embargo o cuota), CUENTA (cuenta de personal de
+          F-135: 465, 466, 476, 4753...), CUENTA_SIN_RESOLVER (trae cuenta y no
+          resuelve: se restringe por si acaso), TERCERO_EMPLEADO (el tercero es
+          un empleado) y DOCUMENTO_NOMINA (nace de una nomina). Hoy los cuatro
+          criterios coinciden y todos salen NATURALEZA.
+        valores: [NATURALEZA, CUENTA, CUENTA_SIN_RESOLVER, TERCERO_EMPLEADO, DOCUMENTO_NOMINA]
+        nulo_significa: El efecto no es de personal (restringido = false).
+    relaciones:
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: La ficha de la obra del efecto (la de su centro de coste).
+      - de: centro_coste_id
+        a: maestro.centros_coste.centro_coste_id
+        cardinalidad: "N:1"
+        porque: El centro de coste del efecto, del que sale la obra.
+    ejemplos_preguntas:
+      - Cuantos pagos de nomina siguen previstos sin puntear y desde cuando
+      - Pagos de embargo realizados por empresa y mes

@@ -42,6 +42,9 @@ from dataclasses import dataclass, replace
 #: (2026-09-26) añadió el undécimo, `contabilidad`: el plan de cuentas como
 #: árbol, el mayor y los saldos por cuenta y mes. F-097 (2026-09-28) añadió
 #: el duodécimo, `descompuestos`: de qué se compone cada partida, por origen.
+#: F-135 añadió `contabilidad_restringida` y F-037 (2026-10-13) los dos de la
+#: cartera de cobros y pagos: `tesoreria` (la general) y `tesoreria_restringida`
+#: (la completa, con los pagos de personal, vetada al rol general).
 #:
 #: Ojo a la trampa de nombres: el esquema se llama `aux` pero su carpeta de SQL
 #: es `sql/auxiliar/`.
@@ -63,6 +66,8 @@ ESQUEMAS_DEL_DATAMART = (
     "raw",
     "retenciones",
     "stg",
+    "tesoreria",
+    "tesoreria_restringida",
 )
 
 #: Qué es el objeto para PostgreSQL.

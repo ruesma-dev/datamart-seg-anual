@@ -233,6 +233,16 @@ infraestructura.
 > recuentos). El inventario sube de 208 a **212 objetos**, las columnas
 > descritas de 1624 a **1699** (20 + 33 + 13 del completo; 1 + 2 + 6 de la
 > general) y las fichas de consumo en cuatro.
+>
+> **Enmienda del 2026-10-13 (F-037, la cartera de cobros y pagos).** Entran los
+> esquemas `tesoreria` y `tesoreria_restringida` (el decimocuarto y el
+> decimoquinto, patrón de F-135): `tesoreria.efectos` (la cartera general, sin
+> los pagos de personal), `tesoreria.efectos_restringidos_mes` (solo
+> recuentos), `tesoreria_restringida.efectos` (la completa, con la marca) y las
+> funciones locales `tesoreria.fn_fecha` y `tesoreria.fn_serie`;
+> `compras.vencimientos` pasa a ser una vista de `tesoreria.efectos`, con las
+> mismas columnas. El inventario sube de 212 a **217 objetos**, las columnas
+> descritas de 1699 a **1795** y las fichas de consumo de 101 a **104**.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,

@@ -820,7 +820,8 @@ def test_f097_r28_documentacion() -> None:
     import main
 
     documentacion = main.run_all.__doc__ or ""
-    assert "siete build" in documentacion and "descompuestos" in documentacion
+    # Ocho desde F-037, que anadio `tesoreria`.
+    assert "ocho build" in documentacion and "descompuestos" in documentacion
     if not DOC_AZURE_APPS.exists():
         pytest.skip("azure-apps no esta junto a este repositorio")
     texto = DOC_AZURE_APPS.read_text(encoding="utf-8")

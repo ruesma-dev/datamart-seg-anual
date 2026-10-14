@@ -88,6 +88,10 @@ GRUPO_B_FUNCIONES = (
     # F-056 (2026-09-26): la copia local de la conversion de fecha del esquema
     # `contabilidad`, por lo mismo que la de `personal`.
     "contabilidad.fn_fecha",
+    # F-037 (2026-10-13): las dos copias locales del build de `tesoreria`
+    # (fecha y serie, copiadas de `compras` para no depender de ella).
+    "tesoreria.fn_fecha",
+    "tesoreria.fn_serie",
     # F-097 (2026-09-28): las tres funciones locales del build de
     # `descompuestos`: el troceado del texto y las dos conversiones.
     "descompuestos.fn_fecha",
