@@ -1,219 +1,190 @@
 # F-138 · Diseño: las alarmas de los documentos de Sigrid y la marca «liquidatoria»
 
-Mediciones que sostienen cada cifra: `progress/spec_F-138.md`. Decisiones del
-humano (2026-10-14): `requirements.md` § Decisiones.
+Mediciones: `progress/spec_F-138.md`. Decisiones (2026-10-14): `requirements.md`.
 
 ## Encaje y límite del servicio
 
-- **Ingesta**: dos tablas más en `raw` (`conala` filtrada en origen a todas las
-  familias menos empleados, `auxala` entera) por la vía de siempre
-  (`ingest_raw` + `tables_sigrid.yaml`). Ni paso nuevo ni cliente nuevo:
-  `stream_table` ya compone `WHERE [ide] > ? AND (<where>)` y
+- **Ingesta**: `conala` (todas las familias menos empleados) y `auxala` en
+  `raw` por la vía de siempre (`ingest_raw` + `tables_sigrid.yaml`):
+  `stream_table` compone `WHERE [ide] > ? AND (<where>)` y
   `check-raw-recuentos` cuenta con el mismo `where` (patrón F-090).
-- **Negocio**: un fichero más en el módulo `compras` (`build_compras`, sub-paso
-  15, el último). Lee `raw` y las tablas que construye `01`. No toca `stg`,
-  `mart`, `cierre`, `retenciones` ni ningún objeto existente.
-- **Límite**: este ETL LEE las alarmas; no las crea ni las corrige (solo
-  lecturas de Sigrid). Publicar las alarmas de todos los documentos en `compras`
-  es aceptable porque el 86 % son de compras (facturas, contratos, albaranes) y
-  el resto son pocas (ventas 4.647, proveedores 470, otras ~1.200); si algún día
-  el dato de ventas crece en uso, su sitio natural sería un esquema de ventas.
+- **Negocio**: un fichero en `compras` (`build_compras`, sub-paso 15, el último)
+  que escribe en `compras` y en el esquema nuevo `compras_restringida` (D9). Lee
+  `raw` y lo que construye `01`. No toca ningún objeto existente.
+- **Límite**: el ETL LEE las alarmas (solo lecturas de Sigrid). Publicar las de
+  todos los documentos en `compras` vale porque el 86 % son de compras y el
+  resto son pocas (ventas 4.647, proveedores 470, otras ~1.200).
 
 ## Ficheros a crear
 
 | Ruta | Qué |
 |---|---|
-| `etl_sigrid/domain/liquidatoria.py` | Oráculo puro: familias, `filtro_conala()`, traducción, patrones, `PRECEDENCIA`, `normalizar`, `clasificar`, `marca_documento`, `fecha_hora_creacion` |
-| `etl_sigrid/infrastructure/postgres/sql/compras/15_alarmas_liquidatoria.sql` | guarda R16, dos funciones y los cuatro objetos |
-| `tests/test_f138_dominio.py` | R5-R12 (casos de R10, precedencia, horas imposibles, idempotencia de `normalizar`, longitudes de la traducción, patrones sin `\b`/`\w`/`(?`) |
-| `tests/test_f138_ingesta_sql.py` | R1-R5, R13-R26 sobre el TEXTO del YAML, del SQL y de `SUB_PASOS` (no se ejecuta SQL: Postgres compartido) |
-| `tests/test_f138_diccionario.py` | R27-R30 |
+| `etl_sigrid/domain/liquidatoria.py` | Oráculo puro (R4-R10) |
+| `etl_sigrid/infrastructure/postgres/sql/compras/15_alarmas_liquidatoria.sql` | guarda, funciones, las dos `documento_alarmas` y los tres objetos de la marca |
+| `config/diccionario/compras_restringida.yaml` | ficha de `compras_restringida.documento_alarmas` |
+| `tests/test_f138_dominio.py` | R3-R10 |
+| `tests/test_f138_ingesta_sql.py` | R1-R2, R11-R21 sobre el TEXTO del YAML, del SQL y de `SUB_PASOS` (no se ejecuta SQL) |
+| `tests/test_f138_grants.py` | R22-R23: listas de `settings`, `.env.example` y `02_roles.sql` |
+| `tests/test_f138_diccionario.py` | R24-R27 |
 
 ## Ficheros a modificar
 
 | Ruta | Cambio |
 |---|---|
-| `config/tables_sigrid.yaml` | + `conala` y + `auxala` al final, con su comentario (cifras, por qué lista explícita, la 43 fuera, `fec1`/`fec2` vacías, `creusu` es un login) |
-| `etl_sigrid/application/steps/build_compras_step.py` | + `_SubStep("alarmas_liquidatoria", "15_alarmas_liquidatoria.sql", "compras", "documento_alarmas")` al final de `SUB_PASOS`, con comentario, y la línea del docstring |
-| `config/diccionario/compras.yaml` | fichas `documento_alarmas`, `documento_liquidatoria`, `contrato_liquidacion`, `facturas_tras_liquidacion`, `fn_texto_normalizado`, `fn_clase_liquidacion`; una línea en `relaciones` de `facturas`, `albaranes` y `contratos` |
-| `config/diccionario/raw.yaml` | fichas `conala` y `auxala` (capa origen, `consumo_recomendado: false`); «Son 76 tablas» |
-| `config/diccionario/00_global.yaml` | `version` +1 con su nota (F-138), «las 76 tablas» (líneas ~522 y ~1130) |
-| `docs/ARCHITECTURE.md` | § «Qué se copia de Sigrid»: 76 tablas, `conala` (sin la 43) y `auxala`, F-138 en el título |
-| `tests/test_f085_sql.py`, `test_f085_diccionario.py`, `test_f090_diccionario.py`, `test_f090_ingesta_sql.py`, `test_f095_retenciones_contables.py`, `test_f097_ingesta_descompuestos.py` | el censo fijado en 74 pasa a 76 (asserts y textos buscados); nada más |
-| `C:\Users\pgris\PycharmProjects\azure-apps\datamart_seg_anual.md` (otro repo, commit propio allí, sin push) | «Qué consume»: 76 tablas, `conala`/`auxala`; «Qué expone»: los cuatro objetos |
+| `config/tables_sigrid.yaml` | + `conala` y + `auxala` al final, con comentario (cifras, lista explícita, la 43 fuera, 33/35 restringidas aguas abajo, `fec1`/`fec2` vacías, `creusu` es un login) |
+| `etl_sigrid/application/steps/build_compras_step.py` | + `_SubStep("alarmas_liquidatoria", "15_alarmas_liquidatoria.sql", "compras", "documento_alarmas")` al final, comentario y docstring |
+| `sql/compras/00_setup.sql` | + `CREATE SCHEMA IF NOT EXISTS compras_restringida;` (como `contabilidad/00_setup.sql`) |
+| `config/settings.py`, `.env.example` | `compras_restringida` en `DEFAULT_VETOED_SCHEMAS` y `DEFAULT_RESTRICTED_SCHEMAS` (y sus `PG_*`), con su línea en el comentario de cada lista |
+| `etl_sigrid/domain/diccionario.py` | `ESQUEMAS_DEL_DATAMART` + `compras_restringida` (16) y su línea en el comentario |
+| `infra/sql/02_roles.sql` | ver § Permisos |
+| `config/diccionario/compras.yaml` | fichas `documento_alarmas` (general), `documento_liquidatoria`, `contrato_liquidacion`, `facturas_tras_liquidacion`, `fn_texto_normalizado`, `fn_clase_liquidacion`; relaciones en `facturas`, `albaranes`, `contratos` |
+| `config/diccionario/raw.yaml` | fichas `conala` y `auxala`; «Son 76 tablas» |
+| `config/diccionario/00_global.yaml` | esquema `compras_restringida`, regla `R-COMPRAS-RESTRINGIDA`, `version` +1, «las 76 tablas» (~522, ~1130) |
+| `docs/ARCHITECTURE.md`, `CLAUDE.md` (mapa) | 76 tablas, `conala`/`auxala`, y `compras_restringida` junto a las otras dos restringidas |
+| tests que fijan el censo 74 (`test_f085_sql`, `test_f085_diccionario`, `test_f090_diccionario`, `test_f090_ingesta_sql`, `test_f095_retenciones_contables`, `test_f097_ingesta_descompuestos`) y las listas de esquemas (`test_f006_formato`, `test_f037_diccionario`, `test_f037_grants`, `test_f057_personal`, `test_f135_grants`) | 74 -> 76; 15 -> 16; + `compras_restringida`. Nada más |
+| `azure-apps/datamart_seg_anual.md` (otro repo, commit propio, sin push) | consume 76 tablas; expone los objetos; el contrato para `mcp-bbdd` (§ Despliegue, paso 7) |
 
 ## Ficheros que NO se tocan
 
-- `sql/compras/01_documentos.sql` (`facturas`, `albaranes`): D7. F-128 (P3) y
-  F-093 van a añadirles columnas; la marca como columna, cuando cierren.
-- `sql/compras/07_texto.sql` (`documento_texto`, solo tip 15 y 44): el memo se
-  lee de `raw.con.tex` directamente.
+- `sql/compras/01_documentos.sql` y `07_texto.sql` (D7; F-128 y F-093 tocarán `01`).
 - `sql/compras/03_views.sql`: se COPIA su cadena factura -> contrato.
-- `ingest_raw_step.py`, `sigrid_api_client.py`, `config/settings.py`: el
-  `where` basta; `raw` ya está vetado al rol general (F-135).
-- `config/objetos_pendientes.yaml`: los objetos nuevos los construye `run-all`.
+- `grants.py` y `apply_grants_step.py`: son de listas desde F-135/F-136; con
+  `settings` cambiado conceden, vetan y VERIFICAN el esquema nuevo solos (F-037 § 6).
+- `ingest_raw_step.py`, `sigrid_api_client.py`, `objetos_pendientes.yaml`.
 
 ## Dominio · `etl_sigrid/domain/liquidatoria.py`
 
 ```python
-FAMILIAS_ALARMAS: Final[dict[int, str]] = {1: "INFORME", 4: "CLIENTE", ..., 54: "CONTRATO_VENTA"}  # R6, sin la 43
-FAMILIA_EMPLEADOS: Final[int] = 43         # la que no entra nunca (R5)
+FAMILIAS_ALARMAS: Final[dict[int, str]] = {1: "INFORME", ..., 54: "CONTRATO_VENTA"}  # R4, sin la 43
+FAMILIA_EMPLEADOS: Final[int] = 43
 FAMILIAS_MARCA: Final[tuple[int, ...]] = (14, 15)
-TRADUCCION_ORIGEN: Final[str] = "áàäâéèëêíìïîóòöôúùüûñçÁÀÄÂÉÈËÊÍÌÏÎÓÒÖÔÚÙÜÛÑÇ"
-TRADUCCION_DESTINO: Final[str] = "aaaaeeeeiiiioooouuuuncAAAAEEEEIIIIOOOOUUUUNC"
-PATRON_MENCION, PATRON_NEGADA, PATRON_CARTA, PATRON_DUDOSA, PATRON_REMITE: Final[str]  # R9
-PRECEDENCIA: Final[tuple[str, ...]] = (
-    "NEGADA", "LIQUIDATORIA", "CARTA_LIQUIDACION", "DUDOSA", "REMITE")
-CLASES_CIERRE: Final[frozenset[str]] = frozenset({"LIQUIDATORIA", "CARTA_LIQUIDACION"})
-
-def filtro_conala() -> str: ...   # "conide IN (SELECT ide FROM dbo.con WHERE tip IN (1, 4, 5, ...))"
-def normalizar(texto: str | None) -> str: ...
-def clasificar(texto: str | None) -> str | None: ...
-def marca_documento(clases: Iterable[str | None]) -> str | None: ...
-def fecha_hora_creacion(crefec: int | None, crehor: int | None) -> datetime | None: ...
+FAMILIAS_RESTRINGIDAS: Final[frozenset[int]] = frozenset({33, 35})   # D9
+TRADUCCION_ORIGEN / TRADUCCION_DESTINO: Final[str]                   # 44 caracteres cada una
+PATRON_MENCION, PATRON_NEGADA, PATRON_CARTA, PATRON_DUDOSA, PATRON_REMITE: Final[str]
+PRECEDENCIA = ("NEGADA", "LIQUIDATORIA", "CARTA_LIQUIDACION", "DUDOSA", "REMITE")
+CLASES_CIERRE = frozenset({"LIQUIDATORIA", "CARTA_LIQUIDACION"})
+def filtro_conala() -> str; def normalizar(t) -> str; def clasificar(t) -> str | None
+def marca_documento(clases) -> str | None; def es_restringida(tip: int) -> bool
+def fecha_hora_creacion(crefec, crehor) -> datetime | None
 ```
 
 `normalizar` = `translate` -> `re.sub(r"[^A-Za-z0-9]+", " ")` -> `.upper()` ->
-`.strip()`. El `upper` va DESPUÉS de dejar solo ASCII a propósito: así Python y
-PostgreSQL dan lo mismo con cualquier `LC_CTYPE` (en `C`, `upper('á')` no
-cambia; Python convierte `ß` en `SS`). Mismo patrón que `documento_adjuntos.py`
-y `texto_comentarios.py`: la regla vive UNA vez aquí y los tests comprueban que
-el SQL y el YAML llevan los mismos literales.
+`.strip()`: el `upper` DESPUÉS de dejar solo ASCII, para que Python y
+PostgreSQL coincidan con cualquier `LC_CTYPE`. La regla vive UNA vez aquí y los
+tests comparan sus literales con el SQL y el YAML (patrón de F-090 y F-080).
 
-### Lista explícita y no «todo menos la 43» (D3)
+**Lista explícita y no `tip <> 43`** (D3): ante una familia NUEVA con alarmas la
+lista falla CERRADA (no entra hasta que alguien la añade y decide si es
+restringida); la exclusión fallaría ABIERTA (una alarma en una nómina entraría
+sola en `raw` y en `compras`). La ficha de `raw.conala` deja escrita la consulta
+de censo (`SELECT c.tip, COUNT(*) ... GROUP BY c.tip`) para revisarla.
 
-El filtro enumera las 17 familias en vez de `tip <> 43`. Ante una familia NUEVA
-con alarmas, la lista falla CERRADA: no entra hasta que alguien la añade, y lo
-peor que pasa es que falte un dato. La exclusión fallaría ABIERTA: si mañana
-alguien pone una alarma a una nómina (F-090 midió 306 adjuntos de nómina en
-otra familia de personal), entraría sola en `raw` y en `compras`, que leen el
-MCP y Power BI. La ficha de `raw.conala` deja escrita la consulta de solo
-lectura que hace el censo (`SELECT c.tip, COUNT(*) ... GROUP BY c.tip`) para
-revisarla cuando se quiera.
-
-### Precedencia
-
-- **Por alarma** (R8): `NEGADA` antes que nada porque la negación es explícita
-  («NO ES LIQUIDATORIA»); `CARTA_LIQUIDACION` antes que `DUDOSA` porque Negocio
-  dice qué significa (2026-10-14); `DUDOSA` antes que `LIQUIDATORIA` porque
-  «PREVISIÓN DE LIQUIDACIÓN» no lo es todavía.
-- **Por documento** (R11): `NEGADA` > `LIQUIDATORIA` > `CARTA_LIQUIDACION` >
-  `DUDOSA` > `REMITE`. La declarada gana a la carta porque la carta se pide
-  justamente cuando la factura NO lo decía: si otra alarma del mismo documento
-  sí lo dice, el documento es liquidatoria declarada. Las dos CIERRAN el
-  contrato (`cierra_contrato`); `pendiente_carta_liquidacion` las distingue.
+**Precedencia**. Por alarma (R6): NEGADA primero (la negación es explícita);
+CARTA antes que DUDOSA (Negocio dijo qué significa); DUDOSA antes que
+LIQUIDATORIA («PREVISIÓN DE LIQUIDACIÓN» no lo es aún). Por documento (R9): la
+declarada gana a la carta porque la carta se pide justo cuando la factura NO lo
+decía; si otra alarma lo dice, es liquidatoria declarada. Las dos cierran el
+contrato (`cierra_contrato`); `pendiente_carta_liquidacion` las distingue.
 
 ## SQL · `sql/compras/15_alarmas_liquidatoria.sql`
 
-Cabecera: qué construye, de qué lee (`raw.conala`, `raw.auxala`, `raw.con`,
-`compras.contratos`, `facturas`, `factura_lineas`, `albaranes`,
-`albaran_lineas`) y que los literales son los del dominio. Orden:
+Una sola llamada a `execute_sql_file`, o sea UNA transacción (como `tesoreria`):
+si una guarda salta, se deshace todo y quedan las tablas de la noche anterior.
 
-1. **Guarda R16** (`DO`): sin ninguna alarma de factura (`tip = 15`) en
-   `raw.conala`, `RAISE EXCEPTION 'F-138: ...'` (ingesta ausente o a medias).
-2. **Funciones** (`CREATE OR REPLACE`, `IMMUTABLE`): `compras.fn_texto_normalizado(t)` =
+1. **Guarda de ingesta** (`DO`): sin alarmas de factura en `raw.conala`, `RAISE`.
+2. **Funciones** `IMMUTABLE`: `compras.fn_texto_normalizado(t)` =
    `btrim(upper(regexp_replace(translate(COALESCE(t, ''), '<ORIGEN>', '<DESTINO>'), '[^A-Za-z0-9]+', ' ', 'g')))`;
-   `compras.fn_clase_liquidacion(t)` = `CASE` sobre el normalizado en el orden
-   de R8. Aquí y no en `00_setup.sql` para que F-138 quede en una pieza.
-3. **`compras.documento_alarmas`** (R13-R14): `raw.conala a JOIN raw.con c ON
-   c.ide = a.conide LEFT JOIN raw.auxala x ON x.ide = NULLIF(a.alaide, 0)`.
-   `familia` = `CASE c.tip WHEN 1 THEN 'INFORME' ... END` con las parejas de R6.
-   `creada_el` = `fn_sigrid_date(crefec) + make_interval(hours => crehor /
-   10000, mins => crehor / 100 % 100, secs => crehor % 100)` dentro de un
-   `CASE` que deja NULL las horas imposibles (oráculo R12). `creada_por` =
-   `NULLIF(btrim(a.creusu), '')`. PK `alarma_id`; índices `documento_id`,
-   `familia`.
-4. **`compras.documento_liquidatoria`** (R17-R20): CTE `al` por `documento_id`
-   desde `documento_alarmas` con `tipo_documento_codigo IN (14, 15)`: `marca` =
-   `CASE WHEN bool_or(clase = 'NEGADA') ...` en el orden de `PRECEDENCIA` (un
-   test comprueba el orden de los literales), `string_agg(texto, ' | ' ORDER BY
-   alarma_id) FILTER (WHERE clase IS NOT NULL)`, `min(creada_el) FILTER (WHERE
-   clase IN ('LIQUIDATORIA', 'CARTA_LIQUIDACION'))`. CTE `memo`: `raw.con` con
-   `tip IN (14, 15) AND tex ILIKE '%liq%'`. Universo = `al.marca` no nula UNION
-   `memo.clase` no nula, unido a `raw.con`. Booleanos con `COALESCE(..., FALSE)`.
-   PK `documento_id`; índices `tipo_documento`, `cierra_contrato`.
-5. **`compras.contrato_liquidacion`** (R21-R22): CTE `fac_ctr` = `DISTINCT
-   factura_id, COALESCE(fl.contrato_id_directo, alb.contrato_id,
-   alb_l.contrato_id_linea)` con los mismos `LEFT JOIN` (por `albaran_linea_id`)
-   que `fact_por_ctr` de `v_pbi_contrato_consumo`; CTE `alb_ctr` = `DISTINCT
-   albaran_id, COALESCE(a.contrato_id, l.contrato_id_linea)` solo `ALBARAN` y
-   `PROFORMA`. Factura de cierre por contrato con `DISTINCT ON (contrato_id)
-   ... ORDER BY fecha, factura_id` entre las de `cierra_contrato`; última factura
-   igual con `ORDER BY fecha DESC, factura_id DESC`. Base: `compras.contratos`
-   con LEFT JOIN, para que los 19.127 estén y `facturas_terminadas` sea FALSE
-   (no NULL) en los que no tienen cierre. PK `contrato_id`; índice `obra_id`.
-6. **`compras.facturas_tras_liquidacion`** (R23): `fac_ctr` JOIN
-   `contrato_liquidacion` (con cierre) JOIN `compras.facturas` con `f.fecha >
-   fecha_cierre`. PK (`contrato_id`, `factura_id`); índices `obra_id`,
-   `proveedor_id`. ~1.170 filas. Es el AVISO (c): «facturas llegadas después de
-   la liquidatoria», consultable sin cruzar nada.
+   `compras.fn_clase_liquidacion(t)` = `CASE` en el orden de R6.
+3. **`compras_restringida.documento_alarmas`** (la completa): `raw.conala a JOIN
+   raw.con c ON c.ide = a.conide LEFT JOIN raw.auxala x ON x.ide =
+   NULLIF(a.alaide, 0)`. `familia` = `CASE c.tip WHEN 1 THEN 'INFORME' ...`;
+   `restringido` = `c.tip IN (33, 35)`; `motivo_restriccion` = la familia si
+   restringido. `creada_el` = `fn_sigrid_date(crefec) + make_interval(...)` con
+   `CASE` que deja NULL las horas imposibles (oráculo R10); `creada_por` =
+   `NULLIF(btrim(creusu), '')`. PK `alarma_id`; índices `documento_id`, `familia`.
+4. **`compras.documento_alarmas`** (la general): las mismas columnas salvo
+   `restringido` y `motivo_restriccion`, `WHERE NOT restringido` sobre la
+   completa. PK e índices iguales.
+5. **Guarda de la restricción** (`DO`, como R12 de F-037): recalcula desde
+   `raw.con` que ninguna fila de la general es de 33 o 35 y que general +
+   restringidas = completa; si no, `RAISE EXCEPTION 'F-138: ...'`.
+6. **`compras.documento_liquidatoria`**: CTE `al` sobre la GENERAL con
+   `tipo_documento_codigo IN (14, 15)` (`marca` por `bool_or` en el orden de
+   `PRECEDENCIA`, `string_agg(... ORDER BY alarma_id)`, `min(creada_el)` de las
+   que cierran); CTE `memo` de `raw.con` (`tip IN (14, 15) AND tex ILIKE
+   '%liq%'`); universo = las dos UNION; booleanos con `COALESCE(..., FALSE)`.
+7. **`compras.contrato_liquidacion`**: CTE `fac_ctr` = `DISTINCT factura_id,
+   COALESCE(fl.contrato_id_directo, alb.contrato_id, alb_l.contrato_id_linea)`
+   con los `LEFT JOIN` de `fact_por_ctr` de `v_pbi_contrato_consumo`; `alb_ctr`
+   para ALBARAN y PROFORMA; factura de cierre con `DISTINCT ON (contrato_id)
+   ORDER BY fecha, factura_id` entre las de `cierra_contrato`; base
+   `compras.contratos` con LEFT JOIN (19.127 filas, `facturas_terminadas` FALSE
+   y no NULL sin cierre). PK `contrato_id`; índice `obra_id`.
+8. **`compras.facturas_tras_liquidacion`**: `fac_ctr` JOIN contratos con cierre
+   JOIN `compras.facturas` con `fecha > fecha_cierre`. PK (`contrato_id`,
+   `factura_id`); ~1.170 filas. Es el AVISO (c), consultable sin cruzar nada.
 
-`fac_ctr` se calcula una vez en una tabla `TEMP` (o CTE repetido) que usan 5 y
-6. Coste esperado: `documento_alarmas` ~45.700 filas; el resto, decenas de miles
-como mucho; segundos.
+Coste: ~45.750 + ~45.720 alarmas y unas decenas de miles de filas más; segundos.
 
 ## Ingesta · `config/tables_sigrid.yaml`
 
-```yaml
-  - source_table: conala
-    target_table: conala
-    id_column: ide
-    incremental_column: null   # medido 2026-10-14: `conala` no tiene tiemod
-    where: "conide IN (SELECT ide FROM dbo.con WHERE tip IN (1, 4, 5, 11, 12, 14, 15, 17, 20, 25, 33, 35, 40, 42, 44, 46, 54))"
-    exclude_columns: []
-  - source_table: auxala
-    target_table: auxala
-    id_column: ide
-    incremental_column: tiemod
-    where: null
-    exclude_columns: []
-```
+`conala`: `id_column: ide`, `incremental_column: null`, `exclude_columns: []`,
+`where: "conide IN (SELECT ide FROM dbo.con WHERE tip IN (1, 4, 5, 11, 12, 14,
+15, 17, 20, 25, 33, 35, 40, 42, 44, 46, 54))"`. `auxala`: entera, `tiemod`.
+Medido: 45.747 filas y 1,79 MB en ~2 s en una petición (5 páginas de 10.000; la
+subconsulta se repite por página, como en `gra`: estimado < 15 s). `auxala`, 4.
+`raw` ya está vetado al estándar y al total (F-135, F-136): las alarmas de
+recursos y partes en `raw.conala` no abren nada.
 
-Coste medido: 45.747 filas y 1,79 MB leídos en ~2 s en una petición (a 10.000
-filas por página, 5 páginas; la subconsulta del filtro se repite en cada una,
-como en `gra`: estimado < 15 s). `auxala`, 4 filas.
+## Permisos (D9): el patrón «módulo + `_restringida`»
 
-## Diccionario (resumen)
+Mismo patrón que `contabilidad_restringida` (F-135) y `tesoreria_restringida`
+(F-037): los permisos de PostgreSQL se dan POR ESQUEMA, así que lo que el
+estándar no debe leer vive en un esquema que nunca se le concede. **Descartado**:
+`REVOKE` por tabla en `compras` (`PG_EXCLUDED_TABLES`) —quitaría la tabla entera
+también al total, que hereda del estándar— y una vista con filtro por usuario
+—el MCP conecta con dos logins fijos, no con el de quien pregunta—.
 
-- `documento_alarmas`: una fila por alarma de cualquier documento salvo
-  empleados; TEXTO LIBRE escrito a mano en Sigrid; 03 INFORMATIVA en el ~98 %;
-  `creada_el`/`creada_por` son el «Creada por … -> fecha hora» de la ventana;
-  `fec1`/`fec2` no se publican; `clase_liquidacion` en todas las familias (las
-  marcas de ventas, contratos y comparativos se leen aquí).
-- `documento_liquidatoria`: la regla en palabras, la precedencia, la carta, la
-  cobertura (R28); «no tener fila» = «ninguna alarma ni memo lo menciona»;
-  `clase_memo` es indicio, no marca (D5); la obra de una factura es
-  `factura_lineas.obra_id`.
-- `contrato_liquidacion`: el para qué (a)-(c); que `fecha_cierre` es la de alta
-  (`con.fec`) de la factura de cierre y que, según Control de Costes, desde ella
-  el IVA ya no se difiere; `tipo_cierre` CARTA_LIQUIDACION = falta pedir la
-  carta; `facturas_terminadas` FALSE no prueba que falten facturas (≈ 5 % de las
-  facturas llevan la marca).
-- `facturas_tras_liquidacion`: el aviso (c) y cómo leerlo.
-- `ejemplos_preguntas` con las cuatro de R33.
+- **`settings`**: `compras_restringida` en VETADOS (el estándar y Power BI no lo
+  leen; `apply_grants` lo revoca cada noche y FALLA si lo sigue leyendo) y en
+  RESTRINGIDOS (lo lee `sigrid_dm_restringido_ro`; el total, por pertenencia).
+  No en `DEFAULT_TOTAL_VETOED_SCHEMAS` (`raw` solo).
+- **`02_roles.sql`**: `CREATE SCHEMA IF NOT EXISTS compras_restringida` con `SET
+  ROLE sigrid_dm_etl`; `compras_restringida` en los dos `ARRAY` de vetados al
+  estándar del 5 ter (NO en el del total); `GRANT USAGE`, `SELECT ON ALL TABLES`
+  y `ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl` al autorizado; y en las
+  comprobaciones finales (propietario, `lee = f` del estándar, columna
+  `compras_restringida = t` del total). Un test compara estas listas con `settings`.
+- **Diccionario**: `R-COMPRAS-RESTRINGIDA` (bloqueante, ámbito los dos
+  `documento_alarmas`): por defecto `compras`; la restringida solo para el
+  perfil total, sin rodear el «permission denied», nunca se suman. La ficha de la
+  general dice que le faltan las alarmas de recursos y partes (27 hoy).
 
-## Riesgos y decisiones
+## Despliegue (MANUAL, en este orden, tras el review)
+
+1. El job no fija `PG_VETOED_SCHEMAS` ni `PG_RESTRICTED_SCHEMAS` (`az containerapp
+   job show`, solo nombres); si los fija, cambiarlos allí. Imagen con tag fechado
+   y job apuntado a ella (comprobar el tag).
+2. Humano, como administrador: `psql -X -v ON_ERROR_STOP=1 -f infra/sql/02_roles.sql $dsn` (cabecera del fichero)
+   ANTES del build (crea el esquema con dueño `sigrid_dm_etl`).
+3. `python main.py ingest --table conala --full` y `... --table auxala --full`.
+4. `python main.py build-compras` (anotar duración) y `python main.py apply-grants`
+   (`verificacion`, `verificacion_total`, `acceso_total` = ok, R30).
+5. `python main.py check-raw-recuentos` y los recuentos de R28-R29 por SQL de solo lectura.
+6. `python main.py publicar-diccionario` (lo autoriza el humano) y los tres
+   `check-*` (`check-diccionario`, `check-declarados`, `check-unicidad`).
+7. Pedir a `mcp-bbdd` que añada `compras_restringida` a su lista blanca común y
+   reinicie (cachea el diccionario); después, las preguntas de R31 con la cuenta
+   total y la negativa con la estándar.
+8. Primera nocturna: `python main.py timings` (ingesta de `conala`/`auxala` y sub-paso).
+
+## Riesgos
 
 - **Regla heurística sobre texto libre** (697 variantes): se publica el texto
-  íntegro y la clase de cada alarma; los casos raros conocidos van en la ficha.
-- **`\b` en PostgreSQL es RETROCESO, no frontera de palabra**: por eso
-  `(^| )` sobre el texto ya normalizado. Un test lo prohíbe en las constantes.
+  íntegro y la clase de cada alarma; los casos raros van en la ficha.
+- **`\b` en PostgreSQL es RETROCESO**: por eso `(^| )` sobre el texto normalizado.
 - **El prefiltro `ILIKE '%liq%'` del memo** no ve «LÍQ…»: ninguna variante medida.
-- **Datos personales (D9, abierta)**: con D3, 27 alarmas de recursos y partes con
-  nombres de trabajadores y sus bajas llegan a `compras`. Si el humano acepta
-  D9, se quitan 33 y 35 de `FAMILIAS_ALARMAS` y del `where`; nada más cambia.
-- **Descartado**: columna en `facturas`/`albaranes` (D7); vistas en vez de tablas
-  para los objetos de contrato (agregan `factura_lineas` entera en cada lectura:
-  pasarían de los 30 s del MCP).
+- **Familia 25 en la general**: medido que sus 88 efectos con alarma son de la
+  cartera general de F-037; si un día un efecto de personal tuviera alarma, la
+  regla se ampliaría con el criterio de `domain/tesoreria.py`, no a mano.
 - **Versión del diccionario**: la siguiente libre al implementar (hoy 51 -> 52).
-
-## Verificación MANUAL (tras desplegar la imagen)
-
-- `python main.py ingest --table conala --full`, `... --table auxala --full`
-  (o la nocturna), `python main.py build-compras`, `python main.py
-  check-raw-recuentos`; recuentos de R31-R32 por SQL de solo lectura.
-- `publicar-diccionario` (lo autoriza el humano), reiniciar el MCP (cachea el
-  diccionario) y las cuatro preguntas de R33. `compras` ya está en la lista
-  blanca de `mcp-bbdd`.
-- Primera nocturna: segundos de `ingest_raw.conala`, `ingest_raw.auxala` y del
-  sub-paso (`python main.py timings`), anotados en `progress/` (R34).

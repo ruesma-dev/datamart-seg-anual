@@ -165,3 +165,21 @@ empleados. ok a todo lo demás».
   efectos de pago (25) nombran personas en algún caso. Son 27 + 89 filas. Con
   D3 irían a `compras.documento_alarmas` (MCP y Power BI). Recomendación:
   sacar 33 y 35 de la lista. Queda abierta para el humano.
+
+## 10. D9 cerrada (2026-10-14) y la familia 25
+
+Palabras del humano: «mete esas alarmas en lectura solo para el perfil admin y no
+el estándar». Diseño: patrón «módulo + `_restringida`» de F-135 y F-037.
+`compras_restringida.documento_alarmas` es la COMPLETA (~45.750 alarmas, con
+`restringido` y `motivo_restriccion`) y solo la lee el grupo autorizado y, por
+pertenencia, el perfil total del MCP; `compras.documento_alarmas` es la general,
+sin recursos (33) ni partes (35): ~45.720. Guarda de recálculo en el SQL como R12
+de F-037. Descartados: `REVOKE` por tabla (se lo quitaría también al total, que
+hereda del estándar) y vista filtrada por usuario (el MCP conecta con dos logins
+fijos).
+
+**Familia 25 (efectos de pago), medida en Azure en solo lectura**: los 88
+efectos distintos que tienen alguna de sus 89 alarmas están TODOS en la cartera
+general de F-037 (`tesoreria_restringida.efectos`: 88 sin `motivo_restriccion`,
+0 de personal). Sus alarmas nombran a quien da una orden o un aviso, no a un
+trabajador como objeto del pago. Se quedan en la general.

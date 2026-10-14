@@ -9,20 +9,18 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-14 · F-138 · SPEC ACTUALIZADA con las decisiones del humano (D1-D8 cerradas, D9 abierta)
+## 2026-10-14 · F-138 · SPEC ACTUALIZADA con las decisiones del humano (D1-D9 cerradas)
 
-- Spec en `specs/F-138-facturas-liquidatorias/` (requirements 150/150, design 219/250, 15 tareas),
-  rama `feature/F-138-facturas-liquidatorias`; mediciones en `progress/spec_F-138.md` (§ 8-9).
+- Spec en `specs/F-138-facturas-liquidatorias/` (R1-R32, 17 tareas), rama
+  `feature/F-138-facturas-liquidatorias`; mediciones en `progress/spec_F-138.md` (§ 8-10).
 - D1: la marca sirve para (a) saber si se han terminado las facturas del contrato, (b) el IVA, que
   ya no se difiere, y (c) avisar de facturas llegadas después: `compras.contrato_liquidacion` (una
-  fila por contrato, `facturas_terminadas`) y `compras.facturas_tras_liquidacion` (el aviso).
-  D4: «CARTA LIQUIDACIÓN» es clase propia que cierra el contrato (99 facturas). D3: `conala` con
-  todas las familias menos empleados (43), por lista explícita de 17: 45.747 alarmas, ~2 s.
-- Remedido: 8.752 facturas cierran contrato (8.653 + 99 con carta), 4.586 albaranes, 55 proformas;
-  5.611 contratos con factura de cierre; 722 contratos con 1.167 facturas posteriores.
-- **D9 (NUEVA, abierta para el humano)**: con D3 entran en `compras.documento_alarmas` 27 alarmas de
-  recursos (33) y partes (35) con nombres de trabajadores y sus bajas. Recomendación: sacar 33 y 35
-  de la lista (una línea); sin respuesta, entran tal como ordenó D3.
+  fila por contrato) y `compras.facturas_tras_liquidacion`. D4: «CARTA LIQUIDACIÓN» es clase propia
+  que cierra (99 facturas). D3: `conala` con todas las familias menos empleados (43), lista explícita.
+- D9 (cerrada): las alarmas de recursos (33) y partes (35) solo para el perfil total: esquema nuevo
+  `compras_restringida` (patrón F-135/F-037: vetado al estándar, del autorizado, `02_roles.sql`
+  ANTES del build, `R-COMPRAS-RESTRINGIDA`, y `mcp-bbdd` debe añadirlo a su lista blanca). La
+  familia 25 queda en la general: sus 88 efectos con alarma son todos de la cartera general.
 
 ## 2026-10-14 · Backlog reordenado por orden del humano · BACKLOG.md con una tabla por estado
 
