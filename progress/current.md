@@ -9,7 +9,14 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-14 · F-037 · IMPLEMENTADA (`in_progress`, pendiente del reviewer) · informe `progress/impl_F-037.md`
+## 2026-10-14 · F-037 · CERRADA (`done`, APROBADO en pasada 2) · SIN FUSIONAR NI DESPLEGAR (espera orden del humano)
+
+- **Review pasada 2 (14-10): APROBADO** (`progress/review_F-037.md`): el delta desde la pasada 1
+  solo toca `progress/`; campaña de mutación VÁLIDA (45/45 muertos, 0 supervivientes, SHA
+  `b475edb`, 2 workers, 7.428 s); `init.sh` en verde sobre `1d1b9f6` (7.826 passed, cobertura
+  100 % de 136). Siguiente: con la orden del humano, merge a `main` (espejo en `dev`) y
+  despliegue según «Verificaciones MANUAL» de abajo (T13-T16); avisar a `mcp-bbdd` de que su
+  lista blanca común debe admitir `tesoreria` y `tesoreria_restringida`.
 
 - Rama `feature/F-037-tesoreria`; `bash harness/init.sh` en verde al empezar (7.587 passed,
   30 min). Tarea en curso y desviaciones: aquí; informe final en `progress/impl_F-037.md`.
@@ -126,8 +133,11 @@ resultado: «permission denied» y 0).
   13-10), `contabilidad.mayor` 2.120.755 (55.519 restringidos, como el 12-10).
   **P11** (líder): `apply-grants` SUCCESS, 46 sentencias, `verificacion`,
   `verificacion_total` y `acceso_total` = `ok`; veto de `raw` al total aplicado.
-- **Pendiente del LÍDER**: la nocturna del 14-10 (R29: los tres «ok» sin nada a mano). El
-  total no lo usa nadie hasta la F-008 de `mcp-bbdd`.
+- **R29 HECHA (líder, 14-10 07:27 UTC, solo lectura)**: nocturna del 14-10 con 122 pasos
+  SUCCESS (00:00-04:33 UTC); `apply_grants` SUCCESS a las 04:33 con `verificacion`,
+  `verificacion_total` y `acceso_total` = `ok`, sin nada a mano. F-136 cerrada del todo.
+  `mcp-bbdd` ya tiene su F-008 aprobada y el secreto `mcp-perfil-total-oids` (3 oid) creado el
+  13-10 por orden del humano; su despliegue y pruebas son de esa sesión.
 - **13-10, decisiones del humano**: D10 de F-135 (restringir el coste por persona de
   `personal`) «de momento no»: no se pregunta a Juan ni se abre feature. Los dos arreglos de
   infra que la review de F-136 dejó fuera pasan a **F-137** (pending, prioridad 9).
