@@ -317,3 +317,78 @@ def test_f138_r20_un_solo_fichero_sin_control_de_transaccion() -> None:
 
 def test_f138_r11_00_setup_crea_el_esquema_restringido() -> None:
     assert "CREATE SCHEMA IF NOT EXISTS compras_restringida;" in _texto(DIR_SQL / "00_setup.sql")
+
+
+# ===========================================================================
+# R15-R16 · compras.documento_liquidatoria (T6)
+# ===========================================================================
+
+COLUMNAS_LIQUIDATORIA = [
+    "documento_id", "tipo_documento_codigo", "tipo_documento", "codigo_documento",
+    "fecha_alta", "marca_liquidacion", "es_liquidatoria", "pendiente_carta_liquidacion",
+    "cierra_contrato", "texto_alarmas", "liquidacion_creada_el", "clase_memo",
+]
+
+
+def test_f138_r15_se_reconstruye_con_su_clave() -> None:
+    sql = _sql()
+    objeto = "compras.documento_liquidatoria"
+    assert sql.index(f"DROP TABLE IF EXISTS {objeto} CASCADE;") < sql.index(
+        f"CREATE TABLE {objeto} AS")
+    assert f"ALTER TABLE {objeto} ADD PRIMARY KEY (documento_id);" in sql
+    assert sql.index("R14 · la guarda de la restricción") < sql.index(f"CREATE TABLE {objeto} AS"), (
+        "la marca se construye DESPUÉS de comprobar la restricción"
+    )
+
+
+def test_f138_r15_lee_la_general_y_solo_las_familias_de_la_marca() -> None:
+    bloque = _plano(_bloque("compras.documento_liquidatoria"))
+    familias = ", ".join(str(t) for t in liq.FAMILIAS_MARCA)
+    assert "FROM compras.documento_alarmas" in bloque
+    assert "compras_restringida" not in bloque, "14 y 15 no son restringidas: lee la general"
+    assert f"WHERE tipo_documento_codigo IN ({familias})" in bloque
+    assert f"WHERE c.tip IN ({familias}) AND c.tex ILIKE '%liq%'" in bloque, "prefiltro del memo"
+    assert "compras.fn_clase_liquidacion(c.tex) AS clase_memo" in bloque
+
+
+def test_f138_r15_universo_alarmas_o_memo_con_clase() -> None:
+    bloque = _plano(_bloque("compras.documento_liquidatoria"))
+    assert "SELECT documento_id FROM al WHERE marca IS NOT NULL UNION " \
+           "SELECT documento_id FROM memo WHERE clase_memo IS NOT NULL" in bloque
+
+
+def test_f138_r9_la_marca_en_sql_sigue_la_precedencia() -> None:
+    bloque = _bloque("compras.documento_liquidatoria")
+    orden = re.findall(r"WHEN bool_or\(clase_liquidacion = '(\w+)'\) THEN '(\w+)'", bloque)
+    assert orden == [(c, c) for c in liq.PRECEDENCIA]
+
+
+def test_f138_r16_columnas() -> None:
+    assert _alias_finales(_bloque("compras.documento_liquidatoria")) == COLUMNAS_LIQUIDATORIA
+
+
+def test_f138_r16_los_tres_booleanos_nunca_null_y_sin_el_memo() -> None:
+    bloque = _plano(_bloque("compras.documento_liquidatoria"))
+    cierre = ", ".join(f"'{c}'" for c in sorted(liq.CLASES_CIERRE))
+    for expresion in (
+        "COALESCE(al.marca = 'LIQUIDATORIA', FALSE) AS es_liquidatoria",
+        "COALESCE(al.marca = 'CARTA_LIQUIDACION', FALSE) AS pendiente_carta_liquidacion",
+        f"COALESCE(al.marca IN ({cierre}), FALSE) AS cierra_contrato",
+    ):
+        assert expresion in bloque, f"falta «{expresion}» (R16)"
+    final = _bloque("compras.documento_liquidatoria").rsplit("\nSELECT", 1)[1]
+    assert final.count("clase_memo") == 2, "el memo no entra en los booleanos (D5)"
+    assert "m.clase_memo AS clase_memo" in final
+
+
+def test_f138_r16_texto_y_fecha_de_las_alarmas() -> None:
+    bloque = _plano(_bloque("compras.documento_liquidatoria"))
+    cierre = ", ".join(f"'{c}'" for c in sorted(liq.CLASES_CIERRE))
+    assert ("string_agg(texto, ' | ' ORDER BY alarma_id) FILTER "
+            "(WHERE clase_liquidacion IS NOT NULL) AS texto_alarmas") in bloque
+    assert (f"min(creada_el) FILTER (WHERE clase_liquidacion IN ({cierre})) "
+            "AS liquidacion_creada_el") in bloque
+    assert ("CASE WHEN al.marca IN (" + cierre + ") THEN al.liquidacion_creada_el END "
+            "AS liquidacion_creada_el") in bloque, "solo si el documento cierra"
+    assert "compras.fn_sigrid_date(c.fec) AS fecha_alta" in bloque
+    assert "compras.fn_tipo_documento(c.tip, compras.fn_serie(c.cod)) AS tipo_documento" in bloque

@@ -242,3 +242,73 @@ BEGIN
         RAISE EXCEPTION 'F-138 R14: compras.documento_alarmas tiene % alarmas de recursos o partes, y general (%) + restringidas (%) <> completa (%). No se publica: revisar FAMILIAS_RESTRINGIDAS y el CASE de restringido.', v_indebidas, v_general, v_restringidas, v_completa;
     END IF;
 END $$;
+
+
+-- ---------------------------------------------------------------------------
+-- compras.documento_liquidatoria — LA MARCA DE CADA DOCUMENTO 14/15 (R15, R16)
+--
+-- Una fila por factura, abono, albarán, proforma o nota cuya marca de alarmas
+-- (R9: la clase de mayor precedencia, NEGADA > LIQUIDATORIA > CARTA_LIQUIDACION
+-- > DUDOSA > REMITE) o cuya clase del MEMO (`raw.con.tex`, prefiltrado con
+-- `ILIKE '%liq%'`) no es NULL. Lee la GENERAL: 14 y 15 no son restringidas.
+--
+-- `cierra_contrato` = LIQUIDATORIA o CARTA_LIQUIDACION (la carta se pide cuando
+-- la última factura no lo decía: cierra igual, pendiente de la carta). La
+-- declarada gana a la carta. Los tres booleanos son FALSE, nunca NULL, en el
+-- resto. El memo va APARTE (`clase_memo`, D5): no entra en los booleanos.
+-- ---------------------------------------------------------------------------
+DROP TABLE IF EXISTS compras.documento_liquidatoria CASCADE;
+CREATE TABLE compras.documento_liquidatoria AS
+WITH al AS (
+    SELECT
+        documento_id,
+        CASE
+            WHEN bool_or(clase_liquidacion = 'NEGADA') THEN 'NEGADA'
+            WHEN bool_or(clase_liquidacion = 'LIQUIDATORIA') THEN 'LIQUIDATORIA'
+            WHEN bool_or(clase_liquidacion = 'CARTA_LIQUIDACION') THEN 'CARTA_LIQUIDACION'
+            WHEN bool_or(clase_liquidacion = 'DUDOSA') THEN 'DUDOSA'
+            WHEN bool_or(clase_liquidacion = 'REMITE') THEN 'REMITE'
+        END AS marca,
+        string_agg(texto, ' | ' ORDER BY alarma_id) FILTER (WHERE clase_liquidacion IS NOT NULL) AS texto_alarmas,
+        min(creada_el) FILTER (WHERE clase_liquidacion IN ('CARTA_LIQUIDACION', 'LIQUIDATORIA')) AS liquidacion_creada_el
+    FROM compras.documento_alarmas
+    WHERE tipo_documento_codigo IN (14, 15)
+    GROUP BY documento_id
+),
+memo AS (
+    SELECT
+        c.ide AS documento_id,
+        compras.fn_clase_liquidacion(c.tex) AS clase_memo
+    FROM raw.con c
+    WHERE c.tip IN (14, 15) AND c.tex ILIKE '%liq%'
+),
+universo AS (
+    SELECT documento_id FROM al WHERE marca IS NOT NULL
+    UNION
+    SELECT documento_id FROM memo WHERE clase_memo IS NOT NULL
+)
+SELECT
+    u.documento_id AS documento_id,
+    c.tip AS tipo_documento_codigo,
+    compras.fn_tipo_documento(c.tip, compras.fn_serie(c.cod)) AS tipo_documento,
+    c.cod AS codigo_documento,
+    compras.fn_sigrid_date(c.fec) AS fecha_alta,
+    al.marca AS marca_liquidacion,
+    COALESCE(al.marca = 'LIQUIDATORIA', FALSE) AS es_liquidatoria,
+    COALESCE(al.marca = 'CARTA_LIQUIDACION', FALSE) AS pendiente_carta_liquidacion,
+    COALESCE(al.marca IN ('CARTA_LIQUIDACION', 'LIQUIDATORIA'), FALSE) AS cierra_contrato,
+    al.texto_alarmas AS texto_alarmas,
+    -- La más antigua de sus alarmas que cierran, y solo si el DOCUMENTO cierra:
+    -- con una alarma NEGADA al lado no hay fecha de liquidación que dar.
+    CASE WHEN al.marca IN ('CARTA_LIQUIDACION', 'LIQUIDATORIA') THEN al.liquidacion_creada_el END AS liquidacion_creada_el,
+    m.clase_memo AS clase_memo
+FROM universo u
+JOIN      raw.con c ON c.ide = u.documento_id
+LEFT JOIN al        ON al.documento_id = u.documento_id
+LEFT JOIN memo m    ON m.documento_id = u.documento_id;
+
+ALTER TABLE compras.documento_liquidatoria ADD PRIMARY KEY (documento_id);
+CREATE INDEX ix_com_documento_liquidatoria_tipo ON compras.documento_liquidatoria (tipo_documento);
+
+COMMENT ON TABLE compras.documento_liquidatoria IS
+'Marca liquidatoria de facturas, abonos, albaranes, proformas y notas (F-138): una fila por documento con alguna alarma o memo que hable de liquidacion. cierra_contrato = liquidatoria declarada o pendiente de carta de liquidacion. Regla heuristica sobre TEXTO LIBRE de una alarma de Sigrid: un documento sin fila no esta marcado, lo que no prueba que no sea liquidatorio (cobertura en el diccionario). Clave documento_id.';
