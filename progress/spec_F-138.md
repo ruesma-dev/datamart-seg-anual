@@ -1,6 +1,6 @@
 # F-138 · Informe del spec-author: mediciones de las alarmas y la marca «liquidatoria»
 
-Spec: `specs/F-138-facturas-liquidatorias/`. Todo medido el **2026-10-14** en SOLO LECTURA,
+Spec: `specs/F-138-facturas-liquidatorias/` (actualizada el 2026-10-14 con D1-D8, § 8-9). Todo medido el **2026-10-14** en SOLO LECTURA,
 contra Sigrid por `sigrid-api` (`leer_sql`). Sin escrituras en Sigrid ni en
 Postgres. Ni logins ni nombres en este informe: solo agregados. Los volcados
 intermedios vivieron en el scratchpad de la sesión y no se versionan.
@@ -45,7 +45,7 @@ proformas**; las ~770 restantes, de ventas (700), contratos (32), comparativos
 (23) y otras. Las de contrato son sobre todo «CONTRATO INTERNO» y la forma de
 pago escrita a mano.
 
-**Coste de ingesta**: `conala` filtrada a `tip IN (14, 15)` son **23.833 filas,
+**Coste de ingesta** (primera propuesta, superada por D3: ver § 9): `conala` filtrada a `tip IN (14, 15)` son **23.833 filas,
 643 KB**, leídas en **1,1 s** en una petición; `auxala`, 4 filas.
 
 ## 4. El texto: 697 variantes y una regla
@@ -120,9 +120,48 @@ línea del albarán a contrato)`; albarán -> contrato por `ctride` o por su lí
   Recibido 175, Enviado 140, Comprobada 91, Pdt. envío 72, Rescindido 6. De los
   3.185 contratos Terminados, 1.435 (45 %) tienen liquidatoria.
 
-## 8. Decisiones que necesita el humano
+## 8. Decisiones del humano (2026-10-14) y lo que cambiaron
 
-Ver `specs/F-138-facturas-liquidatorias/requirements.md`, D1-D8. La que bloquea el
-cierre de la feature es **D1 (para qué)**: es el criterio 1 del `acceptance` y
-solo lo puede contestar Elena Díaz. Pregunta propuesta para reenviarle (texto
-completo en D1). Las demás tienen recomendación y no bloquean empezar.
+Sus palabras: «sirve para saber si se han terminado las facturas, para el iva ya
+que no se puede diferir más, avisar si llega una factura después, la alarma
+carta liquidación es que la factura última no ponía liquidatoria y hay que pedir
+la carta de liquidación. alarmas, ingiere también proformas, todas menos
+empleados. ok a todo lo demás».
+
+- **D1 cerrada** (criterio 1 del `acceptance` cumplido): (a) facturas terminadas
+  del contrato, (b) IVA que ya no se difiere, (c) aviso de factura posterior.
+  `contrato_liquidacion` pasa a tener UNA fila por contrato (los 19.127, con
+  `facturas_terminadas`) y nace `compras.facturas_tras_liquidacion` para (c).
+- **D4 cambiada**: «CARTA LIQUIDACIÓN» es clase propia `CARTA_LIQUIDACION`
+  (cierra el contrato, pendiente de carta). Precedencia por documento: NEGADA >
+  LIQUIDATORIA > CARTA_LIQUIDACION > DUDOSA > REMITE (motivo en el design).
+- **D3 cambiada**: `conala` entra con todas las familias menos la 43, con LISTA
+  EXPLÍCITA de 17 familias (falla cerrada ante una familia nueva).
+- D2, D5, D6, D7, D8: aprobadas con la recomendación.
+
+## 9. Remedido el 2026-10-14 tras las decisiones (solo lectura)
+
+- **Todas las familias menos la 43**: **45.747 alarmas, 1,79 MB**, leídas en
+  ~2 s en una petición (la 43 son 497). Por familia: 15 → 18.593, 44 → 15.562,
+  14 → 5.240, 11 → 4.259, 46 → 727, 54 → 388, 12 → 360, 5 → 340, 17 → 130, 25 →
+  89, 35 → 24, 42 → 18, 20 → 6, 4 → 4, 33 → 3, 1 → 2, 40 → 2. Identificadas por
+  sus códigos: 1 informe/consulta de Sigrid, 4 cliente, 17 cuenta auxiliar de
+  proveedor, 20 asiento, 25 efecto de pago, 33 recurso, 35 parte de trabajo
+  (`PT12/00099`), 40 sin identificar (2 alarmas; nombre «OTRA»).
+- **Clase por familia con la regla nueva**: facturas 8.663 LIQUIDATORIA, 99
+  CARTA_LIQUIDACION, 23 DUDOSA, 45 NEGADA, 3.185 REMITE; albaranes y proformas
+  4.644 / 0 / 25 / 13 / 9; ventas 11 → 480 LIQUIDATORIA y 54 → 188; contratos
+  31; comparativos 22. Las 99 «CARTA» son todas de facturas.
+- **Por documento**: facturas 8.653 liquidatorias + 99 pendientes de carta =
+  8.752 que cierran contrato; albaranes 4.586; proformas 55.
+- **Contratos** (misma cadena que § 7): **5.611 con factura de cierre** (81 solo
+  por carta); **722 contratos con 1.167 facturas posteriores** a la primera de
+  cierre; en 5.281 la última factura es la de cierre. 84 de las 99 facturas con
+  carta cuelgan de un contrato.
+- **Hallazgo que abre D9**: las alarmas de recursos (33: «vehículo de <persona>,
+  mientras está de baja…», «hay que pagarle horas extras…») y de partes (35:
+  «se quita al encargado <nombre> del parte por estar de baja», «causan alta los
+  trabajadores…») llevan nombres de trabajadores y datos de bajas; las de
+  efectos de pago (25) nombran personas en algún caso. Son 27 + 89 filas. Con
+  D3 irían a `compras.documento_alarmas` (MCP y Power BI). Recomendación:
+  sacar 33 y 35 de la lista. Queda abierta para el humano.
