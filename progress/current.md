@@ -20,9 +20,69 @@
 - T10-T12 y T17 hechas: docs (azure-apps commit local `a781704`, sin push), mutación 45/45
   muertos (campaña paralela NO VÁLIDA por expirar la base de cierre; los 45 reverificados en
   serie), contraste de solo lectura en Azure conforme con la spec, `init.sh` verde (7.826
-  passed, cobertura 100 % de 136 líneas). **Pendiente MANUAL**: T13-T16 (despliegue en el
-  orden de design §7, pruebas con los logins reales, `publicar-diccionario` v51, aviso a
-  `mcp-bbdd` de la lista blanca).
+  passed, cobertura 100 % de 136 líneas). **Pendiente MANUAL**: T13-T16, con sus comandos
+  abajo.
+- **Review pasada 1 (14-10): CHANGES_REQUESTED solo por evidencia** (`progress/review_F-037.md`).
+  Ciclo de corrección: (1) repetir la campaña de mutación con `--workers 2` hasta un informe
+  VÁLIDO, sin tocar código; (2) esta lista de MANUAL con su comando exacto. Resultado en
+  `progress/impl_F-037.md` § Evidencias.
+
+### F-037 · Verificaciones MANUAL, con su comando exacto (tras el APROBADO y el merge)
+
+Variables de PowerShell que usan todos los pasos (nombres de recurso, ya en el runbook):
+`$rgJ = "rg-datamart-seg-dev"; $job = "caj-datamart-seg-dev"`. Los `psql` llevan las opciones
+DELANTE y la cadena al final (incidencia del 12-10); la contraseña la pide `psql`, nunca en la
+línea de órdenes. `<host>` es el servidor compartido; `<admin>`, su administrador.
+
+**T13 · Despliegue, design §7, EN ESTE ORDEN** (humano; R29):
+
+1. El job no fija las listas de esquemas (solo NOMBRES de variables):
+   `az containerapp job show -g $rgJ -n $job --query "properties.template.containers[0].env[].name" -o tsv`
+   → no aparece ninguna de `PG_CONSUMPTION_SCHEMAS`, `PG_VETOED_SCHEMAS`,
+   `PG_RESTRICTED_SCHEMAS`. Si alguna sale, se cambia allí antes de seguir.
+2. Imagen con tag fechado desde `main` y job apuntado a ella:
+   `powershell -NoProfile -File infra/70_build_image.ps1` →
+   `powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag rAAAAMMDD-hhmm publicado>` →
+   `az containerapp job show -g $rgJ -n $job --query "properties.template.containers[0].image" -o tsv`
+   (= ese tag).
+3. Roles como administrador (con `APP_PWD`/`MCP_PWD` en el entorno, runbook §4):
+   `psql -X -v ON_ERROR_STOP=1 -f infra/sql/02_roles.sql "host=<host> dbname=sigrid_dm user=<admin> sslmode=require"`
+   → `COMMIT`, los esquemas `tesoreria` y `tesoreria_restringida` en las comprobaciones finales.
+4. Desde el puesto, en este orden y anotando la duración del primero (R29: +1-3 min estimados):
+   `python main.py build-tesoreria` → `python main.py build-compras` → `python main.py apply-grants`
+   (SUCCESS y `verificacion = ok`).
+
+**T14 · Pruebas** (humano, tras T13; resultados a `progress/impl_F-037.md`):
+
+1. Negativa, login estándar real (`psql -X "host=<host> dbname=sigrid_dm user=mcp_sigrid_dm_ro sslmode=require"`):
+   `SELECT 1 FROM tesoreria_restringida.efectos LIMIT 1;` → «permission denied for schema
+   tesoreria_restringida».
+   `SELECT count(*) FROM tesoreria.efectos WHERE naturaleza_pago_id IS NOT NULL;` → **0**.
+2. Positiva, login total (`... user=mcp_sigrid_dm_total ...`):
+   `SELECT count(*), count(*) FILTER (WHERE restringido) FROM tesoreria_restringida.efectos;`
+   → total = `raw.pag` + `raw.cob` del mismo momento, que se lee con el administrador (el total
+   tiene `raw` vetado): `SELECT (SELECT count(*) FROM raw.pag) + (SELECT count(*) FROM raw.cob);`
+   (T12: 256.952 + 21.914 = 278.866; restringidos 37.053).
+3. R16, con el estándar: `SELECT count(*) FROM compras.vencimientos;` → el de antes del despliegue
+   (197.190 el 13-10, ± la variación diaria).
+4. R30, contraste de solo lectura (design §8 bis):
+   `SELECT sentido, previsto_antiguo, count(*), round(sum(importe)/1e6, 1) AS meur FROM tesoreria.efectos WHERE estado_tesoreria = 'PREVISTO' GROUP BY 1, 2 ORDER BY 1, 2;`
+   → PAGO 80,1 M€ en total (antiguo 2.361 / 3,9 M€); COBRO 40,2 M€ (antiguo 398 / 2,2 M€).
+   `SELECT left(codigo_cuenta, 2) AS grupo, round(sum(importe_saldo)/1e6, 1) AS meur FROM contabilidad.mayor WHERE left(codigo_cuenta, 2) IN ('40', '41', '43') GROUP BY 1 ORDER BY 1;`
+   → 40+41 ≈ −78,8 M€; 43 ≈ +47,5 M€ (± la variación diaria; la diferencia la explica la ficha).
+
+**T15 · Diccionario y MCP** (líder, tras T13), desde el puesto:
+`python main.py publicar-diccionario` (v51) → `python main.py check-diccionario` →
+`python main.py check-declarados` → `python main.py check-unicidad`, los cuatro en verde;
+reiniciar el MCP (`ca-mcp-bbdd-dev`) y comprobar que `contexto_bbdd` sirve la v51; avisar al
+humano de que `mcp-bbdd` debe añadir `tesoreria` a su lista blanca (`config.yaml`).
+
+**T16 · Al día siguiente, sin ejecutar nada a mano** (humano):
+`az containerapp job execution list -g $rgJ -n $job -o table` (la nocturna en Succeeded) y,
+con cualquier login que lea `_meta`:
+`SELECT started_at, status, metadata->>'verificacion' AS verificacion FROM _meta.etl_runs WHERE step = 'apply_grants' ORDER BY started_at DESC LIMIT 3;`
+→ SUCCESS y `ok`; y se repite la negativa de T14.1 con `mcp_sigrid_dm_ro` (mismo comando, mismo
+resultado: «permission denied» y 0).
 
 ## 2026-10-13 · F-037 (fase 1, cartera de cobros y pagos) · SPEC APROBADA (`spec_ready`) · implementer lanzado
 
