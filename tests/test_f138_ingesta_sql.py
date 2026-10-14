@@ -392,3 +392,92 @@ def test_f138_r16_texto_y_fecha_de_las_alarmas() -> None:
             "AS liquidacion_creada_el") in bloque, "solo si el documento cierra"
     assert "compras.fn_sigrid_date(c.fec) AS fecha_alta" in bloque
     assert "compras.fn_tipo_documento(c.tip, compras.fn_serie(c.cod)) AS tipo_documento" in bloque
+
+
+# ===========================================================================
+# R17-R19 · los contratos: contrato_liquidacion y facturas_tras_liquidacion (T7)
+# ===========================================================================
+
+COLUMNAS_CONTRATO = [
+    "contrato_id", "codigo_contrato", "obra_id", "codigo_obra", "facturas_terminadas",
+    "tipo_cierre", "factura_cierre_id", "codigo_factura_cierre", "fecha_cierre",
+    "num_facturas_liquidatorias", "num_facturas_carta_liquidacion",
+    "num_albaranes_liquidatorios", "num_facturas_posteriores", "ultima_factura_cierra",
+]
+COLUMNAS_TRAS = [
+    "contrato_id", "codigo_contrato", "obra_id", "codigo_obra", "factura_id",
+    "codigo_factura", "fecha", "fecha_factura", "proveedor_id", "proveedor_nombre",
+    "factura_cierre_id", "codigo_factura_cierre", "fecha_cierre", "dias_tras_cierre",
+    "cierra_contrato",
+]
+
+
+def _cadena_de_la_vista() -> tuple[str, str]:
+    """La cadena factura -> contrato de `fact_por_ctr` en `v_pbi_contrato_consumo`."""
+    vista = _texto(DIR_SQL / "03_views.sql").split("fact_por_ctr AS (", 1)[1].split("GROUP BY", 1)[0]
+    coalesce = re.search(r"COALESCE\(fl\.contrato_id_directo,.*?\)", vista, re.DOTALL)
+    assert coalesce
+    joins = vista[vista.index("FROM compras.factura_lineas fl"): vista.index("WHERE")]
+    return _plano(coalesce.group(0)), _plano(joins).strip()
+
+
+def test_f138_r17_las_dos_se_reconstruyen_en_orden() -> None:
+    sql = _sql()
+    previa = sql.index("CREATE TABLE compras.documento_liquidatoria AS")
+    contrato = sql.index("CREATE TABLE compras.contrato_liquidacion AS")
+    tras = sql.index("CREATE TABLE compras.facturas_tras_liquidacion AS")
+    assert previa < contrato < tras
+    for objeto in ("compras.contrato_liquidacion", "compras.facturas_tras_liquidacion"):
+        assert sql.index(f"DROP TABLE IF EXISTS {objeto} CASCADE;") < sql.index(
+            f"CREATE TABLE {objeto} AS")
+    assert "ALTER TABLE compras.contrato_liquidacion ADD PRIMARY KEY (contrato_id);" in sql
+    assert ("ALTER TABLE compras.facturas_tras_liquidacion ADD PRIMARY KEY "
+            "(contrato_id, factura_id);") in sql
+
+
+def test_f138_r17_la_cadena_es_la_de_v_pbi_contrato_consumo() -> None:
+    coalesce, joins = _cadena_de_la_vista()
+    for objeto in ("compras.contrato_liquidacion", "compras.facturas_tras_liquidacion"):
+        bloque = _plano(_bloque(objeto))
+        assert f"SELECT DISTINCT fl.factura_id, {coalesce} AS contrato_id" in bloque, objeto
+        assert joins in bloque, f"{objeto} no copia los JOIN de fact_por_ctr"
+        assert f"WHERE {coalesce} IS NOT NULL" in bloque, objeto
+
+
+def test_f138_r17_todos_los_contratos_y_la_factura_de_cierre() -> None:
+    bloque = _plano(_bloque("compras.contrato_liquidacion"))
+    assert "FROM compras.contratos k LEFT JOIN cierre ci ON ci.contrato_id = k.contrato_id" in bloque
+    assert ("SELECT DISTINCT ON (contrato_id) contrato_id, factura_id, codigo_factura, fecha, "
+            "es_liquidatoria FROM fac WHERE cierra ORDER BY contrato_id, fecha, factura_id") in bloque
+    assert ("SELECT DISTINCT ON (contrato_id) contrato_id, cierra FROM fac "
+            "ORDER BY contrato_id, fecha DESC NULLS LAST, factura_id DESC") in bloque
+    assert "LEFT JOIN compras.documento_liquidatoria dl ON dl.documento_id = fc.factura_id" in bloque
+    assert "COALESCE(dl.cierra_contrato, FALSE) AS cierra" in bloque
+
+
+def test_f138_r18_columnas_y_nunca_null() -> None:
+    assert _alias_finales(_bloque("compras.contrato_liquidacion")) == COLUMNAS_CONTRATO
+    bloque = _plano(_bloque("compras.contrato_liquidacion"))
+    assert "ci.factura_id IS NOT NULL AS facturas_terminadas" in bloque
+    for cuenta in ("num_facturas_liquidatorias", "num_facturas_carta_liquidacion",
+                   "num_albaranes_liquidatorios", "num_facturas_posteriores"):
+        assert re.search(rf"COALESCE\(\w+\.{cuenta}, 0\) AS {cuenta}", bloque), cuenta
+
+
+def test_f138_r18_albaranes_y_proformas_y_posteriores() -> None:
+    bloque = _plano(_bloque("compras.contrato_liquidacion"))
+    assert "WHERE a.tipo_documento IN ('ALBARAN', 'PROFORMA')" in bloque
+    assert "dl.documento_id = x.albaran_id AND dl.es_liquidatoria" in bloque
+    assert "WHERE f.fecha > ci.fecha" in bloque
+    assert ("CASE WHEN ci.factura_id IS NOT NULL THEN CASE WHEN ci.es_liquidatoria "
+            "THEN 'LIQUIDATORIA' ELSE 'CARTA_LIQUIDACION' END END AS tipo_cierre") in bloque
+
+
+def test_f138_r19_facturas_tras_liquidacion() -> None:
+    assert _alias_finales(_bloque("compras.facturas_tras_liquidacion")) == COLUMNAS_TRAS
+    bloque = _plano(_bloque("compras.facturas_tras_liquidacion"))
+    assert ("JOIN compras.contrato_liquidacion cl ON cl.contrato_id = fc.contrato_id "
+            "AND cl.facturas_terminadas") in bloque
+    assert "JOIN compras.facturas f ON f.factura_id = fc.factura_id AND f.fecha > cl.fecha_cierre" in bloque
+    assert "f.fecha - cl.fecha_cierre AS dias_tras_cierre" in bloque
+    assert "COALESCE(dl.cierra_contrato, FALSE) AS cierra_contrato" in bloque

@@ -312,3 +312,165 @@ CREATE INDEX ix_com_documento_liquidatoria_tipo ON compras.documento_liquidatori
 
 COMMENT ON TABLE compras.documento_liquidatoria IS
 'Marca liquidatoria de facturas, abonos, albaranes, proformas y notas (F-138): una fila por documento con alguna alarma o memo que hable de liquidacion. cierra_contrato = liquidatoria declarada o pendiente de carta de liquidacion. Regla heuristica sobre TEXTO LIBRE de una alarma de Sigrid: un documento sin fila no esta marcado, lo que no prueba que no sea liquidatorio (cobertura en el diccionario). Clave documento_id.';
+
+
+-- ---------------------------------------------------------------------------
+-- compras.contrato_liquidacion — ¿SE HAN TERMINADO LAS FACTURAS? (R17, R18)
+--
+-- UNA fila por contrato de `compras.contratos` (los 19.127; FALSE y no NULL los
+-- que no tienen cierre). La factura llega al contrato por la MISMA cadena que
+-- `fact_por_ctr` de `compras.v_pbi_contrato_consumo` (03_views.sql, copiada y
+-- vigilada por un test): línea directa a contrato, o albarán de origen con su
+-- contrato, o línea de albarán con contrato. Una factura puede colgar de varios
+-- contratos (59 liquidatorias medidas): cuenta en cada uno.
+--
+-- FACTURA DE CIERRE = la de menor (`fecha`, `factura_id`) con `cierra_contrato`
+-- (liquidatoria declarada o pendiente de carta). Desde ella ya no se difiere el
+-- IVA y no debería llegar ninguna más: las que llegan son `num_facturas_posteriores`
+-- y viven, una a una, en `compras.facturas_tras_liquidacion`.
+-- ---------------------------------------------------------------------------
+DROP TABLE IF EXISTS compras.contrato_liquidacion CASCADE;
+CREATE TABLE compras.contrato_liquidacion AS
+WITH fac_ctr AS (
+    SELECT DISTINCT
+        fl.factura_id,
+        COALESCE(fl.contrato_id_directo, alb.contrato_id,
+                 alb_l.contrato_id_linea) AS contrato_id
+    FROM compras.factura_lineas fl
+    LEFT JOIN compras.albaran_lineas alb_l ON alb_l.linea_id = fl.albaran_linea_id
+    LEFT JOIN compras.albaranes alb        ON alb.albaran_id = alb_l.albaran_id
+    WHERE COALESCE(fl.contrato_id_directo, alb.contrato_id,
+                   alb_l.contrato_id_linea) IS NOT NULL
+),
+fac AS (
+    SELECT
+        fc.contrato_id,
+        fc.factura_id,
+        f.codigo_factura,
+        f.fecha,
+        COALESCE(dl.cierra_contrato, FALSE) AS cierra,
+        COALESCE(dl.es_liquidatoria, FALSE) AS es_liquidatoria,
+        COALESCE(dl.pendiente_carta_liquidacion, FALSE) AS pendiente_carta
+    FROM fac_ctr fc
+    JOIN      compras.facturas f ON f.factura_id = fc.factura_id
+    LEFT JOIN compras.documento_liquidatoria dl ON dl.documento_id = fc.factura_id
+),
+cierre AS (
+    SELECT DISTINCT ON (contrato_id)
+        contrato_id, factura_id, codigo_factura, fecha, es_liquidatoria
+    FROM fac
+    WHERE cierra
+    ORDER BY contrato_id, fecha, factura_id
+),
+ultima AS (
+    SELECT DISTINCT ON (contrato_id)
+        contrato_id, cierra
+    FROM fac
+    ORDER BY contrato_id, fecha DESC NULLS LAST, factura_id DESC
+),
+cuentas AS (
+    SELECT
+        contrato_id,
+        count(*) FILTER (WHERE es_liquidatoria) AS num_facturas_liquidatorias,
+        count(*) FILTER (WHERE pendiente_carta) AS num_facturas_carta_liquidacion
+    FROM fac
+    GROUP BY contrato_id
+),
+posteriores AS (
+    SELECT f.contrato_id, count(*) AS num_facturas_posteriores
+    FROM fac f
+    JOIN cierre ci ON ci.contrato_id = f.contrato_id
+    WHERE f.fecha > ci.fecha
+    GROUP BY f.contrato_id
+),
+albaranes AS (
+    -- Albaranes (AC) y proformas (PROF) liquidatorios del contrato, por la misma
+    -- cadena que `lineas_alb` de la vista: cabecera o línea con contrato.
+    SELECT x.contrato_id, count(DISTINCT x.albaran_id) AS num_albaranes_liquidatorios
+    FROM (
+        SELECT a.albaran_id, COALESCE(a.contrato_id, l.contrato_id_linea) AS contrato_id
+        FROM compras.albaran_lineas l
+        JOIN compras.albaranes a ON a.albaran_id = l.albaran_id
+        WHERE a.tipo_documento IN ('ALBARAN', 'PROFORMA')
+          AND COALESCE(a.contrato_id, l.contrato_id_linea) IS NOT NULL
+    ) x
+    JOIN compras.documento_liquidatoria dl
+      ON dl.documento_id = x.albaran_id AND dl.es_liquidatoria
+    GROUP BY x.contrato_id
+)
+SELECT
+    k.contrato_id AS contrato_id,
+    k.codigo_contrato AS codigo_contrato,
+    k.obra_id AS obra_id,
+    k.codigo_obra AS codigo_obra,
+    ci.factura_id IS NOT NULL AS facturas_terminadas,
+    CASE WHEN ci.factura_id IS NOT NULL THEN CASE WHEN ci.es_liquidatoria THEN 'LIQUIDATORIA' ELSE 'CARTA_LIQUIDACION' END END AS tipo_cierre,
+    ci.factura_id AS factura_cierre_id,
+    ci.codigo_factura AS codigo_factura_cierre,
+    ci.fecha AS fecha_cierre,
+    COALESCE(cu.num_facturas_liquidatorias, 0) AS num_facturas_liquidatorias,
+    COALESCE(cu.num_facturas_carta_liquidacion, 0) AS num_facturas_carta_liquidacion,
+    COALESCE(al.num_albaranes_liquidatorios, 0) AS num_albaranes_liquidatorios,
+    COALESCE(po.num_facturas_posteriores, 0) AS num_facturas_posteriores,
+    -- NULL si el contrato no tiene ninguna factura por la cadena.
+    ul.cierra AS ultima_factura_cierra
+FROM compras.contratos k
+LEFT JOIN cierre ci ON ci.contrato_id = k.contrato_id
+LEFT JOIN ultima ul ON ul.contrato_id = k.contrato_id
+LEFT JOIN cuentas cu ON cu.contrato_id = k.contrato_id
+LEFT JOIN posteriores po ON po.contrato_id = k.contrato_id
+LEFT JOIN albaranes al ON al.contrato_id = k.contrato_id;
+
+ALTER TABLE compras.contrato_liquidacion ADD PRIMARY KEY (contrato_id);
+CREATE INDEX ix_com_contrato_liquidacion_obra ON compras.contrato_liquidacion (obra_id);
+
+COMMENT ON TABLE compras.contrato_liquidacion IS
+'Si se han terminado las facturas de cada contrato de compra (F-138): una fila por contrato de compras.contratos, con su factura de cierre (la primera liquidatoria o pendiente de carta de liquidacion por la cadena factura-contrato de v_pbi_contrato_consumo), cuantas facturas liquidatorias y albaranes o proformas liquidatorios tiene y cuantas facturas han llegado despues del cierre. facturas_terminadas nunca es NULL. Clave contrato_id.';
+
+
+-- ---------------------------------------------------------------------------
+-- compras.facturas_tras_liquidacion — EL AVISO (R19, D1 c)
+--
+-- UNA fila por (contrato, factura) con fecha de alta POSTERIOR a la de la
+-- factura de cierre del contrato: lo que no debería haber llegado. ~1.170
+-- filas el 2026-10-14. Se consulta sin cruzar nada.
+-- ---------------------------------------------------------------------------
+DROP TABLE IF EXISTS compras.facturas_tras_liquidacion CASCADE;
+CREATE TABLE compras.facturas_tras_liquidacion AS
+WITH fac_ctr AS (
+    SELECT DISTINCT
+        fl.factura_id,
+        COALESCE(fl.contrato_id_directo, alb.contrato_id,
+                 alb_l.contrato_id_linea) AS contrato_id
+    FROM compras.factura_lineas fl
+    LEFT JOIN compras.albaran_lineas alb_l ON alb_l.linea_id = fl.albaran_linea_id
+    LEFT JOIN compras.albaranes alb        ON alb.albaran_id = alb_l.albaran_id
+    WHERE COALESCE(fl.contrato_id_directo, alb.contrato_id,
+                   alb_l.contrato_id_linea) IS NOT NULL
+)
+SELECT
+    cl.contrato_id AS contrato_id,
+    cl.codigo_contrato AS codigo_contrato,
+    cl.obra_id AS obra_id,
+    cl.codigo_obra AS codigo_obra,
+    f.factura_id AS factura_id,
+    f.codigo_factura AS codigo_factura,
+    f.fecha AS fecha,
+    f.fecha_factura AS fecha_factura,
+    f.proveedor_id AS proveedor_id,
+    f.proveedor_nombre AS proveedor_nombre,
+    cl.factura_cierre_id AS factura_cierre_id,
+    cl.codigo_factura_cierre AS codigo_factura_cierre,
+    cl.fecha_cierre AS fecha_cierre,
+    f.fecha - cl.fecha_cierre AS dias_tras_cierre,
+    COALESCE(dl.cierra_contrato, FALSE) AS cierra_contrato
+FROM fac_ctr fc
+JOIN      compras.contrato_liquidacion cl ON cl.contrato_id = fc.contrato_id AND cl.facturas_terminadas
+JOIN      compras.facturas f ON f.factura_id = fc.factura_id AND f.fecha > cl.fecha_cierre
+LEFT JOIN compras.documento_liquidatoria dl ON dl.documento_id = f.factura_id;
+
+ALTER TABLE compras.facturas_tras_liquidacion ADD PRIMARY KEY (contrato_id, factura_id);
+CREATE INDEX ix_com_facturas_tras_liquidacion_obra ON compras.facturas_tras_liquidacion (obra_id);
+
+COMMENT ON TABLE compras.facturas_tras_liquidacion IS
+'Aviso de facturas llegadas despues de la liquidatoria (F-138): una fila por contrato y factura cuya fecha de alta es posterior a la de la factura de cierre del contrato (compras.contrato_liquidacion). dias_tras_cierre en dias naturales. Clave (contrato_id, factura_id).';
