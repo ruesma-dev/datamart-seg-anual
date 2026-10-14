@@ -9,7 +9,29 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-14 · F-037 · CERRADA (`done`, APROBADO en pasada 2) · SIN FUSIONAR NI DESPLEGAR (espera orden del humano)
+## 2026-10-14 · F-037 · CERRADA (`done`, APROBADO en pasada 2) · DESPLEGADA el 14-10 por orden del humano («adelante f37»)
+
+- **DESPLEGADA (líder, 14-10 ~07:40-08:00 UTC)**: merge `e05bad1` en `main` (árbol idéntico a la
+  rama revisada; espejo en `dev`). T13: el job no fija `PG_*_SCHEMAS`; imagen `r20261014-0938`
+  en el job; `02_roles.sql` (humano): tres contraseñas «SIN CAMBIOS», `COMMIT`, esquemas
+  `tesoreria` y `tesoreria_restringida` de `sigrid_dm_etl`, el estándar sin leer `raw`,
+  `contabilidad_restringida` ni `tesoreria_restringida`, el total con `tesoreria_restringida = t`.
+  `build-tesoreria` **47 s** (R29: dentro de los +1-3 min): 279.006 efectos (= `raw.pag` +
+  `raw.cob`), 37.053 restringidos, 241.953 en la general, 928 filas de recuentos;
+  `build-compras` 529 s con `compras.vencimientos` vista de 197.326 filas; `apply-grants`
+  SUCCESS con `verificacion`, `verificacion_total` y `acceso_total` = `ok`. Privilegios leídos
+  con `has_*_privilege`: estándar sin USAGE en `tesoreria_restringida` y con SELECT en
+  `tesoreria.efectos` y `compras.vencimientos`; total con SELECT en la restringida. Previsto
+  (R30): PAGO 77,0 + 3,9 antiguo (2.362), COBRO 38,1 + 2,2 antiguo (398) M€. T15: v51 publicada
+  (217 objetos, 24 reglas, hash `52603a957e8b`); `check-diccionario` y `check-declarados` OK;
+  `check-unicidad` sale con 1 por 5 objetos grandes de `mart`/`stg`/`cierre` NO COMPROBADOS por
+  el timeout de 30 s (ajenos a F-037; los tres de `tesoreria` y `compras.vencimientos` OK, 0
+  rotas). MCP reiniciado (revisión `--0000016`, ya con la F-008 de `mcp-bbdd`).
+  `azure-apps` `e50c996` (local, sin remoto).
+- **Pendiente para cerrar del todo**: (1) `mcp-bbdd` añade `tesoreria` y
+  `tesoreria_restringida` a su lista blanca común (hoy el MCP da `OBJETO_NO_PERMITIDO`; su
+  sesión no estaba abierta para avisarla); (2) T14 por chat con una cuenta total y una
+  estándar; (3) T16: la nocturna del 15-10 con los tres `ok` y la negativa repetida.
 
 - **Review pasada 2 (14-10): APROBADO** (`progress/review_F-037.md`): el delta desde la pasada 1
   solo toca `progress/`; campaña de mutación VÁLIDA (45/45 muertos, 0 supervivientes, SHA
