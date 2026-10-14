@@ -153,9 +153,9 @@ def test_f090_r5_ninguna_familia_de_personal_o_posventa_en_los_filtros() -> None
             assert tip not in familias, f"`{tabla}` trae la familia {tip} (D2, R5)"
 
 
-def test_f090_r6_el_censo_pasa_a_74() -> None:
-    assert len(_tablas()) == 74
-    assert len(_lista_tablas()) == 74, "tabla declarada dos veces"
+def test_f090_r6_el_censo_pasa_a_76() -> None:
+    assert len(_tablas()) == 76
+    assert len(_lista_tablas()) == 76, "tabla declarada dos veces"
     assert {"rcg", "gra"} <= set(_tablas())
 
 
