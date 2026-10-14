@@ -225,7 +225,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 52,
+      "priority": 53,
       "branch": "feature/F-017-cierre-costes-indirectos"
     },
     {
@@ -237,7 +237,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 56,
+      "priority": 57,
       "branch": "feature/F-018-validacion-cierre-mensual"
     },
     {
@@ -249,7 +249,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 62,
+      "priority": 63,
       "branch": "feature/F-002-plan-vigente"
     },
     {
@@ -268,7 +268,7 @@
       ],
       "status": "pending",
       "sdd": false,
-      "priority": 64,
+      "priority": 65,
       "branch": "feature/F-012-auditoria-costes-azure"
     },
     {
@@ -293,7 +293,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 65,
+      "priority": 66,
       "branch": "feature/F-013-carga-excels-aux"
     },
     {
@@ -305,7 +305,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 66,
+      "priority": 67,
       "branch": "feature/F-010-carga-excels-auxiliares"
     },
     {
@@ -317,7 +317,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 67,
+      "priority": 68,
       "branch": "feature/F-007-disparo-manual-web"
     },
     {
@@ -330,7 +330,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 53,
+      "priority": 54,
       "branch": "feature/F-022-desempate-obrfasamb"
     },
     {
@@ -380,7 +380,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 57,
+      "priority": 58,
       "branch": "feature/F-028-puerta-stg-distingue-fallo"
     },
     {
@@ -404,7 +404,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 47,
+      "priority": 48,
       "branch": "feature/F-029-mutacion-fiable"
     },
     {
@@ -421,7 +421,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 54,
+      "priority": 55,
       "branch": "feature/F-030-reglas-negocio-compartidas"
     },
     {
@@ -439,7 +439,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 49,
+      "priority": 50,
       "branch": "feature/F-031-alerta-no-se-resuelve"
     },
     {
@@ -456,7 +456,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 68,
+      "priority": 69,
       "branch": "feature/F-032-limpieza-secretos-y-puesto"
     },
     {
@@ -473,7 +473,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 58,
+      "priority": 59,
       "branch": "feature/F-033-azure-apps-al-dia"
     },
     {
@@ -490,7 +490,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 60,
+      "priority": 61,
       "branch": "feature/F-026-rbac-propagacion"
     },
     {
@@ -546,7 +546,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 21,
+      "priority": 22,
       "branch": "feature/F-036-oficios"
     },
     {
@@ -602,7 +602,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 41,
+      "priority": 42,
       "branch": "feature/F-039-vistas-puente"
     },
     {
@@ -615,7 +615,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 44,
+      "priority": 45,
       "branch": "feature/F-040-ingresos"
     },
     {
@@ -633,7 +633,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "critico",
-      "priority": 38,
+      "priority": 39,
       "branch": "feature/F-041-mutacion-fiable"
     },
     {
@@ -666,7 +666,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 39,
+      "priority": 40,
       "branch": "feature/F-043-secreto-versionado"
     },
     {
@@ -698,7 +698,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 40,
+      "priority": 41,
       "branch": "feature/F-046-contraste-desgloses"
     },
     {
@@ -729,7 +729,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 43,
+      "priority": 44,
       "branch": "feature/F-048-guardian-secretos-poroso"
     },
     {
@@ -745,7 +745,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 45,
+      "priority": 46,
       "branch": "feature/F-049-sello-pendiente-mutacion"
     },
     {
@@ -761,7 +761,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 50,
+      "priority": 51,
       "branch": "feature/F-050-fases-duplicadas-sigrid"
     },
     {
@@ -797,7 +797,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 48,
+      "priority": 49,
       "branch": "feature/F-053-desempate-obras-duplicadas"
     },
     {
@@ -815,7 +815,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "documental",
-      "priority": 46,
+      "priority": 47,
       "branch": "feature/F-054-conocimiento-de-negocio"
     },
     {
@@ -833,7 +833,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 18,
+      "priority": 19,
       "branch": "feature/F-055-mundo-proveedor"
     },
     {
@@ -883,7 +883,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 42,
+      "priority": 43,
       "branch": "feature/F-058-estados-financieros"
     },
     {
@@ -896,7 +896,7 @@
         "Resuelto y escrito como se identifica al mismo tercero entre empresas distintas, que tienen subcuentas distintas",
         "Documentado en el diccionario que significa 'posicion' y 'pendiente' aqui, para que el MCP no lo confunda con lo que publica compras"
       ],
-      "priority": 51,
+      "priority": 52,
       "rigor": "estandar",
       "branch": "feature/F-060-posicion-terceros",
       "status": "pending",
@@ -913,7 +913,7 @@
         "Contrastado contra el coste de personal que hoy publica el seguimiento, con las diferencias explicadas",
         "Publicados los movimientos y el saldo de las cuentas analiticas de contrapartida de los recursos (peticion de Juan Romero del 24-09), con lo que queda por repartir a obra, y medido y declarado si el asiento de nominas entra o no en esas cuentas"
       ],
-      "priority": 55,
+      "priority": 56,
       "rigor": "critico",
       "branch": "feature/F-061-coste-personal-obra",
       "status": "pending",
@@ -929,7 +929,7 @@
         "Validado por Administracion contra al menos una declaracion real ya presentada",
         "Documentado que este objeto NO sustituye a la declaracion oficial y para que sirve exactamente"
       ],
-      "priority": 59,
+      "priority": 60,
       "rigor": "estandar",
       "branch": "feature/F-062-impuestos",
       "status": "pending",
@@ -945,7 +945,7 @@
         "Contrastado contra el total que la analitica reparte como GENERALES, con la diferencia cuantificada por ano Y EXPLICADA: que parte es gasto no repartido, que parte es diferencia de criterio y que parte no cuadra",
         "NO se cambia el criterio de reparto en esta feature. Si la diferencia sugiere que deberia cambiarse, se lleva a Negocio como propuesta con el numero delante"
       ],
-      "priority": 61,
+      "priority": 62,
       "rigor": "critico",
       "branch": "feature/F-063-generales-reparto",
       "status": "pending",
@@ -962,7 +962,7 @@
         "Distinguidos los apuntes manuales de los generados por documento, con su volumen",
         "El aviso que se pasa a F-058 dice que parte del gasto NO DEBE atribuirse a obra por ser estructura, y que parte falta por error"
       ],
-      "priority": 63,
+      "priority": 64,
       "rigor": "estandar",
       "branch": "feature/F-064-control-interno-contable",
       "status": "pending",
@@ -982,7 +982,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 36,
+      "priority": 37,
       "branch": "feature/F-065-creditos-cpu-tras-la-ventana"
     },
     {
@@ -1058,7 +1058,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 37,
+      "priority": 38,
       "branch": "feature/F-069-mejoras-arnes-review-f066"
     },
     {
@@ -1076,7 +1076,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 29,
+      "priority": 30,
       "branch": "feature/F-070-auditoria-calidad-diccionario"
     },
     {
@@ -1152,7 +1152,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 34,
+      "priority": 35,
       "branch": "feature/F-075-alcance-de-las-puertas"
     },
     {
@@ -1172,7 +1172,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 28,
+      "priority": 29,
       "branch": "feature/F-076-ambitos-certificacion"
     },
     {
@@ -1187,7 +1187,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 31,
+      "priority": 32,
       "branch": "feature/F-077-flag-reconstruir-todo-sin-test"
     },
     {
@@ -1284,7 +1284,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 32,
+      "priority": 33,
       "branch": "feature/F-082-supervivientes-f025"
     },
     {
@@ -1365,7 +1365,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "critico",
-      "priority": 30,
+      "priority": 31,
       "branch": "feature/F-087-rol-propio-de-power-bi"
     },
     {
@@ -1384,7 +1384,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 33,
+      "priority": 34,
       "branch": "feature/F-088-guardian-de-recuentos-y-la-guarda-que-falta"
     },
     {
@@ -1403,7 +1403,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 26,
+      "priority": 27,
       "branch": "feature/F-089-el-mcp-cachea-el-diccionario"
     },
     {
@@ -1442,7 +1442,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 27,
+      "priority": 28,
       "branch": "feature/F-091-factura-asiento"
     },
     {
@@ -1465,7 +1465,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 6,
+      "priority": 7,
       "branch": "feature/F-092-productos-y-centro-de-coste"
     },
     {
@@ -1485,7 +1485,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 25,
+      "priority": 26,
       "branch": "feature/F-093-obra-de-cabecera"
     },
     {
@@ -1533,7 +1533,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 19,
+      "priority": 20,
       "branch": "feature/F-096-plan-mensual-sin-tope"
     },
     {
@@ -1565,7 +1565,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 22,
+      "priority": 23,
       "branch": "feature/F-098-fases-por-ambito-y-controles"
     },
     {
@@ -1581,7 +1581,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 24,
+      "priority": 25,
       "branch": "feature/F-099-expedientes-obra"
     },
     {
@@ -1631,7 +1631,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 17,
+      "priority": 18,
       "branch": "feature/F-104-retenciones-cliente"
     },
     {
@@ -1648,7 +1648,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 23,
+      "priority": 24,
       "branch": "feature/F-105-log-sigrid-usuarios"
     },
     {
@@ -1664,7 +1664,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 16,
+      "priority": 17,
       "branch": "feature/F-106-obras-por-empresa"
     },
     {
@@ -1745,7 +1745,7 @@
       "status": "spec_ready",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 13,
+      "priority": 14,
       "branch": "feature/F-111-nombres-partida-por-ancestro"
     },
     {
@@ -1793,7 +1793,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 15,
+      "priority": 16,
       "branch": "feature/F-114-avisos-mcp-rescatados"
     },
     {
@@ -1811,7 +1811,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 71,
+      "priority": 72,
       "branch": "feature/F-117-obras-ciegas-en-master"
     },
     {
@@ -1843,7 +1843,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 35,
+      "priority": 36,
       "branch": "feature/F-119-cartera-de-obra"
     },
     {
@@ -1858,7 +1858,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 69,
+      "priority": 70,
       "branch": "feature/F-115-tiemod-inexistente"
     },
     {
@@ -1873,7 +1873,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 70,
+      "priority": 71,
       "branch": "feature/F-116-ingesta-descompuestos-error-por-version"
     },
     {
@@ -1906,7 +1906,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 14,
+      "priority": 15,
       "branch": "feature/F-121-recurso-principal-auxiliar"
     },
     {
@@ -1921,7 +1921,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 20,
+      "priority": 21,
       "branch": "feature/F-122-lineas-sin-rendimiento"
     },
     {
@@ -1959,7 +1959,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 7,
+      "priority": 8,
       "branch": "feature/F-126-analitica-lineas-compra"
     },
     {
@@ -1979,7 +1979,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 5,
+      "priority": 6,
       "branch": "feature/F-127-mayor-analitico"
     },
     {
@@ -2018,7 +2018,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 4,
+      "priority": 5,
       "branch": "feature/F-129-objetivo-contra-oferta-referencia"
     },
     {
@@ -2034,7 +2034,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 9,
+      "priority": 10,
       "branch": "feature/F-130-condiciones-y-texto-oferta"
     },
     {
@@ -2050,7 +2050,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 8,
+      "priority": 9,
       "branch": "feature/F-131-cantidades-dpc"
     },
     {
@@ -2086,7 +2086,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 11,
+      "priority": 12,
       "branch": "feature/F-133-procesos-albaranes"
     },
     {
@@ -2104,7 +2104,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 12,
+      "priority": 13,
       "branch": "feature/F-134-empleado-alta-documento"
     },
     {
@@ -2157,7 +2157,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 10,
+      "priority": 11,
       "branch": "feature/F-137-ordenes-infra-patrones-buenos"
     },
     {
@@ -2194,6 +2194,24 @@
       "rigor": "estandar",
       "priority": 2,
       "branch": "feature/F-139-leer-graficos-asociados"
+    },
+    {
+      "id": "F-140",
+      "title": "La fase 2 de la cartera (F-037): los ingredientes de la proyección de caja por obra (devengo pendiente, plazos de pago pactados y retenciones), sin convertir devengo en caja",
+      "description": "Nace el 2026-10-14 por orden del humano («como feature con prioridad 4»), al preguntar qué es la fase 2 de F-037. F-037 (fase 1, desplegada el 14-10) publicó la cartera TAL CUAL: cada efecto de `raw.pag`/`raw.cob` con su vencimiento previsto, fecha real y estado, en `tesoreria` y `tesoreria_restringida`. Es un hecho, no un cálculo. La FASE 2, tal como la dejó escrita la ficha de F-037 y su spec (`specs/F-037-tesoreria/requirements.md`, «FUERA»), es sumar la PROYECCIÓN DE OBRA. ================ LA REGLA DEL HUMANO, que manda sobre el diseño: **el datamart NO convierte devengo en caja**. Publica los INGREDIENTES y la conversión la hace la IA en la consulta, con la hipótesis DECLARADA; la ficha del diccionario tiene que obligar a declararla, porque un resultado que no dice de qué hipótesis sale es un número inventado con aspecto de dato. Los ingredientes: (1) el devengo pendiente por obra y mes, desde `stg.plan_mensual` (ojo a `R-VERSION-MASTER`: conviven todas las versiones master); (2) el plazo de pago pactado, desde `auxpag` y `auxefp` (formas de pago y sus efectos); (3) el porcentaje y el plazo de la retención, desde `ctrrec`. Además, lo que la spec de F-037 dejó para esta fase (D4-B): asignar obra a los efectos sin centro con la cascada de `retenciones` y el respaldo por las líneas del documento (hoy el puente centro -> obra cubre el 78 %). FRONTERAS: F-054 (que el diccionario explique cómo se hace un flujo de caja en Ruesma) es el complemento documental; F-040 (ventas) condiciona el lado de cobros, que en la fase 1 se publicó con cobertura floja (sin documento de venta); F-095 y F-128 (retenciones). Los pagos de personal siguen restringidos como en F-037 (`R-TESORERIA-RESTRINGIDA`).",
+      "acceptance": [
+        "Medido qué está ingerido y qué no de `auxpag`, `auxefp` y `ctrrec`, y qué versión de `stg.plan_mensual` es la que vale para proyectar (con `R-VERSION-MASTER`)",
+        "Publicados por obra y mes el devengo pendiente y, por contrato o proveedor, el plazo de pago pactado y la retención (porcentaje y plazo), con su cobertura medida, SIN ninguna columna de caja proyectada",
+        "Los efectos de la cartera sin obra reciben obra por la cascada de documento (D4-B de F-037), con la cobertura antes y después",
+        "Una regla dura del diccionario obliga a la IA a declarar la hipótesis de conversión devengo -> caja, y el MCP lo hace sin que se le explique",
+        "Los pagos de personal no salen de `tesoreria_restringida` (misma regla que F-037)",
+        "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 4,
+      "branch": "feature/F-140-proyeccion-caja-ingredientes"
     }
   ]
 }
