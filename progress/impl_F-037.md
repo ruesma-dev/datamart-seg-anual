@@ -178,16 +178,16 @@ cobro con retención (19,9 M€, declarada); `mcp-bbdd` (lista blanca) y el rol 
 
 ## Evidencias
 
-Medidas el 2026-10-14, sobre el HEAD `1903619` (todo commiteado).
+Medidas el 2026-10-14. `init.sh` vuelve a correr sobre `2abde26` tras la campaña repetida, con todo commiteado.
 
 | Evidencia | Resultado real |
 |---|---|
-| `bash harness/init.sh` | **ENTORNO LISTO** (salida 0): todas las puertas en `[OK]`; ruff 271 avisos de deuda previa (273 al empezar) |
+| `bash harness/init.sh` (sobre `2abde26`) | **ENTORNO LISTO** (salida 0): todas las puertas en `[OK]`; ruff, 271 avisos de deuda previa |
 | Tests ejecutados (suite completa, dentro de `init.sh`) | **7.826 passed, 242 skipped, 0 failed** |
-| Tiempo de la suite | **1.144 s (19 min 04 s)** con medición de cobertura |
+| Tiempo de la suite | **1.014 s (16 min 54 s)** con medición de cobertura (antes, 1.144 s) |
 | Tests de la feature | `test_f037_{dominio,sql,paso,grants,diccionario}.py`: 72 + 96 + 19 + 16 + 23 = 226 passed |
 | Cobertura de líneas cambiadas | **PUERTA COBERTURA: 100,0 % de 136 líneas (136/136)**, umbral 80 %, nivel crítico |
-| Tamaño | requirements 149/150, design 249/250, impl dentro de 220 |
+| Tamaño | requirements 149/150, design 249/250, impl 216/220, review 139/140 |
 | Mutación (`domain/tesoreria.py` + `build_tesoreria_step.py`, campaña completa) | **45 generados, 45 muertos, 0 supervivientes, 0 timeouts, 0 sin veredicto**: informe VÁLIDO |
 
 **Mutación, ciclo de corrección de la review pasada 1** (detalle en `progress/mutacion_F-037.md`).
