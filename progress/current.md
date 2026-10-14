@@ -9,6 +9,16 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-14 · F-138 · EN IMPLEMENTACIÓN (implementer, `in_progress`)
+
+- Tarea en curso: ver `specs/F-138-facturas-liquidatorias/tasks.md` (las `[x]` son las hechas).
+- `init.sh` de arranque (18:41 UTC): ROJO, pero CAUSADO POR ESTA SESIÓN: la suite tardó 1 h 29 min
+  hasta el 37 % y a mitad se añadieron `conala`/`auxala` a `tables_sigrid.yaml` (T2) sin ficha
+  todavía; `test_f024_cli[run-all]` cayó por «raw.auxala / raw.conala publicados y SIN ficha». Los
+  2.924 tests anteriores, en verde. La sesión se reinició a mitad; se retomó sobre el árbol dejado.
+- Desviación anotada: el censo 74 también lo fijan `test_f066_ingesta_raw.py` y
+  `test_f074_ingesta_censo.py` (`TOTAL_TABLAS`), que la spec no lista; se suben a 76 en T3.
+
 ## 2026-10-14 · F-138 · SPEC ACTUALIZADA con las decisiones del humano (D1-D9 cerradas)
 
 - Spec en `specs/F-138-facturas-liquidatorias/` (R1-R32, 17 tareas), rama

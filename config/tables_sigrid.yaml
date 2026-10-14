@@ -1527,3 +1527,47 @@ tables:
     # grafico (la guarda R15 del SQL cubre el resto).
     # Coste: 20 paginas en 41,5 s (~1,6 s por pagina: la subconsulta del
     # filtro se repite en cada una).
+
+  # --- F-138: las alarmas de los documentos y la marca «liquidatoria» ------
+  # Correo de Control de Costes del 2026-10-14 («facturas liquidatorias»): en
+  # Sigrid la liquidatoria NO es un campo de la factura, es una ALARMA de texto
+  # libre pegada al documento (`conala`), con su clase en `auxala`. Lo publican
+  # `compras.documento_alarmas`, `compras.documento_liquidatoria`,
+  # `compras.contrato_liquidacion` y `compras.facturas_tras_liquidacion`
+  # (`sql/compras/15_alarmas_liquidatoria.sql`); la completa, con recursos y
+  # partes, en `compras_restringida.documento_alarmas` (D9).
+
+  - source_table: conala
+    target_table: conala
+    id_column: ide
+    incremental_column: null   # medido 2026-10-14: `conala` no tiene tiemod
+    where: "conide IN (SELECT ide FROM dbo.con WHERE tip IN (1, 4, 5, 11, 12, 14, 15, 17, 20, 25, 33, 35, 40, 42, 44, 46, 54))"
+    exclude_columns: []
+    # LAS ALARMAS («Alarmas en conceptos»): `conide` el documento, `alaide` el
+    # tipo (`auxala`), `tex` el texto LIBRE, `tipabr` «ver al abrir», y
+    # `creusu`/`crefec`/`crehor` quien y cuando la creo (es el «Creada por:
+    # <login> -> fecha hora» que ensena Sigrid; `creusu` es un LOGIN, D6).
+    # Medido el 2026-10-14 (F-138): 46.242 filas en total, 0 huerfanas contra
+    # `con` y `auxala`, 643 con `alaide = 0`. `fec1` y `fec2` NO son fechas
+    # fiables (a 0 en 45.741 filas) y `usu` y `rol` estan vacias: entran por
+    # ser `raw` literal, pero no se publican aguas abajo.
+    # FILTRADA EN ORIGEN con una LISTA EXPLICITA de 17 familias (D3), que es
+    # `filtro_conala()` de `etl_sigrid/domain/liquidatoria.py`
+    # (`tests/test_f138_ingesta_sql.py` falla si no): todas menos la 43
+    # (empleados, 497 alarmas), que NO entra ni en `raw`. Lista y no `tip <> 43`
+    # para fallar CERRADA: una familia nueva con alarmas no entra hasta que
+    # alguien la anade y decide si es restringida. Las de recursos (33) y
+    # partes (35) nombran trabajadores y bajas: entran en `raw` (vetado al
+    # estandar y al total) y aguas abajo solo en `compras_restringida` (D9).
+    # Con el filtro, 45.747 filas y 1,79 MB, leidas en ~2 s en una peticion
+    # (5 paginas de 10.000; la subconsulta se repite por pagina, como en `gra`).
+
+  - source_table: auxala
+    target_table: auxala
+    id_column: ide
+    incremental_column: tiemod
+    where: null
+    exclude_columns: []
+    # EL CATALOGO DE TIPOS DE ALARMA («Alarmas (Clasificaciones)»): 4 filas el
+    # 2026-10-14 (F-138): 01 ALARMA FACT. POR INCIDENCIAS, 02 AVISO ABONOS,
+    # 03 INFORMATIVA y 04 sin nombre. Entera: es un catalogo minimo.
