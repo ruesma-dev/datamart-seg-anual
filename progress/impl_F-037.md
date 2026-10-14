@@ -188,13 +188,29 @@ Medidas el 2026-10-14, sobre el HEAD `1903619` (todo commiteado).
 | Tests de la feature | `test_f037_{dominio,sql,paso,grants,diccionario}.py`: 72 + 96 + 19 + 16 + 23 = 226 passed |
 | Cobertura de líneas cambiadas | **PUERTA COBERTURA: 100,0 % de 136 líneas (136/136)**, umbral 80 %, nivel crítico |
 | Tamaño | requirements 149/150, design 249/250, impl dentro de 220 |
-| Mutación (`domain/tesoreria.py` + `build_tesoreria_step.py`, campaña completa) | **45 generados, 45 muertos, 0 supervivientes** |
+| Mutación (`domain/tesoreria.py` + `build_tesoreria_step.py`, campaña completa) | **45 generados, 45 muertos, 0 supervivientes, 0 timeouts, 0 sin veredicto**: informe VÁLIDO |
 
-Mutación, con su matiz (detalle en `progress/mutacion_F-037.md`): la campaña paralela
-(`--timeout 2400 --workers 4`, línea base ~715 s por worker) dio 43 muertos, 0 supervivientes y 2
-`timeout`, y el arnés la declaró **NO VÁLIDA** porque la línea base de cierre agotó 12.000 s (la
-campaña cruzó la noche: 23.686 s). Por eso se reevaluaron **los 45 en serie**, aplicando cada
-mutante en el árbol: 42 los matan los tests de F-037 (los 2 `timeout` mueren en 0,1 s), y los 3
-restantes —las banderas `slots`/`frozen` de las dos dataclases— los mata la guarda genérica
-`tests/test_f006_dataclasses_inmutables.py`, que forma parte de la suite. Ningún superviviente
-que analizar ni justificación pendiente del humano.
+**Mutación, ciclo de corrección de la review pasada 1** (detalle en `progress/mutacion_F-037.md`).
+La primera campaña (`--workers 4`) salió **NO VÁLIDA**: la línea base de cierre agotó 12.000 s
+porque la campaña cruzó una suspensión de la máquina (23.686 s en total). Se repitió **sin tocar
+código** y con el mismo alcance:
+`python -m harness.mutacion --feature F-037 --ficheros etl_sigrid/application/steps/build_tesoreria_step.py,etl_sigrid/domain/tesoreria.py --workers 2 --timeout 2400`.
+Se lanzó desacoplada de la sesión y con `SetThreadExecutionState` para que el equipo no se
+suspendiera (sin `powercfg`). Corrió de 00:46 a 02:50 UTC del 14-10, salida 0, y el informe sale
+**sin la cabecera «⚠ CAMPAÑA NO VÁLIDA»**:
+
+| Métrica | Valor |
+|---|---|
+| Generados / evaluados / muertos | 45 / 45 / 45 |
+| Supervivientes / timeouts / base rota | 0 / 0 / 0 |
+| SHA de HEAD medido | `b475edb` (= HEAD al lanzar; después solo cambian `progress/`) |
+| Tiempo total | 7.428,3 s (2 h 04 min), 2 workers |
+| Línea base por worker | 490,6 s y 491,3 s |
+| Media por mutante | 165,1 s (× 2 workers = 330 s, por debajo de la base: cada mutante corre con `-x` y se corta en el primer fallo, mientras que la base corre la suite entera) |
+| Timeout por mutante | 2.400 s, con `--timeout` (sin el flag la base tendría 120 × 5 = 600 s, justos para ~490 s) |
+
+`--timeout 2400` es el mismo de la primera campaña. Sin él, la base habría corrido con 600 s de
+margen y medía ~490 s. Los 2 `timeout` de la primera campaña (`tesoreria.py:192` y `:193`) salen
+ahora **muertos**: eran efecto de la suspensión. Como dijo la primera reverificación en serie, los
+3 mutantes de las banderas `slots`/`frozen` de `@dataclass` los mata la guarda genérica
+`tests/test_f006_dataclasses_inmutables.py`. Ningún superviviente que analizar.
