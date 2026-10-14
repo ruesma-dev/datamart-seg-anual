@@ -2172,7 +2172,7 @@
         "Se responde por el MCP, sin explicarle nada: «¿qué facturas liquidatorias tiene la obra X?» y «¿qué contratos tienen ya su factura liquidatoria?»",
         "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
       ],
-      "status": "spec_ready",
+      "status": "in_progress",
       "sdd": true,
       "rigor": "estandar",
       "priority": 1,
