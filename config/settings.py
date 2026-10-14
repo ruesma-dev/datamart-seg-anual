@@ -103,9 +103,14 @@ class SigridApiSettings(BaseSettings):
 # lo único que protegía `raw` era lo revocado. Ahora `raw` está además VETADO
 # (`DEFAULT_VETOED_SCHEMAS`, abajo): ponerlo de vuelta en esta lista hace FALLAR
 # `apply_grants` sin ejecutar nada (R17), en vez de reabrirlo en silencio.
+#
+# F-037 (2026-10-13) añade `tesoreria`: la cartera GENERAL de cobros y pagos,
+# SIN los pagos de personal (nóminas, embargos, cuotas). La completa vive en
+# `tesoreria_restringida`, que NO entra aquí: está vetada al rol general y es
+# del autorizado, como la contabilidad completa (listas de abajo).
 DEFAULT_CONSUMPTION_SCHEMAS = (
-    "mart,cierre,compras,maestro,retenciones,personal,contabilidad,descompuestos,"
-    "stg,aux,_meta"
+    "mart,cierre,compras,maestro,retenciones,personal,contabilidad,tesoreria,"
+    "descompuestos,stg,aux,_meta"
 )
 
 # Esquemas que el rol GENERAL de lectura (`PG_READONLY_ROLE`, el del MCP y
@@ -118,19 +123,23 @@ DEFAULT_CONSUMPTION_SCHEMAS = (
 #   contabilidad_restringida  la contabilidad COMPLETA, con los apuntes de
 #                             personal (nóminas, cuentas de trabajadores,
 #                             embargos): solo para el rol autorizado
+#   tesoreria_restringida     la cartera COMPLETA de cobros y pagos, con los
+#                             pagos de nómina, embargo y cuotas (F-037): solo
+#                             para el rol autorizado
 #   raw                       la copia literal de Sigrid, con todo lo anterior
 #                             y más (ver el comentario de arriba)
 #
 # Un esquema no puede estar a la vez aquí y en `DEFAULT_CONSUMPTION_SCHEMAS`.
-DEFAULT_VETOED_SCHEMAS = "contabilidad_restringida,raw"
+DEFAULT_VETOED_SCHEMAS = "contabilidad_restringida,tesoreria_restringida,raw"
 
 # El rol AUTORIZADO (F-135): grupo NOLOGIN que lee la contabilidad completa. Lo
 # crea `infra/sql/02_roles.sql`; quién es miembro lo decide Negocio (Juan
 # Romero, D8) y se da con `GRANT sigrid_dm_restringido_ro TO <login>`. Hoy no lo
 # usa ningún cliente: el MCP tendría que conectar con él según quién pregunta
-# (`mcp-bbdd`, su F-008) y Power BI necesita rol propio (F-087).
+# (`mcp-bbdd`, su F-008) y Power BI necesita rol propio (F-087). Desde F-037 lee
+# también la cartera completa de cobros y pagos (`tesoreria_restringida`).
 DEFAULT_RESTRICTED_ROLE = "sigrid_dm_restringido_ro"
-DEFAULT_RESTRICTED_SCHEMAS = "contabilidad_restringida"
+DEFAULT_RESTRICTED_SCHEMAS = "contabilidad_restringida,tesoreria_restringida"
 
 # El login de acceso TOTAL del MCP (F-136): lee lo mismo que el rol general más
 # la contabilidad completa, por PERTENENCIA a los dos grupos (`02_roles.sql`,

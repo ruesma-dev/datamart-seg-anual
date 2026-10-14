@@ -663,6 +663,8 @@ def test_f006_r20_pipeline_publicar_va_entre_build_mart_y_apply_grants() -> None
         # los seis recrean tablas o vistas con DROP + CREATE, y un DROP se
         # lleva los GRANT que `apply_grants` concede.
         "build_maestros",
+        # F-037: el octavo, la cartera de cobros y pagos, delante de compras.
+        "build_tesoreria",
         "build_compras",
         "build_retenciones",
         "build_personal",

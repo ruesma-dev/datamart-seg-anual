@@ -73,10 +73,11 @@ confirmación cubre el plan que se enseñó, no lo que apareció después.
 
 - `main.py` — CLI (click). Comandos: check-api, check-pg, bootstrap, ingest,
   stage, build-mart, publicar-diccionario, run-all, status. `run-all` construye
-  el datamart ENTERO desde F-047: catorce pasos, con los siete build de
-  negocio —maestros, compras, retenciones, personal, contabilidad,
+  el datamart ENTERO desde F-047: quince pasos, con los ocho build de
+  negocio —maestros, tesoreria, compras, retenciones, personal, contabilidad,
   descompuestos (con su ingesta `ingest_descompuestos` delante) y cierre—
-  dentro y en ese orden. `ingest-descompuestos` y `build-descompuestos` sueltos
+  dentro y en ese orden. `tesoreria` va delante de `compras` porque
+  `compras.vencimientos` es una vista suya (F-037). `ingest-descompuestos` y `build-descompuestos` sueltos
   llevan `--sin-tope` para la primera carga, que es MANUAL.
   `cierre` va después de `mart` porque `mart` destruye lo que `cierre`
   construye.
@@ -97,8 +98,12 @@ confirmación cubre el plan que se enseñó, no lo que apareció después.
   cada step hereda de `steps/base.py`).
 - `etl_sigrid/infrastructure/postgres/` — cliente + `sql/` por capa:
   `raw` (implícito en ingesta), `stg/`, `mart/`, `cierre/`, `compras/`,
-  `maestro/`, `retenciones/`, `personal/`, `contabilidad/`, `auxiliar/`,
-  `descompuestos/`. **`descompuestos/` (F-097)** son de qué se compone cada
+  `maestro/`, `retenciones/`, `personal/`, `contabilidad/`, `tesoreria/`,
+  `auxiliar/`, `descompuestos/`. **`tesoreria/` (F-037)** es la cartera de
+  cobros y pagos (un efecto de `raw.pag`/`raw.cob` por fila) en dos esquemas,
+  como la contabilidad: `tesoreria` (la general) y `tesoreria_restringida` (con
+  los pagos de nómina, embargo y cuota; solo el perfil total). BAJA no se suma
+  y `fecha_real` vacía no es pendiente (`R-TESORERIA-ESTADO`). **`descompuestos/` (F-097)** son de qué se compone cada
   partida, con su ORIGEN (ESTUDIO, PLANIF_JO y cada versión del master), y es
   el primer esquema INCREMENTAL: su texto lo trae `ingest_descompuestos` a
   tablas propias que `--full` no trunca (nunca `DROP` ni `TRUNCATE` de

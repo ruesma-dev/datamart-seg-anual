@@ -279,12 +279,14 @@ def test_f006_r4_son_doce_esquemas_y_estos() -> None:
     así que un esquema que entre o salga tiene que hacerlo por aquí y no en
     silencio.
     """
-    # Trece desde F-135 (2026-10-11), que anadio `contabilidad_restringida`.
-    assert len(ESQUEMAS_DEL_DATAMART) == 13
+    # Trece desde F-135 (2026-10-11), que anadio `contabilidad_restringida`;
+    # quince desde F-037 (2026-10-13): `tesoreria` y `tesoreria_restringida`.
+    assert len(ESQUEMAS_DEL_DATAMART) == 15
     assert set(ESQUEMAS_DEL_DATAMART) == {
         "_meta", "raw", "stg", "aux", "mart",
         "cierre", "compras", "maestro", "retenciones", "personal",
         "contabilidad", "contabilidad_restringida", "descompuestos",
+        "tesoreria", "tesoreria_restringida",
     }
 
 
@@ -309,13 +311,16 @@ def test_f006_r4_la_entrada_de_esquema_necesita_titulo_y_para_que_sirve() -> Non
 
 
 def test_f006_r4_una_ficha_de_un_esquema_no_declarado_falla() -> None:
-    """Documentar `tesoreria.movimientos` hoy sería documentar humo."""
+    """Documentar `flujo_caja.movimientos` hoy sería documentar humo.
+
+    (El ejemplo era `tesoreria` hasta que F-037 lo creó el 2026-10-13.)
+    """
     errores = validar(
-        _dicc(fichas=[_ficha(esquema="tesoreria")]), PASOS_NOCTURNOS
+        _dicc(fichas=[_ficha(esquema="flujo_caja")]), PASOS_NOCTURNOS
     )
 
     assert errores
-    assert any("tesoreria" in e.detalle for e in errores)
+    assert any("flujo_caja" in e.detalle for e in errores)
 
 
 # ---------------------------------------------------------------------------
@@ -1106,9 +1111,9 @@ def test_f006_r2_el_diccionario_global_real_valida_entero() -> None:
 
 
 def test_f006_r4_un_esquema_de_mas_en_el_global_falla() -> None:
-    """Declarar `tesoreria` en `esquemas` sería anunciar algo que no existe."""
+    """Declarar `flujo_caja` en `esquemas` sería anunciar algo que no existe."""
     esquemas = _esquemas()
-    esquemas["tesoreria"] = {
+    esquemas["flujo_caja"] = {
         "titulo": "Tesorería",
         "para_que_sirve": "Cobros y pagos.",
         "consumo_recomendado": True,
@@ -1117,7 +1122,7 @@ def test_f006_r4_un_esquema_de_mas_en_el_global_falla() -> None:
 
     errores = validar(_dicc(esquemas=esquemas), PASOS_NOCTURNOS)
 
-    assert any("tesoreria" in e.detalle for e in errores)
+    assert any("flujo_caja" in e.detalle for e in errores)
 
 
 def test_f006_r4_un_refresco_inventado_en_la_entrada_de_esquema_falla() -> None:

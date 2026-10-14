@@ -56,6 +56,8 @@ STEPS_POR_COMANDO = {
     "build-personal": ("BuildPersonalStep", "build_personal", "build_aux"),
     # F-056: el sexto, con el mismo `stage` que `personal` (`build_aux`).
     "build-contabilidad": ("BuildContabilidadStep", "build_contabilidad", "build_aux"),
+    # F-037: el octavo, la cartera de cobros y pagos, con el mismo `stage`.
+    "build-tesoreria": ("BuildTesoreriaStep", "build_tesoreria", "build_aux"),
     # F-097: los descompuestos, con su propia ingesta. `ingest-descompuestos`
     # declara `stage = ingest`, como la ingesta de `raw`; el build, `build_aux`.
     "ingest-descompuestos": ("IngestDescompuestosStep", "ingest_descompuestos", "ingest"),

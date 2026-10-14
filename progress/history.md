@@ -1761,3 +1761,23 @@ PostgreSQL 16 real con el `psql.exe` 16.4 de Windows (0 apariciones de la contra
 QUEDA (MANUAL): imagen, job y diccionario v50; rotación y alta del total (runbook §12) de día;
 `check-pg` puntual (P12); credencial de Power BI; nocturna siguiente; copias muertas (D12).
 Fuera: F-008 de `mcp-bbdd` (elegir conexión por oid) y F-087.
+
+## F-037 · La cartera de cobros y pagos (fase 1), con los pagos de personal restringidos · 2026-10-14
+
+Un efecto de `raw.pag`/`raw.cob` por fila en dos esquemas, como la contabilidad:
+`tesoreria_restringida.efectos` (completa, solo el rol autorizado y el login total) y
+`tesoreria.efectos` (sin pagos de personal: unión de naturaleza, cuenta 465/466/475, tercero
+empleado y documento de nómina, con fallo cerrado y guarda que recalcula desde `raw`), más
+`efectos_restringidos_mes` (solo recuentos). Estado PREVISTO/REALIZADO/BAJA leído de `est`,
+`importe_flujo` con signo, obra solo por el centro (D4-A), `previsto_antiguo` con regla dura
+(D11-A). `compras.vencimientos` pasa a vista de la general (mismo contenido, 197.190).
+Diccionario v51 (`R-TESORERIA-ESTADO`, `R-TESORERIA-RESTRINGIDA`); permisos en `apply_grants` y
+`02_roles.sql`; paso `build_tesoreria` delante de compras.
+
+Verificado: `init.sh` 7.826 passed, cobertura 100 % (136/136), mutación 45/45 (la primera campaña
+salió NO VÁLIDA por suspensión del equipo y se repitió); SQL probado por el reviewer en
+PostgreSQL 16 local (dos noches, la vista sobrevive, la guarda corta); contraste de solo lectura
+en Azure conforme. Review: pasada 1 rechazada solo por evidencia, pasada 2 APROBADO.
+
+QUEDA (MANUAL, con orden del humano): merge, imagen y job, `02_roles.sql`, build, apply-grants,
+pruebas negativa/positiva, diccionario v51, nocturna siguiente; lista blanca de `mcp-bbdd`.

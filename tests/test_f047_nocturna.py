@@ -76,6 +76,10 @@ def test_f047_r1_la_composicion_nocturna_es_exactamente_esta() -> None:
         "build_stg",
         "build_mart",
         "build_maestros",
+        # F-037: la cartera de cobros y pagos, DELANTE de compras (su
+        # `compras.vencimientos` es una vista de `tesoreria.efectos`) pero sin
+        # que nadie la declare en su `depends_on` (D9).
+        "build_tesoreria",
         "build_compras",
         "build_retenciones",
         # F-057 metió el quinto build de negocio, y con la misma propiedad que

@@ -141,13 +141,16 @@ def test_f006_r11_una_regla_bloqueante_con_objeto_inexistente_falla() -> None:
 
 
 def test_f006_r11_un_esquema_inexistente_en_el_ambito_tambien_falla() -> None:
-    """`tesoreria` no existe todavía (es F-037): protegerlo sería protegar humo."""
+    """`flujo_caja` no existe: protegerlo sería protegar humo.
+
+    (El ejemplo era `tesoreria` hasta que F-037 lo creó el 2026-10-13.)
+    """
     reglas = [_regla(c) for c in CODIGOS_REGLAS_OBLIGATORIAS]
-    reglas[0] = _regla(CODIGOS_REGLAS_OBLIGATORIAS[0], ambito=("tesoreria",))
+    reglas[0] = _regla(CODIGOS_REGLAS_OBLIGATORIAS[0], ambito=("flujo_caja",))
 
     errores = validar(_dicc(reglas=reglas), PASOS_NOCTURNOS)
 
-    assert any("tesoreria" in e.detalle for e in errores)
+    assert any("flujo_caja" in e.detalle for e in errores)
 
 
 def test_f006_r11_tambien_se_exige_a_las_reglas_de_aviso() -> None:

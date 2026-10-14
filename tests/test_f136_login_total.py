@@ -1187,7 +1187,8 @@ def _regla_restringida() -> dict:
 
 
 def test_f136_r32_version_50() -> None:
-    assert _yaml_dicc("00_global.yaml")["version"] == 50
+    # «Al menos»: F-037 subio a la 51 el 2026-10-13 (la leccion de F-073/F-080).
+    assert _yaml_dicc("00_global.yaml")["version"] >= 50
 
 
 def test_f136_r32_el_titulo_se_explica_solo() -> None:

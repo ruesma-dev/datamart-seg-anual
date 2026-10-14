@@ -22,7 +22,7 @@ obras. Microservicio único; se despliega como job programado en Azure.
 
 `raw` → `stg` → `mart` (+ `cierre` para cierres mensuales y planif vs real).
 Módulos adicionales: `compras`, `maestro`, `retenciones`, `personal`,
-`contabilidad`, `descompuestos`, `auxiliar`. SQL numerado `NN_nombre.sql` y
+`contabilidad`, `tesoreria`, `descompuestos`, `auxiliar`. SQL numerado `NN_nombre.sql` y
 ejecutado en orden dentro de cada capa.
 
 **`personal` (F-057, 2026-09-18) es el único esquema con datos personales**
@@ -67,6 +67,28 @@ de `05_mayor_general.sql` hace fallar el paso si se cuela un apunte de cuenta
 restringida o si general más restringidos no suman el completo. Regla dura
 `R-CONTABILIDAD-RESTRINGIDA`: el mayor completo se lee solo de
 `contabilidad_restringida` y los dos esquemas nunca se suman.
+
+**`tesoreria` (F-037, fase 1, 2026-10-13) es la cartera de cobros y pagos**:
+una fila por EFECTO de `raw.pag` (PAGO) y `raw.cob` (COBRO), tal cual, con su
+estado PREVISTO/REALIZADO/BAJA (precedencia de F-094, igual en los dos
+sentidos: la baja gana y `est = 10` sin fecha real es REALIZADO), su signo de
+caja (`importe_flujo`), la obra SOLO por el centro de coste y la marca
+`previsto_antiguo` (PREVISTO vencido hace más de 2 años: deuda sin puntear, no
+caja). Mismo patrón de DOS esquemas que la contabilidad:
+`tesoreria_restringida.efectos` es la cartera COMPLETA con `restringido` y
+`motivo_restriccion` (los pagos de nómina, embargo y cuota: 37.053; criterio en
+`domain/tesoreria.py`, que importa el de cuentas de F-135), y solo la lee el
+autorizado y el total; `tesoreria.efectos` es la GENERAL, sin ellos, con una
+guarda `DO` que recalcula el criterio desde `raw` y hace fallar el paso si se
+cuela uno, y `tesoreria.efectos_restringidos_mes` cuenta lo que falta (sin
+importes). **Las tablas no se dropean** (`CREATE TABLE IF NOT EXISTS` +
+`TRUNCATE` + `INSERT`, patrón de `personal`): `compras.vencimientos` de F-080 es
+desde F-037 una VISTA de `tesoreria.efectos` (pago y factura de compra, mismas
+columnas), y un `DROP ... CASCADE` se la llevaría cada noche. `build_tesoreria`
+solo depende de `ingest_raw`, va delante de `build_compras` en la lista y nadie
+lo declara en su `depends_on`: si falla, su `TRUNCATE` se deshace y compras lee
+la cartera de ayer. Es cartera, no devengo: la proyección de obra (fase 2) no
+existe. Reglas duras `R-TESORERIA-ESTADO` y `R-TESORERIA-RESTRINGIDA`.
 
 **`descompuestos` (F-097, 2026-09-28) es de qué se compone cada partida**, por
 ORIGEN, y es el primer esquema del datamart que NO se reconstruye de cero:
@@ -627,10 +649,11 @@ fallo con cualquier tolerancia.
 - **Qué lee cada rol, desde F-135.** El GENERAL (`mcp_sigrid_dm_ro`) lee los
   esquemas de `PG_CONSUMPTION_SCHEMAS` —`mart`, `cierre`, `compras`,
   `maestro`, `retenciones`, `personal`, `contabilidad` (la general),
-  `descompuestos`, `stg`, `aux` y `_meta`— y NO lee los de `PG_VETOED_SCHEMAS`:
-  `contabilidad_restringida` y `raw`. El AUTORIZADO
-  (`sigrid_dm_restringido_ro`) lee `contabilidad_restringida`
-  (`PG_RESTRICTED_SCHEMAS`). El dueño y el administrador lo leen todo, como
+  `tesoreria` (la general, F-037), `descompuestos`, `stg`, `aux` y `_meta`— y
+  NO lee los de `PG_VETOED_SCHEMAS`: `contabilidad_restringida`,
+  `tesoreria_restringida` y `raw`. El AUTORIZADO (`sigrid_dm_restringido_ro`)
+  lee `contabilidad_restringida` y `tesoreria_restringida`
+  (`PG_RESTRICTED_SCHEMAS`); el total, las dos por pertenencia. El dueño y el administrador lo leen todo, como
   siempre. `apply_grants`, cada noche y en este orden: (1) si un esquema está a
   la vez en consumo y en vetados —un `.env` viejo que aún lista `raw`— o el del
   autorizado no está vetado, FAILED sin ejecutar nada; (2) concede al general,
@@ -656,8 +679,9 @@ fallo con cualquier tolerancia.
   sobre los grupos): eso es `02_roles.sql`, que corre el humano (runbook §12).
 - **Lo que NO es de este repositorio** (F-135, F-136): que el MCP conecte con
   el login total según quién pregunta (por oid, fuera de todo repositorio) y que
-  su lista blanca admita `contabilidad_restringida` (`mcp-bbdd`, su F-008, con el
-  contrato en `azure-apps/datamart_seg_anual.md`); y que Power BI tenga rol
+  su lista blanca admita `contabilidad_restringida` y `tesoreria_restringida`,
+  y `tesoreria` en las dos conexiones (`mcp-bbdd`, su F-008, con el contrato en
+  `azure-apps/datamart_seg_anual.md`): hasta entonces el MCP no ve la cartera; y que Power BI tenga rol
   propio (F-087). Hasta entonces el login total existe pero ningún cliente lo
   usa: nadie lee lo que no debía, y quien debe verlo lo tiene en Sigrid.
 - **La recuperación es volver a ejecutar el ETL, no restaurar**: el PITR es de
@@ -1041,13 +1065,15 @@ Otras 13 entradas tienen el mismo defecto (F-115).
 Hasta el 2026-08-28 `run-all` construía `raw → stg → mart` y nada más.
 `cierre`, `compras`, `maestro` y `retenciones` se lanzaban a mano y podían
 estar desfasados semanas. F-057 añadió el quinto, `build_personal`, que nació
-ya dentro, F-056 el sexto, `build_contabilidad`, y F-097 el séptimo,
-`build_descompuestos`, con su propia ingesta `ingest_descompuestos` delante. Los
-catorce pasos de hoy, en orden:
+ya dentro, F-056 el sexto, `build_contabilidad`, F-097 el séptimo,
+`build_descompuestos`, con su propia ingesta `ingest_descompuestos` delante, y
+F-037 el octavo, `build_tesoreria`, delante de `build_compras` (su
+`compras.vencimientos` es una vista de `tesoreria.efectos`; sin `depends_on`).
+Los quince pasos de hoy, en orden:
 
 ```
 ingest_raw → load_excel_aux → build_stg → build_mart
-           → build_maestros → build_compras → build_retenciones
+           → build_maestros → build_tesoreria → build_compras → build_retenciones
            → build_personal → build_contabilidad
            → ingest_descompuestos → build_descompuestos → build_cierre
            → publicar_diccionario → apply_grants
@@ -1079,7 +1105,10 @@ ingest_raw → load_excel_aux → build_stg → build_mart
   `build_contabilidad` (F-056) tampoco está medido en build todavía: el SELECT
   entero de las tres tablas lee en 126 s en solo lectura (2026-09-26), y con
   la escritura y los índices se estima en 4-6 min y ~1,2 GB; se mide en su
-  primera ejecución.
+  primera ejecución. `build_tesoreria` (F-037), tampoco: el SELECT de la
+  cartera completa lee 278.866 filas en 2-9 s en solo lectura (2026-10-13), y
+  con los dos `INSERT` y sus índices se estima en +1-3 min y +0,2 GB; se mide
+  en el primer build manual del despliegue (R29).
 
 **El guardián.** `run-all` termina contrastando **lo que el SQL del
 repositorio declara crear** contra `information_schema`, y sale con código 1

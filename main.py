@@ -22,7 +22,8 @@ Operación del datamart en Azure (F-005, ver docs/runbook_postgres_azure.md):
                                         a mano solo hace falta tras lanzar
                                         build-cierre, build-compras,
                                         build-maestros, build-retenciones,
-                                        build-personal, build-contabilidad o
+                                        build-personal, build-contabilidad,
+                                        build-tesoreria o
                                         build-descompuestos sueltos: recrean
                                         tablas y vistas con
                                         DROP + CREATE y un DROP se lleva los
@@ -103,6 +104,7 @@ from etl_sigrid.application.steps.apply_grants_step import ApplyGrantsStep
 from etl_sigrid.application.steps.build_cierre_step import BuildCierreStep
 from etl_sigrid.application.steps.build_compras_step import BuildComprasStep
 from etl_sigrid.application.steps.build_contabilidad_step import BuildContabilidadStep
+from etl_sigrid.application.steps.build_tesoreria_step import BuildTesoreriaStep
 from etl_sigrid.application.steps.build_descompuestos_step import BuildDescompuestosStep
 from etl_sigrid.application.steps.build_maestros_step import BuildMaestrosStep
 from etl_sigrid.application.steps.build_mart_step import BuildMartStep
@@ -513,8 +515,9 @@ def build_pipeline_steps(
 
     F-047 (que absorbe F-044) metió aquí los CUATRO build que se lanzaban a
     mano, F-057 añadió el quinto (`build_personal`), F-056 el sexto
-    (`build_contabilidad`) y F-097 el séptimo (`build_descompuestos`, con su
-    propia ingesta `ingest_descompuestos` delante): siete build de negocio. El
+    (`build_contabilidad`), F-097 el séptimo (`build_descompuestos`, con su
+    propia ingesta `ingest_descompuestos` delante) y F-037 el octavo
+    (`build_tesoreria`): ocho build de negocio, quince pasos. El
     orden dentro de la lista es legible, pero lo que lo GARANTIZA es el
     `depends_on` de cada paso, que es lo que obedece el orden topológico.
     """
@@ -533,6 +536,13 @@ def build_pipeline_steps(
         # con CASCADE la tabla de la que cuelga `cierre.v_pbi_planif_vs_real`.
         # Eso lo declara `BuildCierreStep.depends_on`, no esta posición.
         BuildMaestrosStep(settings),
+        # F-037: la cartera de cobros y pagos, el OCTAVO build de negocio. Va
+        # DELANTE de compras porque `compras.vencimientos` es una vista de
+        # `tesoreria.efectos`: la noche buena, compras lee la cartera de hoy.
+        # Pero `build_compras` NO lo declara en su `depends_on` (D9): la vista
+        # solo necesita que la tabla exista, y si este paso falla su TRUNCATE
+        # se deshace y compras lee la de ayer. Nadie depende de el.
+        BuildTesoreriaStep(settings),
         BuildComprasStep(settings),
         BuildRetencionesStep(settings),
         # F-057: `personal` entra como QUINTO build de negocio. Lee `stg.obras`
@@ -591,8 +601,9 @@ def build_pipeline_steps(
 def run_all(full_refresh: bool, reconstruir_todo: bool) -> None:
     """
     Ejecuta el pipeline completo: ingest → load_aux → stage → build_mart →
-    los siete build (maestros, compras, retenciones, personal, contabilidad,
-    descompuestos —con su ingesta `ingest_descompuestos` delante— y cierre) →
+    los ocho build (maestros, tesoreria, compras, retenciones, personal,
+    contabilidad, descompuestos —con su ingesta `ingest_descompuestos`
+    delante— y cierre) →
     publicar_diccionario → apply_grants.
 
     Cuatro de esos esquemas se construían antes a mano y entraron aquí con
@@ -601,9 +612,10 @@ def run_all(full_refresh: bool, reconstruir_todo: bool) -> None:
     `personal` —recursos, partes de trabajo y horas por obra—, nació ya dentro
     de la nocturna con F-057, el sexto, `contabilidad` —el plan de cuentas,
     el mayor y los saldos por cuenta y mes—, con F-056, y el séptimo,
-    `descompuestos` —de qué se compone cada partida, por origen—, con F-097.
+    `descompuestos` —de qué se compone cada partida, por origen—, con F-097,
+    y el octavo, `tesoreria` —la cartera de cobros y pagos—, con F-037.
 
-    Los siete comparten una propiedad que hay que conocer antes de leer un dato
+    Los ocho comparten una propiedad que hay que conocer antes de leer un dato
     suyo: **ninguno es dependencia de ningún otro paso**, así que un fallo en
     cualquiera de ellos deja su esquema con el dato de una noche anterior
     mientras `raw`, `stg` y `mart` están al día, y la noche termina en verde.
@@ -805,8 +817,9 @@ def apply_grants() -> None:
 
     `run-all` ya lo ejecuta como último paso de la noche. A mano hace falta
     tras lanzar `build-cierre`, `build-compras`, `build-maestros`,
-    `build-retenciones`, `build-personal`, `build-contabilidad` o
-    `build-descompuestos` SUELTOS: esos comandos recrean tablas y vistas con
+    `build-retenciones`, `build-personal`, `build-contabilidad`,
+    `build-tesoreria` o `build-descompuestos` SUELTOS: esos comandos recrean
+    tablas y vistas con
     DROP + CREATE y un DROP se lleva los GRANT concedidos.
     """
     settings = get_settings()
@@ -5314,6 +5327,40 @@ def build_personal() -> None:
     pg = _get_pg()
     ejecucion = _arrancar_ejecucion(pg)
     _ejecutar_paso(BuildPersonalStep(settings), pg, ejecucion)
+
+
+# =============================================================================
+# MÓDULO TESORERÍA (F-037, fase 1): la cartera de cobros y pagos
+# =============================================================================
+@cli.command("build-tesoreria")
+def build_tesoreria() -> None:
+    """
+    Construye los schemas tesoreria y tesoreria_restringida desde raw.*.
+
+    Ejecuta en orden los SQL de sql/tesoreria:
+      00_setup.sql                     schemas, funciones y las tres tablas
+      01_efectos_completo.sql          tesoreria_restringida.efectos: todos los
+                                       efectos de pag y cob, con la marca de personal
+      02_efectos_general.sql           tesoreria.efectos: sin los de personal, con
+                                       la guarda que lo comprueba desde raw
+      03_efectos_restringidos_mes.sql  cuantos faltan, sin importes
+
+    En el PRIMER despliegue va ANTES que `build-compras`: `compras.vencimientos`
+    es una vista de `tesoreria.efectos` y su `05` falla si la tabla no existe.
+    Tras lanzarlo suelto, `apply-grants`. No publica el diccionario.
+
+    LO QUE HAY QUE SABER ANTES DE CONSULTAR LO QUE ESTO CONSTRUYE:
+
+      * `estado_tesoreria = 'BAJA'` no se suma nunca (efectos divididos,
+        agrupados o anulados), y `fecha_real` vacia NO es pendiente: desde
+        2020 el pago por remesa queda en estado 10 sin fecha real.
+      * La cartera de un flujo de caja es PREVISTO y no `previsto_antiguo`.
+      * Es caja/cartera, no devengo: la fase 2 (proyeccion de obra) no existe.
+    """
+    settings = get_settings()
+    pg = _get_pg()
+    ejecucion = _arrancar_ejecucion(pg)
+    _ejecutar_paso(BuildTesoreriaStep(settings), pg, ejecucion)
 
 
 # =============================================================================
