@@ -481,3 +481,69 @@ def test_f138_r19_facturas_tras_liquidacion() -> None:
     assert "JOIN compras.facturas f ON f.factura_id = fc.factura_id AND f.fecha > cl.fecha_cierre" in bloque
     assert "f.fecha - cl.fecha_cierre AS dias_tras_cierre" in bloque
     assert "COALESCE(dl.cierra_contrato, FALSE) AS cierra_contrato" in bloque
+
+
+# ===========================================================================
+# R20-R21 · el sub-paso y la frontera (T8)
+# ===========================================================================
+
+
+def test_f138_r20_el_sub_paso_es_el_ultimo_y_cuenta_la_general() -> None:
+    from etl_sigrid.application.steps.build_compras_step import SUB_PASOS
+
+    ultimo = SUB_PASOS[-1]
+    assert (ultimo.name, ultimo.sql_file, ultimo.target_schema, ultimo.target_table) == (
+        "alarmas_liquidatoria", "15_alarmas_liquidatoria.sql", "compras", "documento_alarmas",
+    )
+    assert [s.sql_file for s in SUB_PASOS].count("15_alarmas_liquidatoria.sql") == 1
+    assert (DIR_SQL / ultimo.sql_file).exists()
+
+
+def test_f138_r20_el_paso_ejecuta_el_15_al_final(monkeypatch) -> None:
+    """Con el cliente simulado: el 15 se ejecuta el último y se cuenta la general."""
+    from types import SimpleNamespace
+
+    from etl_sigrid.application.steps import build_compras_step as modulo
+    from etl_sigrid.domain.entities import StepStatus
+
+    ejecutados: list[str] = []
+    contados: list[tuple[str, str]] = []
+
+    class _Pg:
+        def execute_sql_file(self, ruta):
+            ejecutados.append(Path(ruta).name)
+
+        def count_rows(self, esquema, tabla):
+            contados.append((esquema, tabla))
+            return 1
+
+    monkeypatch.setattr(modulo, "build_postgres_client", lambda _s: _Pg())
+    resultado = modulo.BuildComprasStep(SimpleNamespace()).run()
+    assert resultado.status == StepStatus.SUCCESS
+    assert ejecutados[-1] == "15_alarmas_liquidatoria.sql"
+    assert contados[-1] == ("compras", "documento_alarmas")
+
+
+def test_f138_r20_el_docstring_y_el_comentario_lo_cuentan() -> None:
+    texto = _texto(RAIZ / "etl_sigrid" / "application" / "steps" / "build_compras_step.py")
+    docstring = texto.split('"""', 2)[1]
+    assert "15_alarmas_liquidatoria.sql" in docstring and "F-138" in docstring
+    assert "compras_restringida" in docstring
+    comentario = texto.split('name="documento_adjuntos"')[1]
+    assert "F-138" in comentario
+
+
+def test_f138_r21_lo_existente_no_nombra_las_alarmas() -> None:
+    for fichero in ("01_documentos.sql", "07_texto.sql"):
+        texto = _texto(DIR_SQL / fichero).lower()
+        for tabla in ("conala", "auxala"):
+            assert tabla not in texto, f"{fichero} nombra `{tabla}` (R21, D7)"
+
+
+def test_f138_r21_solo_el_15_nombra_las_alarmas() -> None:
+    for ruta in sorted(DIR_SQL.glob("*.sql")):
+        if ruta.name == "15_alarmas_liquidatoria.sql":
+            continue
+        texto = _texto(ruta).lower()
+        assert "raw.conala" not in texto and "raw.auxala" not in texto, ruta.name
+        assert "documento_alarmas" not in texto, ruta.name
