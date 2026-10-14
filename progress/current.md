@@ -9,6 +9,22 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-14 · F-138 · SPEC ESCRITA (spec-author), pendiente de aprobación del humano
+
+- Spec en `specs/F-138-facturas-liquidatorias/` (requirements 148/150, design 198/250, 14 tareas);
+  mediciones en `progress/spec_F-138.md`. Escrita sobre `main`, sin rama, sin commit y sin
+  `init.sh` (orden del líder: tenía un `init.sh` corriendo sobre el árbol).
+- Lo esencial medido: el «Creada por / fecha y hora» de la alarma es `conala.creusu/crefec/crehor`
+  (100 % informado; `fec1`/`fec2` vacías). `conala` filtrada a facturas y albaranes: 23.833 filas,
+  1,1 s. Regla de texto -> 8.653 facturas, 4.586 albaranes y 55 proformas liquidatorias (notas 0).
+  5.859 contratos tienen alguna; 719 reciben 1.160 facturas DESPUÉS de su primera liquidatoria.
+- **Decisiones que necesita el humano (D1-D8 en `requirements.md`)**: D1 «para qué» es el criterio
+  1 del `acceptance` y solo lo contesta Elena Díaz (pregunta lista para reenviar en D1); no bloquea
+  empezar, solo `compras.contrato_liquidacion`. Resto, con recomendación: NTC dentro (D2); ingesta
+  filtrada a 14/15 (D3); «CARTA LIQUIDACIÓN» como DUDOSA (D4); memo aparte de la marca (D5);
+  publicar el login de quien crea la alarma (D6); `facturas`/`albaranes` intactas por F-128/F-093
+  (D7); `acceptance` concretado (D8).
+
 ## 2026-10-14 · Backlog reordenado por orden del humano · BACKLOG.md con una tabla por estado
 
 - **Nuevas**: **F-138** (facturas liquidatorias, correo de Elena Díaz del 14-10; la marca es una

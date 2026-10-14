@@ -1,0 +1,22 @@
+# F-138 · Tareas
+
+Requisito previo: el humano ha aprobado la spec y decidido D1-D8
+(`requirements.md`). Si D1 llega después de empezar, T1-T6 no dependen de ella;
+T5 lleva el bloque `contrato_liquidacion`, que se quita entero si D1 lo descarta.
+Rama `feature/F-138-facturas-liquidatorias`; rigor `estandar` (fase RED,
+cobertura y mutación muestreada).
+
+- [ ] T1: `etl_sigrid/domain/liquidatoria.py` (familias, `filtro_conala`, traducción, patrones R9, `PRECEDENCIA`, `normalizar`, `clasificar`, `marca_documento`, `fecha_hora_creacion`) + `tests/test_f138_dominio.py` en RED primero (casos de R10, precedencia, horas imposibles, patrones sin `\b`/`\w`/`(?`)  |  Verificación: `python -m pytest tests/test_f138_dominio.py -q` (R6-R12)
+- [ ] T2: `config/tables_sigrid.yaml` + `conala` (filtro del dominio) y + `auxala`, con su comentario de cifras + tests de ingesta en `tests/test_f138_ingesta_sql.py`  |  Verificación: `python -m pytest tests/test_f138_ingesta_sql.py -q -k "r1 or r2 or r3 or r5"` (R1-R3, R5)
+- [ ] T3: censo 74 -> 76 en `tests/test_f085_sql.py`, `test_f085_diccionario.py`, `test_f090_diccionario.py`, `test_f090_ingesta_sql.py`, `test_f095_retenciones_contables.py` y `test_f097_ingesta_descompuestos.py` (solo los asserts del censo) + test R4  |  Verificación: `python -m pytest tests/test_f085_sql.py tests/test_f090_ingesta_sql.py tests/test_f097_ingesta_descompuestos.py tests/test_f138_ingesta_sql.py -q -k "r4 or censo or tablas"` (los de textos de documentación siguen en rojo hasta T7-T8; se anota en el informe)
+- [ ] T4: `sql/compras/15_alarmas_liquidatoria.sql`: guarda R16, `fn_texto_normalizado`, `fn_clase_liquidacion` y `compras.documento_alarmas` + tests de texto SQL (literales del dominio, LEFT JOIN a `auxala`, `creada_el`)  |  Verificación: `python -m pytest tests/test_f138_ingesta_sql.py -q -k "r13 or r14 or r15 or r16"`
+- [ ] T5: mismo fichero: `compras.documento_liquidatoria` (orden de `PRECEDENCIA` en el CASE, `es_liquidatoria` nunca NULL, prefiltro del memo) y, según D1, `compras.contrato_liquidacion` (cadena de `v_pbi_contrato_consumo`) + tests  |  Verificación: `python -m pytest tests/test_f138_ingesta_sql.py -q -k "r17 or r18 or r19 or r20 or r21 or r22 or r25"`
+- [ ] T6: sub-paso `alarmas_liquidatoria` el último de `SUB_PASOS` en `build_compras_step.py` (comentario y docstring) + test de orden y destino + test R26 (`01_documentos.sql` y `07_texto.sql` no nombran `conala`/`auxala`)  |  Verificación: `python -m pytest tests/test_f138_ingesta_sql.py -q -k "r24 or r26"`
+- [ ] T7: diccionario: fichas de los tres objetos y las dos funciones en `compras.yaml` (R27-R29) y relaciones en `facturas`, `albaranes`, `contratos`; fichas `raw.conala` y `raw.auxala`, «Son 76 tablas»; `00_global.yaml` con `version` +1 y «las 76 tablas» + `tests/test_f138_diccionario.py`  |  Verificación: `python -m pytest tests/test_f138_diccionario.py -q` (R27-R30)
+- [ ] T8: `docs/ARCHITECTURE.md` (76 tablas, `conala`/`auxala`, F-138) y `azure-apps/datamart_seg_anual.md` (commit local en ese repo, sin push) + tests R31  |  Verificación: `python -m pytest tests/test_f138_diccionario.py tests/test_f085_diccionario.py tests/test_f090_diccionario.py tests/test_f095_retenciones_contables.py -q`
+- [ ] T9: campaña de mutación y análisis de supervivientes sobre `domain/liquidatoria.py`  |  Verificación: `python -m harness.mutacion --feature F-138` (si da 0 mutantes, tabla MANUAL de `CHECKPOINTS.md` C4 bis)
+- [ ] T10: `progress/impl_F-138.md` con trazas RED/GREEN y las verificaciones MANUAL pendientes (T11-T13)  |  Verificación: `python -m harness.tamano --feature F-138`
+- [ ] T11: MANUAL (humano): tras desplegar la imagen, `python main.py ingest --table conala --full` y `... --table auxala --full` (o la nocturna), `python main.py build-compras`, `python main.py check-raw-recuentos`; recuentos de R32 y R23 por SQL de solo lectura  |  Verificación: MANUAL (humano) (R23, R32)
+- [ ] T12: MANUAL (líder, solo lectura): `publicar-diccionario` (lo autoriza el humano), reiniciar el MCP y hacerle las tres preguntas de R33 sin explicarle nada  |  Verificación: MANUAL (humano), resultado en `progress/impl_F-138.md` (R33)
+- [ ] T13: MANUAL (líder): medir en la primera nocturna con F-138 los segundos de `ingest_raw.conala`, `ingest_raw.auxala` y del sub-paso (`python main.py timings`)  |  Verificación: MANUAL (humano) (R34)
+- [ ] T14: Ejecutar `bash harness/init.sh` en verde  |  Verificación: `bash harness/init.sh`
