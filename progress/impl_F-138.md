@@ -141,7 +141,7 @@ Medidas el 2026-10-15 (hora local de la máquina).
 
 | Evidencia | Resultado real |
 |---|---|
-| `bash harness/init.sh` (sobre `6183ba7`, código final) | **ENTORNO LISTO** (salida 0); se repite sobre el commit final del informe (abajo) |
+| `bash harness/init.sh` (sobre `6183ba7`, código final, y de nuevo sobre `7244084`, con los informes) | **ENTORNO LISTO** (salida 0) las dos veces: 8.065 passed, 249 skipped; la segunda en 1.002 s |
 | Tests ejecutados (suite completa, dentro de `init.sh`) | **8.065 passed, 249 skipped, 0 failed** |
 | Tiempo de la suite | **1.244 s (20 min 44 s)** con medición de cobertura |
 | Tests de la feature | `test_f138_{dominio,ingesta_sql,grants,diccionario}.py`: 102 + 40 + 13 + 22 = **177 passed** |

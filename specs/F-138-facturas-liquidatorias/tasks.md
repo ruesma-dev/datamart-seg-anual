@@ -20,4 +20,4 @@ Requisito previo: spec aprobada; D1-D9 decididas por el humano el 2026-10-14
 - [ ] T14: MANUAL (humano), pasos 1-5 de design § Despliegue: job sin `PG_*` fijadas e imagen; `psql -X -v ON_ERROR_STOP=1 -f infra/sql/02_roles.sql $dsn`; `python main.py ingest --table conala --full` y `--table auxala --full`; `python main.py build-compras`; `python main.py apply-grants`; `python main.py check-raw-recuentos` y recuentos de R28-R29  |  Verificación: MANUAL (humano) (R28-R30)
 - [ ] T15: MANUAL (líder, solo lectura), pasos 6-7: `publicar-diccionario` (lo autoriza el humano) y los tres `check-*`; pedir a `mcp-bbdd` la lista blanca y el reinicio; preguntas de R31 con la cuenta total y la negativa con la estándar  |  Verificación: MANUAL (humano), resultado en `progress/impl_F-138.md` (R31)
 - [ ] T16: MANUAL (líder), paso 8: segundos de `ingest_raw.conala`, `ingest_raw.auxala` y del sub-paso en la primera nocturna (`python main.py timings`)  |  Verificación: MANUAL (humano)
-- [ ] T17: Ejecutar `bash harness/init.sh` en verde  |  Verificación: `bash harness/init.sh`
+- [x] T17: Ejecutar `bash harness/init.sh` en verde  |  Verificación: `bash harness/init.sh`
