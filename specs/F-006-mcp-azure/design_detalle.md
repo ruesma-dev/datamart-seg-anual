@@ -243,6 +243,16 @@ infraestructura.
 > `compras.vencimientos` pasa a ser una vista de `tesoreria.efectos`, con las
 > mismas columnas. El inventario sube de 212 a **217 objetos**, las columnas
 > descritas de 1699 a **1795** y las fichas de consumo de 101 a **104**.
+>
+> **Enmienda del 2026-10-14 (F-138, las alarmas de los documentos y la marca
+> «liquidatoria»).** Entran `raw.conala` y `raw.auxala` (son 76 tablas), el
+> esquema `compras_restringida` (el decimosexto, patrón de F-135 y F-037) con
+> `compras_restringida.documento_alarmas` (todas las alarmas, con recursos y
+> partes), y en `compras` la general `documento_alarmas`,
+> `documento_liquidatoria`, `contrato_liquidacion`, `facturas_tras_liquidacion`
+> y las funciones `fn_texto_normalizado` y `fn_clase_liquidacion`. El
+> inventario sube de 217 a **226 objetos**, las columnas descritas de 1795 a
+> **1864** y las fichas de consumo de 104 a **109**.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,

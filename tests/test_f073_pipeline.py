@@ -73,6 +73,8 @@ FICHEROS_COMPRAS = [
     "13_estado_documentos.sql",
     # F-090: el índice de ficheros adjuntos (`rcg` + `gra`).
     "14_documento_adjuntos.sql",
+    # F-138: las alarmas y la marca «liquidatoria» (`conala` + `auxala`).
+    "15_alarmas_liquidatoria.sql",
 ]
 
 

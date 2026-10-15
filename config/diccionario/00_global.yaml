@@ -563,7 +563,21 @@
 # mismas columnas; su frescura es la de `build_tesoreria`. `R-FRESCURA` alcanza
 # los dos esquemas nuevos.
 
-version: 51
+# version 52 (F-138, 2026-10-14): LAS ALARMAS DE LOS DOCUMENTOS Y LA MARCA
+# «LIQUIDATORIA». Correo de Control de Costes («facturas liquidatorias»): en
+# Sigrid la liquidatoria es una ALARMA de texto libre (`conala`), no un campo.
+# Entran `raw.conala` (17 familias en lista explicita, sin empleados) y
+# `raw.auxala`: son las 76 tablas. Objetos nuevos en `compras`:
+# `documento_alarmas` (la general), `documento_liquidatoria` (la marca de cada
+# factura, albaran, proforma y nota), `contrato_liquidacion` (¿se han terminado
+# las facturas del contrato?), `facturas_tras_liquidacion` (el aviso de las que
+# llegan despues) y las funciones `fn_texto_normalizado` y
+# `fn_clase_liquidacion`. Esquema nuevo `compras_restringida`, patron de F-135 y
+# F-037, con la tabla COMPLETA de alarmas (las de recursos y partes de trabajo
+# nombran trabajadores y bajas: D9, solo perfil total) y regla dura nueva
+# `R-COMPRAS-RESTRINGIDA`. `R-SIGRID-CON` declara los campos propios de `auxala`.
+
+version: 52
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -585,11 +599,12 @@ reglas:
   - codigo: R-FRESCURA
     titulo: Ocho esquemas pueden quedarse atras sin tumbar la noche
     severidad: bloqueante
-    ambito: [cierre, compras, maestro, retenciones, personal, contabilidad, contabilidad_restringida, tesoreria, tesoreria_restringida, descompuestos]
+    ambito: [cierre, compras, compras_restringida, maestro, retenciones, personal, contabilidad, contabilidad_restringida, tesoreria, tesoreria_restringida, descompuestos]
     regla: >-
-      Estos ocho esquemas (diez con `contabilidad_restringida` y
-      `tesoreria_restringida`, que construyen el mismo `build_contabilidad` y
-      el mismo `build_tesoreria`) SI se construyen cada noche dentro de
+      Estos ocho esquemas (once con `contabilidad_restringida`,
+      `tesoreria_restringida` y `compras_restringida`, que construyen el mismo
+      `build_contabilidad`, el mismo `build_tesoreria` y el mismo
+      `build_compras`) SI se construyen cada noche dentro de
       `run-all`, y los ocho registran paso, asi que su fecha de build siempre es
       consultable. Lo que no cambia es que su paso NO es dependencia de ningun
       otro: si `build_cierre`, `build_compras`, `build_maestros`,
@@ -907,6 +922,31 @@ reglas:
       documento de nomina- coinciden exactamente; 0 cobros. El MCP no filtra el
       catalogo ni el diccionario por perfil, asi que el titulo dice cual usar.
 
+  - codigo: R-COMPRAS-RESTRINGIDA
+    titulo: Usa compras.documento_alarmas; compras_restringida es solo para el perfil total del MCP
+    severidad: bloqueante
+    ambito:
+      - compras.documento_alarmas
+      - compras_restringida
+    regla: >-
+      Por defecto usa SIEMPRE `compras.documento_alarmas`.
+      `compras_restringida.documento_alarmas` solo la lee el perfil total del
+      MCP (y el grupo `sigrid_dm_restringido_ro`); para cualquier otro usuario
+      devuelve «permission denied», y eso no se rodea: no reintentes ni busques
+      esas alarmas por otro camino (`raw` tampoco se lee). Responde con
+      `compras.documento_alarmas` y di que no incluye las alarmas de recursos ni
+      de partes de trabajo. Si el usuario no pide expresamente alarmas de
+      recursos o de partes, no vayas a `compras_restringida` aunque sea «la
+      completa». Las dos tablas NUNCA se suman ni se unen: la completa ya
+      contiene a la general y sumarlas duplica lo visible.
+    motivo: >-
+      Decision del humano del 2026-10-14 (F-138, D9): las alarmas de recursos
+      (familia 33) y de partes de trabajo (35) nombran a trabajadores y sus
+      bajas, «mete esas alarmas en lectura solo para el perfil admin y no el
+      estandar». Son 27 de ~45.750 alarmas medidas ese dia. Mismo patron que
+      `R-TESORERIA-RESTRINGIDA`: el MCP no filtra el catalogo ni el diccionario
+      por perfil, asi que el titulo dice cual usar.
+
   - codigo: R-DESCOMPUESTO-ORIGEN
     titulo: Los descompuestos no se mezclan entre origenes ni entre versiones
     severidad: bloqueante
@@ -1127,7 +1167,7 @@ reglas:
     regla: >-
       Antes de escribir cualquier consulta contra `raw`, seis cosas.
 
-      **1. `ide` es la clave de las 74 tablas.** Se llama igual en todas, es el
+      **1. `ide` es la clave de las 76 tablas.** Se llama igual en todas, es el
       indice primario y es unico. Un campo que acaba en `ide` —`conide`,
       `entide`, `obride`— es una referencia a el.
 
@@ -1140,7 +1180,7 @@ reglas:
       alta— **y es de donde el datamart los toma para esas diez**. Pero **no
       asumas que un campo esta en `con` solo porque exista alli**: hay tablas
       cuyos campos propios el ETL lee **sin pasar por `con`**, y estas son, con
-      el campo exacto: `apu` (`apu.fec`, `apu.res`); `auxban` (`auxban.res`); `auxefp` (`auxefp.res`); `auxemp` (`auxemp.res`); `auxhor` (`auxhor.cod`, `auxhor.res`); `auxrestip` (`auxrestip.res`); `auxmun` (`auxmun.res`); `auxnap` (`auxnap.res`); `auxobramb` (`auxobramb.cod`, `auxobramb.res`); `auxobrcla` (`auxobrcla.res`); `auxobrtip` (`auxobrtip.res`); `auxpag` (`auxpag.cod`, `auxpag.res`); `auxpro` (`auxpro.res`); `auxpronat` (`auxpronat.cod`, `auxpronat.res`); `conest` (`conest.cod`, `conest.res`); `conext` (`conext.cod`); `confir` (`confir.cod`, `confir.fec`); `ctrpro` (`ctrpro.res`); `dcapro` (`dcapro.res`); `dcfpro` (`dcfpro.res`); `dcopro` (`dcopro.res`); `dncpro` (`dncpro.fec`, `dncpro.res`); `gra` (`gra.cod`, `gra.fec`, `gra.res`); `obrfas` (`obrfas.res`); `obrfasamb` (`obrfasamb.fec`, `obrfasamb.res`); `hmores` (`hmores.fec`); `obrparpar` (`obrparpar.cod`, `obrparpar.res`); `prv` (`prv.cif`, `prv.raz`); `rac` (`rac.fec`, `rac.res`); `res` (`res.cif`); `usu` (`usu.cod`, `usu.res`). Ahi el valor bueno es el de la tabla, no el de
+      el campo exacto: `apu` (`apu.fec`, `apu.res`); `auxala` (`auxala.cod`, `auxala.res`); `auxban` (`auxban.res`); `auxefp` (`auxefp.res`); `auxemp` (`auxemp.res`); `auxhor` (`auxhor.cod`, `auxhor.res`); `auxrestip` (`auxrestip.res`); `auxmun` (`auxmun.res`); `auxnap` (`auxnap.res`); `auxobramb` (`auxobramb.cod`, `auxobramb.res`); `auxobrcla` (`auxobrcla.res`); `auxobrtip` (`auxobrtip.res`); `auxpag` (`auxpag.cod`, `auxpag.res`); `auxpro` (`auxpro.res`); `auxpronat` (`auxpronat.cod`, `auxpronat.res`); `conest` (`conest.cod`, `conest.res`); `conext` (`conext.cod`); `confir` (`confir.cod`, `confir.fec`); `ctrpro` (`ctrpro.res`); `dcapro` (`dcapro.res`); `dcfpro` (`dcfpro.res`); `dcopro` (`dcopro.res`); `dncpro` (`dncpro.fec`, `dncpro.res`); `gra` (`gra.cod`, `gra.fec`, `gra.res`); `obrfas` (`obrfas.res`); `obrfasamb` (`obrfasamb.fec`, `obrfasamb.res`); `hmores` (`hmores.fec`); `obrparpar` (`obrparpar.cod`, `obrparpar.res`); `prv` (`prv.cif`, `prv.raz`); `rac` (`rac.fec`, `rac.res`); `res` (`res.cif`); `usu` (`usu.cod`, `usu.res`). Ahi el valor bueno es el de la tabla, no el de
       `con`.
 
       **4. Y hay tablas que no cuelgan de `con` en absoluto**: `auxhor`, `auxobramb`, `hmores`, `obrfas`, `obrfasamb`, `obrparpre`, `reshor`
@@ -1692,6 +1732,22 @@ esquemas:
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_tesoreria]
+
+  compras_restringida:
+    titulo: Las alarmas COMPLETAS de los documentos, con recursos y partes (solo perfil total del MCP y rol autorizado)
+    para_que_sirve: >-
+      La misma tabla de alarmas que `compras.documento_alarmas` pero COMPLETA:
+      con las alarmas de recursos y de partes de trabajo (F-138, D9), que
+      nombran trabajadores y bajas, marcadas con `restringido` y
+      `motivo_restriccion`. SOLO LA LEEN el perfil total del MCP (el login
+      `mcp_sigrid_dm_total`, F-136) y el grupo autorizado
+      `sigrid_dm_restringido_ro`; para el perfil estandar del MCP y para Power
+      BI esta vetada, y una consulta devuelve «permission denied». Por defecto
+      se usa `compras.documento_alarmas` (`R-COMPRAS-RESTRINGIDA`); no se suma
+      con ella.
+    consumo_recomendado: true
+    refresco: nocturno
+    pasos_etl: [build_compras]
 
   descompuestos:
     titulo: De que se compone cada partida, por origen

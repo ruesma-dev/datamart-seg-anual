@@ -126,20 +126,26 @@ DEFAULT_CONSUMPTION_SCHEMAS = (
 #   tesoreria_restringida     la cartera COMPLETA de cobros y pagos, con los
 #                             pagos de nómina, embargo y cuotas (F-037): solo
 #                             para el rol autorizado
+#   compras_restringida       las alarmas COMPLETAS de los documentos de Sigrid,
+#                             con las de recursos y partes de trabajo, que
+#                             nombran trabajadores y bajas (F-138, D9: «solo
+#                             para el perfil admin y no el estándar»): solo
+#                             para el rol autorizado
 #   raw                       la copia literal de Sigrid, con todo lo anterior
 #                             y más (ver el comentario de arriba)
 #
 # Un esquema no puede estar a la vez aquí y en `DEFAULT_CONSUMPTION_SCHEMAS`.
-DEFAULT_VETOED_SCHEMAS = "contabilidad_restringida,tesoreria_restringida,raw"
+DEFAULT_VETOED_SCHEMAS = "contabilidad_restringida,tesoreria_restringida,compras_restringida,raw"
 
 # El rol AUTORIZADO (F-135): grupo NOLOGIN que lee la contabilidad completa. Lo
 # crea `infra/sql/02_roles.sql`; quién es miembro lo decide Negocio (Juan
 # Romero, D8) y se da con `GRANT sigrid_dm_restringido_ro TO <login>`. Hoy no lo
 # usa ningún cliente: el MCP tendría que conectar con él según quién pregunta
 # (`mcp-bbdd`, su F-008) y Power BI necesita rol propio (F-087). Desde F-037 lee
-# también la cartera completa de cobros y pagos (`tesoreria_restringida`).
+# también la cartera completa de cobros y pagos (`tesoreria_restringida`), y
+# desde F-138 las alarmas completas de los documentos (`compras_restringida`).
 DEFAULT_RESTRICTED_ROLE = "sigrid_dm_restringido_ro"
-DEFAULT_RESTRICTED_SCHEMAS = "contabilidad_restringida,tesoreria_restringida"
+DEFAULT_RESTRICTED_SCHEMAS = "contabilidad_restringida,tesoreria_restringida,compras_restringida"
 
 # El login de acceso TOTAL del MCP (F-136): lee lo mismo que el rol general más
 # la contabilidad completa, por PERTENENCIA a los dos grupos (`02_roles.sql`,

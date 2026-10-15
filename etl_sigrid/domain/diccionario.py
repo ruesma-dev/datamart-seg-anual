@@ -44,7 +44,9 @@ from dataclasses import dataclass, replace
 #: el duodécimo, `descompuestos`: de qué se compone cada partida, por origen.
 #: F-135 añadió `contabilidad_restringida` y F-037 (2026-10-13) los dos de la
 #: cartera de cobros y pagos: `tesoreria` (la general) y `tesoreria_restringida`
-#: (la completa, con los pagos de personal, vetada al rol general).
+#: (la completa, con los pagos de personal, vetada al rol general). F-138
+#: (2026-10-14) añadió `compras_restringida`: las alarmas COMPLETAS de los
+#: documentos, con las de recursos y partes de trabajo, vetada al rol general.
 #:
 #: Ojo a la trampa de nombres: el esquema se llama `aux` pero su carpeta de SQL
 #: es `sql/auxiliar/`.
@@ -57,6 +59,7 @@ ESQUEMAS_DEL_DATAMART = (
     "aux",
     "cierre",
     "compras",
+    "compras_restringida",
     "contabilidad",
     "contabilidad_restringida",
     "descompuestos",

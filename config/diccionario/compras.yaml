@@ -405,6 +405,19 @@ objetos:
         porque: >-
           Para los ficheros adjuntos del contrato (el contrato firmado, en
           PDF o Word). Los tiene el 92,4 % de los contratos (F-090).
+      - de: contrato_id
+        a: compras.contrato_liquidacion.contrato_id
+        cardinalidad: "1:1"
+        porque: >-
+          Para saber si ya se han terminado las facturas del contrato (su
+          factura liquidatoria o pendiente de carta de liquidacion) y cuantas
+          han llegado despues (F-138). Todos los contratos tienen fila alli.
+      - de: contrato_id
+        a: compras.documento_alarmas.documento_id
+        cardinalidad: "1:N"
+        porque: >-
+          Para las alarmas de texto libre pegadas al contrato en Sigrid
+          (F-138), filtrando antes `familia = 'CONTRATO'`.
     ejemplos_preguntas:
       - Que contratos tiene abiertos la obra X y con quien
       - Con que proveedores tiene contrato la obra X
@@ -592,6 +605,13 @@ objetos:
         porque: >-
           Para los ficheros adjuntos del albaran. Casi ninguno los tiene
           (0,2 %): la practica no esta implantada (F-090).
+      - de: albaran_id
+        a: compras.documento_liquidatoria.documento_id
+        cardinalidad: "1:1"
+        porque: >-
+          Para saber si el albaran o la proforma es liquidatorio (F-138). Solo
+          tienen fila los que alguna alarma o el memo mencionan la liquidacion:
+          con LEFT JOIN, sin fila es «no marcado».
     ejemplos_preguntas:
       - Que albaranes ha traido el proveedor P este mes
 
@@ -900,6 +920,20 @@ objetos:
           proveedor, casi siempre en PDF). Que una factura no tenga fila
           alli es que Sigrid no tiene adjunto: desde 2019 lo tiene el 96,1
           %, antes de 2017 practicamente ninguna (F-090).
+      - de: factura_id
+        a: compras.documento_liquidatoria.documento_id
+        cardinalidad: "1:1"
+        porque: >-
+          Para saber si la factura es liquidatoria, o cierra el contrato
+          pendiente de carta de liquidacion (F-138). Solo tienen fila las que
+          alguna alarma o el memo mencionan la liquidacion: con LEFT JOIN, sin
+          fila es «no marcada», y `cierra_contrato` se lee con COALESCE a FALSE.
+      - de: factura_id
+        a: compras.documento_alarmas.documento_id
+        cardinalidad: "1:N"
+        porque: >-
+          Para las alarmas de texto libre pegadas a la factura en Sigrid
+          (F-138), filtrando antes `familia = 'FACTURA'`.
     ejemplos_preguntas:
       - Que facturas nos ha pasado el proveedor P este ano
       - En que estado esta la factura X, esta aprobada o solo contabilizada
@@ -4016,3 +4050,523 @@ objetos:
       - Cuantas facturas de 2025 estan sin adjunto
       - Que comparativos de la obra 0720 tienen un Excel adjunto, en el comparativo o en alguna de sus ofertas
       - Quien subio el contrato firmado de un contrato y cuando
+
+  fn_texto_normalizado:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de compras: la usa `compras.fn_clase_liquidacion`.
+    descripcion: >-
+      Normaliza un texto libre de Sigrid para clasificarlo (F-138): traduce las
+      vocales acentuadas, la `u` con dieresis, la `n` con tilde y la cedilla;
+      convierte cada tramo que no sea letra ASCII o cifra en UN espacio; pasa a
+      mayusculas y recorta. NULL da la cadena vacia. Las mayusculas van DESPUES
+      de dejar solo ASCII, para que el resultado no dependa de la configuracion
+      regional. Sus literales son los de `etl_sigrid/domain/liquidatoria.py`.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_clase_liquidacion:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de compras. Su resultado ya esta publicado:
+      `clase_liquidacion` en `compras.documento_alarmas` y `clase_memo` en
+      `compras.documento_liquidatoria`.
+    descripcion: >-
+      La clase de liquidacion de un texto libre (F-138), sobre el texto
+      normalizado (`fn_texto_normalizado`). Si no hay ninguna palabra que
+      empiece por LIQ: REMITE si remite a otro sitio («VER TEXTO», «VER NOTA»,
+      «MIRAR TEXTO», «VER EL TEXTO»), si no NULL. Si la hay, la primera que
+      case de: NEGADA («NO ES LIQUIDATORIA», «NO SERA LIQ...», «NO <una
+      palabra> LIQ...»), CARTA_LIQUIDACION («CARTA LIQUIDACION», «CARTA DE
+      LIQUIDACION»), DUDOSA (contiene PREVISION, POSTERIOR, TIENE QUE VENIR,
+      QUEDA PENDIENTE o NO SE SI); y si ninguna, LIQUIDATORIA. Es una regla
+      HEURISTICA sobre texto libre: la regla y sus casos medidos viven escritos
+      una sola vez en `etl_sigrid/domain/liquidatoria.py`, y un test comprueba
+      que el SQL lleva los mismos patrones en el mismo orden.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  documento_alarmas:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **LAS ALARMAS DE LOS DOCUMENTOS DE SIGRID** (F-138): una fila por alarma
+      de texto libre pegada a un documento (`raw.conala`), con la familia del
+      documento, el tipo de alarma, el texto INTEGRO, quien y cuando la creo y
+      su clase de liquidacion. ~45.720 filas el 2026-10-14, de 16 familias: el
+      86 % de compras (facturas 18.593, contratos 15.562, albaranes y proformas
+      5.240), facturas de venta 4.259, comparativos 727, contratos de venta 388,
+      ofertas 360, proveedores 340 y unas pocas de cuentas auxiliares, efectos de
+      pago, obras, asientos, clientes, informes y otras.
+
+      **LE FALTAN las alarmas de recursos (familia 33) y de partes de trabajo
+      (35)**, que nombran trabajadores y bajas: 27 el 2026-10-14. Estan en
+      `compras_restringida.documento_alarmas`, solo para el perfil total
+      (`R-COMPRAS-RESTRINGIDA`). Las de empleados (43) no estan en el datamart.
+
+      **LA MARCA «LIQUIDATORIA» ES TEXTO LIBRE DE UNA ALARMA, no un campo de
+      Sigrid.** `clase_liquidacion` la clasifica con una regla heuristica
+      (`compras.fn_clase_liquidacion`): texto normalizado (sin acentos,
+      mayusculas, solo letras y cifras); sin palabra que empiece por LIQ, REMITE
+      si dice «VER TEXTO/NOTA» o NULL; con ella, NEGADA, CARTA_LIQUIDACION o
+      DUDOSA si casan, y si no LIQUIDATORIA. La marca de cada factura, albaran
+      y proforma ya agregada esta en `compras.documento_liquidatoria`; aqui se
+      leen las de los documentos que no la tienen: facturas de venta (668
+      alarmas LIQUIDATORIA el 2026-10-14, 480 en facturas y 188 en contratos de
+      venta), contratos de compra (31, casi todas «CONTRATO INTERNO» o la forma
+      de pago escrita a mano) y comparativos (veintidos).
+
+      **FECHAS**: `creada_el` es la fecha y hora de creacion de la alarma
+      (informada en el 100 %, desde el 2008-12-04: no hay alarmas anteriores).
+      Las otras dos fechas de Sigrid (`fec1`, `fec2`) NO se publican: estan a 0
+      en el 99 % y no son fiables.
+
+      **DATO PERSONAL**: `creada_por` es el LOGIN de Sigrid de quien creo la
+      alarma (D6 de F-138). El nombre de la persona, si hace falta, esta en
+      `raw.usu` por el login.
+    grano: >-
+      Una fila por alarma, identificada por `alarma_id` (`conala.ide`), clave
+      primaria declarada. Un documento puede tener varias alarmas (453 facturas
+      y albaranes tienen dos): contar filas no cuenta documentos.
+    clave_negocio: [alarma_id]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      alarma_id:
+        significado: Identificador de la alarma en Sigrid (`conala.ide`).
+        agregacion: no_sumable
+      documento_id:
+        significado: >-
+          El documento del que cuelga la alarma (`conala.conide`, un `con.ide`):
+          el `factura_id`, `albaran_id` o `contrato_id` de las tablas de
+          `compras` segun `familia`.
+        agregacion: no_sumable
+      tipo_documento_codigo:
+        significado: Tipo de documento de Sigrid (`con.tip`), el numero de `familia`.
+        valores: [1, 4, 5, 11, 12, 14, 15, 17, 20, 25, 40, 42, 44, 46, 54]
+        agregacion: no_sumable
+      familia:
+        significado: >-
+          Familia del documento: FACTURA (15) y ALBARAN (14, que incluye
+          proformas y notas) son de compras, FACTURA_VENTA (11) y
+          CONTRATO_VENTA (54) de ventas.
+        valores: [INFORME, CLIENTE, PROVEEDOR, FACTURA_VENTA, OFERTA, ALBARAN, FACTURA, CUENTA_AUXILIAR, ASIENTO, EFECTO_PAGO, OTRA, OBRA, CONTRATO, COMPARATIVO, CONTRATO_VENTA]
+      tipo_documento:
+        significado: >-
+          Tipo de documento de negocio de `compras.fn_tipo_documento`: FACTURA,
+          ABONO, ALBARAN, PROFORMA, NOTA, CONTRATO u OTRO.
+        nulo_significa: El documento no es una factura, albaran o contrato de compra (familias 14, 15 y 44).
+      codigo_documento:
+        significado: Codigo del documento tal y como se ve en Sigrid (`FR26/10035`).
+      tipo_alarma_codigo:
+        significado: >-
+          Codigo del tipo de alarma (`auxala.cod`): 01 ALARMA FACT. POR
+          INCIDENCIAS, 02 AVISO ABONOS, 03 INFORMATIVA (casi todas), 04 sin
+          nombre.
+        nulo_significa: La alarma no tiene tipo en Sigrid (643 alarmas).
+      tipo_alarma:
+        significado: Nombre del tipo de alarma (`auxala.res`).
+        nulo_significa: La alarma no tiene tipo en Sigrid, o el tipo no tiene nombre.
+      texto:
+        significado: >-
+          El texto de la alarma, INTEGRO y tal cual se escribio en Sigrid
+          (`conala.tex`): «FACTURA LIQUIDATORIA», «VER TEXTO», una forma de pago,
+          una incidencia. Texto libre, con 697 variantes de la palabra
+          liquidatoria.
+        nulo_significa: La alarma no tiene texto.
+      ver_al_abrir:
+        significado: >-
+          Cierto si la alarma salta sola al abrir el documento en Sigrid
+          (`conala.tipabr = 1`). Nunca nulo.
+      creada_el:
+        significado: >-
+          Fecha y hora en que se creo la alarma (`crefec` + `crehor`): el
+          «Creada por: <login> -> 29/09/2026 7:38:06» de Sigrid. Es la fecha
+          fiable de la alarma.
+        nulo_significa: Fecha u hora de creacion vacia o imposible en Sigrid (ninguna el 2026-10-14).
+        agregacion: no_sumable
+      creada_por:
+        significado: >-
+          LOGIN de Sigrid de quien creo la alarma (`conala.creusu`). DATO
+          PERSONAL (D6 de F-138: el login, sin nombre).
+        nulo_significa: Sigrid no guarda quien la creo.
+      clase_liquidacion:
+        significado: >-
+          Que dice la alarma de la liquidacion, por la regla de
+          `compras.fn_clase_liquidacion`: LIQUIDATORIA (lo afirma), NEGADA
+          («NO ES LIQUIDATORIA»), CARTA_LIQUIDACION (hay que pedir la carta de
+          liquidacion: la ultima factura no lo decia), DUDOSA («PREVISION DE
+          LIQUIDACION», «TRABAJOS POSTERIORES A LA LIQUIDACION»), REMITE («VER
+          TEXTO», «VER NOTA»: la marca puede estar en el memo).
+        valores: [LIQUIDATORIA, NEGADA, CARTA_LIQUIDACION, DUDOSA, REMITE]
+        nulo_significa: La alarma no habla de liquidacion ni remite a otro sitio.
+    relaciones:
+      - de: documento_id
+        a: compras.facturas.factura_id
+        cardinalidad: "N:1"
+        porque: Las alarmas de una factura, filtrando antes `familia = 'FACTURA'`.
+      - de: documento_id
+        a: compras.albaranes.albaran_id
+        cardinalidad: "N:1"
+        porque: Las alarmas de un albaran, proforma o nota, filtrando antes `familia = 'ALBARAN'`.
+      - de: documento_id
+        a: compras.contratos.contrato_id
+        cardinalidad: "N:1"
+        porque: Las alarmas de un contrato de compra, filtrando antes `familia = 'CONTRATO'`.
+      - de: documento_id
+        a: compras.documento_liquidatoria.documento_id
+        cardinalidad: "N:1"
+        porque: >-
+          De la alarma a la marca ya agregada de su documento (facturas,
+          albaranes, proformas y notas).
+    ejemplos_preguntas:
+      - Que alarmas tiene la factura FR26/10035 y quien las creo
+      - Que facturas de venta tienen una alarma de liquidatoria
+      - Que alarmas de tipo ALARMA FACT. POR INCIDENCIAS se han creado este mes
+
+  documento_liquidatoria:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **LA MARCA «LIQUIDATORIA» DE CADA FACTURA, ALBARAN, PROFORMA Y NOTA**
+      (F-138): una fila por documento de compra (familias 14 y 15) que tiene
+      alguna alarma o un memo que hablan de la liquidacion. Responde «¿es
+      liquidatoria la factura X y desde cuando?» y alimenta
+      `compras.contrato_liquidacion`. Para que la quiere Negocio (D1): saber si
+      se han TERMINADO las facturas de un contrato, el IVA (con la liquidatoria
+      ya no se puede diferir mas) y avisar si llega una factura DESPUES.
+
+      **LA MARCA ES TEXTO LIBRE DE UNA ALARMA DE SIGRID, no un campo**, y la
+      regla que la lee es heuristica: el texto se normaliza (sin acentos,
+      mayusculas, solo letras y cifras) y se clasifica cada alarma
+      (`compras.fn_clase_liquidacion`, ver `compras.documento_alarmas`). La
+      marca del documento es la clase de mayor precedencia entre sus alarmas:
+      NEGADA > LIQUIDATORIA > CARTA_LIQUIDACION > DUDOSA > REMITE. La
+      declarada gana a la carta porque la carta se pide justo cuando la factura
+      no lo decia. **CARTA LIQUIDACION** significa que la ultima factura no
+      ponia «liquidatoria» y hay que pedir la carta de liquidacion: CIERRA el
+      contrato igual, pendiente de la carta.
+
+      **COBERTURA, medida el 2026-10-14**: facturas 8.653 liquidatorias y 99
+      pendientes de carta (8.752 que cierran contrato), albaranes 4.586,
+      proformas 55 y notas 0. Es el **~5 % de las facturas de cada año desde
+      2018** (4-9 % entre 2010 y 2017) y el ~1,5 % de los albaranes. **No hay
+      alarmas creadas antes del 2008-12-04**: un documento anterior sin marca no
+      dice nada. Fuera de la marca quedan, a proposito: 45 facturas y 13
+      albaranes NEGADOS, ~23 facturas y 25 albaranes DUDOSOS y ~3.000 facturas
+      cuyas alarmas solo remiten («VER TEXTO», «VER NOTA»), de las que 50 tienen
+      la liquidacion en el memo.
+
+      **EL MEMO VA APARTE** (`clase_memo`, D5): 458 facturas y 46 albaranes
+      dicen «liquidatoria» en el memo del documento (`raw.con.tex`) sin que
+      ninguna alarma lo diga. Tienen fila aqui con `clase_memo` informada,
+      pero sus tres booleanos son FALSE: el memo no entra en la marca.
+
+      **SIN FILA AQUI = NO MARCADO**, que no prueba que no sea liquidatorio: se
+      une con LEFT JOIN y los booleanos se leen con COALESCE a FALSE. Las
+      marcas de facturas de venta, contratos y comparativos no estan aqui: se
+      leen en `compras.documento_alarmas`.
+    grano: >-
+      Una fila por documento de las familias 14 (albaran, proforma, nota) y 15
+      (factura, abono) con alguna alarma de clase no nula o un memo con clase
+      no nula. `documento_id` es clave primaria declarada.
+    clave_negocio: [documento_id]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      documento_id:
+        significado: >-
+          El documento (`con.ide`): el `factura_id` de `compras.facturas` o el
+          `albaran_id` de `compras.albaranes` segun `tipo_documento_codigo`.
+        agregacion: no_sumable
+      tipo_documento_codigo:
+        significado: Tipo de documento de Sigrid (`con.tip`) - 15 factura o abono, 14 albaran, proforma o nota.
+        valores: [14, 15]
+        agregacion: no_sumable
+      tipo_documento:
+        significado: Tipo de documento de negocio (`compras.fn_tipo_documento`).
+        valores: [FACTURA, ABONO, ALBARAN, PROFORMA, NOTA, OTRO]
+      codigo_documento:
+        significado: Codigo del documento tal y como se ve en Sigrid (`FR26/10035`, `AC26/21188`).
+      fecha_alta:
+        significado: Fecha de alta del documento en Sigrid (`con.fec`), la misma que `compras.facturas.fecha`.
+        nulo_significa: El documento no tiene fecha de alta informada.
+        agregacion: no_sumable
+      marca_liquidacion:
+        significado: >-
+          La clase de mayor precedencia entre las alarmas del documento: NEGADA
+          > LIQUIDATORIA > CARTA_LIQUIDACION > DUDOSA > REMITE.
+        valores: [NEGADA, LIQUIDATORIA, CARTA_LIQUIDACION, DUDOSA, REMITE]
+        nulo_significa: >-
+          Ninguna alarma habla de liquidacion: la fila esta aqui solo por el
+          memo (`clase_memo`).
+      es_liquidatoria:
+        significado: >-
+          Cierto si la marca es LIQUIDATORIA: alguna alarma lo afirma y
+          ninguna lo niega. Nunca nulo.
+      pendiente_carta_liquidacion:
+        significado: >-
+          Cierto si la marca es CARTA_LIQUIDACION: la factura no decia
+          «liquidatoria» y hay que pedir la carta de liquidacion. Cierra el
+          contrato igual. Nunca nulo.
+      cierra_contrato:
+        significado: >-
+          Cierto si el documento cierra el contrato: liquidatoria declarada o
+          pendiente de carta. Es la columna con la que se decide si las
+          facturas de un contrato han terminado. Nunca nulo.
+      texto_alarmas:
+        significado: >-
+          Los textos de sus alarmas que hablan de liquidacion o remiten a otro
+          sitio, integros, separados por « | » en el orden de las alarmas.
+        nulo_significa: Ninguna alarma habla de liquidacion, la fila esta aqui solo por el memo.
+      liquidacion_creada_el:
+        significado: >-
+          Fecha y hora de creacion de la mas antigua de sus alarmas que cierran
+          (LIQUIDATORIA o CARTA_LIQUIDACION): desde cuando consta en Sigrid que
+          el documento es liquidatorio.
+        nulo_significa: El documento no cierra el contrato (`cierra_contrato` falso).
+        agregacion: no_sumable
+      clase_memo:
+        significado: >-
+          La clase de liquidacion del MEMO del documento (`raw.con.tex`, la
+          pestaña «Texto»), con la misma regla que las alarmas. Informativa: NO
+          entra en `marca_liquidacion` ni en los booleanos (D5).
+        valores: [LIQUIDATORIA, NEGADA, CARTA_LIQUIDACION, DUDOSA, REMITE]
+        nulo_significa: El memo no habla de liquidacion (o el documento no tiene memo).
+    relaciones:
+      - de: documento_id
+        a: compras.facturas.factura_id
+        cardinalidad: "1:1"
+        porque: La factura marcada, filtrando antes `tipo_documento_codigo = 15`.
+      - de: documento_id
+        a: compras.albaranes.albaran_id
+        cardinalidad: "1:1"
+        porque: El albaran, proforma o nota marcado, filtrando antes `tipo_documento_codigo = 14`.
+      - de: documento_id
+        a: compras.documento_alarmas.documento_id
+        cardinalidad: "1:N"
+        porque: Las alarmas de las que sale la marca, una a una.
+    ejemplos_preguntas:
+      - Que facturas liquidatorias tiene la obra X
+      - Es liquidatoria la factura FR26/10035 y desde cuando
+      - Que facturas estan pendientes de la carta de liquidacion
+      - Que albaranes y proformas liquidatorios hay este ano
+
+  contrato_liquidacion:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **¿SE HAN TERMINADO LAS FACTURAS DE CADA CONTRATO?** (F-138): una fila por
+      contrato de compra de `compras.contratos` (los 19.127, tengan o no
+      cierre), con su FACTURA DE CIERRE --la primera, por fecha de alta, que
+      `cierra_contrato` en `compras.documento_liquidatoria`: liquidatoria
+      declarada o pendiente de carta de liquidacion--, cuantas facturas
+      liquidatorias y albaranes o proformas liquidatorios tiene y cuantas
+      facturas han llegado DESPUES del cierre. Desde la factura de cierre ya no
+      se difiere el IVA y no deberia llegar ninguna mas.
+
+      **LA FACTURA LLEGA AL CONTRATO por la misma cadena que
+      `compras.v_pbi_contrato_consumo`**: linea de factura directa a contrato,
+      o albaran de origen con su contrato, o linea de albaran con contrato. Una
+      factura puede colgar de varios contratos y cuenta en cada uno.
+
+      **Medido el 2026-10-14 (±2 %)**: 5.611 contratos con
+      `facturas_terminadas` (81 solo por carta), 722 con 1.167 facturas
+      posteriores al cierre, y en 5.281 la ultima factura es la de cierre. El
+      70 % de las facturas liquidatorias cuelga de un contrato.
+
+      **`facturas_terminadas` FALSO NO PRUEBA QUE QUEDEN FACTURAS**: dice que
+      ninguna factura del contrato lleva la marca, y la marca es texto libre de
+      una alarma (cobertura en `compras.documento_liquidatoria`). Un contrato
+      «Terminado» en Sigrid sin liquidatoria es lo normal en el 55 % de los
+      casos. Las facturas posteriores, una a una, en
+      `compras.facturas_tras_liquidacion`.
+    grano: >-
+      Una fila por contrato de compra, identificada por `contrato_id`, clave
+      primaria declarada.
+    clave_negocio: [contrato_id]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      contrato_id:
+        significado: El contrato de compra (`compras.contratos.contrato_id`).
+        agregacion: no_sumable
+      codigo_contrato:
+        significado: Codigo del contrato tal y como se ve en Sigrid.
+      obra_id:
+        significado: Obra del contrato (`compras.contratos.obra_id`).
+        nulo_significa: El contrato no tiene obra.
+        agregacion: no_sumable
+      codigo_obra:
+        significado: Codigo de la obra del contrato.
+        nulo_significa: El contrato no tiene obra.
+      facturas_terminadas:
+        significado: >-
+          Cierto si el contrato tiene factura de cierre (liquidatoria o
+          pendiente de carta): sus facturas se han terminado. Nunca nulo.
+      tipo_cierre:
+        significado: >-
+          Como se cierra: LIQUIDATORIA (la factura de cierre lo declara) o
+          CARTA_LIQUIDACION (cierra pendiente de pedir la carta de liquidacion).
+        valores: [LIQUIDATORIA, CARTA_LIQUIDACION]
+        nulo_significa: El contrato no tiene factura de cierre.
+      factura_cierre_id:
+        significado: La factura de cierre (`compras.facturas.factura_id`), la primera por fecha de alta que cierra.
+        nulo_significa: El contrato no tiene factura de cierre.
+        agregacion: no_sumable
+      codigo_factura_cierre:
+        significado: Codigo de la factura de cierre (`FR26/10035`).
+        nulo_significa: El contrato no tiene factura de cierre.
+      fecha_cierre:
+        significado: Fecha de alta en Sigrid de la factura de cierre.
+        nulo_significa: El contrato no tiene factura de cierre.
+        agregacion: no_sumable
+      num_facturas_liquidatorias:
+        significado: Cuantas facturas del contrato son liquidatorias declaradas (puede haber varias).
+        agregacion: suma
+      num_facturas_carta_liquidacion:
+        significado: Cuantas facturas del contrato estan pendientes de carta de liquidacion.
+        agregacion: suma
+      num_albaranes_liquidatorios:
+        significado: Cuantos albaranes (AC) y proformas (PROF) del contrato son liquidatorios.
+        agregacion: suma
+      num_facturas_posteriores:
+        significado: >-
+          Cuantas facturas del contrato tienen fecha de alta POSTERIOR a la de
+          la factura de cierre: las del aviso, una a una en
+          `compras.facturas_tras_liquidacion`.
+        agregacion: suma
+      ultima_factura_cierra:
+        significado: >-
+          Cierto si la ultima factura del contrato (por fecha de alta) es una de
+          las que cierran.
+        nulo_significa: El contrato no tiene ninguna factura por la cadena.
+    relaciones:
+      - de: contrato_id
+        a: compras.contratos.contrato_id
+        cardinalidad: "1:1"
+        porque: Para el proveedor, el estado y el resto de la cabecera del contrato.
+      - de: factura_cierre_id
+        a: compras.facturas.factura_id
+        cardinalidad: "N:1"
+        porque: La cabecera de la factura de cierre (una factura puede cerrar varios contratos).
+      - de: contrato_id
+        a: compras.facturas_tras_liquidacion.contrato_id
+        cardinalidad: "1:N"
+        porque: Las facturas llegadas despues del cierre, una a una.
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: Para el nombre de la obra y su `clave_obra` (las obras son por empresa).
+    ejemplos_preguntas:
+      - Que contratos tienen ya su factura liquidatoria
+      - Se han terminado las facturas del contrato X
+      - Que contratos de la obra X estan sin factura liquidatoria
+      - En que contratos la ultima factura no es la liquidatoria
+
+  facturas_tras_liquidacion:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **EL AVISO: FACTURAS LLEGADAS DESPUES DE LA LIQUIDATORIA** (F-138, D1):
+      una fila por contrato y factura cuya fecha de alta en Sigrid es POSTERIOR
+      a la de la factura de cierre del contrato (`compras.contrato_liquidacion`).
+      Es lo que no deberia haber llegado: con la liquidatoria se terminan las
+      facturas y ya no se difiere el IVA. ~1.170 filas en 722 contratos el
+      2026-10-14. Se consulta sin cruzar nada.
+
+      `cierra_contrato` dice si la propia factura posterior tambien es de
+      cierre (una segunda liquidatoria o una con carta): no es lo mismo una
+      factura nueva que una que vuelve a liquidar. La cadena factura-contrato
+      es la de `compras.v_pbi_contrato_consumo`: una factura de varios
+      contratos sale una vez por contrato.
+    grano: >-
+      Una fila por (`contrato_id`, `factura_id`), clave primaria compuesta
+      declarada. La misma factura puede salir en varios contratos: contar
+      facturas distintas es `COUNT(DISTINCT factura_id)`.
+    clave_negocio: [contrato_id, factura_id]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      contrato_id:
+        significado: El contrato ya cerrado (`compras.contrato_liquidacion.contrato_id`).
+        agregacion: no_sumable
+      codigo_contrato:
+        significado: Codigo del contrato tal y como se ve en Sigrid.
+      obra_id:
+        significado: Obra del contrato.
+        nulo_significa: El contrato no tiene obra.
+        agregacion: no_sumable
+      codigo_obra:
+        significado: Codigo de la obra del contrato.
+        nulo_significa: El contrato no tiene obra.
+      factura_id:
+        significado: La factura llegada despues del cierre (`compras.facturas.factura_id`).
+        agregacion: no_sumable
+      codigo_factura:
+        significado: Codigo de la factura posterior.
+      fecha:
+        significado: Fecha de alta en Sigrid de la factura posterior.
+        agregacion: no_sumable
+      fecha_factura:
+        significado: Fecha del documento del proveedor de la factura posterior.
+        nulo_significa: La factura no tiene fecha de documento informada.
+        agregacion: no_sumable
+      proveedor_id:
+        significado: Proveedor de la factura posterior.
+        nulo_significa: La factura no tiene proveedor informado.
+        agregacion: no_sumable
+      proveedor_nombre:
+        significado: Nombre del proveedor de la factura posterior.
+        nulo_significa: La factura no tiene proveedor informado.
+      factura_cierre_id:
+        significado: La factura de cierre del contrato.
+        agregacion: no_sumable
+      codigo_factura_cierre:
+        significado: Codigo de la factura de cierre.
+      fecha_cierre:
+        significado: Fecha de alta de la factura de cierre.
+        agregacion: no_sumable
+      dias_tras_cierre:
+        significado: Dias naturales entre la fecha de alta de la factura de cierre y la de esta.
+        unidad: dias
+        agregacion: promedio
+      cierra_contrato:
+        significado: >-
+          Cierto si esta factura posterior tambien es de cierre (otra
+          liquidatoria o pendiente de carta). Nunca nulo.
+    relaciones:
+      - de: contrato_id
+        a: compras.contrato_liquidacion.contrato_id
+        cardinalidad: "N:1"
+        porque: El resumen del contrato cerrado.
+      - de: factura_id
+        a: compras.facturas.factura_id
+        cardinalidad: "N:1"
+        porque: La cabecera de la factura posterior (importes en sus lineas).
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: Para el nombre de la obra y su `clave_obra`.
+    ejemplos_preguntas:
+      - Que facturas han llegado despues de la liquidatoria
+      - Que facturas de la obra X han llegado tras la liquidatoria de su contrato
+      - Cuantos dias despues de la liquidatoria llegan las facturas tardias

@@ -45,12 +45,12 @@ def test_f037_r20_settings_la_restringida_vetada_y_del_autorizado() -> None:
         PostgresSettings,
     )
 
-    assert DEFAULT_VETOED_SCHEMAS == "contabilidad_restringida,tesoreria_restringida,raw"
-    assert DEFAULT_RESTRICTED_SCHEMAS == "contabilidad_restringida,tesoreria_restringida"
+    assert DEFAULT_VETOED_SCHEMAS == "contabilidad_restringida,tesoreria_restringida,compras_restringida,raw"
+    assert DEFAULT_RESTRICTED_SCHEMAS == "contabilidad_restringida,tesoreria_restringida,compras_restringida"  # + F-138
     assert DEFAULT_TOTAL_VETOED_SCHEMAS == "raw", "el total SÍ lee tesoreria_restringida"
     pg = PostgresSettings(_env_file=None)
-    assert pg.vetoed_schema_list == [RESTR_C, RESTR_T, "raw"]
-    assert pg.restricted_schema_list == [RESTR_C, RESTR_T]
+    assert pg.vetoed_schema_list == [RESTR_C, RESTR_T, "compras_restringida", "raw"]
+    assert pg.restricted_schema_list == [RESTR_C, RESTR_T, "compras_restringida"]
     assert GENERAL in pg.consumption_schema_list
 
 
@@ -155,8 +155,8 @@ def test_f037_r21_el_estandar_recibe_tesoreria_y_se_le_veta_la_restringida() -> 
     assert resultado.status == StepStatus.SUCCESS
     general = _llamada(cliente, "general", ESTANDAR)
     assert GENERAL in general[3] and RESTR_T not in general[3]
-    assert general[4] == [RESTR_C, RESTR_T, "raw"]
-    assert _llamada(cliente, "verifica", ESTANDAR)[2] == [RESTR_C, RESTR_T, "raw"], (
+    assert general[4] == [RESTR_C, RESTR_T, "compras_restringida", "raw"]  # + F-138
+    assert _llamada(cliente, "verifica", ESTANDAR)[2] == [RESTR_C, RESTR_T, "compras_restringida", "raw"], (
         "la postcondición pregunta al catálogo también por tesoreria_restringida"
     )
     assert resultado.metadata["verificacion"] == "ok"
@@ -166,7 +166,7 @@ def test_f037_r21_el_autorizado_recibe_la_restringida() -> None:
     cliente = _ClienteFalso()
     _paso(cliente).run()
     assert _llamada(cliente, "autorizado", AUTORIZADO) == (
-        "autorizado", AUTORIZADO, DUENO, [RESTR_C, RESTR_T],
+        "autorizado", AUTORIZADO, DUENO, [RESTR_C, RESTR_T, "compras_restringida"],
     )
 
 
@@ -300,9 +300,9 @@ def test_f037_r22_las_comprobaciones_finales_miran_la_restringida() -> None:
     final = sql.split("\nCOMMIT;", 1)[1]
     assert (
         "WHERE grantee = 'mcp_sigrid_dm_ro'\n"
-        "  AND table_schema IN ('contabilidad_restringida', 'tesoreria_restringida', 'raw')"
+        "  AND table_schema IN ('contabilidad_restringida', 'tesoreria_restringida', 'compras_restringida', 'raw')"
     ) in final
-    assert "WHERE nspname IN ('contabilidad_restringida', 'tesoreria_restringida', 'raw')" in final
+    assert "WHERE nspname IN ('contabilidad_restringida', 'tesoreria_restringida', 'compras_restringida', 'raw')" in final
     assert "'tesoreria', 'tesoreria_restringida'" in final, "los esquemas del punto 6"
     assert (
         "has_schema_privilege('mcp_sigrid_dm_total', 'tesoreria_restringida', 'USAGE')" in final

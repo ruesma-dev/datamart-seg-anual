@@ -103,7 +103,13 @@ confirmación cubre el plan que se enseñó, no lo que apareció después.
   cobros y pagos (un efecto de `raw.pag`/`raw.cob` por fila) en dos esquemas,
   como la contabilidad: `tesoreria` (la general) y `tesoreria_restringida` (con
   los pagos de nómina, embargo y cuota; solo el perfil total). BAJA no se suma
-  y `fecha_real` vacía no es pendiente (`R-TESORERIA-ESTADO`). **`descompuestos/` (F-097)** son de qué se compone cada
+  y `fecha_real` vacía no es pendiente (`R-TESORERIA-ESTADO`). **`compras/` publica
+  también las alarmas de los documentos (F-138)**: `raw.conala` (lista explícita
+  de 17 familias, sin empleados) da `compras.documento_alarmas` y la marca
+  «liquidatoria» de facturas, albaranes y proformas (`documento_liquidatoria`,
+  `contrato_liquidacion`, `facturas_tras_liquidacion`); las de recursos y
+  partes van solo a `compras_restringida`, el tercer esquema restringido (perfil
+  total), junto a `contabilidad_restringida` y `tesoreria_restringida`. **`descompuestos/` (F-097)** son de qué se compone cada
   partida, con su ORIGEN (ESTUDIO, PLANIF_JO y cada versión del master), y es
   el primer esquema INCREMENTAL: su texto lo trae `ingest_descompuestos` a
   tablas propias que `--full` no trunca (nunca `DROP` ni `TRUNCATE` de

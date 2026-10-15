@@ -2,7 +2,7 @@
 #
 # Fichas del esquema `raw`: la copia de Sigrid, tabla a tabla.
 #
-# **A NIVEL DE OBJETO, NO DE COLUMNA** (DA-2 de la spec). Son 74 tablas con
+# **A NIVEL DE OBJETO, NO DE COLUMNA** (DA-2 de la spec). Son 76 tablas con
 # cientos de campos de cuatro letras cuyo diccionario completo —tipos, indices y
 # referencias— vive en `azure-apps/sigrid_tablas.md`. Cada ficha remite alli con
 # el `grep` de su bloque. Lo que SI se documenta aqui es lo que ese documento no
@@ -2262,6 +2262,48 @@ objetos:
 
       **No se traen** 4 columnas de binario o texto ilimitado: el fichero incrustado (`ima`, 71 filas), el otro binario (`pul`, vacio) y dos textos ilimitados (`tex`, `cam`). Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
     grano: Una fila por fichero adjunto a un documento de compras, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  conala:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Son las alarmas en bruto, con el documento como identificador desnudo y el texto sin clasificar. Ya unidas al documento, con su familia, su tipo, quien y cuando las creo y su clase de liquidacion, estan en `compras.documento_alarmas`; la marca de cada factura, albaran y proforma, en `compras.documento_liquidatoria`.
+    descripcion: >-
+      **LAS ALARMAS DE LOS DOCUMENTOS («Alarmas en conceptos» de Sigrid)** (F-138): una fila por alarma pegada a un documento. `conide` es el documento (`raw.con.ide`), `alaide` el tipo de alarma (`raw.auxala.ide`; 0 = sin tipo, 643 filas), `tex` el texto LIBRE, `tipabr` «ver al abrir» (1 = se abre sola al entrar en el documento), y `creusu`, `crefec` (AAAAMMDD) y `crehor` (HHMMSS) quien y cuando la creo: es el «Creada por: <login> -> fecha hora» que ensena Sigrid, informado en el 100 % desde el 2008-12-04. La factura liquidatoria NO es un campo de la factura: es una alarma de esta tabla con un texto como «FACTURA LIQUIDATORIA».
+
+      **`fec1` y `fec2` NO son fechas fiables** (a 0 en 45.741 de 46.242 filas el 2026-10-14) y **`usu` y `rol` estan vacias**: entran por ser copia literal, pero no se publican aguas abajo.
+
+      **FILTRADA EN ORIGEN con una LISTA EXPLICITA de 17 familias** (decision D3 del humano del 2026-10-14): todas las medidas MENOS la 43, empleados, que no entra ni aqui. Lista y no exclusion para fallar cerrada: una familia nueva con alarmas no entra hasta que alguien la anade. Medido el 2026-10-14: 45.747 de las 46.242 alarmas de Sigrid. Contar esta tabla contra el total de Sigrid no casa por eso; `check-raw-recuentos` aplica el mismo filtro. Para revisar si aparece una familia nueva, en Sigrid: `SELECT c.tip, COUNT(*) FROM conala a JOIN con c ON c.ide = a.conide GROUP BY c.tip`.
+
+      **Dato personal**: `creusu` es el LOGIN de quien creo la alarma, y el texto de las alarmas de recursos (familia 33) y partes de trabajo (35) nombra trabajadores y bajas; aguas abajo esas solo estan en `compras_restringida`. `raw` esta vetado al rol estandar y al perfil total.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `conala`, y se localiza con `grep -n "^| conala " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid, con su filtro: lo que cambio ayer en Sigrid esta aqui esta manana. No tiene columna de ultima modificacion.
+    grano: Una fila por alarma de un documento de las 17 familias, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  auxala:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Cuatro filas de catalogo: traduce un codigo. El tipo de cada alarma, ya resuelto, esta en `compras.documento_alarmas` (`tipo_alarma_codigo`, `tipo_alarma`).
+    descripcion: >-
+      **Tipos de alarma («Alarmas (Clasificaciones)» de Sigrid)** (F-138), a donde apunta `conala.alaide`: 4 filas el 2026-10-14 -- 01 ALARMA FACT. POR INCIDENCIAS, 02 AVISO ABONOS, 03 INFORMATIVA y 04 sin nombre --. Casi todas las alarmas son 03 INFORMATIVA (45.223 de 46.239); la marca liquidatoria va en el texto, no en el tipo.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `auxala`, y se localiza con `grep -n "^| auxala " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+    grano: Una fila por tipo de alarma, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
     refresco: nocturno

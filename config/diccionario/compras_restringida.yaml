@@ -1,0 +1,119 @@
+# config/diccionario/compras_restringida.yaml
+#
+# Fichas del esquema `compras_restringida` (F-138, 2026-10-14): las alarmas
+# COMPLETAS de los documentos de Sigrid, con las de recursos (familia 33) y
+# partes de trabajo (35), que nombran trabajadores y bajas.
+#
+# SOLO LA LEEN el perfil total del MCP (el login `mcp_sigrid_dm_total`, F-136)
+# y el grupo `sigrid_dm_restringido_ro`. El rol estandar del MCP y de Power BI
+# (`mcp_sigrid_dm_ro`) la tiene VETADA: `apply_grants` se la revoca y lo
+# comprueba cada noche. La ficha EMPIEZA por el aviso de acceso restringido
+# porque el MCP no filtra el diccionario por perfil. Decision del humano del
+# 2026-10-14 (D9): «mete esas alarmas en lectura solo para el perfil admin y no
+# el estandar». Regla dura `R-COMPRAS-RESTRINGIDA`.
+#
+# Lo construye `build_compras` (`15_alarmas_liquidatoria.sql`) y de aqui sale
+# la general, `compras.documento_alarmas`. Solo recuentos, ni nombres de nadie.
+
+version: 1
+esquema: compras_restringida
+
+objetos:
+
+  documento_alarmas:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **ACCESO RESTRINGIDO: solo el perfil total del MCP.** Si no lo tienes, la
+      consulta devuelve «permission denied»: usa `compras.documento_alarmas`
+      (`R-COMPRAS-RESTRINGIDA`), sin reintentar ni buscar otro camino.
+
+      **TODAS LAS ALARMAS DE LOS DOCUMENTOS DE SIGRID** (F-138): una fila por
+      alarma de texto libre pegada a un documento (`raw.conala`), ~45.750 el
+      2026-10-14, con `restringido` y `motivo_restriccion`. Es
+      `compras.documento_alarmas` MAS las alarmas de recursos (familia 33, 3 el
+      2026-10-14) y de partes de trabajo (35, 24), que nombran trabajadores y
+      sus bajas. Las dos tablas NUNCA se suman ni se unen: la completa ya
+      contiene a la general. Las alarmas de empleados (43) no estan en el
+      datamart.
+
+      Valen las mismas columnas y la misma regla de clasificacion que en la
+      general (`clase_liquidacion`, ver `compras.documento_alarmas`): la marca
+      «liquidatoria» es texto libre de una alarma y la regla es heuristica.
+      `creada_por` es el LOGIN de quien creo la alarma (dato personal).
+    grano: >-
+      Una fila por alarma, identificada por `alarma_id` (`conala.ide`), clave
+      primaria declarada. Un documento puede tener varias alarmas.
+    clave_negocio: [alarma_id]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      alarma_id:
+        significado: Identificador de la alarma en Sigrid (`conala.ide`).
+        agregacion: no_sumable
+      documento_id:
+        significado: >-
+          El documento del que cuelga la alarma (`conala.conide`, un `con.ide`).
+          En RECURSO es el recurso y en PARTE_TRABAJO el parte.
+        agregacion: no_sumable
+      tipo_documento_codigo:
+        significado: Tipo de documento de Sigrid (`con.tip`), el numero de `familia`.
+        valores: [1, 4, 5, 11, 12, 14, 15, 17, 20, 25, 33, 35, 40, 42, 44, 46, 54]
+        agregacion: no_sumable
+      familia:
+        significado: >-
+          Familia del documento. RECURSO (33) y PARTE_TRABAJO (35) son las que
+          solo estan aqui.
+        valores: [INFORME, CLIENTE, PROVEEDOR, FACTURA_VENTA, OFERTA, ALBARAN, FACTURA, CUENTA_AUXILIAR, ASIENTO, EFECTO_PAGO, RECURSO, PARTE_TRABAJO, OTRA, OBRA, CONTRATO, COMPARATIVO, CONTRATO_VENTA]
+      tipo_documento:
+        significado: >-
+          Tipo de documento de negocio de `compras.fn_tipo_documento`: FACTURA,
+          ABONO, ALBARAN, PROFORMA, NOTA, CONTRATO u OTRO.
+        nulo_significa: El documento no es una factura, albaran o contrato de compra (familias 14, 15 y 44).
+      codigo_documento:
+        significado: Codigo del documento tal y como se ve en Sigrid (`PT12/00099` en un parte).
+      tipo_alarma_codigo:
+        significado: Codigo del tipo de alarma (`auxala.cod`), casi siempre 03 INFORMATIVA.
+        nulo_significa: La alarma no tiene tipo en Sigrid.
+      tipo_alarma:
+        significado: Nombre del tipo de alarma (`auxala.res`).
+        nulo_significa: La alarma no tiene tipo en Sigrid, o el tipo no tiene nombre.
+      texto:
+        significado: >-
+          El texto de la alarma, INTEGRO y tal cual se escribio en Sigrid
+          (`conala.tex`). En recursos y partes nombra trabajadores y bajas.
+        nulo_significa: La alarma no tiene texto.
+      ver_al_abrir:
+        significado: Cierto si la alarma salta sola al abrir el documento en Sigrid. Nunca nulo.
+      creada_el:
+        significado: Fecha y hora en que se creo la alarma (`crefec` + `crehor`).
+        nulo_significa: Fecha u hora de creacion vacia o imposible en Sigrid.
+        agregacion: no_sumable
+      creada_por:
+        significado: LOGIN de Sigrid de quien creo la alarma (`conala.creusu`). DATO PERSONAL.
+        nulo_significa: Sigrid no guarda quien la creo.
+      clase_liquidacion:
+        significado: >-
+          Que dice la alarma de la liquidacion (`compras.fn_clase_liquidacion`),
+          igual que en la general.
+        valores: [LIQUIDATORIA, NEGADA, CARTA_LIQUIDACION, DUDOSA, REMITE]
+        nulo_significa: La alarma no habla de liquidacion ni remite a otro sitio.
+      restringido:
+        significado: >-
+          Cierto si la alarma es de un recurso o de un parte de trabajo: la que
+          NO esta en `compras.documento_alarmas`. Nunca nulo.
+      motivo_restriccion:
+        significado: La familia que la restringe, RECURSO o PARTE_TRABAJO.
+        valores: [RECURSO, PARTE_TRABAJO]
+        nulo_significa: La alarma no es restringida (esta tambien en la general).
+    relaciones:
+      - de: alarma_id
+        a: compras.documento_alarmas.alarma_id
+        cardinalidad: "1:1"
+        porque: >-
+          La misma alarma en la general, solo si no es restringida. No se
+          suman: la completa ya la contiene.
+    ejemplos_preguntas:
+      - Que alarmas tienen los partes de trabajo de la obra X
+      - Cuantas alarmas de recursos y de partes hay y de cuando son
