@@ -85,6 +85,12 @@ GRUPO_B_FUNCIONES = (
     # F-067 (2026-10-06): la fecha serie de Delphi con su hora (`con.tiemod`).
     # `compras.contratos.fecha_ultima_modificacion` ya publica su resultado.
     "compras.fn_sigrid_tiempo",
+    # F-138 (2026-10-14): la regla de la marca liquidatoria, con los literales
+    # del dominio. Se llaman desde `15_alarmas_liquidatoria.sql`, y
+    # `compras.documento_alarmas` y `compras.documento_liquidatoria` ya
+    # publican su resultado en `clase_liquidacion` y `clase_memo`.
+    "compras.fn_texto_normalizado",
+    "compras.fn_clase_liquidacion",
     # F-056 (2026-09-26): la copia local de la conversion de fecha del esquema
     # `contabilidad`, por lo mismo que la de `personal`.
     "contabilidad.fn_fecha",

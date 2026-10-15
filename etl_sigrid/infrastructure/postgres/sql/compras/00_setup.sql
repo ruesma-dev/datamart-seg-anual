@@ -7,6 +7,13 @@
 -- ============================================================================
 
 CREATE SCHEMA IF NOT EXISTS compras;
+-- F-138 (D9): las alarmas COMPLETAS de los documentos, con las de recursos y
+-- partes de trabajo (nombran trabajadores y bajas). Lo crea el dueño de los
+-- objetos (`sigrid_dm_etl`, por PG_SET_ROLE) y nace sin ninguna concesión al
+-- rol estándar: `apply_grants` se la revoca cada noche y la concede al
+-- autorizado. En Azure lo crea antes `infra/sql/02_roles.sql`; esto es la red
+-- para una base local o recién provisionada (patrón de `tesoreria/00_setup.sql`).
+CREATE SCHEMA IF NOT EXISTS compras_restringida;
 
 -- Función local para no depender del schema stg (modularidad).
 CREATE OR REPLACE FUNCTION compras.fn_sigrid_date(d BIGINT)

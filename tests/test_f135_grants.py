@@ -58,12 +58,13 @@ def test_f135_r19_las_exclusiones_de_f068_se_conservan() -> None:
 def test_f135_settings_vetados_por_defecto() -> None:
     from config.settings import DEFAULT_VETOED_SCHEMAS, PostgresSettings
 
-    # F-037 añade `tesoreria_restringida` a los dos: vetada y del autorizado.
-    assert DEFAULT_VETOED_SCHEMAS == "contabilidad_restringida,tesoreria_restringida,raw"
+    # F-037 añade `tesoreria_restringida` a los dos: vetada y del autorizado;
+    # F-138, `compras_restringida`.
+    assert DEFAULT_VETOED_SCHEMAS == "contabilidad_restringida,tesoreria_restringida,compras_restringida,raw"
     pg = PostgresSettings(_env_file=None)
-    assert pg.vetoed_schema_list == [RESTR, "tesoreria_restringida", "raw"]
+    assert pg.vetoed_schema_list == [RESTR, "tesoreria_restringida", "compras_restringida", "raw"]
     assert pg.restricted_role == AUTORIZADO
-    assert pg.restricted_schema_list == [RESTR, "tesoreria_restringida"]
+    assert pg.restricted_schema_list == [RESTR, "tesoreria_restringida", "compras_restringida"]
 
 
 def test_f135_settings_parametrizables_y_limpias() -> None:
@@ -100,9 +101,9 @@ def test_f135_settings_env_example_documenta_las_tres() -> None:
         if linea and not linea.startswith("#") and "=" in linea
     )
     # F-037: con `tesoreria_restringida` en las dos listas.
-    assert lineas["PG_VETOED_SCHEMAS"] == "contabilidad_restringida,tesoreria_restringida,raw"
+    assert lineas["PG_VETOED_SCHEMAS"] == "contabilidad_restringida,tesoreria_restringida,compras_restringida,raw"
     assert lineas["PG_RESTRICTED_ROLE"] == AUTORIZADO
-    assert lineas["PG_RESTRICTED_SCHEMAS"] == f"{RESTR},tesoreria_restringida"
+    assert lineas["PG_RESTRICTED_SCHEMAS"] == f"{RESTR},tesoreria_restringida,compras_restringida"
     assert "raw" not in lineas["PG_CONSUMPTION_SCHEMAS"].split(","), (
         "el .env.example no puede reabrir raw: R17 tumbaría apply_grants"
     )
@@ -593,7 +594,7 @@ def test_f135_r20_comprobacion_final() -> None:
     sql = _roles_sql()
     assert (
         "WHERE grantee = 'mcp_sigrid_dm_ro'\n"
-        "  AND table_schema IN ('contabilidad_restringida', 'tesoreria_restringida', 'raw')"  # F-037
+        "  AND table_schema IN ('contabilidad_restringida', 'tesoreria_restringida', 'compras_restringida', 'raw')"  # F-037, F-138
     ) in sql
     assert (
         "SELECT nspname, has_schema_privilege('mcp_sigrid_dm_ro', nspname, 'USAGE') AS lee"

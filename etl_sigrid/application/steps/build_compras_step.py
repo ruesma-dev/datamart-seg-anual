@@ -17,6 +17,8 @@ Encadena los archivos SQL en orden:
     12_documento_procesos.sql - el historial de PROCESOS de `rac` (F-085)
     13_estado_documentos.sql - el estado actual y desde cuándo, de `rac` (F-132)
     14_documento_adjuntos.sql - el índice de ficheros adjuntos, de `rcg`/`gra` (F-090)
+    15_alarmas_liquidatoria.sql - las alarmas de los documentos y la marca
+                         «liquidatoria», de `conala`/`auxala` (F-138)
 
 Lee de `raw.*` y, como `03_views.sql`, de `maestro.v_obra_fichas` (de
 `build_maestros`, que corre antes en `run-all`). No necesita `stg` ni `mart`.
@@ -51,6 +53,16 @@ lleva cada noche: `13` la vuelve a crear. Lee además las tres cabeceras (`01`,
 `fn_sigrid_date` de `00_setup.sql`; no depende de ningún otro objeto de
 `compras` ni ninguno depende de él. Va al final para no mover a nadie. El
 fichero adjunto NO se lee: vive en `ruesma_rep` y lo sirve `sigrid-api`.
+
+`15` (F-138) es el ÚLTIMO porque lee lo que construye `01` (contratos,
+albaranes, facturas y sus líneas) y las funciones de `00_setup.sql`; nadie de
+`compras` depende de él. Es el único sub-paso que escribe FUERA de `compras`:
+la tabla completa de alarmas va a `compras_restringida` (D9: las de recursos y
+partes de trabajo, solo para el perfil total), y de ella sale la general,
+`compras.documento_alarmas`. El esquema lo crea `00_setup.sql` (y, en Azure,
+antes, `infra/sql/02_roles.sql`). Un solo fichero, una sola transacción: si
+una de sus dos guardas salta, el paso falla con el nombre del sub-paso y quedan
+las tablas de la noche anterior.
 
 POR QUÉ EXISTE ESTE FICHERO (F-047, absorbe F-044). `build-compras` ejecutaba
 su SQL **en línea dentro del comando**, sin step, y por eso **no dejaba fila en
@@ -199,6 +211,20 @@ SUB_PASOS: tuple[_SubStep, ...] = (
         sql_file="14_documento_adjuntos.sql",
         target_schema="compras",
         target_table="documento_adjuntos",
+    ),
+    # F-138: las alarmas de los documentos (`raw.conala`), en dos esquemas
+    # (`compras_restringida` la completa, `compras` la general), y la marca
+    # «liquidatoria» de facturas, albaranes y proformas con lo que responde:
+    # ¿están terminadas las facturas del contrato?, ¿cuáles llegaron después?
+    # El ÚLTIMO: lee `01` y nadie lo lee. Cuenta la GENERAL, la que leen el MCP
+    # estándar y Power BI (~45.720 alarmas). Si una guarda salta (ingesta de
+    # `conala` vacía, o la restricción mal calculada), el paso falla con el
+    # nombre de este sub-paso y el mensaje de la guarda.
+    _SubStep(
+        name="alarmas_liquidatoria",
+        sql_file="15_alarmas_liquidatoria.sql",
+        target_schema="compras",
+        target_table="documento_alarmas",
     ),
 )
 

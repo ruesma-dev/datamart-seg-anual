@@ -9,7 +9,94 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-15 · F-138 · CERRADA (`done`, APROBADO en pasada 1) · SIN FUSIONAR NI DESPLEGAR (espera orden del humano)
+
+- Review pasada 1: **APROBADO** sin cambios requeridos (`progress/review_F-138.md`). El reviewer
+  repitió `init.sh` (exit 0, 8.065 passed, cobertura 100 %) y el SQL en PostgreSQL 16 desechable
+  con tres `LC_CTYPE`: 0 divergencias en 4.003 textos entre la regla SQL y el oráculo. Cuatro
+  observaciones no bloqueantes (la 2, guarda de restricción solo para 33/35, candidata a feature).
+- Historia de la implementación, abajo.
+
+- Tarea en curso: ver `specs/F-138-facturas-liquidatorias/tasks.md` (las `[x]` son las hechas).
+- `init.sh` de arranque (18:41 UTC): ROJO, pero CAUSADO POR ESTA SESIÓN: la suite tardó 1 h 29 min
+  hasta el 37 % y a mitad se añadieron `conala`/`auxala` a `tables_sigrid.yaml` (T2) sin ficha
+  todavía; `test_f024_cli[run-all]` cayó por «raw.auxala / raw.conala publicados y SIN ficha». Los
+  2.924 tests anteriores, en verde. La sesión se reinició a mitad; se retomó sobre el árbol dejado.
+- Desviación anotada: el censo 74 también lo fijan `test_f066_ingesta_raw.py` y
+  `test_f074_ingesta_censo.py` (`TOTAL_TABLAS`), que la spec no lista; se suben a 76 en T3.
+- T9 (diccionario v52): recuentos del árbol tras F-138, **226 objetos, 1864 columnas, 109 de
+  consumo** (9 fichas nuevas: `raw.conala`, `raw.auxala`, las dos `documento_alarmas`, la marca,
+  los dos objetos de contratos y las dos funciones).
+- T1-T13 hechas, un commit por tarea; `azure-apps` commit local `0f45bbb` (sin push). Informe:
+  `progress/impl_F-138.md`. Mutación muestreada (20 de 37): 17 muertos, 3 supervivientes
+  EQUIVALENTES analizados (`progress/mutacion_F-138.md`). `init.sh` en verde (8.065 passed,
+  cobertura 100 % de 66 líneas). Siguiente: reviewer.
+- **PENDIENTE MANUAL, solo tras el APROBADO del reviewer y el merge a `main`, EN ESTE ORDEN**
+  (design § Despliegue; nada de esto se ha ejecutado):
+  1. (líder, solo lectura) el job no fija `PG_VETOED_SCHEMAS` ni `PG_RESTRICTED_SCHEMAS`:
+     `az containerapp job show` (solo nombres de variables). Imagen con tag fechado
+     `rYYYYMMDD-HHmm` y job apuntado a ella (comprobar el tag del job, no solo el ACR).
+  2. (HUMANO, administrador) `psql -X -v ON_ERROR_STOP=1 -f infra/sql/02_roles.sql $dsn` ANTES
+     de cualquier build: crea `compras_restringida` con dueño `sigrid_dm_etl`. Comprobar al final:
+     estándar `lee = f` en las cuatro filas; total `compras_restringida = t`.
+  3. `python main.py ingest --table conala --full` y `python main.py ingest --table auxala --full`.
+  4. `python main.py build-compras` (anotar duración del sub-paso `alarmas_liquidatoria`) y
+     `python main.py apply-grants` (`verificacion`, `verificacion_total`, `acceso_total` = ok).
+  5. `python main.py check-raw-recuentos` (OK en `conala` y `auxala`) y los recuentos de R28-R29
+     por SQL de solo lectura (completa ~45.750, general ~45.720, ~8.750 facturas y ~4.640
+     albaranes/proformas con `cierra_contrato`, `contrato_liquidacion` = filas de
+     `compras.contratos`; 5.611 terminados ±2 %, 722 contratos con 1.167 posteriores, 5.281).
+  6. (autoriza el humano) `python main.py publicar-diccionario` (v52) y `python main.py
+     check-diccionario`, `python main.py check-declarados`, `python main.py check-unicidad`.
+  7. Pedir a `mcp-bbdd` que añada `compras_restringida` a su lista blanca común y reinicie
+     (cachea el diccionario). Preguntas de R31 con la cuenta total (incluida «¿la FR26/10035 es
+     liquidatoria y desde cuándo?» → 29/09/2026 7:38:06) y la negativa con la estándar
+     (`compras_restringida` → PERMISO_DENEGADO).
+  8. Primera nocturna: `python main.py timings` (segundos de `ingest_raw.conala`,
+     `ingest_raw.auxala` y del sub-paso).
+
+## 2026-10-14 · F-138 · SPEC ACTUALIZADA con las decisiones del humano (D1-D9 cerradas)
+
+- Spec en `specs/F-138-facturas-liquidatorias/` (R1-R32, 17 tareas), rama
+  `feature/F-138-facturas-liquidatorias`; mediciones en `progress/spec_F-138.md` (§ 8-10).
+- D1: la marca sirve para (a) saber si se han terminado las facturas del contrato, (b) el IVA, que
+  ya no se difiere, y (c) avisar de facturas llegadas después: `compras.contrato_liquidacion` (una
+  fila por contrato) y `compras.facturas_tras_liquidacion`. D4: «CARTA LIQUIDACIÓN» es clase propia
+  que cierra (99 facturas). D3: `conala` con todas las familias menos empleados (43), lista explícita.
+- D9 (cerrada): las alarmas de recursos (33) y partes (35) solo para el perfil total: esquema nuevo
+  `compras_restringida` (patrón F-135/F-037: vetado al estándar, del autorizado, `02_roles.sql`
+  ANTES del build, `R-COMPRAS-RESTRINGIDA`, y `mcp-bbdd` debe añadirlo a su lista blanca). La
+  familia 25 queda en la general: sus 88 efectos con alarma son todos de la cartera general.
+
+## 2026-10-14 · Backlog reordenado por orden del humano · BACKLOG.md con una tabla por estado
+
+- **Nuevas**: **F-138** (facturas liquidatorias, correo de Elena Díaz del 14-10; la marca es una
+  alarma de texto libre en `conala`, medida en Sigrid: 14.248 alarmas «LIQUIDA», 8.811 en facturas;
+  `conala` y `auxala` no se ingieren) con **prioridad 1**, y **F-139** (leer el contenido de los
+  gráficos asociados de facturas, ofertas y contratos; lo que F-090 dejó fuera; la spec decide
+  primero si vive en este ETL) con **prioridad 2**.
+- **F-128 ampliada** a toda la cabecera de `dcf` y de `dca` (albaranes, PROFORMAS y notas, con
+  `dcarec`), con **prioridad 3** (el humano: «f128, y sí vale la 3», «también debe incluir los
+  albaranes», «también proformas»). **F-138 ampliada** a albaranes y proformas («vamos con la f138,
+  también para albaranes y proformas, lanza spec»).
+- **`main` estaba en ROJO desde las 11:19** por un test de F-136 (R30) que contaba las menciones de
+  `pg-password-total` en `azure-apps/mcp_bbdd.md`: su F-008 lo nombra tres veces, legítimamente (es
+  su Key Vault). Con el visto bueno del humano, el test pasa a vigilar lo que sí sería copiar el
+  contrato: ninguna línea con `GRANT` y `mcp_sigrid_dm_total`, ni `SET ROLE` ni «máximo 2».
+- **El resto de abiertas, renumeradas de la 4 a la 71** en su orden anterior (empates por id).
+- **`BACKLOG.md`**: cinco tablas (En curso, Spec lista, Bloqueadas, Backlog y Terminadas).
+  `harness/backlog.py` y `tests/test_backlog_md.py` portados a `arnes-base` **1.7.15** (`5e90b27`)
+  pieza a pieza, como la 1.7.14: aquí el arnés sigue en la 1.7.7 y el instalador traería siete
+  versiones más que no se han pedido.
+
 ## 2026-10-14 · F-037 · CERRADA (`done`, APROBADO en pasada 2) · DESPLEGADA el 14-10 por orden del humano («adelante f37»)
+
+- **T14 HECHA (14-10)**: mcp-bbdd desplegó su F-021 (revisión `--0000017`, imagen
+  `r20261014-1342`) con `tesoreria` y `tesoreria_restringida` en la lista blanca común. Verificado
+  por el humano contra el servicio: cuenta total → `tesoreria_restringida.efectos` 279.006; cuenta
+  estándar → la restringida da `PERMISO_DENEGADO` y `tesoreria.efectos` 241.953. El líder lo
+  repitió por el conector (perfil total): 279.006 / 241.953 / 928, diccionario v51. Queda T16 (la
+  nocturna del 15-10).
 
 - **DESPLEGADA (líder, 14-10 ~07:40-08:00 UTC)**: merge `e05bad1` en `main` (árbol idéntico a la
   rama revisada; espejo en `dev`). T13: el job no fija `PG_*_SCHEMAS`; imagen `r20261014-0938`
