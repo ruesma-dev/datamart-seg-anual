@@ -62,7 +62,10 @@ límite (R2), el aviso de `filename_columns` (R1) y la regla de permisos (R3).
 R7. Ningún módulo de `etl_sigrid/` ni `main.py` debe importar una librería de lectura de
 documentos o de IA (`pypdf`, `pdfplumber`, `fitz`, `pdfminer`, `openpyxl`, `docx`,
 `pytesseract`, `anthropic`, `openai`, `google.genai`, `google.generativeai`). SI alguno lo
-importa, ENTONCES el test debe fallar nombrando módulo y librería.
+importa, ENTONCES el test debe fallar nombrando módulo y librería. **Excepción única (humano,
+2026-10-15, opción A)**: `etl_sigrid/application/steps/load_excel_aux_step.py` puede importar
+`openpyxl` (F-004: los Excels de configuración de Negocio, no adjuntos); SI ese fichero
+desaparece o deja de importarla, ENTONCES un test de control debe fallar diciendo que sobra.
 
 R8. El documento de este proyecto en `azure-apps` (`datamart_seg_anual.md`) debe recoger el
 contrato con `mcp-bbdd` (H1-H13, la regla de R3 y «qué se rompe si cambia»: las columnas del

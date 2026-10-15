@@ -78,7 +78,8 @@ parte de lo que verifica H13.
 - `tests/test_f139_limite.py` — sin red ni BBDD. R1-R4 (texto de la ficha), R5 (la versión
   sube respecto a `main`, mismo patrón que `tests/test_f090_diccionario.py`), R6 (texto de
   `ARCHITECTURE.md`), R7 (recorre con `ast` los `.py` de `etl_sigrid/` y `main.py`, con un caso
-  de sabotaje sobre un módulo temporal) y R9 (las cinco tablas y columnas existen en
+  de sabotaje sobre un módulo temporal y la excepción única de `openpyxl` en
+  `load_excel_aux_step.py`, con su control; decisión del humano del 2026-10-15) y R9 (las cinco tablas y columnas existen en
   `config/diccionario/compras.yaml` y están en `relaciones` del índice).
 
 ## 4 · Ficheros a modificar

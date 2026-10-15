@@ -9,7 +9,14 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-15 · F-139 · IMPLEMENTER PARADO en T1: R7 choca con `openpyxl`, que el ETL ya usa (decide el humano)
+## 2026-10-15 · F-139 · IMPLEMENTER en curso (R7: el humano elige la opción A)
+
+> **Decisión del humano (2026-10-15): opción A.** `openpyxl` sigue prohibida en R7 con UNA
+> excepción nominal, `etl_sigrid/application/steps/load_excel_aux_step.py` (F-004), y un test de
+> control que falla si la excepción sobra. Escrita en `requirements.md` R7, `design.md` §3 y
+> `tasks.md` T1. El implementer retoma T1-T6. Lo de abajo es el registro de la parada.
+
+### La parada (antes de la decisión)
 
 > F-139 pasa a `in_progress` (rama `feature/F-139-leer-graficos-asociados`). **No se marca
 > `blocked`** en `features.json` porque el líder lo prohibió expresamente en este encargo (R10 es

@@ -1,7 +1,7 @@
 <!-- specs/F-139-leer-graficos-asociados/tasks.md -->
 # F-139 · Tareas (rama `feature/F-139-leer-graficos-asociados`; spec aprobada el 2026-10-15)
 
-- [ ] T1: Escribir `tests/test_f139_limite.py` con un test por R1, R2, R3, R4, R5, R6, R7 y R9 (fase RED: R1-R6 fallan; R7 y R9 pasan, R7 con un caso de sabotaje que importa `pypdf` en un módulo temporal)  |  Verificación: `python -m pytest tests/test_f139_limite.py` con R1-R6 en rojo por la razón esperada
+- [x] T1: Escribir `tests/test_f139_limite.py` con un test por R1, R2, R3, R4, R5, R6, R7 y R9 (fase RED: R1-R6 fallan; R7 y R9 pasan, R7 con un caso de sabotaje que importa `pypdf` en un módulo temporal y la excepción única de `openpyxl` en `load_excel_aux_step.py` con su control, opción A del humano del 2026-10-15)  |  Verificación: `python -m pytest tests/test_f139_limite.py` con R1-R6 en rojo por la razón esperada
 - [ ] T2: Ficha `documento_adjuntos` en `config/diccionario/compras.yaml`: `filename_columns`, el límite con `mcp-bbdd`, «QUIEN PUEDE ABRIR EL FICHERO» con las cinco tablas y la regla del índice (D1), los > 20 MB y las 305 ofertas (R1-R4)  |  Verificación: `python -m pytest tests/test_f139_limite.py -k "r1 or r2 or r3 or r4 or r9"` en verde
 - [ ] T3: `version` 52 → 53 en `config/diccionario/00_global.yaml` (R5)  |  Verificación: `python -m pytest tests/test_f139_limite.py -k r5` y los tests de diccionario existentes en verde
 - [ ] T4: `docs/ARCHITECTURE.md`, subpunto «El fichero NO se replica» de F-090: límite, `filename_columns` y regla de permisos (R6)  |  Verificación: `python -m pytest tests/test_f139_limite.py -k r6` en verde
