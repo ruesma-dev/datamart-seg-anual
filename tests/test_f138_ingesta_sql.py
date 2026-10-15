@@ -198,8 +198,8 @@ def test_f138_r12_expresiones_de_la_completa() -> None:
         "CASE WHEN c.tip IN (14, 15, 44) THEN compras.fn_tipo_documento(c.tip, "
         "compras.fn_serie(c.cod)) END",
         "x.cod AS tipo_alarma_codigo",
-        "x.res AS tipo_alarma",
-        "a.tex AS texto",
+        "NULLIF(btrim(x.res), '') AS tipo_alarma",
+        "NULLIF(a.tex, '') AS texto",
         "COALESCE(a.tipabr, 0) = 1 AS ver_al_abrir",
         "NULLIF(btrim(a.creusu), '') AS creada_por",
         "compras.fn_clase_liquidacion(a.tex) AS clase_liquidacion",

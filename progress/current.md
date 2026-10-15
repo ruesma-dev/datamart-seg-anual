@@ -18,6 +18,9 @@
   2.924 tests anteriores, en verde. La sesión se reinició a mitad; se retomó sobre el árbol dejado.
 - Desviación anotada: el censo 74 también lo fijan `test_f066_ingesta_raw.py` y
   `test_f074_ingesta_censo.py` (`TOTAL_TABLAS`), que la spec no lista; se suben a 76 en T3.
+- T9 (diccionario v52): recuentos del árbol tras F-138, **226 objetos, 1864 columnas, 109 de
+  consumo** (9 fichas nuevas: `raw.conala`, `raw.auxala`, las dos `documento_alarmas`, la marca,
+  los dos objetos de contratos y las dos funciones).
 
 ## 2026-10-14 · F-138 · SPEC ACTUALIZADA con las decisiones del humano (D1-D9 cerradas)
 

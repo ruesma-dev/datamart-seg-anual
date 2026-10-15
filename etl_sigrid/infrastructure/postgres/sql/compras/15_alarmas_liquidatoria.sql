@@ -133,8 +133,8 @@ WITH b AS (
                                                 AS tipo_documento,
         c.cod                                   AS codigo_documento,
         x.cod AS tipo_alarma_codigo,
-        x.res AS tipo_alarma,
-        a.tex AS texto,
+        NULLIF(btrim(x.res), '') AS tipo_alarma,
+        NULLIF(a.tex, '') AS texto,
         COALESCE(a.tipabr, 0) = 1 AS ver_al_abrir,
         -- R10: AAAAMMDD + HHMMSS. Fecha 0 o imposible (la vuelve NULL
         -- `fn_sigrid_date`) u hora 0 o imposible: NULL, como el oráculo.
