@@ -421,6 +421,25 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
     sirve `sigrid-api` con `documents/read` y `cod_repositorio`. Abrirlo desde
     el MCP (`mcp-bbdd`) o un portal (`portal`) es trabajo de esos proyectos;
     este ETL no lee `ruesma_rep`.
+- **LAS ALARMAS Y LA MARCA «LIQUIDATORIA» SALEN DE `conala` (F-138).** En
+  Sigrid la factura liquidatoria no es un campo: es una ALARMA de texto libre
+  pegada al documento. `sql/compras/15_alarmas_liquidatoria.sql`, el último
+  sub-paso de `build_compras` y una sola transacción, publica en DOS esquemas
+  (patrón de F-135 y F-037): `compras_restringida.documento_alarmas`, todas las
+  alarmas (~45.750) con `restringido` y `motivo_restriccion`, y la general
+  `compras.documento_alarmas`, sin las de recursos (33) y partes de trabajo
+  (35), que nombran trabajadores y bajas (D9: solo el perfil total). Sobre la
+  general, `compras.documento_liquidatoria` (la marca de cada factura,
+  albarán, proforma y nota: la clase de mayor precedencia entre sus alarmas,
+  NEGADA > LIQUIDATORIA > CARTA_LIQUIDACION > DUDOSA > REMITE, y el memo
+  aparte), `compras.contrato_liquidacion` (una fila por contrato: ¿se han
+  terminado sus facturas?, con la cadena factura -> contrato de
+  `v_pbi_contrato_consumo`) y `compras.facturas_tras_liquidacion` (el aviso de
+  las que llegan después). La regla de texto (traducción, patrones sin ``,
+  precedencia) vive una vez en `domain/liquidatoria.py` y el SQL lleva sus
+  literales (test); dos guardas `DO` hacen fallar el paso si `raw.conala` no
+  trae alarmas de factura o si la general lleva una alarma restringida. No toca
+  `compras.facturas` ni `compras.albaranes` (D7).
 
 ## Acceso a datos
 
@@ -443,9 +462,9 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
   Azure. Hoy **lee y valida, no carga** a `aux.*`: las tablas destino y el
   esquema de los libros no están definidos todavía.
 
-### Qué se copia de Sigrid: 74 tablas, y qué NO está ahí (F-066, F-074, F-080, F-102, F-107, F-095, F-085, F-090)
+### Qué se copia de Sigrid: 76 tablas, y qué NO está ahí (F-066, F-074, F-080, F-102, F-107, F-095, F-085, F-090, F-138)
 
-`config/tables_sigrid.yaml` declara **74 tablas**: eran 31, F-066 las dejó en 56
+`config/tables_sigrid.yaml` declara **76 tablas**: eran 31, F-066 las dejó en 56
 el 2026-09-06, F-074 sumó nueve más el 2026-09-09, F-080 otras tres el
 2026-09-11 —`auxnap`, `auxban` y `rpa`, el bloque de pago del efecto y las
 remesas—, F-102 una el 2026-09-23 —`auxemp`, las 38 empresas del grupo, que da
@@ -466,7 +485,11 @@ login a persona en `compras.documento_procesos` (nombre) y en
 documento -> fichero y el fichero), **filtradas en origen** a las cinco
 familias de compras (199.042 de 289.451 enlaces: fuera nóminas, DNI y demás
 adjuntos de personal) y **sin binario** (`gra` sin `ima`, `pul`, `tex` ni
-`cam`); `auxgra` no entra. Además de recuperar la columna `con.tex` (el memo del documento,
+`cam`); `auxgra` no entra. F-138 suma las dos últimas el 2026-10-14,
+`conala` (las alarmas de los documentos, 45.747 filas en ~2 s) y `auxala` (sus
+4 tipos): `conala` **filtrada en origen con una lista EXPLÍCITA de 17
+familias** (falla cerrada ante una familia nueva) que deja fuera la 43,
+empleados. Además de recuperar la columna `con.tex` (el memo del documento,
 informado en el 65,5 % de las facturas; traerlo cuesta +26 % de tiempo de
 lectura sobre `con`, medio minuto de la ventana nocturna).
 Las 25 que entraron el primer día vienen en tres grupos, y ninguna se supuso: todo lo
@@ -651,9 +674,10 @@ fallo con cualquier tolerancia.
   `maestro`, `retenciones`, `personal`, `contabilidad` (la general),
   `tesoreria` (la general, F-037), `descompuestos`, `stg`, `aux` y `_meta`— y
   NO lee los de `PG_VETOED_SCHEMAS`: `contabilidad_restringida`,
-  `tesoreria_restringida` y `raw`. El AUTORIZADO (`sigrid_dm_restringido_ro`)
-  lee `contabilidad_restringida` y `tesoreria_restringida`
-  (`PG_RESTRICTED_SCHEMAS`); el total, las dos por pertenencia. El dueño y el administrador lo leen todo, como
+  `tesoreria_restringida`, `compras_restringida` (F-138) y `raw`. El
+  AUTORIZADO (`sigrid_dm_restringido_ro`) lee `contabilidad_restringida`,
+  `tesoreria_restringida` y `compras_restringida` (`PG_RESTRICTED_SCHEMAS`);
+  el total, las tres por pertenencia. El dueño y el administrador lo leen todo, como
   siempre. `apply_grants`, cada noche y en este orden: (1) si un esquema está a
   la vez en consumo y en vetados —un `.env` viejo que aún lista `raw`— o el del
   autorizado no está vetado, FAILED sin ejecutar nada; (2) concede al general,
@@ -679,7 +703,8 @@ fallo con cualquier tolerancia.
   sobre los grupos): eso es `02_roles.sql`, que corre el humano (runbook §12).
 - **Lo que NO es de este repositorio** (F-135, F-136): que el MCP conecte con
   el login total según quién pregunta (por oid, fuera de todo repositorio) y que
-  su lista blanca admita `contabilidad_restringida` y `tesoreria_restringida`,
+  su lista blanca admita `contabilidad_restringida`, `tesoreria_restringida` y
+  `compras_restringida` (F-138),
   y `tesoreria` en las dos conexiones (`mcp-bbdd`, su F-008, con el contrato en
   `azure-apps/datamart_seg_anual.md`): hasta entonces el MCP no ve la cartera; y que Power BI tenga rol
   propio (F-087). Hasta entonces el login total existe pero ningún cliente lo
