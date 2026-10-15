@@ -21,8 +21,10 @@
 - T9 (diccionario v52): recuentos del árbol tras F-138, **226 objetos, 1864 columnas, 109 de
   consumo** (9 fichas nuevas: `raw.conala`, `raw.auxala`, las dos `documento_alarmas`, la marca,
   los dos objetos de contratos y las dos funciones).
-- T1-T11 hechas, un commit por tarea; `azure-apps` commit local `0f45bbb` (sin push). Informe:
-  `progress/impl_F-138.md`.
+- T1-T13 hechas, un commit por tarea; `azure-apps` commit local `0f45bbb` (sin push). Informe:
+  `progress/impl_F-138.md`. Mutación muestreada (20 de 37): 17 muertos, 3 supervivientes
+  EQUIVALENTES analizados (`progress/mutacion_F-138.md`). `init.sh` en verde (8.065 passed,
+  cobertura 100 % de 66 líneas). Siguiente: reviewer.
 - **PENDIENTE MANUAL, solo tras el APROBADO del reviewer y el merge a `main`, EN ESTE ORDEN**
   (design § Despliegue; nada de esto se ha ejecutado):
   1. (líder, solo lectura) el job no fija `PG_VETOED_SCHEMAS` ni `PG_RESTRICTED_SCHEMAS`:

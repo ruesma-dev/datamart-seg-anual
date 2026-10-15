@@ -137,4 +137,26 @@ primera nocturna (`timings`). **Ninguna se ha ejecutado.**
 
 ## Evidencias
 
-PENDIENTE_DE_RELLENAR
+Medidas el 2026-10-15 (hora local de la máquina).
+
+| Evidencia | Resultado real |
+|---|---|
+| `bash harness/init.sh` (sobre `6183ba7`, código final) | **ENTORNO LISTO** (salida 0); se repite sobre el commit final del informe (abajo) |
+| Tests ejecutados (suite completa, dentro de `init.sh`) | **8.065 passed, 249 skipped, 0 failed** |
+| Tiempo de la suite | **1.244 s (20 min 44 s)** con medición de cobertura |
+| Tests de la feature | `test_f138_{dominio,ingesta_sql,grants,diccionario}.py`: 102 + 40 + 13 + 22 = **177 passed** |
+| Cobertura de líneas cambiadas | **PUERTA COBERTURA: 100,0 % de 66 líneas (66/66)**, umbral 80 %, nivel estándar |
+| Tamaño | requirements 150/150, design 190/250, impl dentro de 220 |
+| Mutación (`domain/liquidatoria.py`, muestreada 20 de 37, semilla 20260820) | **17 muertos, 3 supervivientes, 0 timeouts, 0 sin veredicto**, 5.598 s con 2 workers (`--timeout 2400`, línea base 585-588 s por worktree). Los 3 supervivientes son **EQUIVALENTES** y están analizados en `progress/mutacion_F-138.md`: la guarda `crefec < 0 or crehor < 0` es redundante con `not crefec`/`not crehor` y con el `ValueError` de `datetime()` sobre un componente negativo |
+
+**La campaña cazó dos fallos reales antes de evaluar nada.** Primer intento (4 workers): la
+línea base no cupo en 600 s (contención). Segundo: el árbol tenía `current.md` sin commitear. Tercero:
+**LÍNEA BASE EN ROJO** con dos tests que mi cambio había roto y que no estaban en mis ejecuciones
+parciales: `test_f025_contrato_cliente` (el doble `_Pg` de `test_f138_ingesta_sql.py` nombraba
+`ruta`/`esquema` donde el cliente real dice `path`/`schema`) y `test_f079_stg_consultable` r3 (el
+inventario de funciones desaconsejadas no tenía `fn_texto_normalizado` ni `fn_clase_liquidacion`).
+Corregidos en `6183ba7`; `init.sh` en verde después, y la cuarta campaña, válida.
+
+**Comandos**: `python -m harness.mutacion --feature F-138 --ficheros etl_sigrid/domain/liquidatoria.py --workers 2 --timeout 2400`
+(lanzada desacoplada de la sesión con `SetThreadExecutionState`, como F-037);
+`bash harness/init.sh`.
