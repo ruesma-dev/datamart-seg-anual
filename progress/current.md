@@ -21,6 +21,31 @@
 - T9 (diccionario v52): recuentos del árbol tras F-138, **226 objetos, 1864 columnas, 109 de
   consumo** (9 fichas nuevas: `raw.conala`, `raw.auxala`, las dos `documento_alarmas`, la marca,
   los dos objetos de contratos y las dos funciones).
+- T1-T11 hechas, un commit por tarea; `azure-apps` commit local `0f45bbb` (sin push). Informe:
+  `progress/impl_F-138.md`.
+- **PENDIENTE MANUAL, solo tras el APROBADO del reviewer y el merge a `main`, EN ESTE ORDEN**
+  (design § Despliegue; nada de esto se ha ejecutado):
+  1. (líder, solo lectura) el job no fija `PG_VETOED_SCHEMAS` ni `PG_RESTRICTED_SCHEMAS`:
+     `az containerapp job show` (solo nombres de variables). Imagen con tag fechado
+     `rYYYYMMDD-HHmm` y job apuntado a ella (comprobar el tag del job, no solo el ACR).
+  2. (HUMANO, administrador) `psql -X -v ON_ERROR_STOP=1 -f infra/sql/02_roles.sql $dsn` ANTES
+     de cualquier build: crea `compras_restringida` con dueño `sigrid_dm_etl`. Comprobar al final:
+     estándar `lee = f` en las cuatro filas; total `compras_restringida = t`.
+  3. `python main.py ingest --table conala --full` y `python main.py ingest --table auxala --full`.
+  4. `python main.py build-compras` (anotar duración del sub-paso `alarmas_liquidatoria`) y
+     `python main.py apply-grants` (`verificacion`, `verificacion_total`, `acceso_total` = ok).
+  5. `python main.py check-raw-recuentos` (OK en `conala` y `auxala`) y los recuentos de R28-R29
+     por SQL de solo lectura (completa ~45.750, general ~45.720, ~8.750 facturas y ~4.640
+     albaranes/proformas con `cierra_contrato`, `contrato_liquidacion` = filas de
+     `compras.contratos`; 5.611 terminados ±2 %, 722 contratos con 1.167 posteriores, 5.281).
+  6. (autoriza el humano) `python main.py publicar-diccionario` (v52) y `python main.py
+     check-diccionario`, `python main.py check-declarados`, `python main.py check-unicidad`.
+  7. Pedir a `mcp-bbdd` que añada `compras_restringida` a su lista blanca común y reinicie
+     (cachea el diccionario). Preguntas de R31 con la cuenta total (incluida «¿la FR26/10035 es
+     liquidatoria y desde cuándo?» → 29/09/2026 7:38:06) y la negativa con la estándar
+     (`compras_restringida` → PERMISO_DENEGADO).
+  8. Primera nocturna: `python main.py timings` (segundos de `ingest_raw.conala`,
+     `ingest_raw.auxala` y del sub-paso).
 
 ## 2026-10-14 · F-138 · SPEC ACTUALIZADA con las decisiones del humano (D1-D9 cerradas)
 
