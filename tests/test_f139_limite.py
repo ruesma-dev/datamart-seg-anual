@@ -168,7 +168,7 @@ def test_f139_r6_la_arquitectura_declara_limite_aviso_y_permisos() -> None:
     for dato in ("F-139", "mcp-bbdd", 'filename_columns: ["cod"]', "HTTP 500",
                  "sin convertir", "tabla de origen", "F-141"):
         assert dato in punto, f"el punto de F-090 de ARCHITECTURE.md no dice «{dato}» (R6)"
-    for tabla, columna in ORIGEN_POR_FAMILIA.values():
+    for tabla, _columna in ORIGEN_POR_FAMILIA.values():
         assert f"`{tabla}`" in punto, f"ARCHITECTURE.md no nombra `{tabla}` (R6)"
 
 
@@ -219,7 +219,7 @@ def importaciones_prohibidas(
 
 
 def _ficheros_del_etl() -> list[Path]:
-    return sorted((RAIZ / "etl_sigrid").rglob("*.py")) + [RAIZ / "main.py"]
+    return [*sorted((RAIZ / "etl_sigrid").rglob("*.py")), RAIZ / "main.py"]
 
 
 def test_f139_r7_el_etl_no_importa_librerias_de_documentos_ni_de_ia() -> None:

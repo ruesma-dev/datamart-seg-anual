@@ -8,4 +8,4 @@
 - [x] T5: `azure-apps/datamart_seg_anual.md`: sección «Abrir el original de un adjunto (contrato con `mcp-bbdd`, F-139)» con H1-H13, la tabla de familias, el riesgo de H13 con claude.ai y ChatGPT, D2 por escrito y «qué se rompe si cambia»; commit local en `azure-apps` (R8)  |  Verificación: MANUAL (humano): `git -C C:\Users\pgris\PycharmProjects\azure-apps log -1 --stat` muestra el commit y `grep -n "abrir_adjunto" datamart_seg_anual.md` lo encuentra
 - [ ] T6: Informe `progress/impl_F-139.md` y reviewer contra `CHECKPOINTS.md`  |  Verificación: veredicto APROBADO en `progress/review_F-139.md`
 - [ ] T7: (líder) F-139 a `blocked` con el motivo de R10, y entregar al humano el pliego H1-H13 para `mcp-bbdd` y la propuesta del 500 para `sigrid-api`  |  Verificación: `BACKLOG.md` regenerado con F-139 en «Bloqueadas»
-- [ ] T8: Ejecutar `bash harness/init.sh` en verde  |  Verificación: salida en verde (incluye pytest y la puerta de tamaño de esta spec)
+- [x] T8: Ejecutar `bash harness/init.sh` en verde  |  Verificación: salida en verde (incluye pytest y la puerta de tamaño de esta spec)

@@ -16,6 +16,10 @@
 > control que falla si la excepción sobra. Escrita en `requirements.md` R7, `design.md` §3 y
 > `tasks.md` T1. El implementer retoma T1-T6. Lo de abajo es el registro de la parada.
 
+- **T1-T5 hechos** (commits `5f847c6`, `408bfb0`, `ea7335f`, `72e5683`, `8d2b3c7`; en
+  `azure-apps`, `ec1e38a` sin push). Diccionario v53 en el árbol, SIN publicar. Informe:
+  `progress/impl_F-139.md`. Siguiente: reviewer (T6) y, tras el APROBADO, el líder (T7, R10).
+
 ### La parada (antes de la decisión)
 
 > F-139 pasa a `in_progress` (rama `feature/F-139-leer-graficos-asociados`). **No se marca
