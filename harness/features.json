@@ -2188,7 +2188,7 @@
         "Un test impide importar en este ETL librerías de lectura de documentos o de IA",
         "bash harness/init.sh en verde y veredicto APROBADO del reviewer; después, F-139 en `blocked` con la propuesta para `mcp-bbdd`"
       ],
-      "status": "spec_ready",
+      "status": "in_progress",
       "sdd": true,
       "rigor": "estandar",
       "priority": 2,

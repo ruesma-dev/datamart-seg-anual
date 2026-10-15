@@ -3,17 +3,18 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **130 features**, 73 abiertas (0 en curso, 2 con la spec lista, 0 bloqueadas y 71 en backlog) y 57 terminadas.
+Resumen: **130 features**, 73 abiertas (1 en curso, 1 con la spec lista, 0 bloqueadas y 71 en backlog) y 57 terminadas.
 
 ## En curso
 
-_Ninguna feature en curso._
+| # | Feature | Prioridad | Rigor | Rama |
+|---|---|---|---|---|
+| F-139 | Que la IA pueda abrir el ORIGINAL de los gráficos asociados (facturas, ofertas, contratos, comparativos, albaranes) por el MCP: el datamart publica el índice y la regla de permisos; la apertura en vivo vive en `mcp-bbdd` | 2 | estandar | `feature/F-139-leer-graficos-asociados` |
 
 ## Spec lista
 
 | # | Feature | Prioridad | Rigor | Rama |
 |---|---|---|---|---|
-| F-139 | Que la IA pueda abrir el ORIGINAL de los gráficos asociados (facturas, ofertas, contratos, comparativos, albaranes) por el MCP: el datamart publica el índice y la regla de permisos; la apertura en vivo vive en `mcp-bbdd` | 2 | estandar | `feature/F-139-leer-graficos-asociados` |
 | F-111 | Los nombres de partida se resuelven por codigo en los niveles del arbol y en la dimension de costes indirectos: 10.593 filas con un escalon con el nombre de otra partida | 15 | estandar | `feature/F-111-nombres-partida-por-ancestro` |
 
 ## Bloqueadas
@@ -162,7 +163,7 @@ _Ninguna feature bloqueada._
 
 ### F-139 · Que la IA pueda abrir el ORIGINAL de los gráficos asociados (facturas, ofertas, contratos, comparativos, albaranes) por el MCP: el datamart publica el índice y la regla de permisos; la apertura en vivo vive en `mcp-bbdd`
 
-estado **spec lista** · prioridad 2 · rigor `estandar` · SDD sí · rama `feature/F-139-leer-graficos-asociados`
+estado **en curso** · prioridad 2 · rigor `estandar` · SDD sí · rama `feature/F-139-leer-graficos-asociados`
 
 Nace el 2026-10-14 por orden del humano: «pon como prioridad 2 leer los gráficos asociados a facturas, ofertas y contratos». Es la «feature futura» que F-090 dejó FUERA por escrito: F-090 publicó el ÍNDICE de adjuntos (`compras.documento_adjuntos`, una fila por enlace documento <-> fichero, con `cod_repositorio` y `empresa_repositorio`), no el contenido. El binario está en la base documental `ruesma_rep` (su `dbo.gra`, 364.906 ficheros, ~165 GB) y lo sirve `sigrid-api` con `POST /api/documents/read` (`id_column: cod`), probado en F-090 con una factura. COBERTURA DE ADJUNTOS medida en F-090 (2026-10-09): facturas 62,8 % (96,1 % desde 2019), contratos 92,4 %, ofertas 25,1 %. LO QUE HABILITA, y era la petición 3 de Juan Romero del 2026-09-18: contrastar lo que el proveedor factura de verdad (importes, cantidades, precios, conceptos) contra lo registrado en Sigrid sin ir factura a factura; y en ofertas, el Excel del concurso real (ver F-129). ================ RIESGO QUE DECIDE LA SPEC ANTES DE NADA: **el LÍMITE DE RESPONSABILIDAD**. Leer PDF (texto, tablas, escaneos con OCR o extracción con un modelo) es otro dominio que el ETL del datamart y puede merecer proyecto propio, o vivir en `sigrid-api` o en `mcp-bbdd`. Si la spec concluye que no vive aquí, la feature se marca `blocked` y se propone al humano dónde vive. Otros riesgos a medir: el volumen (no se replica el binario en el Postgres compartido), el coste y la ventana nocturna (la lectura sería incremental), y los datos personales que puedan traer los ficheros. ================ CAMBIO DE OBJETIVO DEL 2026-10-15, por orden del humano: «el objetivo es que la IA pueda localizar el documento y lo pueda des-serializar; ya se encargará ella de leer o interpretar, ya sea escaneado o vectorizado». Se descarta el contraste (y la opción `facturas`). Decisiones cerradas: vive en `mcp-bbdd` (herramienta `abrir_adjunto`, en vivo por `sigrid-api`; no se trae la base documental: ~81 GB de compras); sin caché en SharePoint (apertura mediana 0,20 s); sin tope de tamaño, con aviso por encima de 20 MB (17 ficheros); sin conversión, el ORIGINAL (conversión = F-142); permisos por tabla de origen, también para el índice (D1); debe funcionar con ChatGPT además de Claude (D2). En este repositorio solo documentación, contrato y guarda: spec en `specs/F-139-leer-graficos-asociados/`. Tras el APROBADO, F-139 pasa a `blocked` con el trabajo en `mcp-bbdd`.
 

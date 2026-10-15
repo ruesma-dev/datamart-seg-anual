@@ -9,6 +9,41 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-15 · F-139 · IMPLEMENTER PARADO en T1: R7 choca con `openpyxl`, que el ETL ya usa (decide el humano)
+
+> F-139 pasa a `in_progress` (rama `feature/F-139-leer-graficos-asociados`). **No se marca
+> `blocked`** en `features.json` porque el líder lo prohibió expresamente en este encargo (R10 es
+> suyo); el bloqueo es de hecho y queda escrito aquí. Nada commiteado de T1:
+> `tests/test_f139_limite.py` está SIN versionar en el árbol, listo para retomar.
+
+- **El choque.** R7 prohíbe importar `openpyxl` en `etl_sigrid/` y `main.py`, y tasks.md T1 dice
+  que R7 debe PASAR en la fase RED. No pasa: `etl_sigrid/application/steps/load_excel_aux_step.py`
+  importa `from openpyxl import load_workbook` desde F-004 (2026-08-09) para leer los tres Excels
+  auxiliares de Negocio, `openpyxl>=3.1.0` está en `requirements.txt`, y el paso corre en `run-all`
+  (`main.py`). La medición de la spec («este repositorio no tiene ni una librería de PDF ni un SDK
+  de IA») es cierta, pero `openpyxl` no es ni lo uno ni lo otro y entró igual en la lista.
+- **Por qué no se improvisa.** Cumplir R7 tal cual exige quitar `openpyxl` del ETL (código de
+  producción fuera de alcance y rompe F-004) o cambiar el requisito aprobado. Las dos son del
+  humano.
+- **Propuesta (elegir una):**
+  - **A (recomendada)**: mantener `openpyxl` en la lista con UNA excepción nominal y motivada,
+    `etl_sigrid/application/steps/load_excel_aux_step.py` (F-004: Excels de configuración de
+    Negocio, no adjuntos). La guarda sigue cazando `openpyxl` en cualquier otro módulo, y un test
+    de control comprueba que la excepción existe de verdad (si el fichero desaparece o deja de
+    importarlo, la excepción sobra y el test lo dice).
+  - B: quitar `openpyxl` de la lista de R7. Más simple, pero deja libre leer un `.xlsx` adjunto
+    desde el ETL, que es justo lo que R7 quiere impedir.
+- **Fase RED ya medida** (`python -m pytest tests/test_f139_limite.py -p no:cacheprovider -q
+  --tb=line`, 2026-10-15): `8 failed, 5 passed in 4.57s`. R1-R6 fallan por la razón esperada
+  (p. ej. R5 `assert 52 >= 53`; R6 `el punto de F-090 de ARCHITECTURE.md no dice «F-139»`);
+  **R7 falla sin esperarse**: `['etl_sigrid/application/steps/load_excel_aux_step.py: openpyxl']`.
+  Pasan R2 (no nombrar `abrir_adjunto`), R7 control y sabotaje, y R9 (dos tests).
+- **`bash harness/init.sh` de precondición**: lanzado y DETENIDO a medio pytest al aparecer el
+  choque (hasta ahí todo `[OK]`: features.json, BACKLOG, rigor, compileall; ruff 275 avisos de
+  deuda previa). No hay resultado verde ni rojo que citar.
+- **Para retomar**: con la decisión, el implementer ajusta R7 (y la spec, si es A o B), commitea
+  T1 y sigue con T2-T5 sin más cambios: el resto de la spec no depende de esto.
+
 ## 2026-10-15 · F-139 · SPEC REHECHA y APROBADA por el humano (`spec_ready`; D1 y D2 cerradas)
 
 > Rama `feature/F-139-leer-graficos-asociados` (lleva `main` con F-141 y F-142). Spec en
