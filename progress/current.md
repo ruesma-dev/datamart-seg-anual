@@ -9,12 +9,12 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-15 · F-139 · SPEC REHECHA (spec-author) por cambio de objetivo del humano, pendiente de aprobación
+## 2026-10-15 · F-139 · SPEC REHECHA y APROBADA por el humano (`spec_ready`; D1 y D2 cerradas)
 
 > Rama `feature/F-139-leer-graficos-asociados` (lleva `main` con F-141 y F-142). Spec en
 > `specs/F-139-leer-graficos-asociados/`; mediciones en `progress/spec_F-139.md` (§8 las
 > nuevas). La primera versión (contraste en `facturas`, `52ac5bf`) queda DESCARTADA. F-139
-> sigue `pending` en `features.json`.
+> pasa a `spec_ready`; siguiente paso: el implementer (T1-T6).
 
 - **Objetivo**: la IA abre el ORIGINAL de un adjunto por `mcp-bbdd` (`abrir_adjunto`, pliego
   H1-H13) y lo interpreta ella. Cerrado por el humano: sin caché (mediana 0,20 s), sin tope con
@@ -25,10 +25,15 @@
 - **En este repositorio** (R1-R10): ficha del índice, versión 53, `ARCHITECTURE.md`, guarda de
   imports, test de las cinco tablas de origen y el contrato en `azure-apps/datamart_seg_anual.md`;
   después reviewer y F-139 a `blocked` con el pliego para `mcp-bbdd`.
-- **Abiertas para el humano** (`design.md` §7): **D1** quién lee el propio índice
-  (recomendada: solo quien lee las cinco tablas de origen; con F-141, vista por familia) —
-  **dato para el spec-author de F-141** —, y **D2** si ChatGPT/Codex reciben el original
-  (recomendada: mismo tratamiento que el resto del datamart, por escrito).
+- **D1 cerrada**: el índice sigue la regla de su tabla de origen («el que tenga acceso a la
+  tabla puede acceder a la de los gráficos o su cabecera; si no, no»). **REQUISITO PARA EL
+  SPEC-AUTHOR DE F-141**: las filas de `compras.documento_adjuntos` de cada familia (FACTURA →
+  `compras.facturas`, CONTRATO → `compras.contratos`, COMPARATIVO → `compras.comparativos`,
+  OFERTA → `compras.comparativo_ofertas`, ALBARAN → `compras.albaranes`) solo las ve quien lee
+  esa tabla de origen; el cómo (vistas por familia con `security_barrier`/`security_invoker`
+  o RLS) lo decide F-141. F-139 no crea vistas.
+- **D2 cerrada**: tiene que funcionar con ChatGPT; H13 se verifica también con ChatGPT y, si el
+  base64 incrustado no vale, `mcp-bbdd` lo resuelve (p. ej. enlace temporal).
 - Nuevo para `mcp-bbdd`: pasará a consumir `sigrid-api` (hoy no lo hace) y a necesitar su clave
   en su vault; riesgo técnico H13 (que el conector entregue un PDF al modelo) lo verifica él.
 

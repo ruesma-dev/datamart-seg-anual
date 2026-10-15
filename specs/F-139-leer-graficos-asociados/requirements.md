@@ -19,8 +19,13 @@ leer o interpretar, ya sea escaneado o vectorizado». No hay extracción ni cont
   cuelga. Hoy estándar y total leen las cinco, así que los dos abren todo; la regla importa
   para el perfil restringido (F-141).
 - **HTTP 500 con nombres no ASCII**: sigue como propuesta a `sigrid-api`
-  (design §6); mientras,
-  `filename_columns: ["cod"]`.
+  (design §6); mientras, `filename_columns: ["cod"]`.
+- **D1 · El índice sigue la misma regla** (humano, 2026-10-15: «el que tenga acceso a la tabla
+  puede acceder a la de los gráficos o su cabecera; si no, no»): las filas de
+  `compras.documento_adjuntos` de una familia (nombre, quién lo subió…) solo las ve quien lee
+  la tabla de origen de esa familia. Hoy no cambia nada; lo implementa F-141.
+- **D2 · Tiene que funcionar con ChatGPT** (humano, 2026-10-15): la herramienta no es solo
+  para Claude; mismo tratamiento que el resto del datamart, por escrito en el contrato.
 
 Dos bloques: **R** (este repositorio, documental, con tests) y **H** (el pliego de la
 herramienta para `mcp-bbdd`: se implementa y se prueba allí; aquí queda escrito en el
@@ -41,7 +46,8 @@ R3. La ficha debe declarar la regla de permisos con la tabla de origen de cada f
 FACTURA → `compras.facturas.factura_id`, CONTRATO → `compras.contratos.contrato_id`,
 COMPARATIVO → `compras.comparativos.comparativo_id`, OFERTA →
 `compras.comparativo_ofertas.oferta_id`, ALBARAN → `compras.albaranes.albaran_id`; y la
-regla del propio índice que decida D1 (`design.md` §7).
+regla del propio índice (D1): sus filas de una familia solo las ve quien lee la tabla de
+origen de esa familia, a aplicar por F-141 (vistas por familia o RLS, lo que ella decida).
 
 R4. La ficha debe declarar los ficheros grandes: 17 pasan de 20 MB (facturas 8, contratos 4,
 ofertas 4, comparativos 1), ninguno de 50 MB, máximo 47 MB; y que 305 enlaces de ofertas
@@ -114,9 +120,11 @@ H11. El servidor no debe guardar el binario en disco, base ni caché más allá 
 H12. La clave de `sigrid-api` debe ir al vault de `mcp-bbdd` por referencia, y la herramienta
 solo debe usar `documents/read`.
 
-H13. Antes de desplegar, `mcp-bbdd` debe verificar que el conector de claude.ai (y ChatGPT y
-Codex) entrega un PDF devuelto por una herramienta al modelo; SI no lo entrega, ENTONCES
-para y propone alternativa al humano.
+H13. Antes de desplegar, `mcp-bbdd` debe verificar, con claude.ai Y con ChatGPT (y Codex),
+que el cliente entrega al modelo el original devuelto por la herramienta (PDF e imagen); SI
+el recurso incrustado en base64 no vale para alguno, ENTONCES `mcp-bbdd` debe resolverlo
+(p. ej. un enlace temporal) y llevar la solución al humano: la herramienta no puede quedar
+solo para Claude (D2).
 
 ## C · Fuera de alcance
 

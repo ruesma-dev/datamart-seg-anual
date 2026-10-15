@@ -156,9 +156,13 @@ los dos perfiles abrirían todo.
 devuelve PNG (las imágenes como resultado ya llegan al modelo); **no consume `sigrid-api`**;
 elige el login por perfil y deja que PostgreSQL niegue (`PERMISO_DENEGADO`).
 
-## 9 · Decisiones
+## 9 · Decisiones (todas cerradas; spec APROBADA por el humano el 2026-10-15)
 
-Cerradas por el humano: dónde vive (`mcp-bbdd`), sin caché, sin tope con aviso > 20 MB, sin
-conversión (F-142), permisos por tabla de origen, el 500 como propuesta a `sigrid-api`.
-Abiertas, con recomendación (`design.md` §7): **D1** quién lee el propio índice (con F-141 en
-el horizonte) y **D2** si los clientes de terceros (ChatGPT, Codex) reciben el original.
+Dónde vive (`mcp-bbdd`), sin caché, sin tope con aviso > 20 MB, sin conversión (F-142),
+permisos por tabla de origen, el 500 como propuesta a `sigrid-api`. Y:
+
+- **D1**: «el que tenga acceso a la tabla puede acceder a la de los gráficos o su cabecera; si
+  no, no». Las filas del índice de una familia solo las ve quien lee su tabla de origen. Hoy no
+  cambia nada; lo aplica F-141 (vistas por familia o RLS).
+- **D2**: «tiene que poder funcionar con ChatGPT». Mismo tratamiento que el resto del datamart;
+  H13 se verifica también con ChatGPT y, si el base64 incrustado no vale, `mcp-bbdd` lo resuelve.

@@ -87,7 +87,7 @@ parte de lo que verifica H13.
   DATAMART», `filename_columns: ["cod"]` y el 5,7 % (R1), el límite con `mcp-bbdd` sin afirmar
   que la herramienta exista (R2), los ficheros > 20 MB y las 305 ofertas (R4); párrafo nuevo
   «QUIEN PUEDE ABRIR EL FICHERO» con la regla y las cinco tablas (R3) y la regla del índice
-  (D1). Sin columnas nuevas.
+  (D1, cerrada). Sin columnas nuevas.
 - `config/diccionario/00_global.yaml`: `version` 52 → 53 (R5).
 - `docs/ARCHITECTURE.md`: subpunto «El fichero NO se replica» del índice de F-090 (R6).
 - `C:\Users\pgris\PycharmProjects\azure-apps\datamart_seg_anual.md`: sección nueva «Abrir el
@@ -112,23 +112,24 @@ parte de lo que verifica H13.
 | Riesgo | Medida | Tratamiento |
 |---|---|---|
 | HTTP 500 de `documents/read` con nombre no ASCII | 5,7 % de enlaces; 6/6 fallos con tilde o eñe, 0/75 éxitos; la cabecera `X-Document-Filename` va sin codificar | `filename_columns: ["cod"]` (R1, H5). **Propuesta a `sigrid-api`** (decidido): codificarla como ya codifica `Content-Disposition` |
-| El cliente MCP no entrega el PDF al modelo | Las imágenes sí llegan (`grafico` ya devuelve PNG) | H13: `mcp-bbdd` lo verifica antes de desplegar y, si falla, vuelve al humano |
+| El cliente MCP no entrega el PDF al modelo | Las imágenes sí llegan (`grafico` ya devuelve PNG) | H13: `mcp-bbdd` lo verifica con claude.ai y con ChatGPT antes de desplegar y lo resuelve (D2) |
 | Formatos que la IA no lee | `.doc` 17.233 contratos, `.xls` 250 ofertas, clase correo (`.msg`) 546 | Aviso (H8); conversión en F-142 |
-| Datos personales en el fichero | NIF de firmantes en 3/12 contratos; IBAN en 11/26 facturas | Regla de permisos (R3, H3); traza (H10); D2 para los clientes de terceros |
-| El índice delata al que no lee el origen | `nombre_fichero` (proveedor, número) y `subido_por` (login) | D1 |
+| Datos personales en el fichero | NIF de firmantes en 3/12 contratos; IBAN en 11/26 facturas | Regla de permisos (R3, H3); traza (H10); clientes de terceros como el resto del datamart (D2) |
+| El índice delata al que no lee el origen | `nombre_fichero` (proveedor, número) y `subido_por` (login) | D1: misma regla que el fichero, la aplica F-141 |
 | Carga sobre `sigrid-api` | Bajo demanda, un fichero por llamada | Sin barridos: la herramienta abre de uno en uno |
 | Renombrar una tabla de origen rompe la herramienta | — | R9 (test) y «qué se rompe si cambia» (R8) |
 
-## 7 · Decisiones abiertas (con recomendación)
+## 7 · Decisiones cerradas por el humano el 2026-10-15 (la spec queda aprobada)
 
-- **D1 · ¿Quién puede leer el propio índice?** Hoy todos los perfiles leen `compras` entero.
-  Para F-141: **recomendada**, que `compras.documento_adjuntos` solo se conceda a quien lea
-  las cinco tablas de origen; si F-141 concede `compras` por tablas, que publique una vista
-  por familia (con `security_barrier`) en vez del índice entero. Se escribe como regla en la
-  ficha (R3) y se anota en `progress/current.md` para el spec-author de F-141. Alternativa:
-  índice visible para todos y solo el fichero protegido (filtra nombres y logins).
-- **D2 · Clientes de terceros.** Por ChatGPT y Codex el original (factura, contrato) sale a
-  ese proveedor, como ya sale lo que se consulta. **Recomendada**: mismo tratamiento que el
-  resto del datamart (riesgo aceptado por el humano para `personal` y `contabilidad` el
-  2026-09-22 y el 2026-09-26), dicho por escrito en el contrato. Alternativa: herramienta
-  solo para Claude.
+- **D1 · El índice sigue la regla de su tabla de origen.** «El que tenga acceso a la tabla
+  puede acceder a la de los gráficos o su cabecera; si no, no.» Las filas de
+  `compras.documento_adjuntos` de una familia (nombre del fichero, `subido_por`,
+  `cod_repositorio`…) solo las ve quien lee la tabla de origen de esa familia. **Hoy no
+  cambia nada** (estándar y total leen las cinco); aquí se escribe en la ficha (R3) y es un
+  **requisito para F-141**, que elige cómo: vistas por familia con
+  `security_barrier`/`security_invoker` o RLS. F-139 no crea vistas ni toca permisos.
+- **D2 · Tiene que funcionar con ChatGPT.** Mismo tratamiento que el resto del datamart (lo
+  consultado ya sale a ese proveedor; riesgo aceptado para `personal` y `contabilidad` el
+  2026-09-22 y el 2026-09-26), dicho por escrito en el contrato (R8). H13 se verifica también
+  con ChatGPT; si el recurso incrustado en base64 no le vale, `mcp-bbdd` lo comprueba y lo
+  resuelve (p. ej. enlace temporal) sin que se decida aquí.

@@ -2189,7 +2189,7 @@
         "Existe un contraste factura del proveedor contra factura registrada (total, base, líneas) que marca las discrepancias con las cifras medidas, sin decidir por Negocio cuáles son legítimas",
         "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
       ],
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "rigor": "estandar",
       "priority": 2,

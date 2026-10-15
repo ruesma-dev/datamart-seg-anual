@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **130 features**, 73 abiertas (0 en curso, 1 con la spec lista, 0 bloqueadas y 72 en backlog) y 57 terminadas.
+Resumen: **130 features**, 73 abiertas (0 en curso, 2 con la spec lista, 0 bloqueadas y 71 en backlog) y 57 terminadas.
 
 ## En curso
 
@@ -13,6 +13,7 @@ _Ninguna feature en curso._
 
 | # | Feature | Prioridad | Rigor | Rama |
 |---|---|---|---|---|
+| F-139 | Leer el contenido de los gráficos asociados de facturas, ofertas y contratos para contrastar el original contra lo registrado en Sigrid | 2 | estandar | `feature/F-139-leer-graficos-asociados` |
 | F-111 | Los nombres de partida se resuelven por codigo en los niveles del arbol y en la dimension de costes indirectos: 10.593 filas con un escalon con el nombre de otra partida | 15 | estandar | `feature/F-111-nombres-partida-por-ancestro` |
 
 ## Bloqueadas
@@ -23,7 +24,6 @@ _Ninguna feature bloqueada._
 
 | # | Feature | Prioridad | Rigor | Rama |
 |---|---|---|---|---|
-| F-139 | Leer el contenido de los gráficos asociados de facturas, ofertas y contratos para contrastar el original contra lo registrado en Sigrid | 2 | estandar | `feature/F-139-leer-graficos-asociados` |
 | F-141 | Un tercer perfil de acceso al datamart, RESTRINGIDO: más limitado que el estándar, para dar acceso a Sigrid a quien no debe ver todo lo que ve el estándar | 3 | critico | `feature/F-141-perfil-restringido` |
 | F-128 | Toda la cabecera de la factura de proveedor y del albarán (con proformas): los importes (base, IVA, retención, total y total a pagar), sus recargos y retenciones (dcfrec, dcarec) y el resto de campos de `dcf` y `dca` que hoy no se publican | 4 | estandar | `feature/F-128-importes-cabecera-factura` |
 | F-140 | La fase 2 de la cartera (F-037): los ingredientes de la proyección de caja por obra (devengo pendiente, plazos de pago pactados y retenciones), sin convertir devengo en caja | 5 | estandar | `feature/F-140-proyeccion-caja-ingredientes` |
@@ -162,7 +162,7 @@ _Ninguna feature bloqueada._
 
 ### F-139 · Leer el contenido de los gráficos asociados de facturas, ofertas y contratos para contrastar el original contra lo registrado en Sigrid
 
-estado **pendiente** · prioridad 2 · rigor `estandar` · SDD sí · rama `feature/F-139-leer-graficos-asociados`
+estado **spec lista** · prioridad 2 · rigor `estandar` · SDD sí · rama `feature/F-139-leer-graficos-asociados`
 
 Nace el 2026-10-14 por orden del humano: «pon como prioridad 2 leer los gráficos asociados a facturas, ofertas y contratos». Es la «feature futura» que F-090 dejó FUERA por escrito: F-090 publicó el ÍNDICE de adjuntos (`compras.documento_adjuntos`, una fila por enlace documento <-> fichero, con `cod_repositorio` y `empresa_repositorio`), no el contenido. El binario está en la base documental `ruesma_rep` (su `dbo.gra`, 364.906 ficheros, ~165 GB) y lo sirve `sigrid-api` con `POST /api/documents/read` (`id_column: cod`), probado en F-090 con una factura. COBERTURA DE ADJUNTOS medida en F-090 (2026-10-09): facturas 62,8 % (96,1 % desde 2019), contratos 92,4 %, ofertas 25,1 %. LO QUE HABILITA, y era la petición 3 de Juan Romero del 2026-09-18: contrastar lo que el proveedor factura de verdad (importes, cantidades, precios, conceptos) contra lo registrado en Sigrid sin ir factura a factura; y en ofertas, el Excel del concurso real (ver F-129). ================ RIESGO QUE DECIDE LA SPEC ANTES DE NADA: **el LÍMITE DE RESPONSABILIDAD**. Leer PDF (texto, tablas, escaneos con OCR o extracción con un modelo) es otro dominio que el ETL del datamart y puede merecer proyecto propio, o vivir en `sigrid-api` o en `mcp-bbdd`. Si la spec concluye que no vive aquí, la feature se marca `blocked` y se propone al humano dónde vive. Otros riesgos a medir: el volumen (no se replica el binario en el Postgres compartido), el coste y la ventana nocturna (la lectura sería incremental), y los datos personales que puedan traer los ficheros.
 
