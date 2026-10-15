@@ -43,6 +43,7 @@
   `OBJETO_NO_PERMITIDO`: **PENDIENTE de `mcp-bbdd`** (añadirla a `servidor.esquemas_permitidos`
   y desplegar; contrato en `azure-apps` `0f45bbb`). Tras eso, R31 por chat con la cuenta total y
   la negativa con la estándar.
+- **Paso 7 HECHO (15-10, ~12:45 UTC)**: `mcp-bbdd` desplegó `compras_restringida` en su lista blanca (revisión `ca-mcp-bbdd-dev--0000018`, imagen `r20261015-1438`, creada DESPUÉS de publicar la v52: no hace falta reiniciar ni republicar). Por el conector (perfil total): 45.749 en la restringida y 45.722 en la general; `describir_tabla` sirve la ficha v52 con `R-COMPRAS-RESTRINGIDA`. NEGATIVA con la cuenta estándar HECHA por el humano el 15-10 («está todo ok»): `compras_restringida` → PERMISO_DENEGADO. Solo queda el paso 8.
 - **Paso 8 (líder, 16-10)**: `python main.py timings` de la primera nocturna con la imagen nueva
   (`ingest_raw.conala`, `ingest_raw.auxala` y el sub-paso).
 
