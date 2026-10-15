@@ -3904,9 +3904,35 @@ objetos:
       0,23 % de los enlaces (461) no tiene binario en la base documental: la
       fila existe y el fichero no se puede abrir. Y el 11 % de las filas
       documentales tiene el nombre vacio: el nombre bueno es `nombre_fichero`,
-      el de esta tabla. Abrir el fichero no se hace desde el datamart: es cosa
-      de `sigrid-api` (o de una herramienta del MCP o de un portal que lo
-      llame).
+      el de esta tabla. Pidase SIEMPRE con `filename_columns: ["cod"]`: sin
+      ello `sigrid-api` responde HTTP 500 a los ficheros con nombre documental
+      no ASCII (tildes, eñes), que son 11.262 de 199.032 enlaces (5,7 %),
+      medido el 2026-10-15 (F-139); con ello el fichero llega entero.
+
+      **EL LIMITE (F-139)**: el datamart publica el INDICE, nunca el fichero.
+      Abrir el ORIGINAL para una IA es trabajo de `mcp-bbdd`, que lo pedira a
+      `sigrid-api` y lo entregara SIN CONVERTIR (un `.doc` o un `.xls` llegan
+      tal cual; convertirlos es F-142). Esa herramienta de `mcp-bbdd` NO ESTA
+      DESPLEGADA todavia: hasta que lo este, ni el datamart ni el MCP abren
+      ficheros, y este indice solo dice cuales hay. **Ficheros grandes**: 17
+      ficheros pasan de 20 MB (facturas 8, contratos 4, ofertas 4,
+      comparativos 1), ninguno llega a 50 MB y el mayor tiene 47 MB, medido el
+      2026-10-15. **Ofertas sin fila en su tabla**: 305 enlaces de ofertas
+      (1,4 %) no tienen fila en `compras.comparativo_ofertas`; su fichero
+      existe igual.
+
+      **QUIEN PUEDE ABRIR EL FICHERO**: quien pueda leer la tabla de origen del
+      documento del que cuelga, segun `familia`: FACTURA ->
+      `compras.facturas.factura_id`, CONTRATO -> `compras.contratos.contrato_id`,
+      COMPARATIVO -> `compras.comparativos.comparativo_id`, OFERTA ->
+      `compras.comparativo_ofertas.oferta_id`, ALBARAN ->
+      `compras.albaranes.albaran_id`. El permiso lo decide la base: quien no lee
+      esa tabla no abre sus ficheros. LA MISMA REGLA VALE PARA ESTE INDICE
+      (decision del humano del 2026-10-15): las filas de una familia, con
+      `nombre_fichero`, `subido_por` y `cod_repositorio`, solo debe verlas quien
+      lee la tabla de origen de esa familia. Hoy los perfiles estandar y total
+      leen las cinco tablas y ven el indice entero, asi que no cambia nada; la
+      regla la aplicara el perfil restringido (F-141).
 
       **LA CLASE DE FICHERO SALE DE LA EXTENSION DEL NOMBRE** (`extension`,
       `clase_fichero`), no de la clase de grafico de Sigrid: `gra.gratipide`
