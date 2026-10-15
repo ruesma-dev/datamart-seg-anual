@@ -510,11 +510,11 @@ def test_f138_r20_el_paso_ejecuta_el_15_al_final(monkeypatch) -> None:
     contados: list[tuple[str, str]] = []
 
     class _Pg:
-        def execute_sql_file(self, ruta):
-            ejecutados.append(Path(ruta).name)
+        def execute_sql_file(self, path):
+            ejecutados.append(Path(path).name)
 
-        def count_rows(self, esquema, tabla):
-            contados.append((esquema, tabla))
+        def count_rows(self, schema, table):
+            contados.append((schema, table))
             return 1
 
     monkeypatch.setattr(modulo, "build_postgres_client", lambda _s: _Pg())
