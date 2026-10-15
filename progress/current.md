@@ -9,7 +9,13 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-14 · F-138 · EN IMPLEMENTACIÓN (implementer, `in_progress`)
+## 2026-10-15 · F-138 · CERRADA (`done`, APROBADO en pasada 1) · SIN FUSIONAR NI DESPLEGAR (espera orden del humano)
+
+- Review pasada 1: **APROBADO** sin cambios requeridos (`progress/review_F-138.md`). El reviewer
+  repitió `init.sh` (exit 0, 8.065 passed, cobertura 100 %) y el SQL en PostgreSQL 16 desechable
+  con tres `LC_CTYPE`: 0 divergencias en 4.003 textos entre la regla SQL y el oráculo. Cuatro
+  observaciones no bloqueantes (la 2, guarda de restricción solo para 33/35, candidata a feature).
+- Historia de la implementación, abajo.
 
 - Tarea en curso: ver `specs/F-138-facturas-liquidatorias/tasks.md` (las `[x]` son las hechas).
 - `init.sh` de arranque (18:41 UTC): ROJO, pero CAUSADO POR ESTA SESIÓN: la suite tardó 1 h 29 min

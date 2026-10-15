@@ -1781,3 +1781,22 @@ en Azure conforme. Review: pasada 1 rechazada solo por evidencia, pasada 2 APROB
 
 QUEDA (MANUAL, con orden del humano): merge, imagen y job, `02_roles.sql`, build, apply-grants,
 pruebas negativa/positiva, diccionario v51, nocturna siguiente; lista blanca de `mcp-bbdd`.
+
+## F-138 · Las facturas, albaranes y proformas liquidatorias: las alarmas de Sigrid y su marca · 2026-10-15
+
+Nace del correo de Elena Díaz (Control de Costes) del 14-10: la liquidatoria es una ALARMA de texto
+libre (`conala`), no un campo. Ingesta de `conala` (lista explícita de 17 familias, sin empleados)
+y `auxala`: 76 tablas. `compras_restringida.documento_alarmas` (completa, tercer esquema
+restringido, solo el perfil total) y `compras.documento_alarmas` (sin recursos ni partes, D9), con
+guarda de recálculo; `documento_liquidatoria` (marca por precedencia NEGADA > LIQUIDATORIA >
+CARTA_LIQUIDACION > DUDOSA > REMITE; memo aparte), `contrato_liquidacion` (facturas terminadas, IVA
+que ya no se difiere) y `facturas_tras_liquidacion` (el aviso). Diccionario v52
+(`R-COMPRAS-RESTRINGIDA`); `02_roles.sql`, `settings` y `ESQUEMAS_DEL_DATAMART` (16).
+
+Verificado: `init.sh` 8.065 passed, cobertura 100 % (66/66), mutación 17/20 con 3 equivalentes
+analizados; el reviewer reprodujo el SQL en PostgreSQL 16 desechable con tres `LC_CTYPE` y 4.003
+textos: 0 divergencias entre la regla SQL y el oráculo Python. Review: APROBADO en la pasada 1.
+
+QUEDA (MANUAL, con orden del humano): merge, imagen y job, `02_roles.sql`, ingesta de
+`conala`/`auxala`, build, apply-grants, diccionario v52, lista blanca de `mcp-bbdd`
+(`compras_restringida`), pruebas por el MCP y la nocturna siguiente.
