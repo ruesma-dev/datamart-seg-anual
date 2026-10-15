@@ -9,6 +9,28 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-15 · F-139 · SPEC ESCRITA (spec-author), pendiente de aprobación del humano · recomienda que NO viva aquí
+
+> Rama `feature/F-139-leer-graficos-asociados` (desde `main` `85b1e92`). Spec en
+> `specs/F-139-leer-graficos-asociados/`; mediciones (solo lectura: Azure, `sql/read` y 81
+> `documents/read` a un scratchpad ya borrado) en `progress/spec_F-139.md`. Estado en
+> `features.json`: sigue `pending` (no se toca hasta que el humano decida).
+
+- **Recomendación (D1): opción B, el proyecto `facturas`**, que ya extrae facturas con IA,
+  lee Sigrid por `sigrid-api` y concilia con discrepancias (F-011). Este ETL no: es otro
+  dominio (27 % de facturas recientes escaneadas, sin plantilla dominante, 22 % con varios
+  ficheros). Pliego para `facturas` en `requirements.md` §B (P1-P11).
+- **Hallazgo**: `documents/read` da **HTTP 500** con nombres documentales no ASCII
+  (`X-Document-Filename` sin codificar en `sigrid-api`): 11.262 de 199.032 enlaces (5,7 %).
+  Arreglo de consumidor: `filename_columns: ["cod"]`. La ficha de `documento_adjuntos` no lo
+  avisa (R1).
+- **En este repositorio** solo R1-R5 y R7 (ficha, versión 53, `ARCHITECTURE.md`, guarda de
+  imports y `azure-apps`) y F-139 a `blocked` (R6).
+- **Decisiones abiertas para el humano: D1-D7** (`design.md` §8): D1 dónde vive, D2 solo
+  facturas, D3 lo registrado desde el datamart, D4 piloto y luego desde 2025, D5 sin vuelta
+  al MCP en esta fase, D6 feature en `sigrid-api` para el 500, D7 R1-R7 en feature pequeña
+  propia y F-139 `blocked` ya.
+
 ## 2026-10-15 · F-138 · CERRADA (`done`, APROBADO en pasada 1) · DESPLEGADA el 15-10 (`r20261015-0915`, diccionario v52)
 
 > Orden del humano: «fusiona F-138 en main y despliega». Merge `1d1798d` en `main` (árbol
