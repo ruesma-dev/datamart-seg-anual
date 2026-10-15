@@ -9,7 +9,44 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-15 · F-138 · CERRADA (`done`, APROBADO en pasada 1) · SIN FUSIONAR NI DESPLEGAR (espera orden del humano)
+## 2026-10-15 · F-138 · CERRADA (`done`, APROBADO en pasada 1) · DESPLEGADA el 15-10 (`r20261015-0915`, diccionario v52)
+
+> Orden del humano: «fusiona F-138 en main y despliega». Merge `1d1798d` en `main` (árbol
+> idéntico a la rama revisada salvo `features.json`/`BACKLOG.md` con F-140); espejo `0731a22`
+> en `dev`.
+
+- **Paso 1**: el job no fija `PG_VETOED_SCHEMAS` ni `PG_RESTRICTED_SCHEMAS`. Imagen
+  `r20261015-0915` construida desde `main`; el job apuntado a ella DESPUÉS del paso 2.
+- **Paso 2 (humano, 07:20 UTC)**: `02_roles.sql` con `COMMIT`, tres contraseñas «SIN CAMBIOS»;
+  `compras_restringida` de `sigrid_dm_etl`; el estándar `lee = f` en `compras_restringida`,
+  `contabilidad_restringida`, `raw` y `tesoreria_restringida`; el total ve las tres restringidas
+  y no `raw`.
+- **Paso 3**: `ingest --full` de `conala` 45.752 filas (65,9 s) y `auxala` 4 (58,6 s; casi todo es
+  la firma de origen, ~56-60 s por ingesta).
+- **Paso 4**: `build-compras` SUCCESS **556,2 s** (antes ~529-912 s), sub-paso
+  `alarmas_liquidatoria` **27,45 s**; `apply-grants` SUCCESS con `verificacion`,
+  `verificacion_total` y `acceso_total` = `ok`; `sigrid_dm_restringido_ro` recibe
+  `compras_restringida`.
+- **Paso 5 (R28-R30)**: `check-raw-recuentos` `auxala` OK; `conala` DERIVA 45.753 frente a
+  45.752 (una alarma creada en Sigrid entre la ingesta y la comprobación: sistema vivo).
+  Alarmas: completa 45.749, general 45.722. `cierra_contrato`: 8.752 facturas, 4.586 albaranes y
+  55 proformas (4.641). `contrato_liquidacion` 19.127 = `compras.contratos`; 5.611 con
+  `facturas_terminadas` (81 solo por carta); 722 contratos con 1.167 facturas posteriores;
+  5.281 cuya última factura cierra. TODO EXACTO frente a la spec. Estándar sin USAGE en
+  `compras_restringida`, total con él. FR26/10035: LIQUIDATORIA, cierra, 2026-09-29 07:38:06.
+- **Paso 6**: diccionario **v52** (226 objetos, 1.864 columnas, 25 reglas, hash `886140d227ac`);
+  `check-diccionario` y `check-declarados` OK (226/226); `check-unicidad` sale con 1 por los 5
+  objetos grandes de siempre NO COMPROBADOS por el timeout de 30 s; los cuatro de F-138 con clave,
+  OK, 0 rotas.
+- **Paso 7**: MCP reiniciado (`ca-mcp-bbdd-dev--0000017`). Por el conector (perfil total):
+  FR26/10035 → LIQUIDATORIA desde el 29/09/2026 7:38:06. `compras_restringida` →
+  `OBJETO_NO_PERMITIDO`: **PENDIENTE de `mcp-bbdd`** (añadirla a `servidor.esquemas_permitidos`
+  y desplegar; contrato en `azure-apps` `0f45bbb`). Tras eso, R31 por chat con la cuenta total y
+  la negativa con la estándar.
+- **Paso 8 (líder, 16-10)**: `python main.py timings` de la primera nocturna con la imagen nueva
+  (`ingest_raw.conala`, `ingest_raw.auxala` y el sub-paso).
+
+### Historia de la feature (antes del despliegue)
 
 - Review pasada 1: **APROBADO** sin cambios requeridos (`progress/review_F-138.md`). El reviewer
   repitió `init.sh` (exit 0, 8.065 passed, cobertura 100 %) y el SQL en PostgreSQL 16 desechable
@@ -90,6 +127,12 @@
   versiones más que no se han pedido.
 
 ## 2026-10-14 · F-037 · CERRADA (`done`, APROBADO en pasada 2) · DESPLEGADA el 14-10 por orden del humano («adelante f37»)
+
+- **T16 HECHA (15-10, CIERRE COMPLETO)**: nocturna 00:00-04:32 UTC (4 h 32 min), 123 pasos, 0
+  fallos; `build_tesoreria` 115 s; `apply_grants` con los tres `ok`. Negativa repetida por el
+  catálogo: `mcp_sigrid_dm_ro` sin USAGE en `tesoreria_restringida`, `contabilidad_restringida`
+  ni `raw`; `mcp_sigrid_dm_total` con las dos restringidas y sin `raw`. Cartera 279.100 /
+  242.047. F-037 no tiene nada pendiente.
 
 - **T14 HECHA (14-10)**: mcp-bbdd desplegó su F-021 (revisión `--0000017`, imagen
   `r20261014-1342`) con `tesoreria` y `tesoreria_restringida` en la lista blanca común. Verificado
