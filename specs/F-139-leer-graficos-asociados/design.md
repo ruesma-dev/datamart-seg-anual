@@ -1,146 +1,134 @@
 <!-- specs/F-139-leer-graficos-asociados/design.md -->
-# F-139 · Diseño: dónde vive la lectura de los gráficos asociados
+# F-139 · Diseño: la IA abre el original del adjunto por `mcp-bbdd`
 
-Mediciones: `progress/spec_F-139.md` (todo en solo lectura el 2026-10-15). Este diseño
-decide primero el LÍMITE DE RESPONSABILIDAD (regla dura de `CLAUDE.md`) y, con la opción
-recomendada, deja en este repositorio solo documentación y una guarda.
+Mediciones: `progress/spec_F-139.md` (solo lectura, 2026-10-15). Objetivo y decisiones
+cerradas: `requirements.md` (cabecera). La versión anterior de esta spec (contraste en
+`facturas`) queda **descartada** por el humano; su historia está en el commit `52ac5bf`.
 
-## 1 · Límite de responsabilidad: cinco sitios posibles
+## 1 · Límite de responsabilidad
 
-Lo que hay que hacer: bajar el fichero de `ruesma_rep`, saber si es la factura o un anexo,
-sacar cabecera y líneas (de PDF con texto, escaneados e imágenes), leer lo registrado en
-Sigrid y publicar las discrepancias. Lo medido que pesa en la decisión:
-
-- El 27 % de las facturas PDF de 2025-26 es escaneado (6 de 10 en 2019-21): sin OCR o un
-  modelo multimodal no hay contraste para una de cada cuatro.
-- En las facturas con texto, la cifra registrada APARECE (base 23/26, total 20/26, líneas
-  137/185), pero saber cuál número es cuál exige entender la maqueta de cada proveedor:
-  no hay plantilla dominante. Es extracción con IA, no un `regexp`.
-- El 22 % de las facturas con adjunto tiene varios ficheros y el nombre no dice cuál es.
-- Volumen: ~55 GB de facturas (~15 GB desde 2025); ~130 ficheros por día laborable.
-
-| Opción | A favor | En contra |
+| Pieza | Dónde vive | Por qué |
 |---|---|---|
-| **A · Este ETL** | Ya tiene el índice, el cliente de `sigrid-api` y la nocturna | Otro dominio: `ARCHITECTURE.md` lo define como ETL Sigrid → PostgreSQL → Power BI y dice que «no lee `ruesma_rep`». Metería un SDK de IA, una clave y un coste variable y no determinista en una nocturna de 4 h 32 min con tope de 5 h. Repetiría desde cero lo que `facturas` ya aprendió en 50+ features |
-| **B · `facturas` (RECOMENDADA)** | Ya extrae facturas de proveedor con IA (F-004, F-024 esquema completo, F-039 todas las líneas, F-050 PDF como PDF), ya lee Sigrid por `sigrid-api` en solo lectura con guardián de AST, ya CONCILIA con discrepancias, tolerancias versionadas y coste medido (F-011), y ya tiene base propia sin binarios y conexión de solo lectura al datamart. Mismo dato (la factura) al mismo proveedor de IA: ninguna exposición nueva | Hoy está en local sin desplegar (su F-008). Su conciliación es contra los ORÍGENES (albaranes, proforma), no contra la factura REGISTRADA: hay que añadir un modo y una fuente nuevos (el archivo de `ruesma_rep`) |
-| C · Proyecto nuevo (`documentos-compra`) | Separación limpia, alcance propio | Duplica la extracción de `facturas` (prompts, esquema, correcciones); un octavo inquilino del Postgres compartido; dos equipos de prompts que divergen |
-| D · `sigrid-api` | Ya sirve el binario | Es una pasarela sin lógica de negocio; meter IA ahí la convierte en otra cosa y pone su balanceador (230 s) en el camino crítico |
-| E · `mcp-bbdd` (herramienta `abrir_adjunto`) | Barato e inmediato: el cliente MCP lee el PDF cuando alguien pregunta por UNA factura | Bajo demanda, no sistemático: no responde «qué facturas descuadran»; sirve binarios con datos personales a cualquier perfil. **Complementaria**, no sustituye |
+| El ÍNDICE (qué fichero cuelga de qué documento) | **Este ETL**, ya hecho (F-090) | Sale de Sigrid (`rcg`, `gra`) cada noche, como el resto de `compras` |
+| Abrir el original y dárselo a la IA | **`mcp-bbdd`** (decidido) | Es quien habla con la IA y quien sabe qué perfil pregunta; el datamart no ve conversaciones |
+| Servir el binario | **`sigrid-api`** (`documents/read`), ya existe | Único acceso a Sigrid; `ruesma_rep` no se replica (~81 GB en compras) |
+| Leer o interpretar el contenido | **La IA**, en la conversación | Decisión del humano: escaneado o vectorizado, lo interpreta ella |
+| Convertir `.doc`/`.xls` | F-142, aparte | Decisión del humano: se recibe el original |
 
-**Recomendación: B**, empezando solo por facturas (D2) desde 2025 (D4) y con un piloto
-antes del histórico. E queda como complemento posible a decidir en `mcp-bbdd`.
+Consecuencias para los otros proyectos (cada dueño actualiza su documento de `azure-apps`
+cuando lo implemente; aquí no se tocan): `mcp-bbdd` **pasa a consumir `sigrid-api`** (hoy
+declara expresamente que no lo hace, §1 de `mcp_bbdd.md`) y necesita su clave en
+`kv-mcp-bbdd-dev`; `sigrid-api` gana un consumidor de `documents/read`.
 
-## 2 · Cómo encaja la opción B (lo que se entrega al dueño)
+## 2 · Cómo funciona la herramienta (contrato H1-H13, `requirements.md` §B)
 
 ```
-datamart (este repo)                  facturas (dueño de la lectura)
-compras.documento_adjuntos ──P1──▶  lista de facturas con adjunto (desde D4)
-                                       │ P2 documents/read (filename_columns: ["cod"])
-sigrid-api ◀───────────────────────────┘ P3 tope de tamaño · P4 sin binario guardado
-                                       │ P5 incremental por adjunto_id + sha256
-                                       │ P6 clasificar fichero · P7 extraer (F-024/F-050)
-compras.facturas / factura_lineas ─P8─▶ lo registrado
-                                       │ P9 contraste + discrepancias con cifras
-                                       ▼ P10 coste y tope por lote · P11 nada nuevo al modelo
-                                     base `facturas` (vista de contraste vigente)
+IA ── consultar(SELECT … FROM compras.documento_adjuntos WHERE documento_id = …) ──▶ adjunto_id
+IA ── abrir_adjunto(adjunto_id) ──▶ mcp-bbdd
+   1. índice, con el login del perfil ............ NO_ENCONTRADO si no hay fila      (H2)
+   2. tabla de origen de la familia, mismo login . PERMISO_DENEGADO si la base niega (H3)
+   3. sigrid-api documents/read (filename_columns: ["cod"]) ... SIN_BINARIO / ORIGEN_NO_DISPONIBLE (H5, H9)
+   4. respuesta: original sin convertir + texto (familia, documento, nombre, tamaño, avisos)   (H6-H8)
+   5. traza de la apertura, sin contenido                                                     (H10)
 ```
 
-El pliego P1-P11 está en `requirements.md` §B. Lo que este repositorio garantiza al dueño
-es el **contrato del índice**, ya publicado y descrito en su ficha: `adjunto_id`,
-`documento_id`, `familia`, `cod_repositorio`, `empresa_repositorio`, `nombre_fichero`,
-`extension`, `clase_fichero`, `fecha_alta`, `subido_por`. Si F-139 se implementa allí,
-cualquier cambio de esas columnas pasa a romper a un consumidor: hay que anotarlo en
-`azure-apps/datamart_seg_anual.md` («qué se rompe si cambia») cuando el consumo exista.
+**La comprobación de permiso (H3), en concreto.** Con el login del perfil y según la familia
+leída en el paso 1:
 
-**Carga sobre `sigrid-api` y la ventana**: el día (~130 ficheros, ~50 MB) se baja en ~1 min
-en serie; desde 2025 (~21 GB de las tres familias, ~15 GB de facturas) son ~4-6 h a ~1 MB/s.
-Se propone que el histórico corra de día, por lotes con tope, y nunca en la ventana de la
-nocturna del datamart (comparten la VPN y el SQL Server on-premise). El coste de IA por
-factura no se adelanta aquí: lo mide el piloto con los precios de `facturas`
-(`config/precios_ia.yaml`), no la memoria de nadie.
+```sql
+SELECT a.adjunto_id, a.cod_repositorio, a.nombre_fichero, a.extension,
+       (o.factura_id IS NOT NULL) AS origen_presente     -- columna de la tabla de origen
+FROM compras.documento_adjuntos a
+LEFT JOIN compras.facturas o ON o.factura_id = a.documento_id
+WHERE a.adjunto_id = $1;
+```
+
+PostgreSQL comprueba el `SELECT` sobre **todas** las relaciones de la consulta antes de
+ejecutarla, haya filas o no: sin permiso sobre `compras.facturas` la sentencia falla con
+`permission denied` y el servidor lo traduce al `PERMISO_DENEGADO` que ya existe (F-008 de
+`mcp-bbdd`). Se lee una columna de `o` a propósito: un `LEFT JOIN` por clave única cuyas
+columnas no se usan es candidato a que el planificador lo elimine. El `LEFT` (y no `INNER`)
+es para las 305 ofertas sin fila en `compras.comparativo_ofertas` (H4): quien lee la tabla
+las abre, con `origen_presente = false` como aviso.
+
+Alternativa descartada: `has_table_privilege(...)` en el servidor. Hace lo mismo, pero es el
+servidor quien decide y sería una lógica más que mantener; con el `JOIN` niega la base, que es
+el principio que `mcp-bbdd` ya sigue («quien niega el dato es PostgreSQL»).
+
+**Familias y tablas de origen** (ya están en `relaciones` de la ficha del índice; R9 las fija):
+
+| Familia | Tabla | Columna | Enlaces | Sin fila en origen |
+|---|---|---|---|---|
+| FACTURA | `compras.facturas` | `factura_id` | 134.047 | 0 |
+| CONTRATO | `compras.contratos` | `contrato_id` | 38.169 | 0 |
+| COMPARATIVO | `compras.comparativos` | `comparativo_id` | 4.452 | 0 |
+| OFERTA | `compras.comparativo_ofertas` | `oferta_id` | 22.074 | 305 |
+| ALBARAN | `compras.albaranes` | `albaran_id` | 690 | 0 |
+
+**Sin caché (decidido).** Abrir cuesta mediana 0,20 s, media 0,41 s y máx. 4,3 s en 81
+aperturas; un fichero de 47 MB (el mayor) son ~47 s a ~1 MB/s, dentro de los 230 s. No
+compensa SharePoint. Si en producción el tiempo cambia, se revisa.
+
+**Tamaño (decidido).** Sin tope; aviso por encima de 20 MB (17 ficheros hoy). Un recurso
+incrustado va en base64 (+33 %): el riesgo de que el cliente rechace respuestas grandes es
+parte de lo que verifica H13.
 
 ## 3 · Ficheros a crear (en este repositorio)
 
-- `tests/test_f139_limite.py` — R1, R2, R4 (texto de la ficha y de `ARCHITECTURE.md`), R3
-  (la versión sube respecto a `main`, con el mismo patrón que los tests de diccionario de
-  F-090) y R5 (recorre con `ast` los `.py` de `etl_sigrid/` y `main.py` y falla si importan
-  una librería de la lista). Sin red ni BBDD.
+- `tests/test_f139_limite.py` — sin red ni BBDD. R1-R4 (texto de la ficha), R5 (la versión
+  sube respecto a `main`, mismo patrón que `tests/test_f090_diccionario.py`), R6 (texto de
+  `ARCHITECTURE.md`), R7 (recorre con `ast` los `.py` de `etl_sigrid/` y `main.py`, con un caso
+  de sabotaje sobre un módulo temporal) y R9 (las cinco tablas y columnas existen en
+  `config/diccionario/compras.yaml` y están en `relaciones` del índice).
 
 ## 4 · Ficheros a modificar
 
-- `config/diccionario/compras.yaml` — ficha `documento_adjuntos`: en el párrafo «EL FICHERO
-  NO ESTA EN EL DATAMART», añadir `filename_columns: ["cod"]` y el 5,7 % (11.262 enlaces)
-  que dan HTTP 500 sin él (R1); y una frase de que el contenido se lee fuera, en `facturas`
-  (F-139), solo facturas, sin afirmar que ya exista (R2). Sin columnas nuevas.
-- `config/diccionario/00_global.yaml` — `version` 52 → 53 (R3).
-- `docs/ARCHITECTURE.md` — punto «EL ÍNDICE DE DOCUMENTOS ADJUNTOS…», subpunto «El fichero
-  NO se replica»: el límite de F-139 y el aviso de `filename_columns` (R4).
-- `harness/features.json` — F-139 a `blocked` con el motivo de R6 (lo hace el líder tras la
-  aprobación; `BACKLOG.md` se regenera solo).
-- `progress/current.md` — entrada de la spec.
-- `C:\Users\pgris\PycharmProjects\azure-apps\datamart_seg_anual.md` — lo de R1 y R4 en el
-  párrafo de `documents/read` (R7; otro repositorio, commit local allí).
+- `config/diccionario/compras.yaml`, ficha `documento_adjuntos`: en «EL FICHERO NO ESTA EN EL
+  DATAMART», `filename_columns: ["cod"]` y el 5,7 % (R1), el límite con `mcp-bbdd` sin afirmar
+  que la herramienta exista (R2), los ficheros > 20 MB y las 305 ofertas (R4); párrafo nuevo
+  «QUIEN PUEDE ABRIR EL FICHERO» con la regla y las cinco tablas (R3) y la regla del índice
+  (D1). Sin columnas nuevas.
+- `config/diccionario/00_global.yaml`: `version` 52 → 53 (R5).
+- `docs/ARCHITECTURE.md`: subpunto «El fichero NO se replica» del índice de F-090 (R6).
+- `C:\Users\pgris\PycharmProjects\azure-apps\datamart_seg_anual.md`: sección nueva «Abrir el
+  original de un adjunto (contrato con `mcp-bbdd`, F-139)» con H1-H13, la tabla de §2, el
+  riesgo de H13 y, en «qué se rompe si cambia», las columnas del índice y las cinco tablas de
+  origen (R8). Commit local en `azure-apps`, sin push.
+- `harness/features.json`: F-139 a `blocked` (R10, el líder tras el APROBADO).
+- `progress/current.md`: entrada de la spec.
 
 ## 5 · Ficheros que NO se tocan
 
-- Todo el SQL (`etl_sigrid/infrastructure/postgres/sql/`), en particular
-  `compras/14_documento_adjuntos.sql`: el índice está bien; el fallo es de quien sirve.
-- `config/tables_sigrid.yaml`, `etl_sigrid/domain/documento_adjuntos.py`, los steps y
-  `orchestrator.py`: no hay ingesta ni build nuevos.
-- `etl_sigrid/infrastructure/sigrid/sigrid_api_client.py`: este ETL no llama a
-  `documents/read` y no debe empezar a hacerlo.
-- `requirements.txt` / `pyproject.toml`: ninguna dependencia nueva (R5).
-- `config/objetos_pendientes.yaml` y la lista de pendientes del diccionario: no hay objeto
-  nuevo.
-- `azure-apps/sigrid_api.md` y `azure-apps/facturas.md`: sus dueños son esos proyectos.
+- Todo el SQL, en particular `sql/compras/14_documento_adjuntos.sql`: el índice no cambia.
+- `config/tables_sigrid.yaml`, `etl_sigrid/domain/documento_adjuntos.py`, steps y orquestador.
+- `etl_sigrid/infrastructure/sigrid/sigrid_api_client.py`: este ETL no llama a `documents/read`.
+- `infra/sql/02_roles.sql` y `apply_grants`: los permisos de hoy ya cumplen la regla
+  (estándar y total leen `compras` entero); lo que cambie es de F-141.
+- `requirements.txt`/`pyproject.toml`: ninguna dependencia (R7).
+- `azure-apps/mcp_bbdd.md` y `azure-apps/sigrid_api.md`: sus dueños los actualizan.
 
-## 6 · Clases, funciones y SQL
-
-Ninguna clase ni función de producción, ningún SQL. Solo el test de §3. Capa: ninguna.
-
-## 7 · Riesgos
+## 6 · Riesgos
 
 | Riesgo | Medida | Tratamiento |
 |---|---|---|
-| HTTP 500 de `documents/read` con nombres no ASCII | 5,7 % de los enlaces; 6/6 fallos con tilde o eñe, 0/75 éxitos | R1 (aviso en la ficha) y D6 (arreglo en `sigrid-api`: `X-Document-Filename` va sin codificar) |
-| Volumen | ~81 GB las tres familias; máx. 157 MB un fichero | Nada de binario en el Postgres compartido (P4); tope de tamaño (P3); histórico por lotes |
-| Ventana nocturna (4 h 32 min de 5 h) | — | Con B no la toca: el contraste corre en `facturas`, fuera de la ventana |
-| Carga sobre `sigrid-api` | ~1 MB/s en serie, mediana 0,2 s por fichero | Serie, plazo < 230 s, histórico de día y por lotes (P2) |
-| Escaneados | 27 % recientes, 60 % en 2019-21 | Extracción multimodal de `facturas` (P7); un histórico anterior a 2019 rinde poco (D4) |
-| Fichero equivocado | 22 % de facturas con varios ficheros | Clasificación previa y estado `SIN_ORIGINAL` (P6) |
-| Datos personales | NIF de firmantes en 3/12 contratos; IBAN en 11/26 facturas | Contratos fuera (D2); a la IA solo lo que ya viaja hoy (P11) |
-| Falsa precisión | La aparición en texto es una cota superior | El piloto mide acierto real contra una revisión humana antes del histórico (D4) |
-| Cambio del índice rompe a `facturas` | — | Anotarlo en «qué se rompe si cambia» de `datamart_seg_anual.md` cuando el consumo exista |
+| HTTP 500 de `documents/read` con nombre no ASCII | 5,7 % de enlaces; 6/6 fallos con tilde o eñe, 0/75 éxitos; la cabecera `X-Document-Filename` va sin codificar | `filename_columns: ["cod"]` (R1, H5). **Propuesta a `sigrid-api`** (decidido): codificarla como ya codifica `Content-Disposition` |
+| El cliente MCP no entrega el PDF al modelo | Las imágenes sí llegan (`grafico` ya devuelve PNG) | H13: `mcp-bbdd` lo verifica antes de desplegar y, si falla, vuelve al humano |
+| Formatos que la IA no lee | `.doc` 17.233 contratos, `.xls` 250 ofertas, clase correo (`.msg`) 546 | Aviso (H8); conversión en F-142 |
+| Datos personales en el fichero | NIF de firmantes en 3/12 contratos; IBAN en 11/26 facturas | Regla de permisos (R3, H3); traza (H10); D2 para los clientes de terceros |
+| El índice delata al que no lee el origen | `nombre_fichero` (proveedor, número) y `subido_por` (login) | D1 |
+| Carga sobre `sigrid-api` | Bajo demanda, un fichero por llamada | Sin barridos: la herramienta abre de uno en uno |
+| Renombrar una tabla de origen rompe la herramienta | — | R9 (test) y «qué se rompe si cambia» (R8) |
 
-Alternativas descartadas dentro de B: leer lo registrado directamente de Sigrid por
-`sql/read` (D3, alternativa) duplica la semántica que el datamart ya resolvió (signo de
-abonos, `linea_id` no único en `fact_compras_linea`); usar `descarga-factura` (local, sin
-desplegar, sin documento en `azure-apps`) añadiría un tercer actor sin necesidad.
+## 7 · Decisiones abiertas (con recomendación)
 
-## 8 · Decisiones para el humano
-
-- **D1 · Dónde vive.** Recomendada **B, `facturas`**. Alternativas: A (este ETL), C
-  (proyecto nuevo), D (`sigrid-api`), E (`mcp-bbdd`, como complemento). Con A o C esta spec
-  se rehace entera.
-- **D2 · Alcance de la primera fase.** Recomendada: **solo facturas**. Contratos fuera (47 %
-  Word 97 binario, PDF en buena parte impresos por una aplicación, NIF de firmantes; su
-  lectura jurídica ya es de `contratos`). Ofertas fuera hasta F-129 (el Excel del
-  concurso: 4 de 5 `.xlsx` legibles sin IA, pero sin formato común).
-- **D3 · De dónde lee `facturas` lo registrado.** Recomendada: **del datamart**
-  (`compras.facturas` + `compras.factura_lineas`, ya con su semántica). Alternativa: Sigrid
-  por `sql/read` (más fresco, semántica a rehacer).
-- **D4 · Desde cuándo.** Recomendada: **piloto de ~200 facturas de 2026** (o la obra 0696,
-  donde Juan ya encontró las 41 mal imputadas) con revisión humana del acierto y coste
-  medido; después **desde 2025-01-01** (~39.000 ficheros, ~15 GB). Alternativas: desde 2019
-  (96,1 % de cobertura) o todo.
-- **D5 · ¿Vuelve el resultado al datamart y al MCP?** Recomendada: **no en esta fase**; se
-  consulta en `facturas` (su front, F-057). Si Negocio lo pide por el MCP, feature posterior
-  aquí o en `mcp-bbdd` con su spec.
-- **D6 · El HTTP 500 de `sigrid-api`.** Recomendada: **proponer una feature en `sigrid-api`**
-  (codificar `X-Document-Filename` como ya se codifica `Content-Disposition`). Mientras, los
-  consumidores usan `filename_columns: ["cod"]` (R1). Cualquier consumidor que use el nombre
-  por defecto (`nomori`, `nom`) cae en el 5,7 %.
-- **D7 · Qué se hace con F-139.** Recomendada: aprobar → R1-R5 y R7 en una **feature pequeña
-  propia** (documental, este repositorio; los tests llevan el prefijo `test_f139_`) y F-139
-  pasa a **`blocked`** de inmediato con la propuesta (R6). Alternativa: hacer R1-R5 y R7
-  dentro de F-139, pasar el reviewer y DESPUÉS dejarla `blocked`.
+- **D1 · ¿Quién puede leer el propio índice?** Hoy todos los perfiles leen `compras` entero.
+  Para F-141: **recomendada**, que `compras.documento_adjuntos` solo se conceda a quien lea
+  las cinco tablas de origen; si F-141 concede `compras` por tablas, que publique una vista
+  por familia (con `security_barrier`) en vez del índice entero. Se escribe como regla en la
+  ficha (R3) y se anota en `progress/current.md` para el spec-author de F-141. Alternativa:
+  índice visible para todos y solo el fichero protegido (filtra nombres y logins).
+- **D2 · Clientes de terceros.** Por ChatGPT y Codex el original (factura, contrato) sale a
+  ese proveedor, como ya sale lo que se consulta. **Recomendada**: mismo tratamiento que el
+  resto del datamart (riesgo aceptado por el humano para `personal` y `contabilidad` el
+  2026-09-22 y el 2026-09-26), dicho por escrito en el contrato. Alternativa: herramienta
+  solo para Claude.

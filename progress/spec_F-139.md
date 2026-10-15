@@ -1,5 +1,5 @@
 <!-- progress/spec_F-139.md -->
-# F-139 · Mediciones de la spec (spec-author, 2026-10-15)
+# F-139 · Mediciones de la spec (spec-author, 2026-10-15; rehecha el mismo día)
 
 Todo en SOLO LECTURA: Azure con `filas_solo_lectura` y `_bootstrap_done = True`;
 Sigrid por `sigrid-api` (`sql/read`, todas las respuestas `truncated: false`) y
@@ -118,9 +118,47 @@ autónomos). Facturas: IBAN en 11 de 26; un «DNI» en 1. Ofertas: «DNI» en 2 
 Las facturas ya viajan hoy a un proveedor de IA en `facturas` (mismo tipo de dato);
 los contratos serían una categoría nueva.
 
-## 7 · Conclusión que sostiene la recomendación (design §1)
+## 7 · Conclusión de la PRIMERA versión (descartada por el humano el 2026-10-15)
 
-Leer el contenido es extracción documental con IA: otro dominio que el ETL, y el
-ecosistema ya tiene un proyecto que lo hace para facturas con 50+ features de
-aprendizaje. Recomendada **B: en `facturas`**, solo facturas y desde 2025, con piloto.
-Decisiones abiertas D1-D7 en `design.md` §8.
+La primera versión (commit `52ac5bf`) recomendaba contrastar en `facturas`. El humano cambió
+el objetivo: la IA abre el ORIGINAL por `mcp-bbdd` y lo interpreta ella; sin extracción, sin
+contraste, sin conversión. Las §1, §2, §5 y §6 siguen siendo mediciones válidas; la §5
+(contraste) queda solo como dato de por qué el contenido lo interpreta la IA.
+
+## 8 · Mediciones de la versión rehecha (2026-10-15, solo lectura)
+
+**Ficheros de más de 20 MB** (`ruesma_rep`, por `(emp, cod)`, cinco familias de compras):
+
+| Familia | Enlaces | > 20 MB | > 50 MB | Máx. MB | > 20 MB desde 2025 |
+|---|---|---|---|---|---|
+| Oferta (12) | 21.988 | 4 | 0 | 24 | 1 |
+| Albarán (14) | 690 | 0 | 0 | 2 | 0 |
+| Factura (15) | 133.980 | 8 | 0 | 32 | 4 |
+| Contrato (44) | 37.965 | 4 | 0 | 47 | 0 |
+| Comparativo (46) | 4.428 | 1 | 0 | 45 | 1 |
+
+**17 de 199.051 (0,009 %)**. El máximo de 157 MB de `ruesma_rep` (F-090) no es de compras.
+Al ritmo medido (~1 MB/s) el mayor tarda ~47 s: dentro de los 230 s del balanceador.
+
+**Tiempo de apertura** (de §4): mediana 0,20 s, media 0,41 s, máx. 4,3 s. Base de la
+decisión de no cachear en SharePoint.
+
+**Enlaces del índice sin fila en su tabla de origen** (Azure): FACTURA 0 de 134.047 en
+`compras.facturas`; CONTRATO 0 de 38.169; COMPARATIVO 0 de 4.452; ALBARAN 0 de 690;
+**OFERTA 305 de 22.074 (1,4 %) sin fila en `compras.comparativo_ofertas`**. Por eso la
+comprobación de permiso es un `LEFT JOIN` (design §2), no un `INNER`.
+
+**Permisos de hoy**: `SELECT` directo de `mcp_sigrid_dm_ro` (estándar) y `sigrid_dm_etl` sobre
+`compras.documento_adjuntos` y `compras.facturas`; el total los hereda por pertenencia. Hoy
+los dos perfiles abrirían todo.
+
+**`mcp-bbdd` hoy** (`azure-apps/mcp_bbdd.md`, 2026-10-14): siete herramientas, `grafico`
+devuelve PNG (las imágenes como resultado ya llegan al modelo); **no consume `sigrid-api`**;
+elige el login por perfil y deja que PostgreSQL niegue (`PERMISO_DENEGADO`).
+
+## 9 · Decisiones
+
+Cerradas por el humano: dónde vive (`mcp-bbdd`), sin caché, sin tope con aviso > 20 MB, sin
+conversión (F-142), permisos por tabla de origen, el 500 como propuesta a `sigrid-api`.
+Abiertas, con recomendación (`design.md` §7): **D1** quién lee el propio índice (con F-141 en
+el horizonte) y **D2** si los clientes de terceros (ChatGPT, Codex) reciben el original.

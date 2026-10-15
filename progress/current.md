@@ -9,27 +9,28 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-15 · F-139 · SPEC ESCRITA (spec-author), pendiente de aprobación del humano · recomienda que NO viva aquí
+## 2026-10-15 · F-139 · SPEC REHECHA (spec-author) por cambio de objetivo del humano, pendiente de aprobación
 
-> Rama `feature/F-139-leer-graficos-asociados` (desde `main` `85b1e92`). Spec en
-> `specs/F-139-leer-graficos-asociados/`; mediciones (solo lectura: Azure, `sql/read` y 81
-> `documents/read` a un scratchpad ya borrado) en `progress/spec_F-139.md`. Estado en
-> `features.json`: sigue `pending` (no se toca hasta que el humano decida).
+> Rama `feature/F-139-leer-graficos-asociados` (lleva `main` con F-141 y F-142). Spec en
+> `specs/F-139-leer-graficos-asociados/`; mediciones en `progress/spec_F-139.md` (§8 las
+> nuevas). La primera versión (contraste en `facturas`, `52ac5bf`) queda DESCARTADA. F-139
+> sigue `pending` en `features.json`.
 
-- **Recomendación (D1): opción B, el proyecto `facturas`**, que ya extrae facturas con IA,
-  lee Sigrid por `sigrid-api` y concilia con discrepancias (F-011). Este ETL no: es otro
-  dominio (27 % de facturas recientes escaneadas, sin plantilla dominante, 22 % con varios
-  ficheros). Pliego para `facturas` en `requirements.md` §B (P1-P11).
-- **Hallazgo**: `documents/read` da **HTTP 500** con nombres documentales no ASCII
-  (`X-Document-Filename` sin codificar en `sigrid-api`): 11.262 de 199.032 enlaces (5,7 %).
-  Arreglo de consumidor: `filename_columns: ["cod"]`. La ficha de `documento_adjuntos` no lo
-  avisa (R1).
-- **En este repositorio** solo R1-R5 y R7 (ficha, versión 53, `ARCHITECTURE.md`, guarda de
-  imports y `azure-apps`) y F-139 a `blocked` (R6).
-- **Decisiones abiertas para el humano: D1-D7** (`design.md` §8): D1 dónde vive, D2 solo
-  facturas, D3 lo registrado desde el datamart, D4 piloto y luego desde 2025, D5 sin vuelta
-  al MCP en esta fase, D6 feature en `sigrid-api` para el 500, D7 R1-R7 en feature pequeña
-  propia y F-139 `blocked` ya.
+- **Objetivo**: la IA abre el ORIGINAL de un adjunto por `mcp-bbdd` (`abrir_adjunto`, pliego
+  H1-H13) y lo interpreta ella. Cerrado por el humano: sin caché (mediana 0,20 s), sin tope con
+  aviso > 20 MB (17 ficheros de 199.051, máx. 47 MB), sin conversión (F-142), permiso por tabla
+  de origen (la base niega con un `LEFT JOIN` a la tabla de la familia; 305 ofertas sin fila en
+  `compras.comparativo_ofertas`), el 500 de nombres no ASCII (5,7 %) como propuesta a
+  `sigrid-api` y `filename_columns: ["cod"]` mientras.
+- **En este repositorio** (R1-R10): ficha del índice, versión 53, `ARCHITECTURE.md`, guarda de
+  imports, test de las cinco tablas de origen y el contrato en `azure-apps/datamart_seg_anual.md`;
+  después reviewer y F-139 a `blocked` con el pliego para `mcp-bbdd`.
+- **Abiertas para el humano** (`design.md` §7): **D1** quién lee el propio índice
+  (recomendada: solo quien lee las cinco tablas de origen; con F-141, vista por familia) —
+  **dato para el spec-author de F-141** —, y **D2** si ChatGPT/Codex reciben el original
+  (recomendada: mismo tratamiento que el resto del datamart, por escrito).
+- Nuevo para `mcp-bbdd`: pasará a consumir `sigrid-api` (hoy no lo hace) y a necesitar su clave
+  en su vault; riesgo técnico H13 (que el conector entregue un PDF al modelo) lo verifica él.
 
 ## 2026-10-15 · F-138 · CERRADA (`done`, APROBADO en pasada 1) · DESPLEGADA el 15-10 (`r20261015-0915`, diccionario v52)
 

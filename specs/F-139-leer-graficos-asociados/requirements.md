@@ -1,111 +1,124 @@
 <!-- specs/F-139-leer-graficos-asociados/requirements.md -->
-# F-139 · Leer el contenido de los gráficos asociados (facturas, ofertas, contratos)
+# F-139 · Que la IA abra el ORIGINAL de los gráficos asociados (rehecha el 2026-10-15)
 
-**Spec de DECISIÓN.** Mediciones: `progress/spec_F-139.md`. Diseño, opciones y D1-D7:
-`design.md` (§1 y §8). **Los requisitos siguen la opción recomendada**: la lectura y el
-contraste NO viven en este ETL sino en el proyecto `facturas` (opción B), empezando solo
-por facturas desde 2025 y con un piloto. Si el humano elige otra opción en D1, esta spec se
-rehace; no se adelanta trabajo de ninguna.
+Mediciones: `progress/spec_F-139.md`. Diseño y decisiones: `design.md`.
+**Objetivo fijado por el humano el 2026-10-15** (sustituye a la versión de contraste): «que la
+IA pueda localizar el documento/gráfico y lo pueda des-serializar […] ya se encargará ella de
+leer o interpretar, ya sea escaneado o vectorizado». No hay extracción ni contraste.
 
-Tres bloques:
+**Decisiones CERRADAS por el humano (no se reabren):**
 
-- **R1-R6**: lo que SÍ se hace en este repositorio (dejar escrito el límite, corregir lo
-  que la medición destapó en la ficha y dejar la feature `blocked` con la propuesta).
-- **P1-P11**: la PROPUESTA para el dueño (`facturas`). No se implementan ni se prueban
-  aquí: son el pliego que el humano lleva a ese repositorio, en EARS para que su
-  spec-author los pueda adoptar tal cual.
-- **Fuera de alcance**, al final.
+- **Dónde vive**: en `mcp-bbdd`, una herramienta `abrir_adjunto` que localiza el adjunto por
+  el índice `compras.documento_adjuntos` (F-090) y devuelve el original pedido a `sigrid-api`.
+  Descartado `facturas` y el contraste.
+- **Sin caché en SharePoint**: medido, abrir cuesta mediana 0,20 s, media 0,41 s, máx. 4,3 s
+  (~1 MB/s). Si en producción el tiempo cambia, se revisa.
+- **Sin tope de tamaño**, con AVISO a la IA por encima de 20 MB (hoy 17 ficheros de 199.051).
+- **Sin conversión**: se entrega el original tal cual; convertir `.doc`/`.xls` es F-142.
+- **Permisos**: abre el adjunto quien pueda leer la tabla de origen del documento al que
+  cuelga. Hoy estándar y total leen las cinco, así que los dos abren todo; la regla importa
+  para el perfil restringido (F-141).
+- **HTTP 500 con nombres no ASCII**: sigue como propuesta a `sigrid-api`
+  (design §6); mientras,
+  `filename_columns: ["cod"]`.
+
+Dos bloques: **R** (este repositorio, documental, con tests) y **H** (el pliego de la
+herramienta para `mcp-bbdd`: se implementa y se prueba allí; aquí queda escrito en el
+contrato de `azure-apps`, R8).
 
 ## A · En este repositorio
 
-R1. La ficha de `compras.documento_adjuntos` (`config/diccionario/compras.yaml`) debe
-decir que `documents/read` se pide con `filename_columns: ["cod"]` y que, sin ello,
-`sigrid-api` responde **HTTP 500** a los ficheros cuyo nombre documental tiene caracteres
-no ASCII: **11.262 de 199.032 enlaces de compras (5,7 %)** medidos el 2026-10-15.
+R1. La ficha de `compras.documento_adjuntos` (`config/diccionario/compras.yaml`) debe decir
+que `documents/read` se pide con `filename_columns: ["cod"]` y que sin ello `sigrid-api`
+responde HTTP 500 a los nombres documentales no ASCII: 11.262 de 199.032 enlaces (5,7 %),
+medido el 2026-10-15.
 
-R2. La ficha de `compras.documento_adjuntos` debe declarar, en su descripción, que el
-CONTENIDO de los ficheros no se lee en el datamart y dónde vive su lectura según lo que
-decida D1 (por defecto, el proyecto `facturas`), sin afirmar nada que no esté hecho.
+R2. La ficha debe declarar el límite: el datamart publica el ÍNDICE y no el fichero; la
+apertura del original es de `mcp-bbdd` (F-139) y se entrega sin convertir. MIENTRAS esa
+herramienta no esté desplegada, la ficha no debe afirmar que exista.
 
-R3. CUANDO cambie el contenido del diccionario por R1-R2, `version` de
-`config/diccionario/00_global.yaml` debe subir en una unidad respecto a la de `main`.
+R3. La ficha debe declarar la regla de permisos con la tabla de origen de cada familia:
+FACTURA → `compras.facturas.factura_id`, CONTRATO → `compras.contratos.contrato_id`,
+COMPARATIVO → `compras.comparativos.comparativo_id`, OFERTA →
+`compras.comparativo_ofertas.oferta_id`, ALBARAN → `compras.albaranes.albaran_id`; y la
+regla del propio índice que decida D1 (`design.md` §7).
 
-R4. `docs/ARCHITECTURE.md`, en el punto del índice de adjuntos (F-090), debe declarar el
-límite: este ETL publica el ÍNDICE y no lee ni el binario ni su contenido; la lectura del
-contenido es de otro proyecto (F-139, D1), y el aviso de `filename_columns`.
+R4. La ficha debe declarar los ficheros grandes: 17 pasan de 20 MB (facturas 8, contratos 4,
+ofertas 4, comparativos 1), ninguno de 50 MB, máximo 47 MB; y que 305 enlaces de ofertas
+(1,4 %) no tienen fila en `compras.comparativo_ofertas`.
 
-R5. Ningún módulo de `etl_sigrid/` ni `main.py` debe importar una librería de lectura de
+R5. CUANDO cambie el diccionario por R1-R4, `version` de `config/diccionario/00_global.yaml`
+debe subir en una unidad respecto a la de `main`.
+
+R6. `docs/ARCHITECTURE.md`, en el punto del índice de adjuntos (F-090), debe declarar el
+límite (R2), el aviso de `filename_columns` (R1) y la regla de permisos (R3).
+
+R7. Ningún módulo de `etl_sigrid/` ni `main.py` debe importar una librería de lectura de
 documentos o de IA (`pypdf`, `pdfplumber`, `fitz`, `pdfminer`, `openpyxl`, `docx`,
-`pytesseract`, `anthropic`, `openai`, `google.genai`, `google.generativeai`): es la guarda
-ejecutable del límite. SI alguno lo importa, ENTONCES el test debe fallar nombrando el
-módulo y la librería.
+`pytesseract`, `anthropic`, `openai`, `google.genai`, `google.generativeai`). SI alguno lo
+importa, ENTONCES el test debe fallar nombrando módulo y librería.
 
-R6. CUANDO el humano apruebe la spec con D1 = B, `harness/features.json` debe dejar F-139
-en `blocked` con el motivo «vive en `facturas`: propuesta P1-P11 en
-`specs/F-139-leer-graficos-asociados/requirements.md`», sin cambiar su `acceptance`.
+R8. El documento de este proyecto en `azure-apps` (`datamart_seg_anual.md`) debe recoger el
+contrato con `mcp-bbdd` (H1-H13, la regla de R3 y «qué se rompe si cambia»: las columnas del
+índice y las cinco tablas y claves de origen). Verificación MANUAL: otro repositorio, commit
+local allí.
 
-R7. El documento de este proyecto en `azure-apps` (`datamart_seg_anual.md`, del que somos
-dueños) debe recoger R1 y R4 en el mismo trabajo (verificación MANUAL: es otro
-repositorio; commit local allí, sin push).
+R9. Las cinco tablas y columnas de origen de R3 deben existir en el diccionario y figurar en
+`relaciones` de la ficha del índice. SI se renombra una, ENTONCES el test debe fallar
+recordando que rompe el contrato de R8.
 
-## B · Propuesta para `facturas` (P1-P11; se prueban allí, no aquí)
+R10. CUANDO R1-R9 estén aprobados por el reviewer, `harness/features.json` debe dejar F-139
+en `blocked` con el motivo «la herramienta vive en `mcp-bbdd`: pliego H1-H13 en
+`azure-apps/datamart_seg_anual.md`».
 
-P1. El sistema debe tomar la lista de facturas a contrastar del ÍNDICE publicado por el
-datamart (`compras.documento_adjuntos`, `familia = 'FACTURA'`), en una consulta agregada
-de solo lectura como la que ya hace contra `maestro.obras`, limitada a `fecha_alta` desde
-la fecha que fije D4.
+## B · Pliego de la herramienta para `mcp-bbdd` (H1-H13; se prueban allí)
 
-P2. CUANDO descargue un fichero, el sistema debe pedirlo a `sigrid-api` con
-`documents/read` (`database: ruesma_rep`, `table: gra`, `id_column: cod`,
-`id_value = cod_repositorio`, `blob_column: ima`, `filename_columns: ["cod"]`), en serie,
-con un plazo por petición por debajo de los 230 s del balanceador.
+H1. El servidor debe exponer `abrir_adjunto(adjunto_id)`; el `adjunto_id` lo localiza la IA
+antes con `consultar` sobre `compras.documento_adjuntos`.
 
-P3. SI el fichero supera el tope de tamaño configurado (propuesto 10 MB: deja fuera 360
-de 133.964 ficheros de factura), ENTONCES el sistema no debe descargarlo y debe dejarlo
-anotado como `FUERA_DE_TOPE`.
+H2. CUANDO se llame, el servidor debe leer la fila del índice con el login del perfil de
+quien pregunta; SI no existe, ENTONCES debe responder `NO_ENCONTRADO` sin llamar a
+`sigrid-api`.
 
-P4. El sistema no debe guardar el binario en ninguna base (su guardián de DDL ya prohíbe
-`bytea` y `oid`) ni dejarlo en disco al terminar cada fichero.
+H3. Antes de pedir el fichero, el servidor debe consultar, con el login del perfil, la tabla
+de origen de la familia (R3) con un `LEFT JOIN` que lea una columna suya (para que el
+planificador no lo elimine); SI PostgreSQL deniega, ENTONCES debe responder
+`PERMISO_DENEGADO` sin llamar a `sigrid-api`. El permiso lo decide la base, no el servidor.
 
-P5. CUANDO un adjunto (`adjunto_id`) ya tenga un contraste vigente con la misma huella
-`sha256` del fichero, el sistema no debe volver a leerlo ni volver a pagar la IA
-(incremental).
+H4. SI el documento no tiene fila en su tabla de origen (las 305 ofertas) y el perfil sí lee
+esa tabla, ENTONCES el servidor debe entregar el fichero con un aviso.
 
-P6. CUANDO una factura tenga varios ficheros (el 22 % de las que tienen adjunto), el
-sistema debe clasificar cada uno (factura, albarán u otro) antes de contrastar, y SI
-ninguno es la factura, ENTONCES debe marcarla `SIN_ORIGINAL` en vez de contrastar otro
-documento.
+H5. El servidor debe pedir el fichero con `documents/read` (`database: ruesma_rep`,
+`table: gra`, `id_column: cod`, `id_value` = `cod_repositorio`, `blob_column: ima`,
+`filename_columns: ["cod"]`), con plazo por debajo de los 230 s del balanceador.
 
-P7. El sistema debe extraer cabecera y líneas con su cadena actual (F-024, F-050), igual
-para PDF con texto que para escaneados e imágenes (27 % de las facturas PDF de 2025-26
-son escaneadas).
+H6. El servidor debe entregar el ORIGINAL sin convertir: las imágenes como contenido de imagen
+y el resto como recurso incrustado con su tipo MIME (por la extensión cuando `sigrid-api`
+devuelva `application/octet-stream`), más un texto con familia, documento, nombre,
+extensión y tamaño.
 
-P8. El sistema debe leer lo REGISTRADO de cada factura (número del proveedor, CIF, fecha,
-base, cuota de IVA, total y líneas con cantidad, precio e importe), por la fuente que
-decida D3 (recomendada: `compras.facturas` y `compras.factura_lineas` del datamart,
-respetando que los abonos ya van con signo negativo).
+H7. SI el fichero pasa de 20 MB, ENTONCES el servidor debe entregarlo igual y avisar a la IA
+del tamaño.
 
-P9. El sistema debe publicar, por factura, el contraste original contra registrado con
-cada discrepancia: campo, cifra leída, cifra registrada, diferencia y tolerancia aplicada
-(versionada), y un estado (`CUADRA`, `DESCUADRA`, `SIN_ORIGINAL`, `ILEGIBLE`,
-`FUERA_DE_TOPE`, `FALLO_PROVEEDOR`); sin decidir cuáles son legítimas.
+H8. SI la extensión es de un formato binario antiguo (`.doc`, `.xls`, `.msg`), ENTONCES el
+servidor debe avisar de que la IA puede no leerlo y de que la conversión es F-142.
 
-P10. MIENTRAS `IA_DRY_RUN` esté activo, el sistema no debe llamar a ningún modelo; en
-todo caso debe registrar el coste estimado y el medido por factura y por lote, con un
-tope de facturas por ejecución.
+H9. SI `sigrid-api` no devuelve binario (0,23 % de los enlaces) o no responde, ENTONCES el
+servidor debe responder `SIN_BINARIO` u `ORIGEN_NO_DISPONIBLE`, nunca un fichero vacío.
 
-P11. El sistema no debe enviar al modelo más de lo que ya envía hoy en la extracción
-(F-004): el PDF de la factura. Los contratos (NIF de firmantes en 3 de 12 de la muestra)
-quedan fuera mientras D2 no los incluya.
+H10. Cada apertura debe quedar en la traza: identidad, perfil, `adjunto_id`, familia, bytes y
+resultado; nunca el contenido.
 
-## C · Fuera de alcance (escrito para que nadie lo dé por hecho)
+H11. El servidor no debe guardar el binario en disco, base ni caché más allá de la respuesta.
 
-- Leer contenido en este ETL, replicar binarios en el Postgres compartido o ingerir aquí
-  el resultado del contraste: si Negocio lo quiere por el MCP, es una feature posterior
-  (D5) con su propia spec.
-- Contratos y ofertas: fuera en esta fase (D2). Los contratos son 47 % Word 97 binario y
-  sus PDF salen en buena parte de una impresión de aplicación; el Excel del concurso de las
-  ofertas va con F-129.
-- Arreglar el HTTP 500 de `documents/read` con nombres no ASCII: es de `sigrid-api`
-  (D6); aquí solo se avisa en la ficha (R1).
-- Abrir el fichero desde el MCP o el portal (ya fuera desde F-090).
+H12. La clave de `sigrid-api` debe ir al vault de `mcp-bbdd` por referencia, y la herramienta
+solo debe usar `documents/read`.
+
+H13. Antes de desplegar, `mcp-bbdd` debe verificar que el conector de claude.ai (y ChatGPT y
+Codex) entrega un PDF devuelto por una herramienta al modelo; SI no lo entrega, ENTONCES
+para y propone alternativa al humano.
+
+## C · Fuera de alcance
+
+Extraer o contrastar el contenido; convertir formatos (F-142); caché en SharePoint; el perfil
+restringido (F-141); arreglar el 500 en `sigrid-api`; abrir desde el portal.
