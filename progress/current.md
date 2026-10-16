@@ -9,6 +9,32 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-16 · F-141 · SPEC ESCRITA (spec-author), pendiente de que el humano cierre D1-D12
+
+> Rama `feature/F-141-perfil-restringido` (desde `main` `1672383`, más `0288b86` del líder). Spec
+> en `specs/F-141-perfil-restringido/` (requirements 147/150, design 250/250, 17 tareas);
+> mediciones en `progress/spec_F-141.md` (Azure y Sigrid, solo lecturas). Nada de código.
+
+- **Propuesta (las recomendadas)**: solo por el MCP; el restringido lee `compras` (menos
+  `vencimientos`, `v_facturas_pago` y `v_control_forma_pago`, que leen `tesoreria`), `maestro` y
+  `_meta`, y nada más; grupo `sigrid_dm_perfil_restringido_ro` con los permisos + login
+  `mcp_sigrid_dm_restringido`; permisos nocturnos sin privilegio por defecto, veto de todo lo
+  demás del catálogo, guarda de vistas que filtran entre esquemas (revoca y FAILED) y
+  comprobación con `has_*_privilege`.
+- **Decisiones abiertas para el humano** (design §9): **D1** vía (MCP / MCP + Power BI / Power
+  BI); **D2** granularidad (esquemas / columnas / filas: RLS descartada con medida, no hay fuente
+  de obras por persona); **D3** contenido (documental / + cartera / estándar menos personas y
+  dinero); **D4** las tres vistas de pago; **D5** `maestro.obras` ← `stg`; **D6** nombre
+  (renombrar el grupo autorizado `sigrid_dm_restringido_ro` → `sigrid_dm_autorizado_ro`, toca 19
+  ficheros); **D7** diccionario v54; **D8** grupo + login; **D9** perfil por defecto del MCP
+  (recomendada: por defecto restringido, con listas de estándar y total: es contrato para
+  `mcp-bbdd`); **D10** vista que filtra; **D11** catálogo del MCP con el login del perfil; **D12**
+  F-087 no se funde.
+- Hallazgos que conviene saber aunque no se apruebe: no hay vistas materializadas (todo son
+  tablas); `compras.vencimientos` y dos vistas más de `compras` exponen la cartera de
+  `tesoreria` a quien lea `compras`; hoy cualquier cuenta del tenant que llegue a la URL del MCP
+  ve el perfil estándar.
+
 ## 2026-10-16 · F-139 · BLOQUEADA (R10) tras el APROBADO del reviewer
 
 > **Estado (líder, 2026-10-16):** reviewer APROBADO en la pasada 2 (`progress/review_F-139.md`;
