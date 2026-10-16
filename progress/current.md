@@ -16,7 +16,11 @@
 > herramienta vive en `mcp-bbdd`: pliego H1-H13 en `azure-apps/datamart_seg_anual.md`»). El
 > pliego ya se entregó a la sesión de `mcp-bbdd` el 15-10, que no lo arranca hasta que el humano
 > le conceda por escrito una excepción a su límite de microservicio (salida a `sigrid-api`).
-> Pendiente del humano: la orden de merge a main (lleva el diccionario v53) y esa excepción.
+> **Fusionada en main el 16-10 (`ff80438`, dev `2627cd4`; push hecho por el humano).** Diccionario
+> **v53 publicado** en Azure el 16-10 07:31 UTC (226 objetos, 1.864 columnas, 25 reglas, hash
+> `76cebe4959a2`; `check-diccionario` OK) y MCP reiniciado (`ca-mcp-bbdd-dev--0000018`): el
+> conector sirve la v53. La excepción de `mcp-bbdd` ya está concedida (F-023 allí, en curso).
+> Abierto: el tope técnico de 64 MB que dice `mcp-bbdd` frente al «sin tope» del contrato.
 > La propuesta del 500 de `sigrid-api` (D6) sigue sin entregar: espera decisión del humano.
 
 ### Registro de la implementación (2026-10-15)
