@@ -20,6 +20,20 @@
   `azure-apps`, `ec1e38a` sin push). Diccionario v53 en el árbol, SIN publicar. Informe:
   `progress/impl_F-139.md`. Siguiente: reviewer (T6) y, tras el APROBADO, el líder (T7, R10).
 
+### Verificaciones MANUAL (humano), con su comando exacto
+
+- **(a) R8 / T5, el contrato en `azure-apps`** (commit local, sin push):
+  `git -C C:\Users\pgris\PycharmProjects\azure-apps log -1 --stat ec1e38a` (1 fichero,
+  `datamart_seg_anual.md`, +122 -3) y
+  `grep -n "abrir_adjunto" C:\Users\pgris\PycharmProjects\azure-apps\datamart_seg_anual.md`
+  (4 apariciones).
+- **(b) Tras el merge y el despliegue**: `python main.py publicar-diccionario` contra Azure
+  (versión 53; es una ESCRITURA, la autoriza el humano) y reiniciar el MCP para que sirva la ficha
+  nueva. Hasta entonces el MCP sigue con la v52.
+- **(c) T7, del líder**: F-139 a `blocked` con el motivo de R10 («la herramienta vive en
+  `mcp-bbdd`: pliego H1-H13 en `azure-apps/datamart_seg_anual.md`»), entregar el pliego H1-H13 a
+  `mcp-bbdd` y la propuesta del HTTP 500 (`X-Document-Filename` sin codificar) a `sigrid-api`.
+
 ### La parada (antes de la decisión)
 
 > F-139 pasa a `in_progress` (rama `feature/F-139-leer-graficos-asociados`). **No se marca

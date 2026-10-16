@@ -1,3 +1,4 @@
+<!-- progress/impl_F-139.md -->
 # F-139 · Informe del implementer: el límite del índice de adjuntos y el contrato con `mcp-bbdd`
 
 Spec: `specs/F-139-leer-graficos-asociados/` (aprobada el 2026-10-15; R7 enmendado ese día con la
