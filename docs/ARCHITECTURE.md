@@ -418,9 +418,23 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
   objeto: se cruza con ellos por `documento_id` y `comparativo_id`.
   - **El fichero NO se replica**: vive en la base documental de Sigrid,
     `ruesma_rep` (~81 GB solo en compras, más que el disco de 64 GB), y lo
-    sirve `sigrid-api` con `documents/read` y `cod_repositorio`. Abrirlo desde
-    el MCP (`mcp-bbdd`) o un portal (`portal`) es trabajo de esos proyectos;
-    este ETL no lee `ruesma_rep`.
+    sirve `sigrid-api` con `documents/read` y `cod_repositorio`, siempre con
+    `filename_columns: ["cod"]`: sin ello responde HTTP 500 a los nombres
+    documentales no ASCII (5,7 % de los enlaces, medido el 2026-10-15). Este
+    ETL no lee `ruesma_rep` ni importa librerías de documentos o de IA (test de
+    F-139, con la única excepción de `openpyxl` en el paso de F-004).
+  - **El límite (F-139)**: el datamart publica el ÍNDICE; abrir el ORIGINAL
+    para una IA es una herramienta de `mcp-bbdd` (todavía sin desplegar) que lo
+    pide a `sigrid-api` y lo entrega sin convertir (convertir `.doc`/`.xls` es
+    F-142); abrirlo desde un portal, trabajo de `portal`. El contrato
+    (H1-H13) está en `azure-apps/datamart_seg_anual.md`.
+  - **Quién abre cada fichero**: quien pueda leer la tabla de origen de su
+    familia (FACTURA `facturas`, CONTRATO `contratos`, COMPARATIVO
+    `comparativos`, OFERTA `comparativo_ofertas`, ALBARAN `albaranes`, todas en
+    `compras`); lo decide PostgreSQL con el login del perfil. La misma regla
+    vale para las filas del índice. Hoy estándar y total leen las cinco y no
+    cambia nada; la aplicará el perfil restringido (F-141). Renombrar una de
+    esas tablas o claves rompe el contrato (lo vigila un test).
 - **LAS ALARMAS Y LA MARCA «LIQUIDATORIA» SALEN DE `conala` (F-138).** En
   Sigrid la factura liquidatoria no es un campo: es una ALARMA de texto libre
   pegada al documento. `sql/compras/15_alarmas_liquidatoria.sql`, el último

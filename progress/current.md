@@ -9,6 +9,104 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-16 · F-139 · BLOQUEADA (R10) tras el APROBADO del reviewer
+
+> **Estado (líder, 2026-10-16):** reviewer APROBADO en la pasada 2 (`progress/review_F-139.md`;
+> init.sh exit 0, 8080 passed). T7 hecho: F-139 en `blocked` con el motivo de R10 («la
+> herramienta vive en `mcp-bbdd`: pliego H1-H13 en `azure-apps/datamart_seg_anual.md`»). El
+> pliego ya se entregó a la sesión de `mcp-bbdd` el 15-10, que no lo arranca hasta que el humano
+> le conceda por escrito una excepción a su límite de microservicio (salida a `sigrid-api`).
+> Pendiente del humano: la orden de merge a main (lleva el diccionario v53) y esa excepción.
+> La propuesta del 500 de `sigrid-api` (D6) sigue sin entregar: espera decisión del humano.
+
+### Registro de la implementación (2026-10-15)
+
+> **Decisión del humano (2026-10-15): opción A.** `openpyxl` sigue prohibida en R7 con UNA
+> excepción nominal, `etl_sigrid/application/steps/load_excel_aux_step.py` (F-004), y un test de
+> control que falla si la excepción sobra. Escrita en `requirements.md` R7, `design.md` §3 y
+> `tasks.md` T1. El implementer retoma T1-T6. Lo de abajo es el registro de la parada.
+
+- **T1-T5 hechos** (commits `5f847c6`, `408bfb0`, `ea7335f`, `72e5683`, `8d2b3c7`; en
+  `azure-apps`, `ec1e38a` sin push). Diccionario v53 en el árbol, SIN publicar. Informe:
+  `progress/impl_F-139.md`. Siguiente: reviewer (T6) y, tras el APROBADO, el líder (T7, R10).
+
+### Verificaciones MANUAL (humano), con su comando exacto
+
+- **(a) R8 / T5, el contrato en `azure-apps`** (commit local, sin push):
+  `git -C C:\Users\pgris\PycharmProjects\azure-apps log -1 --stat ec1e38a` (1 fichero,
+  `datamart_seg_anual.md`, +122 -3) y
+  `grep -n "abrir_adjunto" C:\Users\pgris\PycharmProjects\azure-apps\datamart_seg_anual.md`
+  (4 apariciones).
+- **(b) Tras el merge y el despliegue**: `python main.py publicar-diccionario` contra Azure
+  (versión 53; es una ESCRITURA, la autoriza el humano) y reiniciar el MCP para que sirva la ficha
+  nueva. Hasta entonces el MCP sigue con la v52.
+- **(c) T7, del líder**: F-139 a `blocked` con el motivo de R10 («la herramienta vive en
+  `mcp-bbdd`: pliego H1-H13 en `azure-apps/datamart_seg_anual.md`»), entregar el pliego H1-H13 a
+  `mcp-bbdd` y la propuesta del HTTP 500 (`X-Document-Filename` sin codificar) a `sigrid-api`.
+
+### La parada (antes de la decisión)
+
+> F-139 pasa a `in_progress` (rama `feature/F-139-leer-graficos-asociados`). **No se marca
+> `blocked`** en `features.json` porque el líder lo prohibió expresamente en este encargo (R10 es
+> suyo); el bloqueo es de hecho y queda escrito aquí. Nada commiteado de T1:
+> `tests/test_f139_limite.py` está SIN versionar en el árbol, listo para retomar.
+
+- **El choque.** R7 prohíbe importar `openpyxl` en `etl_sigrid/` y `main.py`, y tasks.md T1 dice
+  que R7 debe PASAR en la fase RED. No pasa: `etl_sigrid/application/steps/load_excel_aux_step.py`
+  importa `from openpyxl import load_workbook` desde F-004 (2026-08-09) para leer los tres Excels
+  auxiliares de Negocio, `openpyxl>=3.1.0` está en `requirements.txt`, y el paso corre en `run-all`
+  (`main.py`). La medición de la spec («este repositorio no tiene ni una librería de PDF ni un SDK
+  de IA») es cierta, pero `openpyxl` no es ni lo uno ni lo otro y entró igual en la lista.
+- **Por qué no se improvisa.** Cumplir R7 tal cual exige quitar `openpyxl` del ETL (código de
+  producción fuera de alcance y rompe F-004) o cambiar el requisito aprobado. Las dos son del
+  humano.
+- **Propuesta (elegir una):**
+  - **A (recomendada)**: mantener `openpyxl` en la lista con UNA excepción nominal y motivada,
+    `etl_sigrid/application/steps/load_excel_aux_step.py` (F-004: Excels de configuración de
+    Negocio, no adjuntos). La guarda sigue cazando `openpyxl` en cualquier otro módulo, y un test
+    de control comprueba que la excepción existe de verdad (si el fichero desaparece o deja de
+    importarlo, la excepción sobra y el test lo dice).
+  - B: quitar `openpyxl` de la lista de R7. Más simple, pero deja libre leer un `.xlsx` adjunto
+    desde el ETL, que es justo lo que R7 quiere impedir.
+- **Fase RED ya medida** (`python -m pytest tests/test_f139_limite.py -p no:cacheprovider -q
+  --tb=line`, 2026-10-15): `8 failed, 5 passed in 4.57s`. R1-R6 fallan por la razón esperada
+  (p. ej. R5 `assert 52 >= 53`; R6 `el punto de F-090 de ARCHITECTURE.md no dice «F-139»`);
+  **R7 falla sin esperarse**: `['etl_sigrid/application/steps/load_excel_aux_step.py: openpyxl']`.
+  Pasan R2 (no nombrar `abrir_adjunto`), R7 control y sabotaje, y R9 (dos tests).
+- **`bash harness/init.sh` de precondición**: lanzado y DETENIDO a medio pytest al aparecer el
+  choque (hasta ahí todo `[OK]`: features.json, BACKLOG, rigor, compileall; ruff 275 avisos de
+  deuda previa). No hay resultado verde ni rojo que citar.
+- **Para retomar**: con la decisión, el implementer ajusta R7 (y la spec, si es A o B), commitea
+  T1 y sigue con T2-T5 sin más cambios: el resto de la spec no depende de esto.
+
+## 2026-10-15 · F-139 · SPEC REHECHA y APROBADA por el humano (`spec_ready`; D1 y D2 cerradas)
+
+> Rama `feature/F-139-leer-graficos-asociados` (lleva `main` con F-141 y F-142). Spec en
+> `specs/F-139-leer-graficos-asociados/`; mediciones en `progress/spec_F-139.md` (§8 las
+> nuevas). La primera versión (contraste en `facturas`, `52ac5bf`) queda DESCARTADA. F-139
+> pasa a `spec_ready`; siguiente paso: el implementer (T1-T6).
+
+- **Objetivo**: la IA abre el ORIGINAL de un adjunto por `mcp-bbdd` (`abrir_adjunto`, pliego
+  H1-H13) y lo interpreta ella. Cerrado por el humano: sin caché (mediana 0,20 s), sin tope con
+  aviso > 20 MB (17 ficheros de 199.051, máx. 47 MB), sin conversión (F-142), permiso por tabla
+  de origen (la base niega con un `LEFT JOIN` a la tabla de la familia; 305 ofertas sin fila en
+  `compras.comparativo_ofertas`), el 500 de nombres no ASCII (5,7 %) como propuesta a
+  `sigrid-api` y `filename_columns: ["cod"]` mientras.
+- **En este repositorio** (R1-R10): ficha del índice, versión 53, `ARCHITECTURE.md`, guarda de
+  imports, test de las cinco tablas de origen y el contrato en `azure-apps/datamart_seg_anual.md`;
+  después reviewer y F-139 a `blocked` con el pliego para `mcp-bbdd`.
+- **D1 cerrada**: el índice sigue la regla de su tabla de origen («el que tenga acceso a la
+  tabla puede acceder a la de los gráficos o su cabecera; si no, no»). **REQUISITO PARA EL
+  SPEC-AUTHOR DE F-141**: las filas de `compras.documento_adjuntos` de cada familia (FACTURA →
+  `compras.facturas`, CONTRATO → `compras.contratos`, COMPARATIVO → `compras.comparativos`,
+  OFERTA → `compras.comparativo_ofertas`, ALBARAN → `compras.albaranes`) solo las ve quien lee
+  esa tabla de origen; el cómo (vistas por familia con `security_barrier`/`security_invoker`
+  o RLS) lo decide F-141. F-139 no crea vistas.
+- **D2 cerrada**: tiene que funcionar con ChatGPT; H13 se verifica también con ChatGPT y, si el
+  base64 incrustado no vale, `mcp-bbdd` lo resuelve (p. ej. enlace temporal).
+- Nuevo para `mcp-bbdd`: pasará a consumir `sigrid-api` (hoy no lo hace) y a necesitar su clave
+  en su vault; riesgo técnico H13 (que el conector entregue un PDF al modelo) lo verifica él.
+
 ## 2026-10-15 · F-138 · CERRADA (`done`, APROBADO en pasada 1) · DESPLEGADA el 15-10 (`r20261015-0915`, diccionario v52)
 
 > Orden del humano: «fusiona F-138 en main y despliega». Merge `1d1798d` en `main` (árbol

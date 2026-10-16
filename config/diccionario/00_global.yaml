@@ -577,7 +577,16 @@
 # nombran trabajadores y bajas: D9, solo perfil total) y regla dura nueva
 # `R-COMPRAS-RESTRINGIDA`. `R-SIGRID-CON` declara los campos propios de `auxala`.
 
-version: 52
+# version 53 (F-139, 2026-10-15): EL LIMITE DEL INDICE DE ADJUNTOS. Solo cambia
+# la ficha de `compras.documento_adjuntos`, sin objetos ni columnas nuevos: el
+# fichero se pide a `sigrid-api` con `filename_columns: ["cod"]` (sin ello, HTTP
+# 500 en el 5,7 % de los enlaces, los de nombre no ASCII); abrir el ORIGINAL
+# para una IA es de `mcp-bbdd` (aun no desplegado) y se entrega sin convertir;
+# QUIEN PUEDE ABRIR EL FICHERO es quien lee la tabla de origen de su familia, y
+# la misma regla vale para las filas del indice (la aplica F-141); los 17
+# ficheros de mas de 20 MB y las 305 ofertas sin fila en su tabla.
+
+version: 53
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
