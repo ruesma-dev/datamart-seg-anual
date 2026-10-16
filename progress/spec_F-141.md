@@ -130,10 +130,20 @@ reglas `R-*-RESTRINGIDA` lo nombran) y `BACKLOG.md`. El job NO fija `PG_RESTRICT
 (`infra/80_create_job.ps1` solo pasa `PG_READONLY_ROLE`): el nombre vive en el defecto del código.
 `ALTER ROLE … RENAME TO` conserva OID, GRANT y pertenencias.
 
-## 8. Decisiones abiertas para el humano
+## 8. Decisiones (cerradas por el humano el 2026-10-16)
 
-D1-D12 en `specs/F-141-perfil-restringido/design.md` §9, cada una con su recomendada. Las que
-cambian la forma de la feature: **D1** vía (recomendada: solo MCP), **D3** contenido
-(recomendada: `compras` + `maestro` + `_meta`), **D6** nombre (recomendada: renombrar el grupo
-autorizado a `sigrid_dm_autorizado_ro`) y **D9** perfil por defecto del MCP (recomendada: por
-defecto restringido, con lista de estándar).
+D1-D12 cerradas; sus palabras en `specs/F-141-perfil-restringido/design.md` §9. La regla de
+contenido CAMBIÓ respecto de la propuesta: «ven como el estándar, menos el mayor, menos el mayor
+analítico, menos la cartera de cobros (pero sí a retenciones)», y las tres vistas de pago de
+`compras` se quedan visibles («compras debe poder verse»). Quedan P1 (¿los saldos del mayor
+cuentan como «el mayor»?) y P2 (`personal` visible por la regla literal), a confirmar al aprobar.
+
+## 9. Segunda pasada (2026-10-16, tras las decisiones; solo lecturas)
+
+| Qué | Medido | Consecuencia |
+|---|---|---|
+| Objetos con `mayor`, `analit` o `apunte` en el nombre (fuera de `raw`) | `contabilidad.mayor` (2.121.758), `contabilidad_restringida.mayor` (2.178.963), `contabilidad.apuntes_restringidos_mes` (1.283, solo recuentos), `maestro.cuentas_analiticas` (vista: el CATÁLOGO analítico, no apuntes), `retenciones.apuntes_contables` (49.762) | «el mayor» = `contabilidad.mayor` |
+| El mayor ANALÍTICO | es `raw.apa` (709.403 filas, ficha de `raw.yaml`); **no está publicado** en ningún esquema de consumo; lo publicará F-127 (pendiente) | hoy no hay objeto que excluir; vigilancia por nombre y obligación para la spec de F-127 |
+| `contabilidad` | `mayor` 2,12 M / 729 MB; `saldos_cuenta_mes` 390.195 (el mayor agregado por cuenta y mes); `plan_cuentas` 79.056; `apuntes_restringidos_mes` 1.283 | P1 |
+| `retenciones.apuntes_contables` | 49.762 apuntes del mayor de las cuentas de retención, con `importe`, `concepto`, cuenta y obra | visible por «sí a retenciones»; dicho en la regla nueva |
+| Vistas que alcanzan `tesoreria` o `contabilidad.mayor` (transitivo) | exactamente `compras.vencimientos`, `compras.v_facturas_pago`, `compras.v_control_forma_pago`, todas ← `tesoreria.efectos`; NINGUNA lee `contabilidad.mayor` | las tres son las excepciones nominales de D4; la guarda hoy no encuentra nada más |
