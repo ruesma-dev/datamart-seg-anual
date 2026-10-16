@@ -2,8 +2,7 @@
 # F-141 · Diseño
 
 Mediciones: `progress/spec_F-141.md` (§N = sección de ese informe; §9 las de la segunda pasada).
-**D1-D12 CERRADAS por el humano el 2026-10-16** (§9, con sus palabras). Quedan dos preguntas
-pequeñas (P1, P2 en §9) que no cambian la forma de la feature.
+**D1-D12 CERRADAS por el humano el 2026-10-16 y P1-P2 el 2026-10-17** (§9, con sus palabras).
 
 ## 1. Encaje y límite
 
@@ -26,9 +25,9 @@ cartera de cobros (pero sí a retenciones)».
 | `mart`, `cierre`, `stg`, `descompuestos`, `aux`, `maestro`, `_meta` | sí | sí | **sí** |
 | `compras` entero, **incluidas** `vencimientos`, `v_facturas_pago`, `v_control_forma_pago` (D4) | sí | sí | **sí** |
 | `retenciones` (incluye `apuntes_contables`: 49.762 apuntes del mayor de sus cuentas) | sí | sí | **sí** |
-| `personal` (nombre, NIF, DNI, coste por persona) | sí | sí | **sí** (consecuencia de la regla) |
-| `contabilidad.plan_cuentas`, `saldos_cuenta_mes`, `apuntes_restringidos_mes` | sí | sí | **sí** (P1) |
-| `contabilidad.mayor` (2,12 M apuntes) | sí | sí | **no** |
+| `contabilidad.plan_cuentas`, `apuntes_restringidos_mes` | sí | sí | **sí** |
+| `contabilidad.mayor` (2,12 M apuntes) y `contabilidad.saldos_cuenta_mes` (390.195, P1) | sí | sí | **no** |
+| `personal` entero (nombre, NIF, DNI, coste por persona; P2) | sí | sí | **no** |
 | El mayor ANALÍTICO (`raw.apa`, 709.403 filas): hoy NO está publicado; lo publicará F-127 | — | — | **no** (§5, vigilancia) |
 | `tesoreria` (`efectos`, `efectos_restringidos_mes`) | sí | sí | **no** |
 | `*_restringida`, `raw` | no / sí / no | | **no** |
@@ -44,9 +43,9 @@ entero lee las cinco tablas de origen de los adjuntos: la regla de F-139 (D1) se
   `NOMBRE_AUTORIZADO_RETIRADO = "sigrid_dm_restringido_ro"` (D6);
   `DEFAULT_PERFIL_RESTRINGIDO_GROUP = "sigrid_dm_perfil_restringido_ro"`,
   `…_LOGIN = "mcp_sigrid_dm_restringido"`, `…_SCHEMAS` = el consumo menos `tesoreria`
-  (`mart,cierre,compras,maestro,retenciones,personal,contabilidad,descompuestos,stg,aux,_meta`:
+  y `personal` (`mart,cierre,compras,maestro,retenciones,contabilidad,descompuestos,stg,aux,_meta`:
   lista EXPLÍCITA, un esquema de consumo nuevo no le llega solo), `…_EXCLUDED_TABLES =
-  "contabilidad.mayor"`; campos `perfil_restringido_group/_login/_schemas/_excluded_tables` y
+  "contabilidad.mayor,contabilidad.saldos_cuenta_mes"`; campos `perfil_restringido_group/_login/_schemas/_excluded_tables` y
   sus `*_list`; comentario con la regla del humano y el aviso del nombre.
 - `.env.example`: las cuatro `PG_PERFIL_RESTRINGIDO_*` y el nombre nuevo del autorizado.
 - `etl_sigrid/infrastructure/postgres/grants.py`: `EXCEPCIONES_FILTRACION_RESTRINGIDO =
@@ -108,7 +107,7 @@ indebidas_r = pg.lecturas_indebidas(grupo y login, otros, excluidas_r + filtran 
 pert = pg.pertenencias(login), pg.pertenencias(grupo); faltan = pg.esquemas_sin_usage(login, esquemas_r)
 ```
 
-- `otros` sale del CATÁLOGO, no de la configuración: hoy `tesoreria`, `raw` y las tres
+- `otros` sale del CATÁLOGO, no de la configuración: hoy `tesoreria`, `personal`, `raw` y las tres
   `*_restringida`; mañana, cualquier esquema que nadie haya listado. `public` está vacío y sin
   `CREATE` (informe §1).
 - `build_perfil_restringido_statements(grupo, dueno, esquemas, database, excluidas, ausentes)`,
@@ -146,12 +145,12 @@ pert = pg.pertenencias(login), pg.pertenencias(grupo); faltan = pg.esquemas_sin_
    LOGIN` si faltan; contraseña opcional con `\echo` sin valor; `NOCREATEDB NOCREATEROLE` (sin
    `NOSUPERUSER`). **Punto 3**: `CONNECT` al GRUPO.
 4. **Punto 5 quinquies** (en el `BEGIN … COMMIT`, tras el 5 quater): al grupo, lo de la nocturna
-   (USAGE y SELECT en sus once esquemas, default privileges en REVOKE, `REVOKE` de
-   `contabilidad.mayor`, veto de `tesoreria`, `raw` y las `*_restringida`) y `GRANT <grupo> TO
+   (USAGE y SELECT en sus diez esquemas, default privileges en REVOKE, `REVOKE` de los dos
+   excluidos, veto de `tesoreria`, `personal`, `raw` y las `*_restringida`) y `GRANT <grupo> TO
    mcp_sigrid_dm_restringido WITH INHERIT TRUE, SET FALSE`. Ningún otro `GRANT … TO <login>`.
 5. **Punto 6**: los siete roles; pertenencias del login (solo el grupo); `has_schema_privilege`
-   del login `t` en los once y `f` en `tesoreria`, `raw` y las tres `*_restringida`;
-   `has_table_privilege` `f` en `contabilidad.mayor`, `t` en `contabilidad.plan_cuentas` y
+   del login `t` en los diez y `f` en `tesoreria`, `personal`, `raw` y las tres `*_restringida`;
+   `has_table_privilege` `f` en `contabilidad.mayor` y `saldos_cuenta_mes`, `t` en `contabilidad.plan_cuentas` y
    `compras.vencimientos`; `CONNECT` = `t`; cero filas de `table_privileges` del login.
 
 Runbook §13 (PowerShell 5.1, una sesión, de día, patrón F-136 §6): **P0** puerta (UTC 07-21, sin
@@ -168,7 +167,8 @@ viejo, el autorizado «no existiría» y el total perdería las `*_restringida` 
 
 - **E1. Login** `mcp_sigrid_dm_restringido`; mismo host, base, puerto y TLS. **Secreto**
   `pg-password-restringido` en `kv-mcp-bbdd-dev`, por referencia al vault; nunca por valor.
-- **E2. Lee** lo del estándar menos `contabilidad.mayor` y `tesoreria` (y, cuando exista, el mayor
+- **E2. Lee** lo del estándar menos `contabilidad.mayor`, `saldos_cuenta_mes`, `tesoreria` y
+  `personal` (y, cuando exista, el mayor
   analítico de F-127). `permission denied` en eso. No escribe. Sin `SET ROLE`.
 - **E3. Quién** (D9-B): **por defecto restringido**; estándar y total por LISTA de oid (secretos
   del contenedor, nunca un repositorio). Un oid en dos listas → el arranque falla.
@@ -187,14 +187,14 @@ viejo, el autorizado «no existiría» y el total perdería las `*_restringida` 
 - **`R-PERFIL-RESTRINGIDO`** (nueva, bloqueante, `_global`): tres perfiles, TOTAL ⊃ ESTÁNDAR ⊃
   RESTRINGIDO; el restringido (administrativos) ve lo del estándar menos `contabilidad.mayor`, el
   mayor analítico y `tesoreria`; los `*_restringida` son del TOTAL y NO del perfil restringido;
-  un `permission denied` no se rodea (ni reconstruyendo el mayor desde `saldos_cuenta_mes` o
-  `retenciones.apuntes_contables`, ni la cartera desde `compras.vencimientos`): se responde que
+  un `permission denied` no se rodea (ni reconstruyendo el mayor o sus saldos desde
+  `retenciones.apuntes_contables`, ni las personas desde los logins de `compras`, ni la cartera desde `compras.vencimientos`): se responde que
   el perfil no lo incluye. Sin nombres de personas, oid ni UPN.
 - **Las tres `R-*-RESTRINGIDA`**: grupo `sigrid_dm_autorizado_ro` y una frase: «"restringida" =
   reservada al perfil total; el perfil RESTRINGIDO (administrativos) ve MENOS que el estándar y
   no lee este esquema» (en tesorería: tampoco la general). Títulos sin cambio.
-- **Avisos al principio de la ficha**: `contabilidad.mayor` y `tesoreria.efectos`/
-  `efectos_restringidos_mes`, «No disponible para el perfil restringido»; las tres vistas de pago
+- **Avisos al principio de la ficha**: `contabilidad.mayor`, `saldos_cuenta_mes`, los dos de
+  `tesoreria` y los seis de `personal`, «No disponible para el perfil restringido»; las tres vistas de pago
   de `compras`, que el restringido las lee y por ellas ve el estado de pago de las facturas aunque
   no lea la cartera. Cabeceras de los tres YAML `*_restringida`: grupo nuevo.
 - Ningún objeto nuevo: cobertura y `check-diccionario`, igual.
@@ -205,7 +205,7 @@ viejo, el autorizado «no existiría» y el total perdería las `*_restringida` 
 - **D2: esquemas y objetos enteros hoy**; «en el futuro es posible que haya que limitar columnas
   o tablas»: lista de objetos excluidos como configuración y columnas preparadas (§11).
 - **D3: «ven como el estándar, menos el mayor, menos el mayor analítico, menos la cartera de
-  cobros (pero sí a retenciones)»** (§2). `personal` lo ven por la regla literal.
+  cobros (pero sí a retenciones)»** (§2), ajustada por P1-P2.
 - **D4: «no»**, «compras debe poder verse»: las tres vistas de pago visibles, como excepción
   nominal de la guarda (test que falla si sobran).
 - **D6: «el nombre que quieras»** → renombrar el autorizado a `sigrid_dm_autorizado_ro`; grupo
@@ -213,12 +213,9 @@ viejo, el autorizado «no existiría» y el total perdería las `*_restringida` 
 - **D7: regla nueva + frase en las tres + avisos**; versión la siguiente a `main` al fusionar.
 - **D8: grupo NOLOGIN + login miembro.** **D9: B** (contrato). **D10: revocar y FAILED**, con
   las tres excepciones de D4. **D11: catálogo con el login del perfil.** **D12: no se funde.**
-- **P1 (confirmar al aprobar)**: `contabilidad.saldos_cuenta_mes` es el mayor AGREGADO por cuenta y
-  mes (390.195 filas) y `retenciones.apuntes_contables` son 49.762 apuntes del mayor (cuentas de
-  retención). Por la regla, el restringido ve los dos. ¿«Menos el mayor» incluye los saldos?
-  Si sí, basta añadir `contabilidad.saldos_cuenta_mes` a la lista: ni código ni diseño cambian.
-- **P2 (confirmar al aprobar)**: el restringido ve `personal` entero (nombre, NIF, DNI y coste
-  por persona de todos los trabajadores). Si no, `personal` sale de su lista de esquemas.
+- **P1 y P2 (cerradas el 2026-10-17): «personal también quítalo, y saldos cuenta también».** El
+  restringido no ve el esquema `personal` ni `contabilidad.saldos_cuenta_mes` (el mayor agregado).
+  Medido: ninguna vista que ve lee `personal` ni `saldos_cuenta_mes` (informe §10).
 
 ## 10. Pruebas
 
@@ -246,5 +243,7 @@ viejo, el autorizado «no existiría» y el total perdería las `*_restringida` 
   da `permission denied`. Grupo, login, guardas y contrato no cambian. Tablas: ya es la lista.
 - Una feature que meta en un esquema del restringido una TABLA con datos del mayor o de la cartera
   la verá el restringido: la guarda solo ve vistas y nombres. Mitigan la regla de §8 y el aviso en
-  `ARCHITECTURE.md`. `_meta` describe todo el datamart (sin datos): aceptado (D11).
+  `ARCHITECTURE.md`. `_meta` describe todo el datamart (sin datos): aceptado (D11). Sin `personal`
+  siguen visibles los logins y nombres de usuarios de Sigrid de `compras.documento_procesos`,
+  `documento_alarmas.creada_por` y `documento_adjuntos.subido_por` («compras debe poder verse»).
 - D9-B cambia `mcp-bbdd` para todos: mal desplegado deja sin estándar a quien lo tenía (hacia menos).

@@ -147,3 +147,14 @@ cuentan como «el mayor»?) y P2 (`personal` visible por la regla literal), a co
 | `contabilidad` | `mayor` 2,12 M / 729 MB; `saldos_cuenta_mes` 390.195 (el mayor agregado por cuenta y mes); `plan_cuentas` 79.056; `apuntes_restringidos_mes` 1.283 | P1 |
 | `retenciones.apuntes_contables` | 49.762 apuntes del mayor de las cuentas de retención, con `importe`, `concepto`, cuenta y obra | visible por «sí a retenciones»; dicho en la regla nueva |
 | Vistas que alcanzan `tesoreria` o `contabilidad.mayor` (transitivo) | exactamente `compras.vencimientos`, `compras.v_facturas_pago`, `compras.v_control_forma_pago`, todas ← `tesoreria.efectos`; NINGUNA lee `contabilidad.mayor` | las tres son las excepciones nominales de D4; la guarda hoy no encuentra nada más |
+
+## 10. Tercera pasada (P1 y P2 cerradas el 2026-10-17: «personal también quítalo, y saldos cuenta también»)
+
+Medido en Azure (solo lectura, catálogo, clausura transitiva vista sobre vista): de las vistas de
+los diez esquemas del restringido (`mart, cierre, compras, maestro, retenciones, contabilidad,
+descompuestos, stg, aux, _meta`), **ninguna lee `personal` ni `contabilidad.saldos_cuenta_mes`**;
+tampoco ninguna vista de otro esquema lee `personal`. Las únicas que alcanzan algo que el
+restringido no ve siguen siendo las tres de `compras` ← `tesoreria.efectos` (excepciones de D4).
+Lo que queda visible sin `personal` (tablas, no vistas): logins y nombres de usuarios de Sigrid
+en `compras.documento_procesos`, `compras.documento_alarmas.creada_por` y
+`compras.documento_adjuntos.subido_por`; dicho en el design §11.

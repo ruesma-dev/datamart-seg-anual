@@ -2,14 +2,15 @@
 # F-141 · El perfil RESTRINGIDO del datamart (administrativos): ve menos que el estándar
 
 Mediciones: `progress/spec_F-141.md`. **D1-D12 cerradas por el humano el 2026-10-16** (`design.md`
-§9); P1 y P2 se confirman al aprobar. Regla: «ven como el estándar, menos el mayor, menos el mayor
-analítico, menos la cartera de cobros (pero sí a retenciones)».
+§9) y P1-P2 el 2026-10-17. Regla: «ven como el estándar, menos el mayor, menos el mayor analítico,
+menos la cartera de cobros (pero sí a retenciones)» y «personal también quítalo, y saldos cuenta
+también».
 Vocabulario: **estándar** = `mcp_sigrid_dm_ro`; **autorizado** = el grupo `NOLOGIN` que lee las
 `*_restringida`, hoy `sigrid_dm_restringido_ro` y tras F-141 `sigrid_dm_autorizado_ro`; **total**
 = `mcp_sigrid_dm_total`; **restringido** = el grupo `sigrid_dm_perfil_restringido_ro` (lleva los
 permisos) y su login miembro `mcp_sigrid_dm_restringido`; **lo suyo** = los esquemas
-`PG_PERFIL_RESTRINGIDO_SCHEMAS` (el consumo menos `tesoreria`) menos los objetos de
-`PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES` (`contabilidad.mayor`); **excepciones** = las tres vistas
+`PG_PERFIL_RESTRINGIDO_SCHEMAS` (el consumo menos `tesoreria` y `personal`) menos los objetos de
+`PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES` (`contabilidad.mayor`, `contabilidad.saldos_cuenta_mes`); **excepciones** = las tres vistas
 de pago de `compras` (`vencimientos`, `v_facturas_pago`, `v_control_forma_pago`), visibles aunque
 lean `tesoreria` (D4). Elegir el login por persona es de `mcp-bbdd`: aquí, su contrato.
 
@@ -97,9 +98,9 @@ R22. Dentro del `BEGIN … COMMIT` debe dar al grupo `CONNECT` y lo de R11-R12, 
 TO <login> WITH INHERIT TRUE, SET FALSE`; ningún otro `GRANT … TO <login>`.
 
 R23. La comprobación final debe mostrar los siete roles (`rolsuper = f`), las pertenencias del
-login (solo el grupo), `has_schema_privilege` del login `t` en sus once esquemas y `f` en
-`tesoreria`, `raw` y las tres `*_restringida`, `has_table_privilege` `f` en `contabilidad.mayor`
-y `t` en `contabilidad.plan_cuentas` y `compras.vencimientos`, y `CONNECT = t`.
+login (solo el grupo), `has_schema_privilege` del login `t` en sus diez esquemas y `f` en
+`tesoreria`, `personal`, `raw` y las tres `*_restringida`, `has_table_privilege` `f` en
+`contabilidad.mayor` y `contabilidad.saldos_cuenta_mes` y `t` en `contabilidad.plan_cuentas` y `compras.vencimientos`, y `CONNECT = t`.
 
 ## Renombre y secretos
 R24. Fuera de `progress/`, `specs/`, `harness/features.json` y `BACKLOG.md`, ningún fichero debe
@@ -110,14 +111,14 @@ R25. Ningún fichero de F-141 debe contener una contraseña, un oid, un UPN ni u
 ## Diccionario (D7)
 R26. `00_global.yaml` debe tener la regla bloqueante `R-PERFIL-RESTRINGIDO` (los tres perfiles en
 orden; qué no ve el restringido; que los `*_restringida` son del total y NO del perfil
-restringido; que un `permission denied` no se rodea, tampoco desde `saldos_cuenta_mes`,
-`retenciones.apuntes_contables` o `compras.vencimientos`).
+restringido; que un `permission denied` no se rodea, tampoco desde
+`retenciones.apuntes_contables`, `compras.vencimientos` o los logins de `compras`).
 
 R27. Cada `R-*-RESTRINGIDA` debe nombrar `sigrid_dm_autorizado_ro` y decir que el perfil
 restringido no lee ese esquema.
 
-R28. Las fichas de `contabilidad.mayor`, `tesoreria.efectos` y `tesoreria.efectos_restringidos_mes`
-deben EMPEZAR por «No disponible para el perfil restringido»; las de las tres excepciones deben
+R28. Las fichas de `contabilidad.mayor`, `contabilidad.saldos_cuenta_mes`, los dos objetos de
+`tesoreria` y los seis de `personal` deben EMPEZAR por «No disponible para el perfil restringido»; las de las tres excepciones deben
 decir que el restringido las lee y ve por ellas el estado de pago de las facturas.
 
 R29. `version` de `00_global.yaml` debe ser mayor o igual que la de `main` más uno en el momento
@@ -130,12 +131,12 @@ de `design.md` §7; `azure-apps/mcp_bbdd.md`, solo un enlace. `docs/ARCHITECTURE
 el restringido, su comprobación y la obligación de F-127 (§5); el runbook, la §13.
 
 ## Verificación en Azure (MANUAL, humano)
-R31. Con el login real: `permission denied` en `contabilidad.mayor`, `tesoreria.efectos`,
-`raw.obr`, `contabilidad_restringida.mayor`, `tesoreria_restringida.efectos` y
+R31. Con el login real: `permission denied` en `contabilidad.mayor`,
+`contabilidad.saldos_cuenta_mes`, `tesoreria.efectos`, `personal.recursos`, `raw.obr`, `contabilidad_restringida.mayor`, `tesoreria_restringida.efectos` y
 `compras_restringida.documento_alarmas`, y al crear una tabla en `compras`.
 
 R32. Con el login real, legibles: `compras.vencimientos`, `compras.v_facturas_pago`,
-`contabilidad.plan_cuentas`, `retenciones.movimientos`, `personal.recursos`,
+`contabilidad.plan_cuentas`, `retenciones.movimientos`,
 `mart.fact_seguimiento_mensual`, `_meta.v_diccionario`; `count(*)` de
 `compras.documento_adjuntos` igual al del administrador.
 

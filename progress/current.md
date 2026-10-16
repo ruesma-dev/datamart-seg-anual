@@ -9,24 +9,21 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-16 · F-141 · SPEC REHECHA con D1-D12 cerradas por el humano (falta su aprobación)
+## 2026-10-17 · F-141 · SPEC con D1-D12 y P1-P2 cerradas por el humano (falta su aprobación)
 
 > Rama `feature/F-141-perfil-restringido`. Spec en `specs/F-141-perfil-restringido/`
 > (requirements 146/150, design 250/250, 17 tareas); mediciones en `progress/spec_F-141.md` (§9,
 > la segunda pasada). Nada de código.
 
-- **Qué ve el restringido** (D3): todo lo del estándar menos `contabilidad.mayor` y `tesoreria`
-  entera; `retenciones` sí; `compras` entero, incluidas `vencimientos`, `v_facturas_pago` y
+- **Qué ve el restringido** (D3 + P1-P2 del 2026-10-17): todo lo del estándar menos
+  `contabilidad.mayor`, `contabilidad.saldos_cuenta_mes`, `tesoreria` y `personal` enteros;
+  `retenciones` sí; `compras` entero, incluidas `vencimientos`, `v_facturas_pago` y
   `v_control_forma_pago` (D4: excepciones nominales de la guarda; por ellas ve el estado de pago).
+  Medido: ninguna vista que ve lee `personal` ni `saldos_cuenta_mes`. Siguen visibles los logins y
+  nombres de usuarios de Sigrid de tres tablas de `compras` (design §11).
 - **El mayor analítico NO está publicado** (es `raw.apa`; lo publicará F-127): la nocturna vigila
   objetos con «mayor» en el nombre (revoca y FAILED) y **la ficha de F-127 debe decir que excluye
-  su mayor analítico de `PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES`** (el spec-author no toca
-  `features.json`: se lo pasa al líder).
-- **Preguntas para el humano al aprobar**: **P1** ¿«menos el mayor» incluye
-  `contabilidad.saldos_cuenta_mes` (el mayor agregado por cuenta y mes, 390.195 filas)? Hoy lo
-  ve; `retenciones.apuntes_contables` (49.762 apuntes de las cuentas de retención) también, por
-  «sí a retenciones». **P2** el restringido ve `personal` entero (nombre, NIF, DNI, coste por
-  persona) por la regla literal: confirmar.
+  su mayor analítico de `PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES`** (para el líder).
 - Nombre (D6): el grupo autorizado pasa a `sigrid_dm_autorizado_ro` (renombre en `02_roles.sql`,
   imagen el mismo día); el perfil es `sigrid_dm_perfil_restringido_ro` + `mcp_sigrid_dm_restringido`.
   Diccionario: la versión siguiente a la de `main` al fusionar (hoy main = 53).
