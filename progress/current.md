@@ -9,7 +9,17 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-15 · F-139 · IMPLEMENTER en curso (R7: el humano elige la opción A)
+## 2026-10-16 · F-139 · BLOQUEADA (R10) tras el APROBADO del reviewer
+
+> **Estado (líder, 2026-10-16):** reviewer APROBADO en la pasada 2 (`progress/review_F-139.md`;
+> init.sh exit 0, 8080 passed). T7 hecho: F-139 en `blocked` con el motivo de R10 («la
+> herramienta vive en `mcp-bbdd`: pliego H1-H13 en `azure-apps/datamart_seg_anual.md`»). El
+> pliego ya se entregó a la sesión de `mcp-bbdd` el 15-10, que no lo arranca hasta que el humano
+> le conceda por escrito una excepción a su límite de microservicio (salida a `sigrid-api`).
+> Pendiente del humano: la orden de merge a main (lleva el diccionario v53) y esa excepción.
+> La propuesta del 500 de `sigrid-api` (D6) sigue sin entregar: espera decisión del humano.
+
+### Registro de la implementación (2026-10-15)
 
 > **Decisión del humano (2026-10-15): opción A.** `openpyxl` sigue prohibida en R7 con UNA
 > excepción nominal, `etl_sigrid/application/steps/load_excel_aux_step.py` (F-004), y un test de
