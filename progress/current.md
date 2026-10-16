@@ -9,7 +9,11 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-17 · F-141 · SPEC con D1-D12 y P1-P2 cerradas por el humano (falta su aprobación)
+## 2026-10-17 · F-141 · SPEC APROBADA por el humano (`spec_ready`)
+
+> **Aprobada el 2026-10-17.** Última decisión: los usuarios de Sigrid de `compras`
+> (`documento_adjuntos.subido_por`, `documento_alarmas.creada_por`, `documento_procesos`) siguen
+> visibles para el restringido: «deja visible compras». El líder lanza el implementer.
 
 > Rama `feature/F-141-perfil-restringido`. Spec en `specs/F-141-perfil-restringido/`
 > (requirements 146/150, design 250/250, 17 tareas); mediciones en `progress/spec_F-141.md` (§9,

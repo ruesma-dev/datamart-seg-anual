@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **130 features**, 73 abiertas (0 en curso, 1 con la spec lista, 1 bloqueadas y 71 en backlog) y 57 terminadas.
+Resumen: **130 features**, 73 abiertas (0 en curso, 2 con la spec lista, 1 bloqueadas y 70 en backlog) y 57 terminadas.
 
 ## En curso
 
@@ -13,6 +13,7 @@ _Ninguna feature en curso._
 
 | # | Feature | Prioridad | Rigor | Rama |
 |---|---|---|---|---|
+| F-141 | El perfil RESTRINGIDO del datamart, para administrativos: más limitado que el estándar | 3 | critico | `feature/F-141-perfil-restringido` |
 | F-111 | Los nombres de partida se resuelven por codigo en los niveles del arbol y en la dimension de costes indirectos: 10.593 filas con un escalon con el nombre de otra partida | 15 | estandar | `feature/F-111-nombres-partida-por-ancestro` |
 
 ## Bloqueadas
@@ -25,7 +26,6 @@ _Ninguna feature en curso._
 
 | # | Feature | Prioridad | Rigor | Rama |
 |---|---|---|---|---|
-| F-141 | El perfil RESTRINGIDO del datamart, para administrativos: más limitado que el estándar | 3 | critico | `feature/F-141-perfil-restringido` |
 | F-128 | Toda la cabecera de la factura de proveedor y del albarán (con proformas): los importes (base, IVA, retención, total y total a pagar), sus recargos y retenciones (dcfrec, dcarec) y el resto de campos de `dcf` y `dca` que hoy no se publican | 4 | estandar | `feature/F-128-importes-cabecera-factura` |
 | F-140 | La fase 2 de la cartera (F-037): los ingredientes de la proyección de caja por obra (devengo pendiente, plazos de pago pactados y retenciones), sin convertir devengo en caja | 5 | estandar | `feature/F-140-proyeccion-caja-ingredientes` |
 | F-129 | El objetivo del comparativo se mide contra la oferta de referencia del propio comparativo (oficina técnica o planificado ABC), no contra el descompuesto: hoy casa el 29 % | 6 | critico | `feature/F-129-objetivo-contra-oferta-referencia` |
@@ -169,7 +169,7 @@ Nace el 2026-10-14 por orden del humano: «pon como prioridad 2 leer los gráfic
 
 ### F-141 · El perfil RESTRINGIDO del datamart, para administrativos: más limitado que el estándar
 
-estado **pendiente** · prioridad 3 · rigor `critico` · SDD sí · rama `feature/F-141-perfil-restringido`
+estado **spec lista** · prioridad 3 · rigor `critico` · SDD sí · rama `feature/F-141-perfil-restringido`
 
 Nace el 2026-10-15 por orden del humano: «añade como feature después de esto una con acceso restringido a sigrid (rol más restrictivo que el estándar)». Prioridad 3, justo detrás de F-139. HOY HAY DOS PERFILES de lectura: el ESTÁNDAR (`mcp_sigrid_dm_ro`, también Power BI: todo el consumo menos `raw` y las tres restringidas) y el TOTAL (`mcp_sigrid_dm_total`, F-136: el estándar más `contabilidad_restringida`, `tesoreria_restringida` y `compras_restringida`, nunca `raw`). Este sería el TERCERO, por DEBAJO del estándar. PREGUNTAS QUE DECIDE LA SPEC CON EL HUMANO ANTES DE DISEÑAR: (1) para quién es (qué personas o qué uso: jefes de obra, un proveedor externo, un informe concreto) y por qué vía entra (el MCP de `mcp-bbdd`, Power BI o un login de base directo); (2) qué NO ve respecto al estándar: ¿esquemas enteros fuera (p. ej. `personal`, `contabilidad`, `tesoreria`, `compras`), columnas enmascaradas (importes, proveedores, precios) o FILAS acotadas (solo sus obras: seguridad por fila con RLS de PostgreSQL, que hoy el datamart no usa)?; (3) si el acotado es por obra, de dónde sale la lista de obras de cada persona (Sigrid, el portal, una tabla mantenida a mano). PATRÓN A SEGUIR: el de F-135/F-136/F-138: un rol de grupo NOLOGIN con sus GRANT en `apply-grants` y en `infra/sql/02_roles.sql` (el humano lo ejecuta), comprobación en el catálogo con `has_*_privilege`, la cuenta LOGIN y su contraseña solo en Key Vault (nunca en el repo), y el contrato con `mcp-bbdd` en `azure-apps` si el MCP lo usa (lista blanca y un perfil más). RELACIÓN: F-087 (un rol propio y mínimo para Power BI) es pariente: la spec decide si se funden. RIESGO: si el acotado es por fila, RLS en un PostgreSQL compartido y en vistas materializadas tiene coste y trampas (las vistas saltan RLS salvo `security_barrier`/`security_invoker`): medir antes de prometer. ================ DECISIÓN DEL HUMANO (2026-10-16): «el perfil restringido es para administrativos y gente así. llámalo restringido». Responde a la pregunta (1) en cuanto a PARA QUIÉN; la vía de entrada y qué no ve (2) y (3) siguen abiertas para la spec. OJO AL NOMBRE: hoy `contabilidad_restringida`, `tesoreria_restringida` y `compras_restringida` son los esquemas MÁS privilegiados (solo el perfil total). Un perfil «restringido» que ve MENOS que el estándar convive con esquemas «_restringida» que ve MÁS: la spec tiene que dejarlo explícito en la ficha y en `R-*-RESTRINGIDA` para que ni la IA ni una persona lo confundan.
 
