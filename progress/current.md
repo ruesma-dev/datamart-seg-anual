@@ -20,7 +20,7 @@
 > **v53 publicado** en Azure el 16-10 07:31 UTC (226 objetos, 1.864 columnas, 25 reglas, hash
 > `76cebe4959a2`; `check-diccionario` OK) y MCP reiniciado (`ca-mcp-bbdd-dev--0000018`): el
 > conector sirve la v53. La excepción de `mcp-bbdd` ya está concedida (F-023 allí, en curso).
-> Abierto: el tope técnico de 64 MB que dice `mcp-bbdd` frente al «sin tope» del contrato.
+> Tope técnico de 64 MB confirmado por el humano el 16-10: contrato cambiado en `azure-apps` (`fe46ff7`).
 > La propuesta del 500 de `sigrid-api` (D6) sigue sin entregar: espera decisión del humano.
 
 ### Registro de la implementación (2026-10-15)
