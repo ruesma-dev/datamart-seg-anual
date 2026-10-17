@@ -1136,8 +1136,9 @@ AZURE_APPS = RAIZ.parent / "azure-apps"
 
 def test_f136_r31_arquitectura_cinco_roles_y_la_comprobacion_del_total() -> None:
     texto = (RAIZ / "docs" / "ARCHITECTURE.md").read_text(encoding="utf-8")
-    assert "**Cinco roles.**" in texto and "**Cuatro roles.**" not in texto
-    roles = texto.split("**Cinco roles.**", 1)[1].split("\n- **", 1)[0]
+    # F-141 añade los dos del perfil restringido: «Siete roles» (test_f141_r30_...)
+    assert "**Siete roles.**" in texto and "**Cuatro roles.**" not in texto
+    roles = texto.split("**Siete roles.**", 1)[1].split("\n- **", 1)[0]
     assert TOTAL in roles and "pg-password-total" in roles
     for cosa in ("PG_TOTAL_ROLE", "PG_TOTAL_VETOED_SCHEMAS", "verificacion_total",
                  "acceso_total", "5 quater"):
