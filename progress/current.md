@@ -9,7 +9,15 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-16 · F-139 · BLOQUEADA (R10) tras el APROBADO del reviewer
+## 2026-10-17 · F-139 · CERRADA (`done`) · `abrir_adjunto` verificado con Claude y con ChatGPT
+
+> **Cierre (líder, 2026-10-17), por orden del humano («ha funcionado en chatgpt puedes cerrar»):**
+> `mcp-bbdd` desplegó `abrir_adjunto` (su F-023) y el humano lo probó por el MCP: con Claude
+> descargó un PDF y con ChatGPT también funcionó (H13). Se desbloquea R10 y F-139 pasa a `done`.
+> Resumen en `progress/history.md`. Sigue pendiente, fuera de F-139, la propuesta del 500 de
+> `sigrid-api` (D6), a decisión del humano.
+
+### Antes: BLOQUEADA (R10) tras el APROBADO del reviewer (2026-10-16)
 
 > **Estado (líder, 2026-10-16):** reviewer APROBADO en la pasada 2 (`progress/review_F-139.md`;
 > init.sh exit 0, 8080 passed). T7 hecho: F-139 en `blocked` con el motivo de R10 («la
