@@ -14,8 +14,8 @@
 > **Cierre (líder, 2026-10-17), por orden del humano («ha funcionado en chatgpt puedes cerrar»):**
 > `mcp-bbdd` desplegó `abrir_adjunto` (su F-023) y el humano lo probó por el MCP: con Claude
 > descargó un PDF y con ChatGPT también funcionó (H13). Se desbloquea R10 y F-139 pasa a `done`.
-> Resumen en `progress/history.md`. Sigue pendiente, fuera de F-139, la propuesta del 500 de
-> `sigrid-api` (D6), a decisión del humano.
+> Resumen en `progress/history.md`. La propuesta del 500 (D6) ya está en `sigrid-api` como su
+> F-010 (`spec_ready` desde el 16-10, la aprueba el humano allí): aquí no queda nada.
 
 ### Antes: BLOQUEADA (R10) tras el APROBADO del reviewer (2026-10-16)
 

@@ -1817,5 +1817,5 @@ Fusionada el 16-10 (`ff80438`), v53 publicada y MCP reiniciado; bloqueada (R10) 
 `mcp-bbdd` desplegó `abrir_adjunto`. El humano lo verificó el 17-10 con Claude (un PDF) y con
 ChatGPT: cerrada.
 
-QUEDA, fuera de F-139: la propuesta del 500 de `sigrid-api` (D6), a decisión del humano; la
-conversión de documentos es F-142.
+Fuera de F-139: la propuesta del 500 (D6) ya está en `sigrid-api` como su F-010 (`spec_ready`
+desde el 16-10); la conversión de documentos es F-142.
