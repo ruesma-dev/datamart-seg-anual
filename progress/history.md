@@ -1800,3 +1800,22 @@ textos: 0 divergencias entre la regla SQL y el oráculo Python. Review: APROBADO
 QUEDA (MANUAL, con orden del humano): merge, imagen y job, `02_roles.sql`, ingesta de
 `conala`/`auxala`, build, apply-grants, diccionario v52, lista blanca de `mcp-bbdd`
 (`compras_restringida`), pruebas por el MCP y la nocturna siguiente.
+
+## F-139 · Que la IA abra el ORIGINAL de los gráficos asociados por el MCP · 2026-10-17
+
+Nace el 14-10 por orden del humano; el 15-10 cambia de objetivo: localizar el documento y entregar
+el original, sin convertirlo ni contrastarlo. Límite de responsabilidad decidido en la spec: la
+apertura en vivo vive en `mcp-bbdd` (`abrir_adjunto`, por `sigrid-api` `documents/read`); aquí
+solo el índice (`compras.documento_adjuntos`, F-090), la regla de permisos por tabla de origen
+(también para el índice), `filename_columns`, los ficheros de más de 20 MB, el diccionario v53, el
+punto de ARCHITECTURE, la guarda R7 (ninguna librería de lectura de documentos ni de IA en el ETL,
+con la excepción nominal de `openpyxl` en `load_excel_aux_step.py`) y el contrato H1-H13 en
+`azure-apps/datamart_seg_anual.md` (tope técnico de 64 MB, con aviso por encima de 20 MB).
+
+Verificado: `init.sh` 8.080 passed; review: pasada 1 rechazada por evidencia, pasada 2 APROBADO.
+Fusionada el 16-10 (`ff80438`), v53 publicada y MCP reiniciado; bloqueada (R10) hasta que
+`mcp-bbdd` desplegó `abrir_adjunto`. El humano lo verificó el 17-10 con Claude (un PDF) y con
+ChatGPT: cerrada.
+
+QUEDA, fuera de F-139: la propuesta del 500 de `sigrid-api` (D6), a decisión del humano; la
+conversión de documentos es F-142.
