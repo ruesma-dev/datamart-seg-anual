@@ -11,7 +11,13 @@
 
 ## 2026-10-17 · F-141 · IMPLEMENTACIÓN en curso (implementer)
 
-- Tarea en curso: ver la lista de `specs/F-141-perfil-restringido/tasks.md` (marcadas `[x]`).
+- T1-T12 hechos (commits `e6b11e2` … T12); en `azure-apps`, `a520a62` sin push. T13 =
+  `bash harness/init.sh`. T14-T17 son MANUALES (humano/líder): runbook §13.
+- Mutación: 56 mutantes, 52 muertos, 4 supervivientes (1 cerrado con test nuevo; 3 EQUIVALENTES
+  `split(".", 1)[0]` → `split(".", 2)[0]`, **pendientes de aceptación del humano**).
+- Para el líder: la ficha de F-127 en `features.json` nombra aún el grupo autorizado con el
+  nombre retirado y debe excluir su mayor analítico de `PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES`.
+- Informe: `progress/impl_F-141.md`.
 - `init.sh` de arranque: 7403 passed y 1 fallo (`test_f135_settings_env_example_documenta_las_tres`)
   provocado por la edición de T1 de `.env.example` mientras la suite corría (68 min); el árbol de
   partida (`386da30`) estaba en verde hasta ese punto. Se arregla con el literal de T2.

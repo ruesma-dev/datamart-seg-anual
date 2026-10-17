@@ -634,6 +634,33 @@ def test_f141_cliente_apply_perfil_restringido_lo_anota(monkeypatch: pytest.Monk
     ]
 
 
+def test_f141_cliente_apply_perfil_restringido_anota_lo_revocado(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Superviviente 4 de la campaña de mutación: el log nombra lo que SÍ se revoca."""
+    from etl_sigrid.infrastructure.postgres import postgres_client
+
+    anotado: list[tuple[str, dict]] = []
+
+    class _Log:
+        def info(self, evento: str, **datos: object) -> None:
+            anotado.append((evento, datos))
+
+        def warning(self, evento: str, **datos: object) -> None:
+            anotado.append((evento, datos))
+
+    monkeypatch.setattr(postgres_client, "logger", _Log())
+    cliente, _, _ = _cliente(esquemas=["mart", "contabilidad"], tablas={"contabilidad.mayor"})
+    cliente.apply_perfil_restringido(  # type: ignore[attr-defined]
+        GRUPO, DUENO, ["mart", "contabilidad"],
+        ["contabilidad.mayor", "contabilidad.saldos_cuenta_mes", "otro.t"],
+    )
+    ((evento, datos),) = anotado
+    assert evento == "grants_perfil_restringido_aplicados"
+    assert datos["revocados"] == ["contabilidad.mayor"], "el existente, de un esquema concedido"
+    assert datos["ausentes"] == ["contabilidad.saldos_cuenta_mes"]
+
+
 def test_f141_cliente_apply_perfil_restringido_sin_esquemas_no_abre_conexion() -> None:
     cliente, registro, aperturas = _cliente(esquemas=["mart"])
     assert cliente.apply_perfil_restringido(GRUPO, DUENO, ["otro"], []) == [  # type: ignore[attr-defined]
