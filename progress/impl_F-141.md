@@ -103,6 +103,13 @@ IPv4; con `127.0.0.1`, inmediato (nada del código).
 
 ## 5. Fuera del alcance y pendiente
 
+- **Review pasada 1 (CHANGES_REQUESTED, solo evidencia), resuelta el 2026-10-17**: el humano
+  ACEPTA los equivalentes 1-3 («acepto», por chat con el líder) y las MANUAL T14-T17 quedan con
+  su comando exacto en `progress/current.md` (sección de F-141). Sin cambios de código ni campaña nueva.
+- **`init.sh` de esta pasada (2026-10-17) en ROJO por causa AJENA**: `1 failed, 7932 passed, 248
+  skipped` (26 min 05 s), `test_f141_r30_mcp_bbdd_solo_enlaza_al_contrato`, por un cambio sin
+  commit de la sesión de `mcp-bbdd` en `azure-apps/mcp_bbdd.md` (una fila de riesgos nombra F-141
+  sin enlazar al contrato). F-141 `blocked`; motivo y opciones en `progress/current.md`.
 - **MANUAL del humano** (runbook §13, T14-T17): merge, imagen y `85_update_job` el MISMO día que
   `02_roles.sql` con `RESTRINGIDO_PWD` desde `kv-mcp-bbdd-dev/pg-password-restringido`; R31-R32
   con el login real; R33 con la huella; `publicar-diccionario` (v54) y reinicio del MCP; R34 en la
@@ -120,7 +127,7 @@ IPv4; con `127.0.0.1`, inmediato (nada del código).
 | Tests de F-141 | **140 passed** en 5,08 s (`tests/test_f141_perfil_restringido.py`; el barrido R25 suma este informe) |
 | Suite completa (`bash harness/init.sh`) | **8224 passed, 249 skipped**, 0 fallos; `ENTORNO LISTO` sobre `de9656f` (ruff vuelve a los 275 avisos previos) |
 | Cobertura de líneas cambiadas | `PUERTA COBERTURA: 100.0% de 227 líneas cambiadas cubiertas (227/227, umbral 80%, nivel critico)` |
-| Mutación (`python -m harness.mutacion --feature F-141 --workers 3 --timeout 9000`) | **56 generados, 56 evaluados, 52 muertos, 4 supervivientes, 0 timeouts**, 14.715,6 s (línea base 1.149-1.162 s por worker). Análisis en `progress/mutacion_F-141.md`: el 4 era un hueco real del LOG, cerrado con test nuevo (RED pegado arriba); los 1-3 son EQUIVALENTES (`split(".", 1)[0]` ≡ `split(".", 2)[0]`), **pendientes de aceptación del humano** |
+| Mutación (`python -m harness.mutacion --feature F-141 --workers 3 --timeout 9000`) | **56 generados, 56 evaluados, 52 muertos, 4 supervivientes, 0 timeouts**, 14.715,6 s (línea base 1.149-1.162 s por worker). Análisis en `progress/mutacion_F-141.md`: el 4 era un hueco real del LOG, cerrado con test nuevo (RED pegado arriba); los 1-3 son EQUIVALENTES (`split(".", 1)[0]` ≡ `split(".", 2)[0]`), **ACEPTADOS por el humano el 2026-10-17** (por chat con el líder: «acepto»; anotado bajo cada «Decisión» de `progress/mutacion_F-141.md`) |
 | Tiempo de la suite | 1.013,02 s (16 min 53 s) con medición de cobertura sobre `de9656f` (1.612,54 s en la pasada anterior): máquina compartida con otras sesiones |
 
 La primera campaña (`rc=3`, sin veredictos) agotó los 600 s de la línea base con 4 workers en una

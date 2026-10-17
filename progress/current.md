@@ -9,19 +9,113 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-17 · F-141 · IMPLEMENTACIÓN en curso (implementer)
+## 2026-10-17 · F-141 · BLOQUEADA (init.sh en rojo por `azure-apps/mcp_bbdd.md`, ajeno) · review pasada 1 resuelta en evidencia
 
-- T1-T12 hechos (commits `e6b11e2` … T12); en `azure-apps`, `a520a62` sin push. T13 =
-  `bash harness/init.sh`. T14-T17 son MANUALES (humano/líder): runbook §13.
+- T1-T13 hechos (commits `e6b11e2` … `de9656f`); en `azure-apps`, `a520a62` sin push. F-141 en
+  `blocked` en `features.json` (estaba en `spec_ready` por error; pasó a `in_progress` y se bloquea por la nota de abajo). T14-T17 son MANUALES
+  (humano/líder), con su comando exacto abajo.
+- **Review pasada 1: CHANGES_REQUESTED solo por evidencia** (`progress/review_F-141.md`): la
+  aceptación de los equivalentes y las MANUAL con su comando. Resuelto sin tocar código.
 - Mutación: 56 mutantes, 52 muertos, 4 supervivientes (1 cerrado con test nuevo; 3 EQUIVALENTES
-  `split(".", 1)[0]` → `split(".", 2)[0]`, **pendientes de aceptación del humano**).
+  `split(".", 1)[0]` → `split(".", 2)[0]` en `grants.py:393`, `grants.py:426` y
+  `postgres_client.py:1633`). **ACEPTADOS por el humano el 2026-10-17** (por chat con el líder:
+  «acepto»); anotado bajo cada «Decisión» de `progress/mutacion_F-141.md`.
 - Para el líder: la ficha de F-127 en `features.json` nombra aún el grupo autorizado con el
   nombre retirado y debe excluir su mayor analítico de `PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES`.
-- Informe: `progress/impl_F-141.md`.
-- `init.sh` de arranque: 7403 passed y 1 fallo (`test_f135_settings_env_example_documenta_las_tres`)
-  provocado por la edición de T1 de `.env.example` mientras la suite corría (68 min); el árbol de
-  partida (`386da30`) estaba en verde hasta ese punto. Se arregla con el literal de T2.
-- Decisiones y desviaciones: en `progress/impl_F-141.md`.
+- Informe: `progress/impl_F-141.md` (decisiones, desviaciones y evidencias).
+
+> **BLOQUEADA (implementer, 2026-10-17) por un fallo AJENO a F-141 en `bash harness/init.sh`.**
+> Los puntos 1-3 del encargo están hechos (aceptación escrita, MANUAL con su comando, estado), pero
+> `init.sh` sale en ROJO: `1 failed, 7932 passed, 248 skipped` en 26 min 05 s, parado con `-x` en
+> `tests/test_f141_perfil_restringido.py::test_f141_r30_mcp_bbdd_solo_enlaza_al_contrato`.
+> **Causa**: un cambio SIN COMMIT en `azure-apps/mcp_bbdd.md` (54 líneas añadidas, 10 quitadas;
+> el último commit de ese fichero es `a520a62`, el de F-141) que es de la sesión de `mcp-bbdd`
+> (F-023, `abrir_adjunto`): añade a su tabla de riesgos una fila que nombra «RLS (F-141)» y no
+> enlaza a `datamart_seg_anual.md`. R30 exige que toda línea de `mcp_bbdd.md` que nombre F-141 o
+> el login restringido enlace al contrato. El código de F-141 no ha cambiado.
+> **No se ha tocado nada** de `azure-apps` (es del dueño de `mcp_bbdd.md` y está a medio
+> escribir) ni el test. **Decide el líder/humano**: (a) que la sesión de `mcp-bbdd` añada a esa
+> fila el enlace a `datamart_seg_anual.md` (sección «El perfil RESTRINGIDO del MCP»), o (b) que
+> R30 se relaje en la spec. Luego se repite `bash harness/init.sh` y F-141 vuelve a `in_progress`.
+> Comprobación: `git -C C:\Users\pgris\PycharmProjects\azure-apps diff --stat mcp_bbdd.md` y
+> `grep -n "F-141" C:\Users\pgris\PycharmProjects\azure-apps\mcp_bbdd.md`.
+
+### F-141 · Verificaciones MANUAL, con su comando exacto (tras el APROBADO y el merge)
+
+Sacadas de `specs/F-141-perfil-restringido/tasks.md` (T14-T17) y del runbook
+`docs/runbook_postgres_azure.md` §13 (P0-P9), donde está el bloque completo. Una sola sesión de
+Windows PowerShell 5.1, **de día (07:00-21:00 UTC)** y sin imprimir nunca un valor. Variables (ya
+en el runbook): `$rgJ = "rg-datamart-seg-dev"; $job = "caj-datamart-seg-dev"; $kvMcp =
+"kv-mcp-bbdd-dev"; $roles = "infra\sql\02_roles.sql"; $q = @("--query", "value", "-o", "tsv")`.
+`$dsn` es `"host=<host> dbname=sigrid_dm user=<admin> sslmode=require"` (`<host>`, el servidor
+compartido; `<admin>`, su administrador); `psql` lleva las opciones DELANTE y pide la contraseña,
+que nunca va en la línea de órdenes. **La imagen (T14) y `02_roles.sql` (T15) van el MISMO día,
+entre dos nocturnas** (runbook §13, cabecera).
+
+**T14 · Despliegue de la imagen** (humano o líder con autorización), tras el merge:
+`powershell -NoProfile -File infra/70_build_image.ps1` →
+`powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag rAAAAMMDD-hhmm publicado>` →
+`az containerapp job show -g $rgJ -n $job --query "properties.template.containers[0].image" -o tsv`
+(= ese tag).
+
+**T15 · Alta del perfil y renombre del grupo, runbook §13 P0-P7** (humano):
+
+1. P0, puerta (solo lectura): `[DateTime]::UtcNow.ToString("HH:mm")` (entre 07:00 y 21:00),
+   `az containerapp job execution list -g $rgJ -n $job -o table` (ninguna en curso), el
+   `az containerapp job show` de T14 (el tag con F-141) y `psql --version` (15 o posterior).
+2. P2-P3, el vault primero y releído al entorno (función `Nueva-Clave` de P1):
+   `az keyvault secret set --vault-name $kvMcp --name pg-password-restringido --value $v -o none`
+   y `$env:RESTRINGIDO_PWD = az keyvault secret show --vault-name $kvMcp --name pg-password-restringido @q`
+   (longitud 64; si no, `throw`).
+3. P4, **R33 antes**: la consulta `$huella` del runbook (P4) →
+   `psql -X -A -t -c $huella $dsn | Set-Content -Encoding utf8 $antes`; y el fichero:
+   `psql -X -v ON_ERROR_STOP=1 -f $roles $dsn` → `F-141: grupo autorizado renombrado` (o «sin
+   renombre»), `mcp_sigrid_dm_restringido: contraseña fijada`, las otras tres SIN CAMBIOS, `COMMIT`,
+   siete roles con `rolsuper = f`, una pertenencia del login (`hereda = t`, `set_role = f`), `t` en
+   sus diez esquemas y `f` en `tesoreria`, `personal`, `raw` y las tres `*_restringida`, `mayor = f`,
+   `saldos_cuenta_mes = f`, `plan_cuentas = t`, `vencimientos = t`, `conecta = t`, cero privilegios
+   propios. P5: `Remove-Item Env:RESTRINGIDO_PWD`.
+4. P6, con el login real
+   (`$dsnR = "host=<host> dbname=sigrid_dm user=mcp_sigrid_dm_restringido sslmode=require"`;
+   `$env:PGPASSWORD` leído del vault con `@q` y retirado con `Remove-Item Env:PGPASSWORD`):
+   - **R31, negativa**: `foreach ($t in $no) { psql -X -c "SELECT 1 FROM $t LIMIT 1" $dsnR }` con
+     `$no` = `contabilidad.mayor`, `contabilidad.saldos_cuenta_mes`, `tesoreria.efectos`,
+     `personal.recursos`, `raw.obr`, `contabilidad_restringida.mayor`,
+     `tesoreria_restringida.efectos`, `compras_restringida.documento_alarmas`, y
+     `psql -X -c "BEGIN" -c "CREATE TABLE compras.f141_x (x int)" -c "ROLLBACK" $dsnR`
+     → `permission denied` en las nueve.
+   - **R32, positiva**: el mismo `foreach` con `$si` = `compras.vencimientos`,
+     `compras.v_facturas_pago`, `contabilidad.plan_cuentas`, `retenciones.movimientos`,
+     `mart.fact_seguimiento_mensual`, `_meta.v_diccionario` → una fila en cada una; y
+     `psql -X -c "SELECT count(*) FROM compras.documento_adjuntos"` con `$dsnR` y con `$dsn` → el
+     mismo recuento.
+   - Si el `.env` del puesto fija `PG_RESTRICTED_ROLE` con el nombre retirado, se corrige a
+     `sigrid_dm_autorizado_ro` antes (R3). `python main.py apply-grants` → SUCCESS con
+     `verificacion_restringido`, `pertenencias_restringido` y `filtraciones_restringido` a `ok`.
+5. P7, **R33 después**: `psql -X -A -t -c $huella $dsn | Set-Content -Encoding utf8 $despues` y
+   `Compare-Object (Get-Content $antes) (Get-Content $despues)` → SIN salida (el estándar y el
+   total leen lo mismo que antes). Después, con autorización del humano (escritura en `_meta`):
+   `python main.py publicar-diccionario` (v54, o la siguiente a la de `main`) y reinicio del MCP:
+   `$rev = az containerapp show -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --query properties.latestReadyRevisionName -o tsv`
+   → `az containerapp revision restart -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --revision $rev -o none`.
+   Resultados (sin valores) a esta sección.
+
+**T16 · P8, la nocturna siguiente, sin ejecutar nada a mano** (humano o líder, solo lectura):
+`az containerapp job execution list -g $rgJ -n $job -o table` (la nocturna en Succeeded) y, con
+cualquier login que lea `_meta`, **R34**:
+`SELECT started_at, status, metadata->>'verificacion' AS verificacion, metadata->>'verificacion_total' AS verificacion_total, metadata->>'verificacion_restringido' AS verificacion_restringido, metadata->>'pertenencias_restringido' AS pertenencias_restringido FROM _meta.etl_runs WHERE step = 'apply_grants' ORDER BY started_at DESC LIMIT 3;`
+→ SUCCESS y los cuatro `ok`.
+
+**T17 · P9, el contrato a `mcp-bbdd`** (líder): entregar las cláusulas E1-E8 de
+`azure-apps/datamart_seg_anual.md` (perfil restringido, F-141; commit local `a520a62`, push del
+humano), comprobables con
+`git -C C:\Users\pgris\PycharmProjects\azure-apps log -1 --stat a520a62`. Su feature, su
+despliegue y las listas de oid son de `mcp-bbdd`. Y avisar de que la ficha de F-127 excluya su
+mayor analítico de `PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES` si no lleva «mayor» en el nombre.
+
+**Vuelta atrás**: runbook §13, «Vuelta atrás» (P2-P3 no cambian la base; `02_roles.sql` es
+reejecutable; deshacer el renombre con `ALTER ROLE sigrid_dm_autorizado_ro RENAME TO` el nombre
+de `NOMBRE_AUTORIZADO_RETIRADO` y volver a la imagen anterior el mismo día).
 
 ## 2026-10-17 · F-141 · SPEC APROBADA por el humano (`spec_ready`)
 

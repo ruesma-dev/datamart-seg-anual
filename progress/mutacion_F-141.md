@@ -56,6 +56,10 @@ Cada superviviente es una línea que ningún test comprueba de verdad, o una mut
 > Decisión: mutante equivalente justificado; queda a la ACEPTACIÓN DEL HUMANO (rigor
 > crítico, T12). Si no se acepta, la alternativa sin cambiar el comportamiento es
 > `s.partition(".")[0]`, que no tiene literal entero que mutar.
+>
+> **ACEPTADO por el humano el 2026-10-17** (por chat con el líder, tras la pasada 1 del
+> review): «acepto». Queda como mutante EQUIVALENTE justificado y aceptado; no se cambia
+> el código ni se repite la campaña.
 
 ### 2. `etl_sigrid/infrastructure/postgres/grants.py:426` [entero]
 
@@ -71,6 +75,10 @@ Cada superviviente es una línea que ningún test comprueba de verdad, o una mut
 > Decisión: mutante equivalente justificado; queda a la ACEPTACIÓN DEL HUMANO (rigor
 > crítico, T12). Si no se acepta, la alternativa sin cambiar el comportamiento es
 > `s.partition(".")[0]`, que no tiene literal entero que mutar.
+>
+> **ACEPTADO por el humano el 2026-10-17** (por chat con el líder, tras la pasada 1 del
+> review): «acepto». Queda como mutante EQUIVALENTE justificado y aceptado; no se cambia
+> el código ni se repite la campaña.
 
 ### 3. `etl_sigrid/infrastructure/postgres/postgres_client.py:1633` [entero]
 
@@ -86,6 +94,10 @@ Cada superviviente es una línea que ningún test comprueba de verdad, o una mut
 > Decisión: mutante equivalente justificado; queda a la ACEPTACIÓN DEL HUMANO (rigor
 > crítico, T12). Si no se acepta, la alternativa sin cambiar el comportamiento es
 > `s.partition(".")[0]`, que no tiene literal entero que mutar.
+>
+> **ACEPTADO por el humano el 2026-10-17** (por chat con el líder, tras la pasada 1 del
+> review): «acepto». Queda como mutante EQUIVALENTE justificado y aceptado; no se cambia
+> el código ni se repite la campaña.
 
 ### 4. `etl_sigrid/infrastructure/postgres/postgres_client.py:1633` [entero]
 
