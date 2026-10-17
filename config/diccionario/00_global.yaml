@@ -532,7 +532,7 @@
 # 2026-10-09. Esquema nuevo `contabilidad_restringida` con la contabilidad
 # COMPLETA (las fichas de F-056 mas `restringido`, `motivo_restriccion` y
 # `saldo_acumulado_visible` en el mayor), que solo lee
-# `sigrid_dm_restringido_ro`. `contabilidad` pasa a ser la GENERAL: sin los
+# `sigrid_dm_autorizado_ro`. `contabilidad` pasa a ser la GENERAL: sin los
 # apuntes de personal, con las 521 cuentas de personal enmascaradas en el plan,
 # `num_apuntes_restringidos` e `incompleto` en los saldos y la tabla nueva
 # `contabilidad.apuntes_restringidos_mes` (solo recuentos). Regla dura nueva
@@ -832,7 +832,7 @@ reglas:
     ambito: [contabilidad, contabilidad_restringida]
     regla: >-
       Por defecto usa SIEMPRE `contabilidad`. `contabilidad_restringida` solo la
-      lee el perfil total del MCP (y el grupo `sigrid_dm_restringido_ro`); para
+      lee el perfil total del MCP (y el grupo `sigrid_dm_autorizado_ro`); para
       cualquier otro usuario devuelve «permission denied». Eso no es un fallo
       ni algo que haya que rodear: no reintentes con otra sintaxis ni busques la
       misma informacion por otro camino (`raw` tampoco se lee). Ante ese error,
@@ -913,7 +913,7 @@ reglas:
     ambito: [tesoreria, tesoreria_restringida]
     regla: >-
       Por defecto usa SIEMPRE `tesoreria`. `tesoreria_restringida` solo la lee
-      el perfil total del MCP (y el grupo `sigrid_dm_restringido_ro`); para
+      el perfil total del MCP (y el grupo `sigrid_dm_autorizado_ro`); para
       cualquier otro usuario devuelve «permission denied», y eso no se rodea:
       no reintentes ni busques los pagos por otro camino (`raw` tampoco se
       lee). Responde con `tesoreria` y di que la cartera no incluye los pagos
@@ -940,7 +940,7 @@ reglas:
     regla: >-
       Por defecto usa SIEMPRE `compras.documento_alarmas`.
       `compras_restringida.documento_alarmas` solo la lee el perfil total del
-      MCP (y el grupo `sigrid_dm_restringido_ro`); para cualquier otro usuario
+      MCP (y el grupo `sigrid_dm_autorizado_ro`); para cualquier otro usuario
       devuelve «permission denied», y eso no se rodea: no reintentes ni busques
       esas alarmas por otro camino (`raw` tampoco se lee). Responde con
       `compras.documento_alarmas` y di que no incluye las alarmas de recursos ni
@@ -1699,7 +1699,7 @@ esquemas:
       2026-10-11, con las mismas filas, columnas y cifras, mas la marca
       `restringido` en el mayor. SOLO LO LEEN el perfil total del MCP (el
       login `mcp_sigrid_dm_total`, F-136) y el grupo autorizado
-      `sigrid_dm_restringido_ro` (sin login; sus miembros los decide Negocio):
+      `sigrid_dm_autorizado_ro` (sin login; sus miembros los decide Negocio):
       para el perfil estandar del MCP y para Power BI esta vetado, y una
       consulta devuelve «permission denied». Por defecto se usa `contabilidad`
       (`R-CONTABILIDAD-RESTRINGIDA`). No se suma con
@@ -1734,7 +1734,7 @@ esquemas:
       embargo y cuota (F-037), marcados con `restringido` y
       `motivo_restriccion`. SOLO LA LEEN el perfil total del MCP (el login
       `mcp_sigrid_dm_total`, F-136) y el grupo autorizado
-      `sigrid_dm_restringido_ro`; para el perfil estandar del MCP y para Power
+      `sigrid_dm_autorizado_ro`; para el perfil estandar del MCP y para Power
       BI esta vetada, y una consulta devuelve «permission denied». Por defecto
       se usa `tesoreria` (`R-TESORERIA-RESTRINGIDA`); no se suma con ella, y
       valen las mismas trampas del estado (`R-TESORERIA-ESTADO`).
@@ -1750,7 +1750,7 @@ esquemas:
       nombran trabajadores y bajas, marcadas con `restringido` y
       `motivo_restriccion`. SOLO LA LEEN el perfil total del MCP (el login
       `mcp_sigrid_dm_total`, F-136) y el grupo autorizado
-      `sigrid_dm_restringido_ro`; para el perfil estandar del MCP y para Power
+      `sigrid_dm_autorizado_ro`; para el perfil estandar del MCP y para Power
       BI esta vetada, y una consulta devuelve «permission denied». Por defecto
       se usa `compras.documento_alarmas` (`R-COMPRAS-RESTRINGIDA`); no se suma
       con ella.

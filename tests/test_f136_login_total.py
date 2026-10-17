@@ -4,7 +4,7 @@ F-136 · El login de acceso TOTAL del MCP (`mcp_sigrid_dm_total`) y la higiene
 de `psql` con las contraseñas.
 
 Vocabulario de la spec: ESTÁNDAR = `mcp_sigrid_dm_ro` (MCP y Power BI);
-AUTORIZADO = `sigrid_dm_restringido_ro` (grupo NOLOGIN de F-135); TOTAL =
+AUTORIZADO = `sigrid_dm_autorizado_ro` (grupo NOLOGIN de F-135); TOTAL =
 `mcp_sigrid_dm_total` (login nuevo, miembro de los dos); VETADOS DEL TOTAL =
 `PG_TOTAL_VETOED_SCHEMAS` (`raw`, decisión del humano: «siempre fuera»).
 
@@ -20,7 +20,7 @@ import pytest
 
 RAIZ = Path(__file__).resolve().parents[1]
 ESTANDAR = "mcp_sigrid_dm_ro"
-AUTORIZADO = "sigrid_dm_restringido_ro"
+AUTORIZADO = "sigrid_dm_autorizado_ro"
 TOTAL = "mcp_sigrid_dm_total"
 DUENO = "sigrid_dm_etl"
 RESTR = "contabilidad_restringida"
@@ -1212,7 +1212,7 @@ def test_f136_r32_la_regla_manda_lo_que_pidio_el_humano() -> None:
     for termino in (
         "Por defecto usa SIEMPRE `contabilidad`",
         "perfil total del MCP",
-        "sigrid_dm_restringido_ro",
+        "sigrid_dm_autorizado_ro",
         "«permission denied»",
         "no es un fallo ni algo que haya que rodear",
         "no reintentes con otra sintaxis ni busques la misma informacion por otro camino",
@@ -1241,7 +1241,7 @@ def test_f136_r33_la_ficha_del_esquema_nombra_el_login_total() -> None:
 
     entrada = _yaml_dicc("00_global.yaml")["esquemas"][RESTR]
     texto = re.sub(r"\s+", " ", entrada["para_que_sirve"])
-    assert "sigrid_dm_restringido_ro" in texto and f"`{TOTAL}`" in texto
+    assert "sigrid_dm_autorizado_ro" in texto and f"`{TOTAL}`" in texto
     assert "perfil total del MCP" in texto
     cabecera = (DICC / "contabilidad_restringida.yaml").read_text(encoding="utf-8").split("version:")[0]
     assert TOTAL in cabecera, "el comentario de cabecera del fichero, al día"

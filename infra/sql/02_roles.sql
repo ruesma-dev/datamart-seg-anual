@@ -33,11 +33,11 @@
 --   mcp_sigrid_dm_ro   LOGIN, contraseña en Key Vault. Solo lectura, para el MCP
 --                      (y hoy también Power BI). Es el rol GENERAL (estándar):
 --                      desde F-135 NO lee `raw` ni `contabilidad_restringida`
---   sigrid_dm_restringido_ro  NOLOGIN, sin contraseña (F-135). El rol AUTORIZADO:
+--   sigrid_dm_autorizado_ro  NOLOGIN, sin contraseña (F-135). El rol AUTORIZADO:
 --                      lee la contabilidad COMPLETA, con los apuntes de personal
 --                      (nóminas, cuentas de trabajadores, embargos). Es un GRUPO:
 --                      sus miembros los decide Negocio (Juan Romero) y se dan
---                      con `GRANT sigrid_dm_restringido_ro TO <login>`
+--                      con `GRANT sigrid_dm_autorizado_ro TO <login>`
 --   mcp_sigrid_dm_total  LOGIN, contraseña SOLO en el vault del MCP (F-136). El
 --                      acceso TOTAL del MCP: miembro del general y del
 --                      autorizado (punto 5 quater), lee lo de los dos y NUNCA
@@ -129,8 +129,8 @@ ALTER ROLE mcp_sigrid_dm_total WITH LOGIN PASSWORD :'total_pwd';
 
 -- F-135: el rol AUTORIZADO es un grupo sin login y sin contraseña. Quien lo
 -- necesite entra con su propio login, miembro de este grupo.
-SELECT 'CREATE ROLE sigrid_dm_restringido_ro NOLOGIN'
-WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sigrid_dm_restringido_ro')
+SELECT 'CREATE ROLE sigrid_dm_autorizado_ro NOLOGIN'
+WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sigrid_dm_autorizado_ro')
 \gexec
 
 -- Ninguno de ellos crea bases ni roles.
@@ -151,7 +151,7 @@ WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sigrid_dm_restringido_
 ALTER ROLE sigrid_dm_app    WITH NOCREATEDB NOCREATEROLE;
 ALTER ROLE mcp_sigrid_dm_ro WITH NOCREATEDB NOCREATEROLE;
 ALTER ROLE mcp_sigrid_dm_total WITH LOGIN NOCREATEDB NOCREATEROLE;
-ALTER ROLE sigrid_dm_restringido_ro WITH NOLOGIN NOCREATEDB NOCREATEROLE;
+ALTER ROLE sigrid_dm_autorizado_ro WITH NOLOGIN NOCREATEDB NOCREATEROLE;
 
 -- 2. El rol del ETL es miembro del grupo propietario.
 GRANT sigrid_dm_etl TO sigrid_dm_app;
@@ -161,7 +161,7 @@ GRANT sigrid_dm_etl TO sigrid_dm_app;
 GRANT CONNECT ON DATABASE sigrid_dm TO sigrid_dm_app;
 GRANT CONNECT ON DATABASE sigrid_dm TO mcp_sigrid_dm_ro;
 -- F-135: lo heredan los futuros miembros del grupo
-GRANT CONNECT ON DATABASE sigrid_dm TO sigrid_dm_restringido_ro;
+GRANT CONNECT ON DATABASE sigrid_dm TO sigrid_dm_autorizado_ro;
 
 -- 4. Esquemas del datamart. Los crea también el auto-bootstrap del ETL, pero
 --    dejarlos aquí permite comprobar los dieciséis nada más provisionar.
@@ -424,17 +424,17 @@ $$;
 SET ROLE sigrid_dm_etl;
 -- El rol autorizado lee la contabilidad completa (lo mismo que concede la
 -- nocturna; aquí para que el rol nazca ya con su lectura).
-GRANT USAGE ON SCHEMA contabilidad_restringida TO sigrid_dm_restringido_ro;
-GRANT SELECT ON ALL TABLES IN SCHEMA contabilidad_restringida TO sigrid_dm_restringido_ro;
-ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl IN SCHEMA contabilidad_restringida GRANT SELECT ON TABLES TO sigrid_dm_restringido_ro;
+GRANT USAGE ON SCHEMA contabilidad_restringida TO sigrid_dm_autorizado_ro;
+GRANT SELECT ON ALL TABLES IN SCHEMA contabilidad_restringida TO sigrid_dm_autorizado_ro;
+ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl IN SCHEMA contabilidad_restringida GRANT SELECT ON TABLES TO sigrid_dm_autorizado_ro;
 -- F-037: y la cartera completa de cobros y pagos, igual.
-GRANT USAGE ON SCHEMA tesoreria_restringida TO sigrid_dm_restringido_ro;
-GRANT SELECT ON ALL TABLES IN SCHEMA tesoreria_restringida TO sigrid_dm_restringido_ro;
-ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl IN SCHEMA tesoreria_restringida GRANT SELECT ON TABLES TO sigrid_dm_restringido_ro;
+GRANT USAGE ON SCHEMA tesoreria_restringida TO sigrid_dm_autorizado_ro;
+GRANT SELECT ON ALL TABLES IN SCHEMA tesoreria_restringida TO sigrid_dm_autorizado_ro;
+ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl IN SCHEMA tesoreria_restringida GRANT SELECT ON TABLES TO sigrid_dm_autorizado_ro;
 -- F-138: y las alarmas completas de los documentos, igual.
-GRANT USAGE ON SCHEMA compras_restringida TO sigrid_dm_restringido_ro;
-GRANT SELECT ON ALL TABLES IN SCHEMA compras_restringida TO sigrid_dm_restringido_ro;
-ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl IN SCHEMA compras_restringida GRANT SELECT ON TABLES TO sigrid_dm_restringido_ro;
+GRANT USAGE ON SCHEMA compras_restringida TO sigrid_dm_autorizado_ro;
+GRANT SELECT ON ALL TABLES IN SCHEMA compras_restringida TO sigrid_dm_autorizado_ro;
+ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl IN SCHEMA compras_restringida GRANT SELECT ON TABLES TO sigrid_dm_autorizado_ro;
 
 DO $$
 DECLARE
@@ -495,7 +495,7 @@ RESET ROLE;
 --    `SET FALSE`: no puede hacer `SET ROLE` a los grupos (el MCP lo prohíbe y
 --    no le hace falta).
 GRANT mcp_sigrid_dm_ro TO mcp_sigrid_dm_total WITH INHERIT TRUE, SET FALSE;
-GRANT sigrid_dm_restringido_ro TO mcp_sigrid_dm_total WITH INHERIT TRUE, SET FALSE;
+GRANT sigrid_dm_autorizado_ro TO mcp_sigrid_dm_total WITH INHERIT TRUE, SET FALSE;
 
 COMMIT;
 
@@ -504,7 +504,7 @@ COMMIT;
 SELECT rolname, rolcanlogin, rolsuper, rolcreatedb, rolcreaterole
 FROM pg_roles
 WHERE rolname IN ('sigrid_dm_etl', 'sigrid_dm_app', 'mcp_sigrid_dm_ro',
-                  'sigrid_dm_restringido_ro', 'mcp_sigrid_dm_total')
+                  'sigrid_dm_autorizado_ro', 'mcp_sigrid_dm_total')
 ORDER BY rolname;
 
 SELECT r.rolname AS miembro, g.rolname AS grupo
@@ -545,7 +545,7 @@ WHERE nspname IN ('contabilidad_restringida', 'tesoreria_restringida', 'compras_
 ORDER BY nspname;
 
 -- F-136: el login TOTAL. Deben salir EXACTAMENTE dos pertenencias
--- (`mcp_sigrid_dm_ro` y `sigrid_dm_restringido_ro`, hereda = t, set_role = f);
+-- (`mcp_sigrid_dm_ro` y `sigrid_dm_autorizado_ro`, hereda = t, set_role = f);
 -- `raw = f`, `contabilidad_restringida = t`, `contabilidad = t`,
 -- `tesoreria_restringida = t` (F-037), `compras_restringida = t` (F-138) y
 -- `conecta = t`;

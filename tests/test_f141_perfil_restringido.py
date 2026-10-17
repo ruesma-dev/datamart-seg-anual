@@ -152,3 +152,62 @@ def test_f141_r2_el_autorizado_se_llama_ya_sigrid_dm_autorizado_ro() -> None:
     assert NOMBRE_AUTORIZADO_RETIRADO == RETIRADO
     assert PostgresSettings(_env_file=None).restricted_role == AUTORIZADO
     assert _env_example()["PG_RESTRICTED_ROLE"] == AUTORIZADO
+
+
+# ===========================================================================
+# R24 · el nombre retirado no queda en el árbol (T2)
+# ===========================================================================
+
+#: lo que R24 deja fuera del barrido: la memoria del arnés, las specs y el backlog
+_FUERA_DEL_BARRIDO = ("progress/", "specs/")
+_FICHEROS_FUERA = {"harness/features.json", "BACKLOG.md"}
+
+
+def _ficheros_del_arbol() -> list[str]:
+    import subprocess
+
+    salida = subprocess.run(
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard"],
+        cwd=RAIZ, capture_output=True, text=True, check=True, encoding="utf-8",
+    ).stdout
+    return [
+        f for f in salida.splitlines()
+        if f and not f.startswith(_FUERA_DEL_BARRIDO) and f not in _FICHEROS_FUERA
+    ]
+
+
+def _con_el_nombre_retirado() -> dict[str, list[str]]:
+    hallados: dict[str, list[str]] = {}
+    for relativo in _ficheros_del_arbol():
+        ruta = RAIZ / relativo
+        if not ruta.is_file():  # borrado en el árbol y aún en el índice
+            continue
+        try:
+            texto = ruta.read_text(encoding="utf-8")
+        except UnicodeDecodeError:  # binarios: no llevan nombres de rol
+            continue
+        lineas = [linea for linea in texto.splitlines() if RETIRADO in linea]
+        if lineas:
+            hallados[relativo] = lineas
+    return hallados
+
+
+def test_f141_r24_el_nombre_retirado_solo_en_el_renombre_la_guarda_y_su_test() -> None:
+    hallados = _con_el_nombre_retirado()
+    permitidos = {"infra/sql/02_roles.sql", "config/settings.py",
+                  "tests/test_f141_perfil_restringido.py"}
+    assert set(hallados) <= permitidos, sorted(set(hallados) - permitidos)
+    assert hallados.get("config/settings.py") == [
+        f'NOMBRE_AUTORIZADO_RETIRADO = "{RETIRADO}"'
+    ], "en settings solo la constante de la guarda R3"
+
+
+def test_f141_r20_r24_en_02_roles_solo_dentro_del_renombre() -> None:
+    texto = (RAIZ / "infra" / "sql" / "02_roles.sql").read_text(encoding="utf-8")
+    desde = texto.rindex("\\getenv")
+    hasta = texto.index("SELECT 'CREATE ROLE")
+    posiciones = [i for i in range(len(texto)) if texto.startswith(RETIRADO, i)]
+    assert posiciones, "el renombre tiene que nombrar el rol viejo"
+    assert all(desde < p < hasta for p in posiciones), (
+        "solo entre la carga de variables y el primer CREATE ROLE: el renombre y su guarda"
+    )

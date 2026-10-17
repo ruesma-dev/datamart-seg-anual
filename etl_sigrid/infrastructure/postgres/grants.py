@@ -25,7 +25,7 @@ ESQUEMAS VETADOS Y ROL AUTORIZADO (F-135, 2026-10-11): la contabilidad COMPLETA
 (`contabilidad_restringida`, con los apuntes de personal) y `raw` entero quedan
 fuera del rol general. A diferencia de las tablas excluidas, aquí se veta el
 ESQUEMA: sus tablas, su USAGE y su privilegio por defecto. Y el rol autorizado
-(`sigrid_dm_restringido_ro`) recibe la lectura de la contabilidad completa. Las
+(`sigrid_dm_autorizado_ro`) recibe la lectura de la contabilidad completa. Las
 dos listas de sentencias se generan aparte de `build_readonly_grant_statements`,
 que no cambia (F-068 intacto): quien las ejecuta pone los vetos DETRÁS.
 """

@@ -5,7 +5,7 @@
 # partes de trabajo (35), que nombran trabajadores y bajas.
 #
 # SOLO LA LEEN el perfil total del MCP (el login `mcp_sigrid_dm_total`, F-136)
-# y el grupo `sigrid_dm_restringido_ro`. El rol estandar del MCP y de Power BI
+# y el grupo `sigrid_dm_autorizado_ro`. El rol estandar del MCP y de Power BI
 # (`mcp_sigrid_dm_ro`) la tiene VETADA: `apply_grants` se la revoca y lo
 # comprueba cada noche. La ficha EMPIEZA por el aviso de acceso restringido
 # porque el MCP no filtra el diccionario por perfil. Decision del humano del

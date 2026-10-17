@@ -46,7 +46,7 @@ nativos de PostgreSQL con contraseña, y la contraseña en Key Vault**.
 | `sigrid_dm_etl` | Grupo, `NOLOGIN` | **Propietario** de la base y de todos sus objetos |
 | `sigrid_dm_app` | `LOGIN` + contraseña | El ETL: el puesto del humano y el job de F-003. Miembro de `sigrid_dm_etl` |
 | `mcp_sigrid_dm_ro` | `LOGIN` + contraseña | Solo lectura, el ESTÁNDAR: el MCP (F-006) y Power BI. Sin `raw` ni `contabilidad_restringida` desde F-135 |
-| `sigrid_dm_restringido_ro` | Grupo, `NOLOGIN` | El rol AUTORIZADO (F-135): lee la contabilidad completa, `contabilidad_restringida` |
+| `sigrid_dm_autorizado_ro` | Grupo, `NOLOGIN` | El rol AUTORIZADO (F-135): lee la contabilidad completa, `contabilidad_restringida` |
 | `mcp_sigrid_dm_total` | `LOGIN` + contraseña, solo en `kv-mcp-bbdd-dev` (`pg-password-total`) | El acceso TOTAL del MCP (F-136): miembro de los dos anteriores, sin GRANT propios y **nunca `raw`**. Alta y rotación: **§12** |
 
 Por qué un grupo propietario y no un rol a secas: los objetos se crean siempre

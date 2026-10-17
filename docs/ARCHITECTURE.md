@@ -54,7 +54,7 @@ rol general no debe leer vive físicamente en otro que nunca se le concede.
 `contabilidad_restringida` lleva la contabilidad COMPLETA —las tres tablas de
 F-056 con las mismas filas, columnas y cifras, y en el mayor tres columnas más:
 `restringido`, `motivo_restriccion` y `saldo_acumulado_visible`— y solo la lee
-el grupo `sigrid_dm_restringido_ro` (NOLOGIN; sus miembros los decide Negocio).
+el grupo `sigrid_dm_autorizado_ro` (NOLOGIN; sus miembros los decide Negocio).
 `contabilidad` pasa a ser la GENERAL, la que leen el MCP y Power BI: sin los
 apuntes de PERSONAL (los asientos de nómina enteros y las cuentas de
 trabajadores: 55.504 apuntes, el 2,55 %, criterio en
@@ -665,7 +665,7 @@ fallo con cualquier tolerancia.
   `sigrid_dm_app` (login, contraseña en Key Vault) es el que usa el ETL y es
   miembro del grupo; `mcp_sigrid_dm_ro` (login) es el rol GENERAL (estándar) de
   solo lectura, el del MCP y hoy también el de Power BI; desde F-135
-  `sigrid_dm_restringido_ro` (grupo `NOLOGIN`) es el rol AUTORIZADO que lee la
+  `sigrid_dm_autorizado_ro` (grupo `NOLOGIN`) es el rol AUTORIZADO que lee la
   contabilidad completa; y desde F-136 `mcp_sigrid_dm_total` (login, contraseña
   SOLO en `kv-mcp-bbdd-dev/pg-password-total`) es el acceso TOTAL del MCP:
   miembro de los dos anteriores (`WITH INHERIT TRUE, SET FALSE`, punto 5 quater
@@ -689,7 +689,7 @@ fallo con cualquier tolerancia.
   `tesoreria` (la general, F-037), `descompuestos`, `stg`, `aux` y `_meta`— y
   NO lee los de `PG_VETOED_SCHEMAS`: `contabilidad_restringida`,
   `tesoreria_restringida`, `compras_restringida` (F-138) y `raw`. El
-  AUTORIZADO (`sigrid_dm_restringido_ro`) lee `contabilidad_restringida`,
+  AUTORIZADO (`sigrid_dm_autorizado_ro`) lee `contabilidad_restringida`,
   `tesoreria_restringida` y `compras_restringida` (`PG_RESTRICTED_SCHEMAS`);
   el total, las tres por pertenencia. El dueño y el administrador lo leen todo, como
   siempre. `apply_grants`, cada noche y en este orden: (1) si un esquema está a
