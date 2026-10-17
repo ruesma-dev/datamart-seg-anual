@@ -1786,6 +1786,11 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
+      **El perfil restringido SI la lee** (F-141, D4, `R-PERFIL-RESTRINGIDO`):
+      aunque no lea la cartera (`tesoreria`), por esta vista ve el estado de
+      pago de las facturas de compra (si y cuando se pago, por que forma de
+      pago). No la uses para reconstruir la cartera de cobros y pagos.
+
       Los EFECTOS DE PAGO de la factura de compra: la pestana «Vencimientos» de
       la factura, fila a fila. Cuando vence cada pago, de cuanto es, en que
       estado esta, por que banco y cuenta sale, si esta en una remesa y si esta
@@ -2061,6 +2066,11 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
+      **El perfil restringido SI la lee** (F-141, D4, `R-PERFIL-RESTRINGIDO`):
+      aunque no lea la cartera (`tesoreria`), por esta vista ve el estado de
+      pago de las facturas de compra (si y cuando se pago, por que forma de
+      pago). No la uses para reconstruir la cartera de cobros y pagos.
+
       La FORMA DE PAGO de cada factura de compra, con el resumen de sus efectos
       ya agregado: con que forma de pago se pago, con que medio, por que banco y
       cuenta, cuantos efectos tiene, cuando vence el primero y el ultimo y
@@ -2230,6 +2240,11 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
+      **El perfil restringido SI la lee** (F-141, D4, `R-PERFIL-RESTRINGIDO`):
+      aunque no lea la cartera (`tesoreria`), por esta vista ve el estado de
+      pago de las facturas de compra (si y cuando se pago, por que forma de
+      pago). No la uses para reconstruir la cartera de cobros y pagos.
+
       La forma de pago de la factura de compra ENFRENTADA a la de su contrato,
       para ver donde no coinciden. No filtra: las que cuadran salen igual, con
       `forma_pago_coincide` en cierto, porque «cuantas no cuadran» sin el

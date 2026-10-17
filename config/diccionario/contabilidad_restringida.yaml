@@ -17,6 +17,10 @@
 # general (04-07). Las cifras de las fichas son las de F-056 (2026-09-26) y las
 # de F-135 (2026-10-09), en solo lectura; aqui solo hay recuentos y agregados,
 # ni nombres ni importes de nadie.
+#
+# F-141 (2026-10-17): «restringida» = reservada al perfil total. El perfil
+# restringido del MCP (administrativos, grupo `sigrid_dm_perfil_restringido_ro`)
+# ve MENOS que el estandar y NO la lee (`R-PERFIL-RESTRINGIDO`).
 
 version: 1
 esquema: contabilidad_restringida

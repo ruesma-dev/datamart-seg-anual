@@ -586,7 +586,18 @@
 # la misma regla vale para las filas del indice (la aplica F-141); los 17
 # ficheros de mas de 20 MB y las 305 ofertas sin fila en su tabla.
 
-version: 53
+# version 54 (F-141, 2026-10-17): EL PERFIL RESTRINGIDO (administrativos), el
+# tercero, que ve MENOS que el estandar. Regla dura nueva
+# `R-PERFIL-RESTRINGIDO`: TOTAL ⊃ ESTANDAR ⊃ RESTRINGIDO; el restringido no lee
+# `contabilidad.mayor`, `contabilidad.saldos_cuenta_mes`, `tesoreria` ni
+# `personal`, y SI las tres vistas de pago de `compras` (D4). Las fichas de lo
+# que no ve EMPIEZAN por «No disponible para el perfil restringido» y las de
+# las tres vistas de pago dicen que las lee. El grupo autorizado se renombra a
+# `sigrid_dm_autorizado_ro` (D6) y las tres `R-*-RESTRINGIDA` dicen que
+# «restringida» es del perfil total, no del perfil restringido. Sin objetos ni
+# columnas nuevos.
+
+version: 54
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -864,6 +875,10 @@ reglas:
       visible. Excepcion: `retenciones` no se recorta (8 apuntes de retencion
       de proveedor en asientos mixtos, sin dato de trabajador), asi que sus
       saldos pueden incluir apuntes que no estan en `contabilidad.mayor`.
+
+      «restringida» = reservada al perfil total; el perfil RESTRINGIDO
+      (administrativos) ve MENOS que el estandar y no lee este esquema
+      (`R-PERFIL-RESTRINGIDO`).
     motivo: >-
       Correo de Juan Romero (Dir. Administracion y Control de Costes) del
       2026-10-09: cualquier usuario con acceso al mayor podia consultar
@@ -923,6 +938,10 @@ reglas:
       a `tesoreria_restringida` aunque sea «la completa». Los dos esquemas NUNCA
       se suman ni se unen: la completa ya contiene a la general y sumarlas
       duplica lo visible.
+
+      «restringida» = reservada al perfil total; el perfil RESTRINGIDO
+      (administrativos) ve MENOS que el estandar y no lee este esquema, y
+      tampoco la general (`tesoreria`) (`R-PERFIL-RESTRINGIDO`).
     motivo: >-
       Decision del humano del 2026-10-13 (F-037): «los pagos de nominas deben
       quedar restringidos», con el mismo espiritu que F-135 en la contabilidad.
@@ -948,6 +967,10 @@ reglas:
       recursos o de partes, no vayas a `compras_restringida` aunque sea «la
       completa». Las dos tablas NUNCA se suman ni se unen: la completa ya
       contiene a la general y sumarlas duplica lo visible.
+
+      «restringida» = reservada al perfil total; el perfil RESTRINGIDO
+      (administrativos) ve MENOS que el estandar y no lee este esquema
+      (`R-PERFIL-RESTRINGIDO`).
     motivo: >-
       Decision del humano del 2026-10-14 (F-138, D9): las alarmas de recursos
       (familia 33) y de partes de trabajo (35) nombran a trabajadores y sus
@@ -955,6 +978,62 @@ reglas:
       estandar». Son 27 de ~45.750 alarmas medidas ese dia. Mismo patron que
       `R-TESORERIA-RESTRINGIDA`: el MCP no filtra el catalogo ni el diccionario
       por perfil, asi que el titulo dice cual usar.
+
+  - codigo: R-PERFIL-RESTRINGIDO
+    titulo: El perfil restringido ve menos que el estandar; lo que no ve no se rodea
+    severidad: bloqueante
+    ambito:
+      - contabilidad.mayor
+      - contabilidad.saldos_cuenta_mes
+      - tesoreria
+      - personal
+      - retenciones.apuntes_contables
+      - compras.vencimientos
+      - compras.v_facturas_pago
+      - compras.v_control_forma_pago
+      - compras.documento_procesos
+      - compras.documento_alarmas
+      - compras.documento_adjuntos
+    regla: >-
+      Hay TRES perfiles de lectura, de mas a menos: TOTAL ⊃ ESTANDAR ⊃
+      RESTRINGIDO. El TOTAL lee lo del estandar y ademas los esquemas
+      `*_restringida`; el ESTANDAR lee todo el consumo salvo `raw` y los
+      `*_restringida`; el RESTRINGIDO (administrativos) lee lo del estandar
+      MENOS `contabilidad.mayor`, `contabilidad.saldos_cuenta_mes`, el mayor
+      analitico (cuando se publique), el esquema `tesoreria` entero (la cartera
+      de cobros y pagos) y el esquema `personal` entero. SI lee `retenciones`,
+      `compras` entero (tambien `compras.vencimientos`, `compras.v_facturas_pago`
+      y `compras.v_control_forma_pago`, por las que ve el estado de pago de las
+      facturas), `contabilidad.plan_cuentas`,
+      `contabilidad.apuntes_restringidos_mes` y el resto del consumo. OJO AL
+      NOMBRE: los esquemas `*_restringida` son del perfil TOTAL y NO del perfil
+      restringido, que no lee ninguno: «restringida» quiere decir reservada al
+      total, y el perfil restringido ve MENOS que el estandar.
+
+      Con el perfil restringido, lo que no ve devuelve «permission denied», y
+      eso no se rodea: no reintentes con otra sintaxis ni reconstruyas el dato
+      por otro camino -ni el mayor o sus saldos desde
+      `retenciones.apuntes_contables` (solo trae las cuentas de retencion), ni
+      a las personas desde los logins de `compras` (`documento_procesos`,
+      `documento_alarmas.creada_por`, `documento_adjuntos.subido_por`), ni la
+      cartera desde `compras.vencimientos` (solo los pagos de las facturas de
+      compra)-: responde que el perfil no lo incluye. El perfil de quien
+      pregunta lo dira el propio MCP (`estado_servidor`, contrato con
+      `mcp-bbdd`): no lo adivines por un error.
+    motivo: >-
+      Decisiones del humano del 2026-10-16 y 2026-10-17 (F-141): el perfil es
+      «para administrativos y gente asi», y «ven como el estandar, menos el
+      mayor, menos el mayor analitico, menos la cartera de cobros (pero si a
+      retenciones)», «personal tambien quitalo, y saldos cuenta tambien» y
+      «compras debe poder verse». Medido en Azure el 2026-10-16 y 17: de las
+      vistas de sus diez esquemas solo `compras.vencimientos`,
+      `compras.v_facturas_pago` y `compras.v_control_forma_pago` alcanzan algo
+      que el perfil no ve (`tesoreria.efectos`), y se quedan visibles como
+      excepcion nominal; ninguna lee `personal`, `contabilidad.mayor` ni
+      `contabilidad.saldos_cuenta_mes`. `apply_grants` vigila cada noche que no
+      aparezca otra (la revoca y falla) ni un objeto con «mayor» en el nombre
+      sin excluir. El MCP no filtra el catalogo ni el diccionario por perfil:
+      por eso la ficha de cada objeto que no ve empieza por el aviso.
 
   - codigo: R-DESCOMPUESTO-ORIGEN
     titulo: Los descompuestos no se mezclan entre origenes ni entre versiones

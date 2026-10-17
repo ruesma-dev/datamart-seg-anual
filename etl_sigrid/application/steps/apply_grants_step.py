@@ -125,7 +125,7 @@ CLAVES_RESTRINGIDO = (
 )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _PerfilRestringido:
     """La configuración del perfil RESTRINGIDO (F-141) y lo que se hace con ella."""
 
@@ -325,7 +325,7 @@ class _PerfilRestringido:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _BloqueRestringido:
     """Lo que deja el bloque del perfil restringido: sentencias, `metadata` y motivos de FAILED."""
 

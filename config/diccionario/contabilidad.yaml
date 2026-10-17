@@ -217,6 +217,10 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
+      **No disponible para el perfil restringido** (F-141, `R-PERFIL-RESTRINGIDO`):
+      con su login la consulta devuelve «permission denied», y eso no se rodea:
+      responde que el perfil no lo incluye.
+
       **EL MAYOR CONTABLE GENERAL** (F-056, F-135): una fila por apunte de
       `raw.apu` SALVO LOS DE PERSONAL. El 2026-09-26 eran 2.166.701 apuntes de
       38 empresas desde 2008 (la empresa 1, Ruesma, 1.948.503: el 89,9 %).
@@ -424,6 +428,10 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
+      **No disponible para el perfil restringido** (F-141, `R-PERFIL-RESTRINGIDO`):
+      con su login la consulta devuelve «permission denied», y eso no se rodea:
+      responde que el perfil no lo incluye.
+
       **LOS SALDOS POR CUENTA Y MES** (F-056), solo de los apuntes VISIBLES
       (F-135): una fila por cuenta, empresa, ejercicio y mes con algun apunte
       visible (400.342 con todo el 2026-09-26). Las cuentas de personal no

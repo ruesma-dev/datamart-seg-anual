@@ -1474,3 +1474,321 @@ def test_f141_r25_el_barrido_caza_lo_que_debe() -> None:
     for legitimo in ("$env:RESTRINGIDO_PWD", "PASSWORD :'restringido_pwd'",
                      "pg-password-restringido", "<otro>"):
         assert _hallazgos(legitimo) == [], legitimo
+
+
+# ===========================================================================
+# R26-R29 · el diccionario (T9, D7)
+# ===========================================================================
+
+DICC = RAIZ / "config" / "diccionario"
+AVISO = "No disponible para el perfil restringido"
+#: los objetos de tabla o vista que el restringido no lee (R28); las funciones no cuentan
+NO_DISPONIBLES = {
+    "contabilidad.yaml": ["mayor", "saldos_cuenta_mes"],
+    "tesoreria.yaml": ["efectos", "efectos_restringidos_mes"],
+    "personal.yaml": ["recursos", "partes_lineas", "v_pbi_horas_obra_mes", "partes",
+                      "recursos_tipos_hora", "usuarios_sigrid"],
+}
+
+
+def _yaml_dicc(nombre: str) -> dict:
+    import yaml
+
+    return yaml.safe_load((DICC / nombre).read_text(encoding="utf-8"))
+
+
+def _reglas() -> dict[str, dict]:
+    return {r["codigo"]: r for r in _yaml_dicc("00_global.yaml")["reglas"]}
+
+
+def _plano_yaml(texto: str) -> str:
+    import re
+
+    return re.sub(r"\s+", " ", texto)
+
+
+def test_f141_r26_la_regla_nueva_es_bloqueante_y_corta_de_titulo() -> None:
+    regla = _reglas()["R-PERFIL-RESTRINGIDO"]
+    assert regla["severidad"] == "bloqueante"
+    assert len(regla["titulo"]) <= 87, "no más largo que el título más largo ya publicado"
+    assert "restringido" in regla["titulo"].lower() and "menos" in regla["titulo"].lower()
+    assert regla["motivo"].strip()
+
+
+def test_f141_r26_la_regla_dice_lo_que_pidio_el_humano() -> None:
+    texto = _plano_yaml(_reglas()["R-PERFIL-RESTRINGIDO"]["regla"])
+    assert texto.index("TOTAL") < texto.index("ESTANDAR") < texto.index("RESTRINGIDO"), (
+        "los tres perfiles, de más a menos"
+    )
+    for termino in (
+        "TOTAL ⊃ ESTANDAR ⊃ RESTRINGIDO", "administrativos",
+        "`contabilidad.mayor`", "`contabilidad.saldos_cuenta_mes`", "`tesoreria`", "`personal`",
+        "mayor analitico", "`retenciones`",
+        "`*_restringida`", "son del perfil TOTAL y NO del perfil restringido",
+        "«permission denied»", "no se rodea",
+        "`retenciones.apuntes_contables`", "`compras.vencimientos`", "logins de `compras`",
+        "el perfil no lo incluye",
+    ):
+        assert termino in texto, f"la regla no dice «{termino}»"
+
+
+def test_f141_r26_el_ambito_alcanza_lo_que_no_ve_y_los_atajos() -> None:
+    ambito = set(_reglas()["R-PERFIL-RESTRINGIDO"]["ambito"])
+    assert ambito >= {
+        "contabilidad.mayor", "contabilidad.saldos_cuenta_mes", "tesoreria", "personal",
+        "retenciones.apuntes_contables", *EXCEPCIONES,
+    }
+
+
+@pytest.mark.parametrize(
+    ("codigo", "titulo"),
+    [
+        ("R-CONTABILIDAD-RESTRINGIDA",
+         "Usa contabilidad; contabilidad_restringida es solo para el perfil total del MCP"),
+        ("R-TESORERIA-RESTRINGIDA",
+         "Usa tesoreria; tesoreria_restringida es solo para el perfil total del MCP"),
+        ("R-COMPRAS-RESTRINGIDA",
+         "Usa compras.documento_alarmas; compras_restringida es solo para el perfil total del MCP"),
+    ],
+)
+def test_f141_r27_cada_restringida_dice_que_no_es_del_perfil_restringido(
+    codigo: str, titulo: str,
+) -> None:
+    regla = _reglas()[codigo]
+    assert regla["titulo"] == titulo, "títulos sin cambio (D7)"
+    texto = _plano_yaml(regla["regla"])
+    assert f"`{AUTORIZADO}`" in texto and RETIRADO not in texto
+    assert (
+        "«restringida» = reservada al perfil total; el perfil RESTRINGIDO (administrativos) "
+        "ve MENOS que el estandar y no lee este esquema"
+    ) in texto
+
+
+def test_f141_r27_en_tesoreria_tampoco_la_general() -> None:
+    texto = _plano_yaml(_reglas()["R-TESORERIA-RESTRINGIDA"]["regla"])
+    assert "tampoco la general (`tesoreria`)" in texto
+
+
+@pytest.mark.parametrize(
+    ("fichero", "objeto"),
+    [(f, o) for f, objetos in NO_DISPONIBLES.items() for o in objetos],
+)
+def test_f141_r28_la_ficha_empieza_por_el_aviso(fichero: str, objeto: str) -> None:
+    descripcion = _yaml_dicc(fichero)["objetos"][objeto]["descripcion"]
+    primera = _plano_yaml(descripcion.split("\n", 1)[0])
+    assert primera.startswith(f"**{AVISO}**"), primera
+    assert "permission denied" in primera and "`R-PERFIL-RESTRINGIDO`" in primera
+
+
+def test_f141_r28_ninguna_otra_ficha_lleva_el_aviso() -> None:
+    import yaml
+
+    con_aviso = set()
+    for ruta in sorted(DICC.glob("*.yaml")):
+        datos = yaml.safe_load(ruta.read_text(encoding="utf-8")) or {}
+        for objeto, ficha in (datos.get("objetos") or {}).items():
+            if AVISO in str(ficha.get("descripcion", "")):
+                con_aviso.add((ruta.name, objeto))
+    assert con_aviso == {(f, o) for f, objetos in NO_DISPONIBLES.items() for o in objetos}
+
+
+@pytest.mark.parametrize("vista", ["vencimientos", "v_facturas_pago", "v_control_forma_pago"])
+def test_f141_r28_las_tres_excepciones_dicen_que_el_restringido_las_lee(vista: str) -> None:
+    descripcion = _yaml_dicc("compras.yaml")["objetos"][vista]["descripcion"]
+    primera = _plano_yaml(descripcion.split("\n", 1)[0])
+    assert primera.startswith("**El perfil restringido SI la lee**"), primera
+    for termino in ("estado de pago", "aunque no lea la cartera", "`R-PERFIL-RESTRINGIDO`"):
+        assert termino in primera, termino
+
+
+@pytest.mark.parametrize(
+    "fichero", ["contabilidad_restringida.yaml", "tesoreria_restringida.yaml",
+                "compras_restringida.yaml"],
+)
+def test_f141_r27_cabecera_de_los_yaml_restringida(fichero: str) -> None:
+    cabecera = _plano_yaml(
+        (DICC / fichero).read_text(encoding="utf-8").split("\nversion:")[0].replace("#", " ")
+    )
+    assert f"`{AUTORIZADO}`" in cabecera
+    assert "F-141" in cabecera and "perfil restringido" in cabecera and "NO la lee" in cabecera
+
+
+def _version_de_main() -> int:
+    import subprocess
+
+    import yaml
+
+    salida = subprocess.run(
+        ["git", "show", "main:config/diccionario/00_global.yaml"],
+        cwd=RAIZ, capture_output=True, text=True, encoding="utf-8",
+    )
+    if salida.returncode != 0:  # pragma: no cover - un clon sin la rama main
+        pytest.skip("no hay rama main con la que comparar")
+    return int(yaml.safe_load(salida.stdout)["version"])
+
+
+def test_f141_r29_version_la_siguiente_a_la_de_main() -> None:
+    assert _yaml_dicc("00_global.yaml")["version"] >= _version_de_main() + 1
+
+
+def test_f141_r29_la_historia_de_versiones_cuenta_f141() -> None:
+    texto = (DICC / "00_global.yaml").read_text(encoding="utf-8")
+    version = _yaml_dicc("00_global.yaml")["version"]
+    assert f"# version {version} (F-141, " in texto
+
+
+def test_f141_r26_r28_sin_nombres_oid_ni_upn_en_el_diccionario() -> None:
+    textos = [str(_reglas()["R-PERFIL-RESTRINGIDO"])] + [
+        str(_yaml_dicc(f)["objetos"][o]) for f, objetos in NO_DISPONIBLES.items() for o in objetos
+    ]
+    for texto in textos:
+        assert _hallazgos(texto) == []
+
+
+# ===========================================================================
+# R30 · documentación y contrato (T10)
+# ===========================================================================
+
+RUNBOOK = RAIZ / "docs" / "runbook_postgres_azure.md"
+AZURE_APPS = RAIZ.parent / "azure-apps"
+
+
+def _seccion_13() -> str:
+    texto = RUNBOOK.read_text(encoding="utf-8")
+    assert "\n## 13. " in texto, "falta la §13 del runbook"
+    return texto.split("\n## 13. ", 1)[1].split("\n## ", 1)[0]
+
+
+def _paso_13(n: int) -> str:
+    return _seccion_13().split(f"### P{n} ", 1)[1].split("\n### ", 1)[0]
+
+
+def _bloques(texto: str) -> list[str]:
+    import re
+
+    return re.findall(r"```(?:powershell|sql)?\n(.*?)```", texto, re.DOTALL)
+
+
+def test_f141_r30_runbook_tabla_de_roles_con_los_siete() -> None:
+    texto = RUNBOOK.read_text(encoding="utf-8")
+    tabla = texto.split("## 1. Autenticación", 1)[1].split("\n## ", 1)[0]
+    for rol in (DUENO, "sigrid_dm_app", ESTANDAR, AUTORIZADO, TOTAL, GRUPO, LOGIN):
+        assert f"| `{rol}` |" in tabla, rol
+    assert "pg-password-restringido" in tabla and "§13" in tabla
+
+
+def test_f141_r30_runbook_seccion_13_en_orden() -> None:
+    seccion = _seccion_13()
+    posiciones = [seccion.find(f"### P{n} ") for n in range(10)]
+    assert -1 not in posiciones and posiciones == sorted(posiciones), "P0 a P9, en orden"
+    assert "### Vuelta atrás" in seccion and "PowerShell 5.1" in seccion
+    assert "MISMO día" in seccion, "la imagen y 02_roles.sql el mismo día, entre nocturnas"
+
+
+def test_f141_r30_runbook_p0_a_p5() -> None:
+    p0 = _paso_13(0)
+    for cosa in ("07:00", "21:00", "az containerapp job execution list",
+                 "properties.template.containers[0].image", "F-141"):
+        assert cosa in p0, cosa
+    assert "RandomNumberGenerator" in _paso_13(1)
+    p2 = _paso_13(2)
+    assert "--vault-name $kvMcp --name pg-password-restringido --value $v -o none" in p2
+    assert p2.count("$LASTEXITCODE") == 1 and "$v = $null" in p2
+    p3 = _paso_13(3)
+    assert "$env:RESTRINGIDO_PWD = az keyvault secret show" in p3 and "64" in p3
+    p4 = _paso_13(4)
+    assert "psql -X -v ON_ERROR_STOP=1 -f $roles $dsn" in p4
+    assert p4.index("$antes") < p4.index("psql -X -v ON_ERROR_STOP=1 -f $roles $dsn"), (
+        "R33: la huella del estándar y el total ANTES de tocar la base"
+    )
+    assert "Remove-Item Env:RESTRINGIDO_PWD" in _paso_13(5)
+
+
+def test_f141_r30_runbook_p6_negativa_y_positiva() -> None:
+    p6 = _paso_13(6)
+    for objeto in ("contabilidad.mayor", "contabilidad.saldos_cuenta_mes", "tesoreria.efectos",
+                   "personal.recursos", "raw.obr", "contabilidad_restringida.mayor",
+                   "tesoreria_restringida.efectos", "compras_restringida.documento_alarmas",
+                   "compras.vencimientos", "compras.v_facturas_pago", "contabilidad.plan_cuentas",
+                   "retenciones.movimientos", "mart.fact_seguimiento_mensual",
+                   "_meta.v_diccionario", "compras.documento_adjuntos"):
+        assert objeto in p6, objeto
+    assert "CREATE TABLE compras." in p6 and "ROLLBACK" in p6
+    assert "python main.py apply-grants" in p6 and "verificacion_restringido" in p6
+    assert "Remove-Item Env:PGPASSWORD" in p6 and "PG_RESTRICTED_ROLE" in p6
+
+
+def test_f141_r30_runbook_p7_a_p9() -> None:
+    p7 = _paso_13(7)
+    assert "$despues" in p7 and "Compare-Object" in p7, "R33: estándar y total, iguales"
+    assert "python main.py publicar-diccionario" in p7 and "az containerapp revision restart" in p7
+    p8 = _paso_13(8)
+    for clave in ("verificacion", "verificacion_total", "verificacion_restringido",
+                  "pertenencias_restringido"):
+        assert f"'{clave}'" in p8, clave
+    p9 = _paso_13(9)
+    assert "azure-apps/datamart_seg_anual.md" in p9 and "E1" in p9 and "F-127" in p9
+
+
+def test_f141_r30_runbook_higiene_de_la_seccion_13() -> None:
+    import re
+
+    lineas = [linea for b in _bloques(_seccion_13()) for linea in b.splitlines()]
+    assert lineas, "la §13 trae su código"
+    for linea in lineas:
+        assert len(linea) <= 100, linea
+        if "az keyvault secret show" in linea and not linea.lstrip().startswith("#"):
+            assert re.match(r"\s*\$[\w:]+\s*=", linea), f"un `show` sin asignar imprime: {linea}"
+        if "az keyvault secret set" in linea:
+            assert linea.rstrip().endswith("-o none"), linea
+        for consulta in re.findall(r'--query\s+"([^"]*)"', linea):
+            assert not set(consulta) & set("&|("), consulta
+    assert RETIRADO not in _seccion_13(), "R24: la vuelta atrás nombra la constante, no el rol"
+    assert "NOMBRE_AUTORIZADO_RETIRADO" in _seccion_13()
+
+
+def test_f141_r30_arquitectura_siete_roles_y_el_restringido() -> None:
+    texto = (RAIZ / "docs" / "ARCHITECTURE.md").read_text(encoding="utf-8")
+    assert "**Siete roles.**" in texto and "**Cinco roles.**" not in texto
+    roles = texto.split("**Siete roles.**", 1)[1].split("\n- **", 1)[0]
+    for cosa in (GRUPO, LOGIN, "pg-password-restringido", AUTORIZADO, "F-141"):
+        assert cosa in roles, cosa
+    for cosa in ("PG_PERFIL_RESTRINGIDO_GROUP", "PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES",
+                 "verificacion_restringido", "pertenencias_restringido",
+                 "EXCEPCIONES_FILTRACION_RESTRINGIDO", "5 quinquies"):
+        assert cosa in texto, f"ARCHITECTURE no explica {cosa}"
+    f127 = texto.split("F-127", 1)
+    assert len(f127) == 2 and "PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES" in texto.split(
+        "**El mayor analítico y F-127", 1)[1].split("\n- **", 1)[0], "la obligación de F-127"
+
+
+def _azure_apps(nombre: str) -> str:
+    ruta = AZURE_APPS / nombre
+    if not ruta.exists():  # pragma: no cover - solo en un puesto sin el repositorio hermano
+        pytest.skip(f"no está {ruta}: azure-apps es otro repositorio")
+    return ruta.read_text(encoding="utf-8")
+
+
+def test_f141_r30_azure_apps_describe_el_perfil_y_el_contrato() -> None:
+    texto = _azure_apps("datamart_seg_anual.md")
+    assert RETIRADO not in texto, "el nombre retirado tampoco en el contrato"
+    contrato = texto.split("F-141", 1)[1]
+    for cosa in (GRUPO, LOGIN, "pg-password-restringido", "kv-mcp-bbdd-dev",
+                 "contabilidad.mayor", "contabilidad.saldos_cuenta_mes", "`tesoreria`",
+                 "`personal`", "permission denied", "PERFIL_NO_DISPONIBLE", "estado_servidor",
+                 "perfil=restringido", "SET ROLE"):
+        assert cosa in contrato, f"datamart_seg_anual.md no cita {cosa}"
+    for clausula in ("E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8"):
+        assert f"**{clausula}." in contrato, clausula
+    assert _hallazgos(contrato) == [], "ni oid, ni UPN, ni contraseña"
+
+
+def test_f141_r30_mcp_bbdd_solo_enlaza_al_contrato() -> None:
+    texto = _azure_apps("mcp_bbdd.md")
+    lineas = [linea for linea in texto.splitlines() if LOGIN in linea or "F-141" in linea]
+    assert lineas and all("datamart_seg_anual.md" in linea for linea in lineas), lineas
+    # `PERFIL_NO_DISPONIBLE` ya es un código suyo (perfil total): lo que no se copia
+    # son las cláusulas del contrato.
+    assert not [c for c in ("**E1.", "**E3.", "**E4.") if c in texto], (
+        "enlaza al contrato, no lo copia"
+    )

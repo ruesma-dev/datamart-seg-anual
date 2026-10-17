@@ -14,6 +14,10 @@
 #
 # Lo construye `build_compras` (`15_alarmas_liquidatoria.sql`) y de aqui sale
 # la general, `compras.documento_alarmas`. Solo recuentos, ni nombres de nadie.
+#
+# F-141 (2026-10-17): «restringida» = reservada al perfil total. El perfil
+# restringido del MCP (administrativos, grupo `sigrid_dm_perfil_restringido_ro`)
+# ve MENOS que el estandar y NO la lee (`R-PERFIL-RESTRINGIDO`).
 
 version: 1
 esquema: compras_restringida
