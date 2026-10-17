@@ -57,20 +57,130 @@ Desde F-136 (2026-10-13) mira además el login de acceso TOTAL del MCP
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+from config.settings import DEFAULT_RESTRICTED_ROLE, NOMBRE_AUTORIZADO_RETIRADO
 from etl_sigrid.application.steps.base import PipelineStep
 from etl_sigrid.domain.entities import StepResult, StepStatus
 from etl_sigrid.infrastructure.logging_config import get_logger
 from etl_sigrid.infrastructure.postgres.client_factory import build_postgres_client
-from etl_sigrid.infrastructure.postgres.grants import esquemas_en_conflicto
+from etl_sigrid.infrastructure.postgres.grants import (
+    ESQUEMAS_ORIGEN_DE_VISTAS,
+    OBJETO_ADJUNTOS,
+    PATRON_VIGILADO_RESTRINGIDO,
+    esquemas_ajenos,
+    esquemas_en_conflicto,
+    excluidas_invalidas,
+    origenes_de_adjuntos_sin_leer,
+    perfil_restringido_en_conflicto,
+    separar_excepciones,
+)
 
 if TYPE_CHECKING:  # pragma: no cover - solo para anotaciones
     from config.settings import Settings
     from etl_sigrid.infrastructure.postgres.postgres_client import PostgresClient
 
 logger = get_logger(__name__)
+
+#: El esquema sin el cual el MCP no tiene diccionario (F-141, R6).
+ESQUEMA_DICCIONARIO = "_meta"
+
+#: La `metadata` del perfil restringido que vale «no aplica» si no se mira (R9-R10).
+CLAVES_RESTRINGIDO = (
+    "login_restringido",
+    "verificacion_restringido",
+    "filtraciones_restringido",
+    "vigilados_restringido",
+    "pertenencias_restringido",
+    "acceso_restringido",
+    "excepciones_sobrantes",
+)
+
+
+@dataclass(frozen=True)
+class _PerfilRestringido:
+    """La configuración del perfil RESTRINGIDO (F-141) y lo que se hace con ella."""
+
+    grupo: str
+    login: str
+    esquemas: list[str]
+    excluidas: list[str]
+
+    @classmethod
+    def desde(cls, pg_settings: Any) -> _PerfilRestringido:
+        grupo = (getattr(pg_settings, "perfil_restringido_group", "") or "").strip()
+        if not grupo:
+            return cls("", "", [], [])
+        return cls(
+            grupo=grupo,
+            login=(pg_settings.perfil_restringido_login or "").strip(),
+            esquemas=list(pg_settings.perfil_restringido_schema_list),
+            excluidas=list(pg_settings.perfil_restringido_excluded_table_list),
+        )
+
+    def guarda(
+        self,
+        *,
+        otros_roles: Sequence[tuple[str, str]],
+        consumo: Sequence[str],
+        vetados: Sequence[str],
+        restringidos: Sequence[str],
+        total_vetados: Sequence[str],
+    ) -> str:
+        """El motivo para parar ANTES de abrir conexión (R4-R8), o vacío si no hay."""
+        if not self.grupo:
+            return ""
+        # R4: roles propios. Uno vacío no coincide con nada.
+        propios = (
+            ("PG_PERFIL_RESTRINGIDO_GROUP", self.grupo, otros_roles),
+            ("PG_PERFIL_RESTRINGIDO_LOGIN", self.login,
+             (*otros_roles, ("PG_PERFIL_RESTRINGIDO_GROUP", self.grupo))),
+        )
+        for variable, valor, contra in propios:
+            for otra, otro in contra:
+                if valor and valor == otro:
+                    return (
+                        f"{variable} ('{valor}') coincide con {otra}: el perfil restringido "
+                        "necesita un grupo y un login propios"
+                    )
+        # R5: nada que el estándar no lea, ni nada vetado o restringido
+        conflicto = perfil_restringido_en_conflicto(
+            self.esquemas, consumo=consumo, vetados=vetados,
+            restringidos=restringidos, total_vetados=total_vetados,
+        )
+        if conflicto:
+            return (
+                "PG_PERFIL_RESTRINGIDO_SCHEMAS tiene esquemas que el perfil restringido no "
+                f"puede leer ({', '.join(conflicto)}): cada uno tiene que estar en "
+                "PG_CONSUMPTION_SCHEMAS y fuera de PG_VETOED_SCHEMAS, PG_RESTRICTED_SCHEMAS "
+                "y PG_TOTAL_VETOED_SCHEMAS"
+            )
+        # R6: sin `_meta` el MCP no explica nada
+        if ESQUEMA_DICCIONARIO not in self.esquemas:
+            return (
+                f"PG_PERFIL_RESTRINGIDO_SCHEMAS no incluye {ESQUEMA_DICCIONARIO}: el MCP no "
+                "tendría diccionario para el perfil restringido"
+            )
+        # R7: una exclusión que no apunta a nada protegido es una errata
+        malas = excluidas_invalidas(self.excluidas, self.esquemas)
+        if malas:
+            return (
+                "PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES tiene objetos mal escritos o de un "
+                f"esquema que no se le concede ({', '.join(malas)}): cada uno es "
+                "'esquema.tabla' de PG_PERFIL_RESTRINGIDO_SCHEMAS"
+            )
+        # R8: F-139 D1, los adjuntos solo con sus documentos de origen
+        sin_origen = origenes_de_adjuntos_sin_leer(self.esquemas, self.excluidas)
+        if sin_origen:
+            return (
+                f"el perfil restringido leería {OBJETO_ADJUNTOS} sin sus documentos de "
+                f"origen ({', '.join(sin_origen)}): excluye también {OBJETO_ADJUNTOS} o "
+                "concédele esas tablas (F-139, D1)"
+            )
+        return ""
 
 
 class ApplyGrantsStep(PipelineStep):
@@ -168,6 +278,36 @@ class ApplyGrantsStep(PipelineStep):
                 "PG_VETOED_SCHEMAS y fuera de PG_RESTRICTED_SCHEMAS y de "
                 "PG_CONSUMPTION_SCHEMAS (F-136); no se ha ejecutado nada.",
             )
+
+        # F-141, R3: el nombre que F-141 retiró. Con un `.env` viejo el
+        # autorizado «no existiría» y el total perdería las `*_restringida`
+        # tras el primer DROP nocturno, con solo un aviso: se para aquí.
+        if autorizado == NOMBRE_AUTORIZADO_RETIRADO:
+            return self._fallo(
+                result,
+                f"PG_RESTRICTED_ROLE vale '{autorizado}', el nombre que F-141 retiró: el "
+                f"grupo autorizado se llama ahora '{DEFAULT_RESTRICTED_ROLE}' (renombrado "
+                "por infra/sql/02_roles.sql). Corrige el .env; no se ha ejecutado nada.",
+            )
+
+        # F-141, R4-R8: la configuración del perfil restringido. Sin grupo no
+        # se mira (R9); `getattr` porque una configuración anterior a F-141 no
+        # lo trae, y eso es exactamente «sin configurar».
+        perfil = _PerfilRestringido.desde(pg_settings)
+        error = perfil.guarda(
+            otros_roles=(
+                ("PG_READONLY_ROLE", rol),
+                ("PG_RESTRICTED_ROLE", autorizado),
+                ("PG_TOTAL_ROLE", total),
+                ("PG_SET_ROLE", dueno),
+            ),
+            consumo=consumo,
+            vetados=vetados,
+            restringidos=restringidos,
+            total_vetados=total_vetados,
+        )
+        if error:
+            return self._fallo(result, f"{error} (F-141); no se ha ejecutado nada.")
 
         pg = self._client or build_postgres_client(self._settings)
 
