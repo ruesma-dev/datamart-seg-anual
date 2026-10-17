@@ -583,7 +583,9 @@ def test_f136_r12_la_comprobacion_final_mira_rolsuper_de_los_cinco() -> None:
     consulta = re.search(r"SELECT rolname, rolcanlogin, rolsuper.*?;", sql, re.DOTALL)
     assert consulta
     roles = set(re.findall(r"'(\w+)'", consulta.group(0)))
-    assert roles == {DUENO, "sigrid_dm_app", ESTANDAR, AUTORIZADO, TOTAL}
+    # F-141 añade los dos del perfil restringido: aquí, que siguen los cinco
+    # (los siete exactos los fija test_f141_r23_comprobacion_final).
+    assert roles >= {DUENO, "sigrid_dm_app", ESTANDAR, AUTORIZADO, TOTAL}
 
 
 def _tramo_transaccion(sql: str) -> tuple[int, int]:
@@ -671,7 +673,8 @@ def test_f136_r17_cada_contrasena_es_opcional_y_se_anuncia_sin_valor() -> None:
         )
         assert bloque in sql, f"falta el bloque de {login}"
         assert sql.count(f"PASSWORD :'{variable}'") == 1
-    assert sql.count("PASSWORD") == 3, "ninguna otra sentencia con contraseña"
+    # F-141 suma la del login restringido (test_f141_r21_la_contrasena_...)
+    assert sql.count("PASSWORD") == 4, "ninguna otra sentencia con contraseña"
 
 
 def test_f136_r18_guarda_antes_de_crear_nada() -> None:

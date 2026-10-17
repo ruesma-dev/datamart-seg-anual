@@ -4,9 +4,11 @@
 --
 -- QUIÉN LO EJECUTA: el humano, a mano, con el usuario administrador del
 -- Flexible Server, conectado YA a sigrid_dm (01_create_database.sql primero).
--- Procedimiento completo, con la carga desde Key Vault: runbook §12.
+-- Procedimiento completo, con la carga desde Key Vault: runbook §12 (y §13 para
+-- el perfil restringido de F-141).
 --
 --   $env:APP_PWD / $env:MCP_PWD / $env:TOTAL_PWD   (desde Key Vault, opcionales)
+--   $env:RESTRINGIDO_PWD                           (F-141, desde Key Vault, opcional)
 --   psql -X -v ON_ERROR_STOP=1 -f infra/sql/02_roles.sql $dsn
 --
 -- LAS OPCIONES VAN SIEMPRE ANTES DE LA CADENA DE CONEXIÓN, que es lo último. En
@@ -17,7 +19,7 @@
 -- LAS CONTRASEÑAS NO ESTÁN EN ESTE FICHERO NI PUEDEN ESTARLO, y tampoco viajan
 -- ya en la línea de órdenes (que se ve en la lista de procesos). El fichero las
 -- lee con `\getenv` (psql 15 o posterior) de las variables de entorno APP_PWD,
--- MCP_PWD y TOTAL_PWD de la sesión del humano, cargadas desde Key Vault. Cada
+-- MCP_PWD, TOTAL_PWD y RESTRINGIDO_PWD de la sesión del humano, cargadas desde Key Vault. Cada
 -- una es OPCIONAL: la que no esté definida deja la contraseña de su login SIN
 -- CAMBIOS, de modo que reejecutar el fichero para dar un permiso no obliga a
 -- manejar secretos. Solo hace falta la de un login que aún no existe; si
@@ -44,6 +46,20 @@
 --                      `raw` («siempre fuera», decisión del humano del
 --                      2026-10-12). Ningún GRANT propio: todo por pertenencia.
 --                      Quién conecta con él lo decide la F-008 de `mcp-bbdd`
+--   sigrid_dm_perfil_restringido_ro  NOLOGIN, sin contraseña (F-141). El perfil
+--                      RESTRINGIDO (administrativos), que ve MENOS que el
+--                      estándar: lo de este menos `contabilidad.mayor`,
+--                      `contabilidad.saldos_cuenta_mes`, `personal` y
+--                      `tesoreria` (y nunca `raw` ni las `*_restringida`).
+--                      Lleva los permisos (punto 5 quinquies)
+--     └── mcp_sigrid_dm_restringido  LOGIN, contraseña SOLO en el vault del MCP
+--                      (F-141, RESTRINGIDO_PWD). Miembro solo de su grupo, sin
+--                      GRANT propio. Quién conecta con él lo decide `mcp-bbdd`
+--
+-- F-141 RENOMBRÓ el grupo autorizado a `sigrid_dm_autorizado_ro` (punto 0 bis):
+-- su nombre anterior decía «restringido» y es justo lo que ve MÁS. El renombre
+-- conserva OID, GRANT y pertenencias. La imagen del ETL con F-141 y este
+-- fichero se aplican el MISMO día, entre dos nocturnas (runbook §13).
 --
 -- Por qué un grupo y no un solo rol: los objetos los crea siempre
 -- sigrid_dm_etl gracias a PG_SET_ROLE, así que si mañana entra un segundo
@@ -64,12 +80,14 @@
 \getenv app_pwd APP_PWD
 \getenv mcp_pwd MCP_PWD
 \getenv total_pwd TOTAL_PWD
+\getenv restringido_pwd RESTRINGIDO_PWD
 
 -- 0. Guarda (F-136, R18): un login que aún no existe necesita su contraseña.
 --    Se comprueba ANTES de crear nada, para no dejar un login a medias.
 SELECT NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sigrid_dm_app') AS falta_app,
        NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mcp_sigrid_dm_ro') AS falta_mcp,
-       NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mcp_sigrid_dm_total') AS falta_total
+       NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mcp_sigrid_dm_total') AS falta_total,
+       NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mcp_sigrid_dm_restringido') AS falta_restringido
 \gset
 \if :falta_app
 \if :{?app_pwd}
@@ -89,6 +107,32 @@ DO $$ BEGIN RAISE EXCEPTION 'F-136: mcp_sigrid_dm_ro no existe y falta MCP_PWD e
 DO $$ BEGIN RAISE EXCEPTION 'F-136: mcp_sigrid_dm_total no existe y falta TOTAL_PWD en el entorno (runbook §12)'; END $$;
 \endif
 \endif
+\if :falta_restringido
+\if :{?restringido_pwd}
+\else
+DO $$ BEGIN RAISE EXCEPTION 'F-141: mcp_sigrid_dm_restringido no existe y falta RESTRINGIDO_PWD en el entorno (runbook §13)'; END $$;
+\endif
+\endif
+
+-- 0 bis. Renombre del grupo autorizado (F-141, D6), ANTES de crear nada: si no,
+--    el punto 1 crearía el nombre nuevo y existirían los dos. Solo si existe el
+--    viejo y no el nuevo; con los dos, el fichero para aquí, sin haber cambiado
+--    nada (las guardas de arriba tampoco han cambiado nada). Con solo el nuevo,
+--    o con ninguno (base recién creada), no hay nada que renombrar.
+SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sigrid_dm_restringido_ro') AS existe_nombre_viejo,
+       EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sigrid_dm_autorizado_ro') AS existe_nombre_nuevo
+\gset
+\if :existe_nombre_viejo
+\if :existe_nombre_nuevo
+DO $$ BEGIN RAISE EXCEPTION 'F-141: existen sigrid_dm_restringido_ro y sigrid_dm_autorizado_ro; decide cuál sobra antes de seguir (runbook §13)'; END $$;
+\endif
+\endif
+\if :existe_nombre_viejo
+ALTER ROLE sigrid_dm_restringido_ro RENAME TO sigrid_dm_autorizado_ro;
+\echo 'F-141: grupo autorizado renombrado (conserva OID, GRANT y pertenencias)'
+\else
+\echo 'F-141: grupo autorizado sin renombre (ya tiene el nombre nuevo o aún no existe)'
+\endif
 
 -- 1. Roles de login. Se crean si faltan; la contraseña se fija solo si su
 --    variable está definida, y reejecutar el fichero con ella sirve para rotarla.
@@ -103,6 +147,11 @@ WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mcp_sigrid_dm_ro')
 -- F-136: el login de acceso TOTAL del MCP
 SELECT 'CREATE ROLE mcp_sigrid_dm_total LOGIN'
 WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mcp_sigrid_dm_total')
+\gexec
+
+-- F-141: el login del perfil RESTRINGIDO del MCP
+SELECT 'CREATE ROLE mcp_sigrid_dm_restringido LOGIN'
+WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mcp_sigrid_dm_restringido')
 \gexec
 
 -- Las contraseñas: cada una solo si su variable existe, y nunca su valor en la
@@ -126,11 +175,23 @@ ALTER ROLE mcp_sigrid_dm_total WITH LOGIN PASSWORD :'total_pwd';
 \else
 \echo 'mcp_sigrid_dm_total: contraseña SIN CAMBIOS'
 \endif
+\if :{?restringido_pwd}
+ALTER ROLE mcp_sigrid_dm_restringido WITH LOGIN PASSWORD :'restringido_pwd';
+\echo 'mcp_sigrid_dm_restringido: contraseña fijada'
+\else
+\echo 'mcp_sigrid_dm_restringido: contraseña SIN CAMBIOS'
+\endif
 
 -- F-135: el rol AUTORIZADO es un grupo sin login y sin contraseña. Quien lo
 -- necesite entra con su propio login, miembro de este grupo.
 SELECT 'CREATE ROLE sigrid_dm_autorizado_ro NOLOGIN'
 WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sigrid_dm_autorizado_ro')
+\gexec
+
+-- F-141: el grupo del perfil RESTRINGIDO, sin login y sin contraseña. Lleva
+-- los permisos; su login (arriba) solo es miembro suyo (punto 5 quinquies).
+SELECT 'CREATE ROLE sigrid_dm_perfil_restringido_ro NOLOGIN'
+WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sigrid_dm_perfil_restringido_ro')
 \gexec
 
 -- Ninguno de ellos crea bases ni roles.
@@ -152,6 +213,8 @@ ALTER ROLE sigrid_dm_app    WITH NOCREATEDB NOCREATEROLE;
 ALTER ROLE mcp_sigrid_dm_ro WITH NOCREATEDB NOCREATEROLE;
 ALTER ROLE mcp_sigrid_dm_total WITH LOGIN NOCREATEDB NOCREATEROLE;
 ALTER ROLE sigrid_dm_autorizado_ro WITH NOLOGIN NOCREATEDB NOCREATEROLE;
+ALTER ROLE mcp_sigrid_dm_restringido WITH LOGIN NOCREATEDB NOCREATEROLE;
+ALTER ROLE sigrid_dm_perfil_restringido_ro WITH NOLOGIN NOCREATEDB NOCREATEROLE;
 
 -- 2. El rol del ETL es miembro del grupo propietario.
 GRANT sigrid_dm_etl TO sigrid_dm_app;
@@ -162,6 +225,8 @@ GRANT CONNECT ON DATABASE sigrid_dm TO sigrid_dm_app;
 GRANT CONNECT ON DATABASE sigrid_dm TO mcp_sigrid_dm_ro;
 -- F-135: lo heredan los futuros miembros del grupo
 GRANT CONNECT ON DATABASE sigrid_dm TO sigrid_dm_autorizado_ro;
+-- F-141: al GRUPO del perfil restringido; su login lo hereda
+GRANT CONNECT ON DATABASE sigrid_dm TO sigrid_dm_perfil_restringido_ro;
 
 -- 4. Esquemas del datamart. Los crea también el auto-bootstrap del ETL, pero
 --    dejarlos aquí permite comprobar los dieciséis nada más provisionar.
@@ -476,6 +541,77 @@ BEGIN
     END LOOP;
 END
 $$;
+
+-- 5 quinquies a) El perfil RESTRINGIDO (F-141, 2026-10-17): su mitad como DUEÑO.
+--
+--    Reglas del humano: «ven como el estándar, menos el mayor, menos el mayor
+--    analítico, menos la cartera de cobros (pero sí a retenciones)» y
+--    «personal también quítalo, y saldos cuenta también». Es lo mismo que
+--    concede la nocturna (`apply_grants`), aquí para que el grupo nazca ya con
+--    su lectura: sus diez esquemas (`DEFAULT_PERFIL_RESTRINGIDO_SCHEMAS`, un
+--    test lo vigila), el privilegio por defecto SIEMPRE en REVOKE (lo que nazca
+--    no lo lee hasta que la nocturna lo haya mirado), el REVOKE de los dos
+--    objetos excluidos (`DEFAULT_PERFIL_RESTRINGIDO_EXCLUDED_TABLES`) y el veto
+--    de todo esquema del CATÁLOGO que no sea suyo (hoy `tesoreria`, `personal`,
+--    `raw` y las tres `*_restringida`), como la nocturna.
+--
+--    COMO `sigrid_dm_etl`, el mismo concedente que la nocturna: así la nocturna
+--    puede revocar lo que se conceda aquí (una vista que filtre, un objeto
+--    vigilado). Concedido como administrador, sobreviviría a su REVOKE. Va
+--    dentro del tramo `SET ROLE` del 5 ter para que las pertenencias del 5
+--    quater y del 5 quinquies b) sigan siendo lo único que hace el administrador.
+DO $$
+DECLARE
+    esquema_r text;
+    excluida_r text;
+    ajeno_r text;
+BEGIN
+    FOREACH esquema_r IN ARRAY ARRAY[
+        'mart', 'cierre', 'compras', 'maestro', 'retenciones', 'contabilidad',
+        'descompuestos', 'stg', 'aux', '_meta'
+    ]
+    LOOP
+        IF to_regnamespace(esquema_r) IS NOT NULL THEN
+            EXECUTE format('GRANT USAGE ON SCHEMA %I TO sigrid_dm_perfil_restringido_ro', esquema_r);
+            EXECUTE format('GRANT SELECT ON ALL TABLES IN SCHEMA %I TO sigrid_dm_perfil_restringido_ro', esquema_r);
+            EXECUTE format(
+                'ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl IN SCHEMA %I '
+                'REVOKE SELECT ON TABLES FROM sigrid_dm_perfil_restringido_ro', esquema_r
+            );
+        END IF;
+    END LOOP;
+
+    FOREACH excluida_r IN ARRAY ARRAY['contabilidad.mayor', 'contabilidad.saldos_cuenta_mes']
+    LOOP
+        IF to_regclass(excluida_r) IS NOT NULL THEN
+            EXECUTE format(
+                'REVOKE ALL PRIVILEGES ON TABLE %s FROM sigrid_dm_perfil_restringido_ro', excluida_r
+            );
+        END IF;
+    END LOOP;
+
+    FOR ajeno_r IN
+        SELECT nspname FROM pg_namespace
+        WHERE nspname <> ALL (ARRAY[
+                  'mart', 'cierre', 'compras', 'maestro', 'retenciones', 'contabilidad',
+                  'descompuestos', 'stg', 'aux', '_meta'])
+          AND nspname <> ALL (ARRAY['information_schema', 'public'])
+          AND nspname NOT LIKE 'pg\_%'
+        ORDER BY 1
+    LOOP
+        EXECUTE format(
+            'REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA %I FROM sigrid_dm_perfil_restringido_ro', ajeno_r
+        );
+        EXECUTE format(
+            'REVOKE ALL PRIVILEGES ON SCHEMA %I FROM sigrid_dm_perfil_restringido_ro', ajeno_r
+        );
+        EXECUTE format(
+            'ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl IN SCHEMA %I '
+            'REVOKE ALL ON TABLES FROM sigrid_dm_perfil_restringido_ro', ajeno_r
+        );
+    END LOOP;
+END
+$$;
 RESET ROLE;
 
 -- 5 quater. Las pertenencias del login TOTAL (F-136, 2026-10-13).
@@ -497,14 +633,49 @@ RESET ROLE;
 GRANT mcp_sigrid_dm_ro TO mcp_sigrid_dm_total WITH INHERIT TRUE, SET FALSE;
 GRANT sigrid_dm_autorizado_ro TO mcp_sigrid_dm_total WITH INHERIT TRUE, SET FALSE;
 
+-- 5 quinquies b) El perfil RESTRINGIDO (F-141): su mitad como ADMINISTRADOR.
+--
+--    El veto de lo ajeno, otra vez con este concedente (DOS CONCEDENTES, como
+--    en el 5 bis y el 5 ter: un REVOKE solo quita lo que concedió quien lo
+--    ejecuta), y la ÚNICA concesión al login: ser miembro de su grupo. Como
+--    el ADMINISTRADOR, fuera de `SET ROLE`, porque es quien tiene ADMIN OPTION
+--    sobre el grupo. Dentro de la transacción y DESPUÉS de los vetos: el login
+--    nunca hereda un grupo que aún leyera algo ajeno. `INHERIT TRUE`: lee sin
+--    cambiar de rol; `SET FALSE`: no puede hacer `SET ROLE` al grupo.
+DO $$
+DECLARE
+    ajeno_r text;
+BEGIN
+    FOR ajeno_r IN
+        SELECT nspname FROM pg_namespace
+        WHERE nspname <> ALL (ARRAY[
+                  'mart', 'cierre', 'compras', 'maestro', 'retenciones', 'contabilidad',
+                  'descompuestos', 'stg', 'aux', '_meta'])
+          AND nspname <> ALL (ARRAY['information_schema', 'public'])
+          AND nspname NOT LIKE 'pg\_%'
+        ORDER BY 1
+    LOOP
+        EXECUTE format(
+            'REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA %I FROM sigrid_dm_perfil_restringido_ro', ajeno_r
+        );
+        EXECUTE format(
+            'REVOKE ALL PRIVILEGES ON SCHEMA %I FROM sigrid_dm_perfil_restringido_ro', ajeno_r
+        );
+    END LOOP;
+END
+$$;
+GRANT sigrid_dm_perfil_restringido_ro TO mcp_sigrid_dm_restringido WITH INHERIT TRUE, SET FALSE;
+
 COMMIT;
 
--- 6. Comprobaciones. Deben salir: los cinco roles (`rolsuper = f` en todos),
---    sigrid_dm_app dentro de sigrid_dm_etl, y los dieciséis esquemas.
+-- 6. Comprobaciones. Deben salir: los siete roles (`rolsuper = f` en todos;
+--    los dos del perfil restringido desde F-141), sigrid_dm_app dentro de
+--    sigrid_dm_etl, y los dieciséis esquemas.
 SELECT rolname, rolcanlogin, rolsuper, rolcreatedb, rolcreaterole
 FROM pg_roles
 WHERE rolname IN ('sigrid_dm_etl', 'sigrid_dm_app', 'mcp_sigrid_dm_ro',
-                  'sigrid_dm_autorizado_ro', 'mcp_sigrid_dm_total')
+                  'sigrid_dm_autorizado_ro', 'mcp_sigrid_dm_total',
+                  'sigrid_dm_perfil_restringido_ro', 'mcp_sigrid_dm_restringido')
 ORDER BY rolname;
 
 SELECT r.rolname AS miembro, g.rolname AS grupo
@@ -571,4 +742,55 @@ SELECT has_schema_privilege('mcp_sigrid_dm_total', 'raw', 'USAGE') AS raw,
 SELECT table_schema, table_name, privilege_type
 FROM information_schema.table_privileges
 WHERE grantee = 'mcp_sigrid_dm_total'
+ORDER BY table_schema, table_name, privilege_type;
+
+-- F-141: el login del perfil RESTRINGIDO. Debe salir EXACTAMENTE una
+-- pertenencia (`sigrid_dm_perfil_restringido_ro`, hereda = t, set_role = f).
+-- Luego `t` en sus diez esquemas y `f` en `tesoreria`, `personal`, `raw` y las
+-- tres `*_restringida`; `f` en `contabilidad.mayor` y `saldos_cuenta_mes` y `t`
+-- en `contabilidad.plan_cuentas` y `compras.vencimientos` (vacío si el objeto
+-- aún no existe: base recién creada); `conecta = t`; y CERO filas en la última:
+-- el login no tiene ninguna concesión propia.
+SELECT g.rolname AS grupo, m.inherit_option AS hereda, m.set_option AS set_role,
+       m.admin_option AS admin
+FROM pg_auth_members AS m
+JOIN pg_roles AS r ON r.oid = m.member
+JOIN pg_roles AS g ON g.oid = m.roleid
+WHERE r.rolname = 'mcp_sigrid_dm_restringido'
+ORDER BY grupo;
+
+SELECT has_schema_privilege('mcp_sigrid_dm_restringido', 'mart', 'USAGE') AS mart,
+       has_schema_privilege('mcp_sigrid_dm_restringido', 'cierre', 'USAGE') AS cierre,
+       has_schema_privilege('mcp_sigrid_dm_restringido', 'compras', 'USAGE') AS compras,
+       has_schema_privilege('mcp_sigrid_dm_restringido', 'maestro', 'USAGE') AS maestro,
+       has_schema_privilege('mcp_sigrid_dm_restringido', 'retenciones', 'USAGE') AS retenciones,
+       has_schema_privilege('mcp_sigrid_dm_restringido', 'contabilidad', 'USAGE') AS contabilidad,
+       has_schema_privilege('mcp_sigrid_dm_restringido', 'descompuestos', 'USAGE') AS descompuestos,
+       has_schema_privilege('mcp_sigrid_dm_restringido', 'stg', 'USAGE') AS stg,
+       has_schema_privilege('mcp_sigrid_dm_restringido', 'aux', 'USAGE') AS aux,
+       has_schema_privilege('mcp_sigrid_dm_restringido', '_meta', 'USAGE') AS meta;
+
+SELECT has_schema_privilege('mcp_sigrid_dm_restringido', 'tesoreria', 'USAGE') AS tesoreria,
+       has_schema_privilege('mcp_sigrid_dm_restringido', 'personal', 'USAGE') AS personal,
+       has_schema_privilege('mcp_sigrid_dm_restringido', 'raw', 'USAGE') AS raw,
+       has_schema_privilege('mcp_sigrid_dm_restringido', 'contabilidad_restringida', 'USAGE')
+           AS contabilidad_restringida,
+       has_schema_privilege('mcp_sigrid_dm_restringido', 'tesoreria_restringida', 'USAGE')
+           AS tesoreria_restringida,
+       has_schema_privilege('mcp_sigrid_dm_restringido', 'compras_restringida', 'USAGE')
+           AS compras_restringida;
+
+SELECT has_table_privilege('mcp_sigrid_dm_restringido', to_regclass('contabilidad.mayor'), 'SELECT')
+           AS mayor,
+       has_table_privilege('mcp_sigrid_dm_restringido', to_regclass('contabilidad.saldos_cuenta_mes'), 'SELECT')
+           AS saldos_cuenta_mes,
+       has_table_privilege('mcp_sigrid_dm_restringido', to_regclass('contabilidad.plan_cuentas'), 'SELECT')
+           AS plan_cuentas,
+       has_table_privilege('mcp_sigrid_dm_restringido', to_regclass('compras.vencimientos'), 'SELECT')
+           AS vencimientos,
+       has_database_privilege('mcp_sigrid_dm_restringido', current_database(), 'CONNECT') AS conecta;
+
+SELECT table_schema, table_name, privilege_type
+FROM information_schema.table_privileges
+WHERE grantee = 'mcp_sigrid_dm_restringido'
 ORDER BY table_schema, table_name, privilege_type;

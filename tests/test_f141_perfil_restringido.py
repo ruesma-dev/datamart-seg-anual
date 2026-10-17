@@ -1168,3 +1168,230 @@ def test_f141_paso_sin_nombres_a_mano_y_docstring() -> None:
     doc = apply_grants_step.__doc__ or ""
     for cosa in ("F-141", "restringido", "5 quinquies", "excepciones", "mayor"):
         assert cosa in doc, f"el docstring no explica {cosa}"
+
+
+# ===========================================================================
+# R20-R23 · infra/sql/02_roles.sql (T7): contrato textual. La prueba con
+# PostgreSQL 16 real y el psql.exe de Windows está en impl_F-141.md (T11).
+# ===========================================================================
+
+ROLES_SQL = RAIZ / "infra" / "sql" / "02_roles.sql"
+PROVISION = RAIZ / "infra" / "15_provision_db.ps1"
+
+
+def _roles_crudo() -> str:
+    return ROLES_SQL.read_text(encoding="utf-8")
+
+
+def _roles_sql() -> str:
+    """El fichero sin las líneas de comentario: una cita no ejecuta nada."""
+    return "\n".join(
+        linea for linea in _roles_crudo().splitlines() if not linea.lstrip().startswith("--")
+    )
+
+
+def _primera_escritura(sql: str) -> int:
+    return min(sql.index("CREATE ROLE"), sql.index("ALTER ROLE"))
+
+
+def test_f141_r20_renombre_condicionado_y_antes_de_crear_nada() -> None:
+    sql = _roles_sql()
+    consulta = (
+        f"SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{RETIRADO}') "
+        "AS existe_nombre_viejo,\n"
+        f"       EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{AUTORIZADO}') "
+        "AS existe_nombre_nuevo\n\\gset"
+    )
+    assert consulta in sql
+    los_dos = (
+        "\\if :existe_nombre_viejo\n\\if :existe_nombre_nuevo\n"
+        f"DO $$ BEGIN RAISE EXCEPTION 'F-141: existen {RETIRADO} y {AUTORIZADO}"
+    )
+    assert los_dos in sql, "con los dos, falla"
+    renombre = (
+        "\\if :existe_nombre_viejo\n"
+        f"ALTER ROLE {RETIRADO} RENAME TO {AUTORIZADO};\n"
+    )
+    assert sql.count(f"RENAME TO {AUTORIZADO}") == 1 and renombre in sql
+    escritura = _primera_escritura(sql)
+    assert sql.index(los_dos) < escritura, "la guarda de los dos, antes de cambiar nada"
+    assert escritura == sql.index(f"ALTER ROLE {RETIRADO} RENAME"), "el renombre, lo primero"
+    assert sql.index(renombre) > sql.rindex("RAISE EXCEPTION 'F-136"), (
+        "detrás de las guardas de contraseña: si una para, no se ha cambiado nada (R21)"
+    )
+    assert sql.index(renombre) < sql.index("SELECT 'CREATE ROLE"), (
+        "antes de crear el autorizado: si no, existirían los dos"
+    )
+
+
+def test_f141_r21_crea_el_grupo_y_el_login_idempotentes() -> None:
+    sql = _roles_sql()
+    for rol, tipo in ((GRUPO, "NOLOGIN"), (LOGIN, "LOGIN")):
+        assert (
+            f"SELECT 'CREATE ROLE {rol} {tipo}'\n"
+            f"WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{rol}')\n\\gexec"
+        ) in sql
+    assert f"ALTER ROLE {GRUPO} WITH NOLOGIN NOCREATEDB NOCREATEROLE;" in sql
+    assert f"ALTER ROLE {LOGIN} WITH LOGIN NOCREATEDB NOCREATEROLE;" in sql
+    assert "NOSUPERUSER" not in sql, "Azure no lo admite: CREATE ROLE ya lo da"
+    assert "PASSWORD" not in sql.split(f"ROLE {GRUPO}")[1].split(";")[0], "el grupo, sin contraseña"
+
+
+def test_f141_r21_la_contrasena_solo_del_entorno_y_sin_valor() -> None:
+    sql = _roles_sql()
+    primera = sql.index("PASSWORD")
+    linea = "\\getenv restringido_pwd RESTRINGIDO_PWD"
+    assert linea in sql and sql.index("\\set ECHO none") < sql.index(linea) < primera
+    bloque = (
+        "\\if :{?restringido_pwd}\n"
+        f"ALTER ROLE {LOGIN} WITH LOGIN PASSWORD :'restringido_pwd';\n"
+        f"\\echo '{LOGIN}: contraseña fijada'\n"
+        "\\else\n"
+        f"\\echo '{LOGIN}: contraseña SIN CAMBIOS'\n"
+        "\\endif"
+    )
+    assert bloque in sql
+    assert sql.count("PASSWORD :'restringido_pwd'") == 1
+    assert sql.count("PASSWORD") == 4, "las tres de antes y la del login restringido"
+
+
+def test_f141_r21_guarda_antes_de_crear_o_cambiar_nada() -> None:
+    sql = _roles_sql()
+    assert (
+        f"NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{LOGIN}') AS falta_restringido"
+    ) in sql
+    bloque = (
+        "\\if :falta_restringido\n"
+        "\\if :{?restringido_pwd}\n"
+        "\\else\n"
+        f"DO $$ BEGIN RAISE EXCEPTION 'F-141: {LOGIN} no existe y falta RESTRINGIDO_PWD "
+        "en el entorno (runbook §13)'; END $$;\n"
+        "\\endif\n"
+        "\\endif"
+    )
+    assert bloque in sql and sql.index(bloque) < _primera_escritura(sql)
+
+
+def test_f141_r22_connect_al_grupo_y_ningun_grant_al_login_salvo_la_pertenencia() -> None:
+    import re
+
+    sql = _roles_sql()
+    assert f"GRANT CONNECT ON DATABASE sigrid_dm TO {GRUPO};" in sql
+    concesiones = re.findall(rf"GRANT\b[^;]*?\bTO\s+{LOGIN}\b[^;]*;", sql)
+    assert concesiones == [f"GRANT {GRUPO} TO {LOGIN} WITH INHERIT TRUE, SET FALSE;"]
+    assert not re.search(rf"\bTO\s+{LOGIN}\b'", sql), "ni dentro de un format() de un DO"
+    assert f"GRANT SELECT ON TABLES TO {GRUPO}" not in sql, "ningún privilegio por defecto en GRANT"
+
+
+def _tramo_transaccion(sql: str) -> tuple[int, int]:
+    return sql.index("\nBEGIN;"), sql.index("\nCOMMIT;")
+
+
+def test_f141_r22_la_mitad_del_dueno_en_la_transaccion_y_como_dueno() -> None:
+    import re
+
+    from config.settings import (
+        DEFAULT_PERFIL_RESTRINGIDO_EXCLUDED_TABLES,
+        DEFAULT_PERFIL_RESTRINGIDO_SCHEMAS,
+    )
+
+    sql = _roles_sql()
+    apertura, cierre = _tramo_transaccion(sql)
+    bucle = re.search(r"FOREACH esquema_r IN ARRAY ARRAY\[(.*?)\]", sql, re.DOTALL)
+    assert bucle and apertura < bucle.start() < cierre
+    assert re.findall(r"'(\w+)'", bucle.group(1)) == DEFAULT_PERFIL_RESTRINGIDO_SCHEMAS.split(",")
+    antes = sql[:bucle.start()]
+    assert antes.rindex("SET ROLE sigrid_dm_etl;") > antes.rindex("RESET ROLE;"), (
+        "como sigrid_dm_etl, el mismo concedente que la nocturna: así ella puede revocar"
+    )
+    for sentencia in (
+        f"'GRANT USAGE ON SCHEMA %I TO {GRUPO}'",
+        f"'GRANT SELECT ON ALL TABLES IN SCHEMA %I TO {GRUPO}'",
+        f"'REVOKE SELECT ON TABLES FROM {GRUPO}'",
+    ):
+        assert sentencia in sql, sentencia
+    excluidas = re.search(r"FOREACH excluida_r IN ARRAY ARRAY\[(.*?)\]", sql, re.DOTALL)
+    assert excluidas and re.findall(r"'([\w.]+)'", excluidas.group(1)) == (
+        DEFAULT_PERFIL_RESTRINGIDO_EXCLUDED_TABLES.split(",")
+    )
+    assert excluidas.start() > bucle.start(), "los REVOKE de lo excluido, detrás de los GRANT"
+
+
+def test_f141_r22_el_veto_sale_del_catalogo_con_los_dos_concedentes() -> None:
+    import re
+
+    sql = _roles_sql()
+    apertura, cierre = _tramo_transaccion(sql)
+    vetos = [m.start() for m in re.finditer(r"FOR ajeno_r IN", sql)]
+    assert len(vetos) == 2, "una vez como dueño y otra como administrador"
+    assert all(apertura < p < cierre for p in vetos)
+    for sentencia in (
+        f"'REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA %I FROM {GRUPO}'",
+        f"'REVOKE ALL PRIVILEGES ON SCHEMA %I FROM {GRUPO}'",
+    ):
+        assert sql.count(sentencia) == 2, sentencia
+    assert sql.count(f"'REVOKE ALL ON TABLES FROM {GRUPO}'") == 1, "privilegio por defecto, como dueño"
+    for p in vetos:
+        consulta = sql[p:sql.index("LOOP", p)]
+        for suyo in ESQUEMAS_R:
+            assert f"'{suyo}'" in consulta, f"el veto no excluye {suyo}"
+        assert "'information_schema', 'public'" in consulta and "'pg\\_%'" in consulta
+
+
+def test_f141_r22_la_pertenencia_como_administrador_al_final_de_la_transaccion() -> None:
+    sql = _roles_sql()
+    apertura, cierre = _tramo_transaccion(sql)
+    sentencia = f"GRANT {GRUPO} TO {LOGIN} WITH INHERIT TRUE, SET FALSE;"
+    pos = sql.index(sentencia)
+    assert apertura < pos < cierre
+    antes = sql[:pos]
+    assert antes.rindex("RESET ROLE;") > antes.rindex("SET ROLE sigrid_dm_etl;"), (
+        "como el ADMINISTRADOR, que tiene ADMIN OPTION; sigrid_dm_etl no"
+    )
+    assert pos > max(m for m in (sql.rfind("FOR ajeno_r IN"),)), "después de los vetos"
+
+
+def test_f141_r23_comprobacion_final() -> None:
+    import re
+
+    sql = _roles_sql()
+    final = sql.split("\nCOMMIT;", 1)[1]
+    consulta = re.search(r"SELECT rolname, rolcanlogin, rolsuper.*?;", final, re.DOTALL)
+    assert consulta
+    assert set(re.findall(r"'(\w+)'", consulta.group(0))) == {
+        DUENO, "sigrid_dm_app", ESTANDAR, AUTORIZADO, TOTAL, GRUPO, LOGIN,
+    }, "los siete roles, con rolsuper"
+    assert (
+        "FROM pg_auth_members AS m\n"
+        "JOIN pg_roles AS r ON r.oid = m.member\n"
+        "JOIN pg_roles AS g ON g.oid = m.roleid\n"
+        f"WHERE r.rolname = '{LOGIN}'"
+    ) in final, "las pertenencias del login: solo el grupo"
+    for esquema in ESQUEMAS_R + ["tesoreria", "personal", "raw", RESTR_C,
+                                 "tesoreria_restringida", "compras_restringida"]:
+        assert f"has_schema_privilege('{LOGIN}', '{esquema}', 'USAGE')" in final, esquema
+    for tabla in ("contabilidad.mayor", "contabilidad.saldos_cuenta_mes",
+                  "contabilidad.plan_cuentas", "compras.vencimientos"):
+        assert f"has_table_privilege('{LOGIN}', to_regclass('{tabla}'), 'SELECT')" in final
+    assert f"has_database_privilege('{LOGIN}', current_database(), 'CONNECT')" in final
+    assert f"WHERE grantee = '{LOGIN}'" in final
+
+
+def test_f141_r20_r23_la_cabecera_explica_el_perfil_y_el_renombre() -> None:
+    cabecera = _roles_crudo().split("\\set ON_ERROR_STOP on")[0]
+    for texto in (GRUPO, LOGIN, "RESTRINGIDO_PWD", "F-141", AUTORIZADO, "5 quinquies",
+                  "runbook §13"):
+        assert texto in cabecera, f"la cabecera no cita {texto}"
+
+
+def test_f141_r21_provision_exige_restringido_pwd_y_no_la_pasa() -> None:
+    texto = PROVISION.read_text(encoding="utf-8-sig")
+    codigo = "\n".join(
+        linea for linea in texto.splitlines() if not linea.lstrip().startswith("#")
+    )
+    assert "-not $env:RESTRINGIDO_PWD" in codigo, "-Ejecutar no exige RESTRINGIDO_PWD"
+    assert "RESTRINGIDO_PWD" in texto.split("[CmdletBinding()]")[0], "la cabecera la pide"
+    assert "perfil restringido del MCP (F-141)" in codigo, "el rótulo de roles lo nombra"
+    for linea in codigo.splitlines():
+        if "psql" in linea:
+            assert "PWD" not in linea.upper(), linea
