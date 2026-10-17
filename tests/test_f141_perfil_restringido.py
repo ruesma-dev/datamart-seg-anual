@@ -211,3 +211,250 @@ def test_f141_r20_r24_en_02_roles_solo_dentro_del_renombre() -> None:
     assert all(desde < p < hasta for p in posiciones), (
         "solo entre la carga de variables y el primer CREATE ROLE: el renombre y su guarda"
     )
+
+
+# ===========================================================================
+# T3 · grants.py: constantes y funciones puras
+# ===========================================================================
+
+
+def test_f141_grants_excepciones_nominales_de_d4() -> None:
+    from etl_sigrid.infrastructure.postgres import grants
+
+    assert grants.EXCEPCIONES_FILTRACION_RESTRINGIDO == {v: "tesoreria" for v in EXCEPCIONES}
+    assert grants.PATRON_VIGILADO_RESTRINGIDO == "mayor"
+    assert grants.ESQUEMAS_ORIGEN_DE_VISTAS == ("raw",)
+
+
+def _cuerpo_de_vista(sql: str, vista: str) -> str:
+    """El texto de `CREATE ... VIEW <vista> AS` hasta su `;` final, sin comentarios."""
+    sin_comentarios = "\n".join(linea.split("--", 1)[0] for linea in sql.splitlines())
+    inicio = sin_comentarios.index(f"VIEW {vista} AS")
+    return sin_comentarios[inicio:sin_comentarios.index(";", inicio)]
+
+
+_SQL_COMPRAS = RAIZ / "etl_sigrid" / "infrastructure" / "postgres" / "sql" / "compras"
+
+
+def test_f141_excepciones_vivas_vencimientos_lee_tesoreria() -> None:
+    """Si `compras.vencimientos` deja de leer la cartera, la excepción sobra (D4)."""
+    sql = (_SQL_COMPRAS / "05_vencimientos.sql").read_text(encoding="utf-8")
+    assert "FROM tesoreria." in _cuerpo_de_vista(sql, "compras.vencimientos")
+
+
+def test_f141_excepciones_vivas_las_dos_de_pago_leen_vencimientos() -> None:
+    sql = (_SQL_COMPRAS / "06_pago_factura.sql").read_text(encoding="utf-8")
+    assert "compras.vencimientos" in _cuerpo_de_vista(sql, "compras.v_facturas_pago")
+    assert "compras.v_facturas_pago" in _cuerpo_de_vista(sql, "compras.v_control_forma_pago"), (
+        "v_control_forma_pago llega a la cartera por v_facturas_pago"
+    )
+
+
+def test_f141_excepciones_vivas_ninguna_otra_vista_de_compras_lee_la_cartera() -> None:
+    """La lista nominal es exacta: otra vista que lea la cartera no está exceptuada."""
+    import re
+
+    lectoras: set[str] = set()
+    for fichero in sorted(_SQL_COMPRAS.glob("*.sql")):
+        sql = "\n".join(linea.split("--", 1)[0] for linea in
+                        fichero.read_text(encoding="utf-8").splitlines())
+        for m in re.finditer(r"VIEW\s+(compras\.\w+)\s+AS(.*?);", sql, re.DOTALL):
+            if re.search(r"(tesoreria\.|compras\.vencimientos\b|compras\.v_facturas_pago\b)",
+                         m.group(2)):
+                lectoras.add(m.group(1))
+    assert lectoras == set(EXCEPCIONES)
+
+
+def test_f141_grants_tablas_origen_de_adjuntos_casan_con_f139() -> None:
+    from etl_sigrid.infrastructure.postgres import grants
+    from tests.test_f139_limite import ORIGEN_POR_FAMILIA
+
+    assert grants.TABLAS_ORIGEN_ADJUNTOS == tuple(
+        f"compras.{tabla}" for tabla, _ in ORIGEN_POR_FAMILIA.values()
+    )
+    assert grants.OBJETO_ADJUNTOS == "compras.documento_adjuntos"
+
+
+# --- R5 · perfil_restringido_en_conflicto -----------------------------------
+
+_VETADOS = ["contabilidad_restringida", "tesoreria_restringida", "compras_restringida", "raw"]
+_RESTRINGIDOS = ["contabilidad_restringida", "tesoreria_restringida", "compras_restringida"]
+
+
+def _conflicto(esquemas: list[str], **cambios: list[str]) -> list[str]:
+    from etl_sigrid.infrastructure.postgres.grants import perfil_restringido_en_conflicto
+
+    listas = {
+        "consumo": ESQUEMAS_R + ["tesoreria", "personal"],
+        "vetados": _VETADOS,
+        "restringidos": _RESTRINGIDOS,
+        "total_vetados": ["raw"],
+    }
+    listas.update(cambios)
+    return perfil_restringido_en_conflicto(esquemas, **listas)
+
+
+def test_f141_grants_r5_los_defectos_no_chocan() -> None:
+    assert _conflicto(ESQUEMAS_R) == []
+
+
+@pytest.mark.parametrize(
+    ("extra", "cambios"),
+    [
+        ("otro", {}),  # fuera del consumo
+        ("raw", {"consumo": ESQUEMAS_R + ["raw"]}),  # vetado al estándar
+        ("compras_restringida", {"consumo": ESQUEMAS_R + ["compras_restringida"],
+                                 "vetados": ["raw"]}),  # de lo restringido
+        ("stg2", {"consumo": ESQUEMAS_R + ["stg2"], "total_vetados": ["raw", "stg2"]}),
+    ],
+    ids=["fuera-del-consumo", "vetado", "restringido", "vetado-al-total"],
+)
+def test_f141_grants_r5_cada_lista_que_choca(extra: str, cambios: dict) -> None:
+    assert _conflicto(ESQUEMAS_R + [extra, extra], **cambios) == [extra], (
+        "en orden y sin repetir, solo los que chocan"
+    )
+
+
+# --- R7 · objetos excluidos mal escritos o fuera de lo concedido -----------
+
+
+def test_f141_grants_r7_excluidas_invalidas() -> None:
+    from etl_sigrid.infrastructure.postgres.grants import excluidas_invalidas
+
+    assert excluidas_invalidas(EXCLUIDAS_R, ESQUEMAS_R) == []
+    assert excluidas_invalidas(
+        ["contabilidad.mayor", "mayor", "a.b.c", ".x", "tesoreria.efectos", "mayor"], ESQUEMAS_R,
+    ) == ["mayor", "a.b.c", ".x", "tesoreria.efectos"]
+    assert excluidas_invalidas([], []) == []
+
+
+# --- R8 · F-139 D1: los adjuntos no se leen sin sus documentos de origen ---
+
+
+def test_f141_grants_r8_origenes_de_adjuntos() -> None:
+    from etl_sigrid.infrastructure.postgres.grants import origenes_de_adjuntos_sin_leer
+
+    assert origenes_de_adjuntos_sin_leer(ESQUEMAS_R, EXCLUIDAS_R) == []
+    assert origenes_de_adjuntos_sin_leer(ESQUEMAS_R, EXCLUIDAS_R + ["compras.facturas"]) == [
+        "compras.facturas"
+    ]
+    sin_compras = [s for s in ESQUEMAS_R if s != "compras"]
+    assert origenes_de_adjuntos_sin_leer(sin_compras, []) == [
+        "compras.facturas", "compras.contratos", "compras.comparativos",
+        "compras.comparativo_ofertas", "compras.albaranes",
+    ]
+    assert origenes_de_adjuntos_sin_leer(
+        ESQUEMAS_R, ["compras.facturas", "compras.documento_adjuntos"]
+    ) == [], "excluir también los adjuntos cumple la regla"
+
+
+# --- R12 · lo que no es suyo sale del CATÁLOGO -----------------------------
+
+
+def test_f141_grants_r12_esquemas_ajenos_del_catalogo() -> None:
+    from etl_sigrid.infrastructure.postgres.grants import esquemas_ajenos
+
+    catalogo = ESQUEMAS_R + [
+        "tesoreria", "personal", "raw", "contabilidad_restringida", "pg_catalog",
+        "information_schema", "pg_toast", "pg_temp_3", "pg_toast_temp_3", "public",
+        "nuevo", "tesoreria",
+    ]
+    assert esquemas_ajenos(catalogo, ESQUEMAS_R) == [
+        "contabilidad_restringida", "nuevo", "personal", "raw", "tesoreria",
+    ], "ordenados, sin repetir y sin los del sistema"
+
+
+# --- R13 y R15 · las tres excepciones de D4 --------------------------------
+
+
+def test_f141_grants_r13_separar_excepciones() -> None:
+    from etl_sigrid.infrastructure.postgres.grants import separar_excepciones
+
+    filas = [
+        ("compras.vencimientos", "tesoreria.efectos"),
+        ("compras.v_facturas_pago", "tesoreria.efectos"),
+        ("compras.v_control_forma_pago", "tesoreria.efectos"),
+        ("compras.vencimientos", "personal.recursos"),  # la excepción NO cubre otro esquema
+        ("mart.v_nueva", "tesoreria.efectos"),
+    ]
+    filtraciones, sobrantes = separar_excepciones(filas)
+    assert filtraciones == [
+        ("compras.vencimientos", "personal.recursos"), ("mart.v_nueva", "tesoreria.efectos"),
+    ]
+    assert sobrantes == []
+
+
+def test_f141_grants_r15_excepcion_sobrante() -> None:
+    from etl_sigrid.infrastructure.postgres.grants import separar_excepciones
+
+    filtraciones, sobrantes = separar_excepciones([
+        ("compras.vencimientos", "tesoreria.efectos"),
+        ("compras.v_facturas_pago", "personal.x"),
+        ("compras.v_control_forma_pago", "tesoreria_restringida.efectos"),
+    ])
+    assert filtraciones == [
+        ("compras.v_facturas_pago", "personal.x"),
+        ("compras.v_control_forma_pago", "tesoreria_restringida.efectos"),
+    ], "la excepción es el ESQUEMA exacto, no un prefijo"
+    assert sobrantes == ["compras.v_control_forma_pago", "compras.v_facturas_pago"], (
+        "leer otra cosa no es leer la cartera: sobra igual"
+    )
+    assert separar_excepciones([]) == ([], sorted(EXCEPCIONES))
+
+
+# --- R11 · build_perfil_restringido_statements -----------------------------
+
+
+def test_f141_r11_build_sentencias_en_orden() -> None:
+    from etl_sigrid.infrastructure.postgres.grants import build_perfil_restringido_statements
+
+    sentencias = build_perfil_restringido_statements(
+        GRUPO, DUENO, ["mart", "contabilidad"], database="sigrid_dm",
+        excluded=["contabilidad.mayor", "contabilidad.saldos_cuenta_mes", "mart.v_x",
+                  "contabilidad.mayor", "otro.y"],
+        missing=["contabilidad.saldos_cuenta_mes"],
+    )
+    assert sentencias == [
+        f'GRANT CONNECT ON DATABASE "sigrid_dm" TO "{GRUPO}"',
+        f'GRANT USAGE ON SCHEMA "mart" TO "{GRUPO}"',
+        f'GRANT SELECT ON ALL TABLES IN SCHEMA "mart" TO "{GRUPO}"',
+        f'ALTER DEFAULT PRIVILEGES FOR ROLE "{DUENO}" IN SCHEMA "mart" '
+        f'REVOKE SELECT ON TABLES FROM "{GRUPO}"',
+        f'GRANT USAGE ON SCHEMA "contabilidad" TO "{GRUPO}"',
+        f'GRANT SELECT ON ALL TABLES IN SCHEMA "contabilidad" TO "{GRUPO}"',
+        f'ALTER DEFAULT PRIVILEGES FOR ROLE "{DUENO}" IN SCHEMA "contabilidad" '
+        f'REVOKE SELECT ON TABLES FROM "{GRUPO}"',
+        f'REVOKE ALL PRIVILEGES ON TABLE "contabilidad"."mayor" FROM "{GRUPO}"',
+        f'REVOKE ALL PRIVILEGES ON TABLE "mart"."v_x" FROM "{GRUPO}"',
+    ], "los REVOKE al final, sin repetir, sin los ausentes ni los de esquemas no concedidos"
+
+
+def test_f141_r11_build_sin_dueno_ni_base() -> None:
+    from etl_sigrid.infrastructure.postgres.grants import build_perfil_restringido_statements
+
+    assert build_perfil_restringido_statements(GRUPO, "", ["mart"]) == [
+        f'GRANT USAGE ON SCHEMA "mart" TO "{GRUPO}"',
+        f'GRANT SELECT ON ALL TABLES IN SCHEMA "mart" TO "{GRUPO}"',
+        f'ALTER DEFAULT PRIVILEGES IN SCHEMA "mart" REVOKE SELECT ON TABLES FROM "{GRUPO}"',
+    ]
+    assert build_perfil_restringido_statements(GRUPO, DUENO, []) == []
+
+
+def test_f141_r11_build_nunca_un_grant_por_defecto_ni_escritura() -> None:
+    from etl_sigrid.infrastructure.postgres.grants import build_perfil_restringido_statements
+
+    sentencias = build_perfil_restringido_statements(
+        GRUPO, DUENO, ESQUEMAS_R, database="sigrid_dm", excluded=EXCLUIDAS_R,
+    )
+    for s in sentencias:
+        assert "GRANT SELECT ON TABLES" not in s, "lo que nazca no lo lee hasta la comprobación"
+        for palabra in ("INSERT", "UPDATE", "DELETE", "CREATE", "ALL PRIVILEGES"):
+            assert not (s.startswith("GRANT") and palabra in s), s
+    assert len(sentencias) == 1 + 3 * len(ESQUEMAS_R) + 2
+
+
+def test_f141_r11_build_una_excluida_mal_escrita_revienta() -> None:
+    from etl_sigrid.infrastructure.postgres.grants import build_perfil_restringido_statements
+
+    with pytest.raises(ValueError, match="mal declarada"):
+        build_perfil_restringido_statements(GRUPO, DUENO, ["mart"], excluded=["mayor"])

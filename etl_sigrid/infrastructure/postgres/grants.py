@@ -28,6 +28,19 @@ ESQUEMA: sus tablas, su USAGE y su privilegio por defecto. Y el rol autorizado
 (`sigrid_dm_autorizado_ro`) recibe la lectura de la contabilidad completa. Las
 dos listas de sentencias se generan aparte de `build_readonly_grant_statements`,
 que no cambia (F-068 intacto): quien las ejecuta pone los vetos DETRÁS.
+
+EL PERFIL RESTRINGIDO (F-141, 2026-10-17): el tercer perfil, para
+administrativos, que ve MENOS que el estándar («ven como el estándar, menos el
+mayor, menos el mayor analítico, menos la cartera de cobros (pero sí a
+retenciones)»; «personal también quítalo, y saldos cuenta también»). Su grupo
+(`sigrid_dm_perfil_restringido_ro`) recibe lo suyo con
+`build_perfil_restringido_statements`, cuyo privilegio por defecto es SIEMPRE un
+REVOKE: lo que nazca no lo lee hasta que la nocturna lo haya mirado. Lo que NO
+es suyo sale del catálogo (`esquemas_ajenos`) y se le veta con
+`build_veto_statements`. Las vistas que leen lo que no ve son la trampa de dar
+esquemas sueltos (una vista se ejecuta con los permisos de su dueño): se le
+revocan y el paso falla, salvo las tres vistas de pago de `compras`, que el
+humano quiere visibles (D4) y son una excepción NOMINAL.
 """
 
 from __future__ import annotations
@@ -273,4 +286,208 @@ def build_restricted_grant_statements(
                     "ALTER DEFAULT PRIVILEGES IN SCHEMA {} GRANT SELECT ON TABLES TO {}"
                 ).format(esq, rol)
             )
+    return [s.as_string(None) for s in sentencias]
+
+
+# ---------------------------------------------------------------------------
+# El perfil RESTRINGIDO (F-141)
+# ---------------------------------------------------------------------------
+
+#: Vistas del perfil restringido que leen un esquema que no ve y que el humano
+#: quiere visibles igualmente (D4: «compras debe poder verse»). Por ellas ve el
+#: ESTADO DE PAGO de sus facturas (si y cuándo se pagó, forma de pago) aunque no
+#: lea la cartera. La excepción es NOMINAL y por esquema: si una de ellas lee
+#: además otra cosa que no ve, eso sí es una filtración. Un test comprueba que
+#: las tres siguen leyendo la cartera (si no, la excepción sobra).
+EXCEPCIONES_FILTRACION_RESTRINGIDO: dict[str, str] = {
+    "compras.vencimientos": "tesoreria",
+    "compras.v_facturas_pago": "tesoreria",
+    "compras.v_control_forma_pago": "tesoreria",
+}
+
+#: Lo que se vigila por NOMBRE en los esquemas del perfil: el mayor analítico no
+#: está publicado todavía (lo publicará F-127, desde `raw.apa`). Si nace con
+#: «mayor» en el nombre y nadie lo excluye, la nocturna se lo revoca y falla.
+#: Si F-127 le pone otro nombre, su spec TIENE que añadirlo a
+#: `PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES`.
+PATRON_VIGILADO_RESTRINGIDO = r"mayor"
+
+#: Esquemas que las vistas curadas de `maestro` y `compras` leen sin que eso
+#: sea una filtración: `raw` no lo lee el perfil, pero sus vistas sí, a
+#: propósito (son la capa curada sobre la copia de Sigrid).
+ESQUEMAS_ORIGEN_DE_VISTAS: tuple[str, ...] = ("raw",)
+
+#: Las tablas de origen de los documentos de `compras.documento_adjuntos`, una
+#: por familia (F-139, D1: quien lee los adjuntos tiene que poder leer sus
+#: documentos). Un test la contrasta con `ORIGEN_POR_FAMILIA` de F-139.
+TABLAS_ORIGEN_ADJUNTOS: tuple[str, ...] = (
+    "compras.facturas",
+    "compras.contratos",
+    "compras.comparativos",
+    "compras.comparativo_ofertas",
+    "compras.albaranes",
+)
+OBJETO_ADJUNTOS = "compras.documento_adjuntos"
+
+#: Esquemas del catálogo que nunca se le vetan al perfil: el sistema (todo lo
+#: que empieza por `pg_`: `pg_catalog`, `pg_toast`, `pg_temp_N`..., nombres que
+#: PostgreSQL reserva) y `public`, que está vacío y sin `CREATE` (PG 15+).
+ESQUEMAS_DE_SISTEMA: tuple[str, ...] = ("information_schema", "public")
+PREFIJO_DE_SISTEMA = "pg_"
+
+
+def perfil_restringido_en_conflicto(
+    esquemas: Sequence[str],
+    *,
+    consumo: Sequence[str],
+    vetados: Sequence[str],
+    restringidos: Sequence[str],
+    total_vetados: Sequence[str],
+) -> list[str]:
+    """Los esquemas del perfil restringido que no puede tener (F-141, R5).
+
+    Uno que no esté en el consumo (el perfil no puede ver MÁS que el estándar),
+    o que esté vetado al estándar, sea de lo restringido o esté vetado al
+    total. En el orden de `esquemas` y sin repetir; vacía es lo correcto.
+    """
+    prohibidos = set(vetados) | set(restringidos) | set(total_vetados)
+    permitidos = set(consumo)
+    conflicto: list[str] = []
+    for esquema in esquemas:
+        if (esquema not in permitidos or esquema in prohibidos) and esquema not in conflicto:
+            conflicto.append(esquema)
+    return conflicto
+
+
+def excluidas_invalidas(excluidas: Sequence[str], esquemas: Sequence[str]) -> list[str]:
+    """Los objetos excluidos mal escritos o de un esquema que no se concede (F-141, R7).
+
+    Una exclusión que no apunta a nada protegido es casi siempre una errata, y
+    callarla dejaría el objeto que se quería quitar legible con toda la pinta de
+    estar protegido. En orden y sin repetir.
+    """
+    concedidos = set(esquemas)
+    malas: list[str] = []
+    for entrada in excluidas:
+        try:
+            esquema: str | None = partir_tabla_cualificada(entrada)[0]
+        except ValueError:
+            esquema = None
+        if esquema not in concedidos and entrada not in malas:
+            malas.append(entrada)
+    return malas
+
+
+def origenes_de_adjuntos_sin_leer(esquemas: Sequence[str], excluidas: Sequence[str]) -> list[str]:
+    """Las tablas de origen de los adjuntos que el perfil no leería (F-141, R8).
+
+    Solo cuenta si lee `compras.documento_adjuntos`: excluirla también cumple
+    la regla de F-139 (D1). Vacía es lo correcto.
+    """
+    concedidos = set(esquemas)
+    fuera = set(excluidas)
+    if OBJETO_ADJUNTOS in fuera:
+        return []
+    return [
+        tabla for tabla in TABLAS_ORIGEN_ADJUNTOS
+        if tabla in fuera or tabla.split(".", 1)[0] not in concedidos
+    ]
+
+
+def esquemas_ajenos(catalogo: Sequence[str], esquemas: Sequence[str]) -> list[str]:
+    """Los esquemas del CATÁLOGO que no son del perfil restringido (F-141, R12).
+
+    Salen de lo que existe, no de la configuración: hoy `tesoreria`, `personal`,
+    `raw` y las tres `*_restringida`; mañana, cualquier esquema que nadie haya
+    listado. Sin los del sistema. Ordenados y sin repetir.
+    """
+    suyos = set(esquemas)
+    return sorted({
+        esquema for esquema in catalogo
+        if esquema not in suyos
+        and esquema not in ESQUEMAS_DE_SISTEMA
+        and not esquema.startswith(PREFIJO_DE_SISTEMA)
+    })
+
+
+def separar_excepciones(
+    filas: Sequence[tuple[str, str]],
+) -> tuple[list[tuple[str, str]], list[str]]:
+    """Aparta las excepciones de D4 de lo que devuelve el catálogo (F-141, R13 y R15).
+
+    `filas` son pares (vista, objeto que alcanza), con nombres `esquema.objeto`.
+    Devuelve las FILTRACIONES (los pares que no cubre una excepción, en su orden)
+    y las excepciones SOBRANTES (las que ya no aparecen leyendo su esquema,
+    ordenadas): que una sobre no expone nada, pero la lista nominal miente.
+    """
+    filtraciones: list[tuple[str, str]] = []
+    vivas: set[str] = set()
+    for vista, objeto in filas:
+        esquema_objeto = objeto.split(".", 1)[0]
+        if EXCEPCIONES_FILTRACION_RESTRINGIDO.get(vista) == esquema_objeto:
+            vivas.add(vista)
+        else:
+            filtraciones.append((vista, objeto))
+    sobrantes = sorted(set(EXCEPCIONES_FILTRACION_RESTRINGIDO) - vivas)
+    return filtraciones, sobrantes
+
+
+def build_perfil_restringido_statements(
+    group_role: str,
+    owner_role: str,
+    schemas: Sequence[str],
+    *,
+    database: str | None = None,
+    excluded: Sequence[str] = (),
+    missing: Sequence[str] = (),
+) -> list[str]:
+    """Sentencias que dejan al grupo del perfil restringido con lo suyo (F-141, R11).
+
+    Función pura. `GRANT CONNECT` (lo heredan sus miembros); por esquema USAGE y
+    SELECT sobre lo que existe, y su privilegio por defecto SIEMPRE en REVOKE,
+    nunca un GRANT: una tabla o vista que nazca mañana no la lee hasta que la
+    nocturna la haya mirado (es lo que vigila las vistas que filtran). Al final,
+    `REVOKE ALL` de cada objeto de `excluded` (los excluidos, las vistas que
+    filtran y los vigilados) de un esquema concedido, salvo los de `missing`,
+    que hoy no existen (un REVOKE sobre un objeto ausente falla). Sin repetir.
+    """
+    rol = sql.Identifier(group_role)
+    sentencias: list[sql.Composable] = []
+    concedidos = set(schemas)
+    ausentes = {partir_tabla_cualificada(t) for t in missing}
+    revocables: list[tuple[str, str]] = []
+    for entrada in excluded:
+        par = partir_tabla_cualificada(entrada)
+        if par[0] in concedidos and par not in ausentes and par not in revocables:
+            revocables.append(par)
+
+    if database:
+        sentencias.append(
+            sql.SQL("GRANT CONNECT ON DATABASE {} TO {}").format(sql.Identifier(database), rol)
+        )
+    for esquema in schemas:
+        esq = sql.Identifier(esquema)
+        sentencias.append(sql.SQL("GRANT USAGE ON SCHEMA {} TO {}").format(esq, rol))
+        sentencias.append(
+            sql.SQL("GRANT SELECT ON ALL TABLES IN SCHEMA {} TO {}").format(esq, rol)
+        )
+        if owner_role:
+            sentencias.append(
+                sql.SQL(
+                    "ALTER DEFAULT PRIVILEGES FOR ROLE {} IN SCHEMA {} "
+                    "REVOKE SELECT ON TABLES FROM {}"
+                ).format(sql.Identifier(owner_role), esq, rol)
+            )
+        else:
+            sentencias.append(
+                sql.SQL(
+                    "ALTER DEFAULT PRIVILEGES IN SCHEMA {} REVOKE SELECT ON TABLES FROM {}"
+                ).format(esq, rol)
+            )
+    for esquema, tabla in revocables:
+        sentencias.append(
+            sql.SQL("REVOKE ALL PRIVILEGES ON TABLE {} FROM {}").format(
+                sql.Identifier(esquema, tabla), rol
+            )
+        )
     return [s.as_string(None) for s in sentencias]
