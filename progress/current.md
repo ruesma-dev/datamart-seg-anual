@@ -9,10 +9,10 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-17 · F-141 · BLOQUEADA (init.sh en rojo por `azure-apps/mcp_bbdd.md`, ajeno) · review pasada 1 resuelta en evidencia
+## 2026-10-18 · F-141 · EN CURSO (desbloqueada; ampliación de la ficha de adjuntos) · review pasada 1 resuelta en evidencia
 
-- T1-T13 hechos (commits `e6b11e2` … `de9656f`); en `azure-apps`, `a520a62` sin push. F-141 en
-  `blocked` en `features.json` (estaba en `spec_ready` por error; pasó a `in_progress` y se bloquea por la nota de abajo). T14-T17 son MANUALES
+- T1-T13 hechos (commits `e6b11e2` … `de9656f`); en `azure-apps`, `a520a62` sin push. F-141 de nuevo en
+  `in_progress` en `features.json` (2026-10-18; estuvo `blocked` por R30, nota de abajo). T14-T17 son MANUALES
   (humano/líder), con su comando exacto abajo.
 - **Review pasada 1: CHANGES_REQUESTED solo por evidencia** (`progress/review_F-141.md`): la
   aceptación de los equivalentes y las MANUAL con su comando. Resuelto sin tocar código.
@@ -24,21 +24,20 @@
   nombre retirado y debe excluir su mayor analítico de `PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES`.
 - Informe: `progress/impl_F-141.md` (decisiones, desviaciones y evidencias).
 
-> **BLOQUEADA (implementer, 2026-10-17) por un fallo AJENO a F-141 en `bash harness/init.sh`.**
-> Los puntos 1-3 del encargo están hechos (aceptación escrita, MANUAL con su comando, estado), pero
-> `init.sh` sale en ROJO: `1 failed, 7932 passed, 248 skipped` en 26 min 05 s, parado con `-x` en
-> `tests/test_f141_perfil_restringido.py::test_f141_r30_mcp_bbdd_solo_enlaza_al_contrato`.
-> **Causa**: un cambio SIN COMMIT en `azure-apps/mcp_bbdd.md` (54 líneas añadidas, 10 quitadas;
-> el último commit de ese fichero es `a520a62`, el de F-141) que es de la sesión de `mcp-bbdd`
-> (F-023, `abrir_adjunto`): añade a su tabla de riesgos una fila que nombra «RLS (F-141)» y no
-> enlaza a `datamart_seg_anual.md`. R30 exige que toda línea de `mcp_bbdd.md` que nombre F-141 o
-> el login restringido enlace al contrato. El código de F-141 no ha cambiado.
-> **No se ha tocado nada** de `azure-apps` (es del dueño de `mcp_bbdd.md` y está a medio
-> escribir) ni el test. **Decide el líder/humano**: (a) que la sesión de `mcp-bbdd` añada a esa
-> fila el enlace a `datamart_seg_anual.md` (sección «El perfil RESTRINGIDO del MCP»), o (b) que
-> R30 se relaje en la spec. Luego se repite `bash harness/init.sh` y F-141 vuelve a `in_progress`.
-> Comprobación: `git -C C:\Users\pgris\PycharmProjects\azure-apps diff --stat mcp_bbdd.md` y
-> `grep -n "F-141" C:\Users\pgris\PycharmProjects\azure-apps\mcp_bbdd.md`.
+> **DESBLOQUEADA (implementer, 2026-10-18).** El bloqueo por R30 (fila de riesgos de
+> `azure-apps/mcp_bbdd.md` que nombraba F-141 sin enlazar al contrato) lo resolvió la sesión de
+> `mcp-bbdd` (commit `63e1bfa` en `azure-apps`); el líder comprobó `-k r30` en verde. Aquí no se
+> ha tocado `azure-apps`.
+>
+> **Ampliación de alcance aprobada por el humano el 2026-10-17** (pequeña, misma v54): la ficha de
+> `compras.documento_adjuntos` (`config/diccionario/compras.yaml`) ya no dice que la herramienta
+> de `mcp-bbdd` «NO ESTA DESPLEGADA»: nombra `abrir_adjunto(adjunto_id)` (F-023 de `mcp-bbdd`,
+> desplegada el 2026-10-17 y verificada por el humano con Claude y ChatGPT), dice que la IA
+> localiza el `adjunto_id` en el índice, que el original llega sin convertir (imágenes visibles;
+> PDF y ofimática como binario; conversión = F-142) y que los permisos son la regla D1 de F-139.
+> Se mantienen los 17 ficheros > 20 MB (no había tope de 64 MB en la ficha). Test de F-139
+> (`tests/test_f139_limite.py`, R2) cambiado para exigir la redacción nueva, con fase RED. Línea
+> añadida a la entrada de la versión 54 en `00_global.yaml`. Detalle en `progress/impl_F-141.md` §5 bis.
 
 ### F-141 · Verificaciones MANUAL, con su comando exacto (tras el APROBADO y el merge)
 

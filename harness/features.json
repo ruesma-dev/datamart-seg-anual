@@ -2223,7 +2223,7 @@
         "Si el acceso es por el MCP, el contrato con `mcp-bbdd` está escrito en `azure-apps` (perfil nuevo y su lista blanca)",
         "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
       ],
-      "status": "blocked",
+      "status": "in_progress",
       "sdd": true,
       "rigor": "critico",
       "priority": 3,

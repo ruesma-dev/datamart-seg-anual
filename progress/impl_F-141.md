@@ -106,10 +106,9 @@ IPv4; con `127.0.0.1`, inmediato (nada del código).
 - **Review pasada 1 (CHANGES_REQUESTED, solo evidencia), resuelta el 2026-10-17**: el humano
   ACEPTA los equivalentes 1-3 («acepto», por chat con el líder) y las MANUAL T14-T17 quedan con
   su comando exacto en `progress/current.md` (sección de F-141). Sin cambios de código ni campaña nueva.
-- **`init.sh` de esta pasada (2026-10-17) en ROJO por causa AJENA**: `1 failed, 7932 passed, 248
-  skipped` (26 min 05 s), `test_f141_r30_mcp_bbdd_solo_enlaza_al_contrato`, por un cambio sin
-  commit de la sesión de `mcp-bbdd` en `azure-apps/mcp_bbdd.md` (una fila de riesgos nombra F-141
-  sin enlazar al contrato). F-141 `blocked`; motivo y opciones en `progress/current.md`.
+- **`init.sh` de la pasada del 2026-10-17 en ROJO por causa AJENA** (R30, una fila de
+  `azure-apps/mcp_bbdd.md` sin enlace al contrato). Resuelto por la sesión de `mcp-bbdd`
+  (`63e1bfa` en `azure-apps`); F-141 vuelve a `in_progress` el 2026-10-18 (§5 bis).
 - **MANUAL del humano** (runbook §13, T14-T17): merge, imagen y `85_update_job` el MISMO día que
   `02_roles.sql` con `RESTRINGIDO_PWD` desde `kv-mcp-bbdd-dev/pg-password-restringido`; R31-R32
   con el login real; R33 con la huella; `publicar-diccionario` (v54) y reinicio del MCP; R34 en la
@@ -120,15 +119,44 @@ IPv4; con `127.0.0.1`, inmediato (nada del código).
   en PG16 local; en T11 se sorteó como en F-136.
 - Push de `azure-apps` y de la rama: el humano.
 
+## 5 bis. Ampliación del 2026-10-17: la ficha de adjuntos nombra `abrir_adjunto`
+
+Aprobada por el humano el 2026-10-17 (encargo del líder), dentro de la misma v54. Motivo:
+`mcp-bbdd` desplegó `abrir_adjunto(adjunto_id)` (su F-023) el 2026-10-17 y el humano la verificó
+con Claude y ChatGPT; la ficha seguía diciendo «NO ESTA DESPLEGADA todavia».
+
+| Fichero | Cambio |
+|---|---|
+| `config/diccionario/compras.yaml` | Párrafo «EL LIMITE (F-139)» de `documento_adjuntos`: la IA localiza el `adjunto_id` en el índice y abre el ORIGINAL con `abrir_adjunto(adjunto_id)` del MCP, SIN CONVERTIR (imágenes visibles; PDF y ofimática como binario; conversión = F-142); permisos = regla D1 de F-139 («QUIEN PUEDE ABRIR EL FICHERO»). Siguen los 17 ficheros > 20 MB; el tope de 64 MB no figuraba y no se añade |
+| `config/diccionario/00_global.yaml` | Una línea en la entrada de la versión 54 (sin subir versión) |
+| `tests/test_f139_limite.py` | R2: fuera «NO ESTA DESPLEGADA» de lo exigido; `..._no_afirma_que_la_herramienta_exista` pasa a `..._nombra_la_herramienta_desplegada`: exige la firma, F-023, la fecha, el `adjunto_id` en el índice, imágenes y binario, la regla D1, y PROHÍBE «NO ESTA DESPLEGADA» y «ni el datamart ni el MCP abren». Ningún otro test (F-090 incluido) miraba ese texto |
+| `harness/features.json`, `BACKLOG.md` | F-141 `blocked` → `in_progress` |
+
+**Fase RED** (test cambiado antes que la ficha):
+`python -m pytest tests/test_f139_limite.py -k r2 -q -p no:cacheprovider`
+```
+E           AssertionError: la ficha no dice «`abrir_adjunto(adjunto_id)`» (R2, F-141)
+FAILED tests/test_f139_limite.py::test_f139_r2_la_ficha_nombra_la_herramienta_desplegada
+1 failed, 1 passed, 13 deselected in 0.37s
+```
+Tras la ficha (y ajustar el literal esperado a «imagenes se ven directamente», el de la frase
+escrita): `tests/test_f139_limite.py` + `tests/test_f141_perfil_restringido.py` → `156 passed`
+en 5,32 s; `-k "f090 or f006 or diccionario or adjunto"` → `2935 passed, 246 skipped` en 216,60 s.
+
+**`bash harness/init.sh` de esta pasada (2026-10-18)**: VERDE. `8225 passed, 249 skipped` en
+1.024,34 s (17 min 04 s); `PUERTA COBERTURA: 100.0% de 227 líneas cambiadas cubiertas`; `PUERTA
+TAMAÑO` dentro de los topes; `ENTORNO LISTO`. Sin campaña de mutación nueva: el cambio es texto
+del diccionario y un test, sin código de producción.
+
 ## 6. Evidencias
 
 | Evidencia | Valor real |
 |---|---|
 | Tests de F-141 | **140 passed** en 5,08 s (`tests/test_f141_perfil_restringido.py`; el barrido R25 suma este informe) |
-| Suite completa (`bash harness/init.sh`) | **8224 passed, 249 skipped**, 0 fallos; `ENTORNO LISTO` sobre `de9656f` (ruff vuelve a los 275 avisos previos) |
+| Suite completa (`bash harness/init.sh`) | **8225 passed, 249 skipped**, 0 fallos, `ENTORNO LISTO` el 2026-10-18 tras la ampliación (§5 bis); antes, 8224 sobre `de9656f` |
 | Cobertura de líneas cambiadas | `PUERTA COBERTURA: 100.0% de 227 líneas cambiadas cubiertas (227/227, umbral 80%, nivel critico)` |
 | Mutación (`python -m harness.mutacion --feature F-141 --workers 3 --timeout 9000`) | **56 generados, 56 evaluados, 52 muertos, 4 supervivientes, 0 timeouts**, 14.715,6 s (línea base 1.149-1.162 s por worker). Análisis en `progress/mutacion_F-141.md`: el 4 era un hueco real del LOG, cerrado con test nuevo (RED pegado arriba); los 1-3 son EQUIVALENTES (`split(".", 1)[0]` ≡ `split(".", 2)[0]`), **ACEPTADOS por el humano el 2026-10-17** (por chat con el líder: «acepto»; anotado bajo cada «Decisión» de `progress/mutacion_F-141.md`) |
-| Tiempo de la suite | 1.013,02 s (16 min 53 s) con medición de cobertura sobre `de9656f` (1.612,54 s en la pasada anterior): máquina compartida con otras sesiones |
+| Tiempo de la suite | 1.024,34 s el 2026-10-18; 1.013,02 s (16 min 53 s) con medición de cobertura sobre `de9656f` (1.612,54 s en la pasada anterior): máquina compartida con otras sesiones |
 
 La primera campaña (`rc=3`, sin veredictos) agotó los 600 s de la línea base con 4 workers en una
 máquina compartida con otras sesiones; se relanzó con `--workers 3 --timeout 9000` (patrón de

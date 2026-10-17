@@ -595,7 +595,10 @@
 # las tres vistas de pago dicen que las lee. El grupo autorizado se renombra a
 # `sigrid_dm_autorizado_ro` (D6) y las tres `R-*-RESTRINGIDA` dicen que
 # «restringida» es del perfil total, no del perfil restringido. Sin objetos ni
-# columnas nuevos.
+# columnas nuevos. Ampliacion aprobada por el humano el 2026-10-17: la ficha de
+# `compras.documento_adjuntos` deja de decir que la herramienta de `mcp-bbdd` no
+# esta desplegada y nombra `abrir_adjunto(adjunto_id)` (su F-023, desplegada el
+# 2026-10-17): la IA localiza el `adjunto_id` en el indice y abre el original.
 
 version: 54
 base: sigrid_dm
