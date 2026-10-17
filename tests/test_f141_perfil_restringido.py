@@ -458,3 +458,188 @@ def test_f141_r11_build_una_excluida_mal_escrita_revienta() -> None:
 
     with pytest.raises(ValueError, match="mal declarada"):
         build_perfil_restringido_statements(GRUPO, DUENO, ["mart"], excluded=["mayor"])
+
+
+# ===========================================================================
+# T4 · PostgresClient: con conexión simulada, sin BBDD
+# ===========================================================================
+
+
+class _Cursor:
+    def __init__(self, registro: list, filas: list) -> None:
+        self._registro = registro
+        self._filas = filas
+
+    def execute(self, stmt: object, params: object = None) -> None:
+        self._registro.append((stmt, params))
+
+    def fetchall(self) -> list:
+        return list(self._filas)
+
+    def __enter__(self) -> _Cursor:
+        return self
+
+    def __exit__(self, *a: object) -> None:
+        return None
+
+
+class _Conn:
+    def __init__(self, registro: list, filas: list, aperturas: list) -> None:
+        self._registro = registro
+        self._filas = filas
+        aperturas.append(1)
+
+    def cursor(self) -> _Cursor:
+        return _Cursor(self._registro, self._filas)
+
+    def __enter__(self) -> _Conn:
+        return self
+
+    def __exit__(self, *a: object) -> None:
+        return None
+
+
+def _cliente(
+    esquemas: list[str] | None = None,
+    filas: list | None = None,
+    tablas: set[str] | None = None,
+) -> tuple[object, list, list]:
+    from etl_sigrid.infrastructure.postgres.postgres_client import PostgresClient
+
+    registro: list = []
+    aperturas: list = []
+    cliente = PostgresClient.__new__(PostgresClient)
+    cliente._target_db = "sigrid_dm"  # type: ignore[attr-defined]
+    cliente.list_schemas = lambda: list(esquemas or [])  # type: ignore[method-assign]
+    cliente.connection = lambda: _Conn(registro, filas or [], aperturas)  # type: ignore[method-assign]
+    existentes = tablas if tablas is not None else set()
+    cliente.table_exists = lambda e, t: f"{e}.{t}" in existentes  # type: ignore[method-assign]
+    return cliente, registro, aperturas
+
+
+def _plano(texto: str) -> str:
+    return " ".join(texto.split())
+
+
+def test_f141_cliente_vistas_que_filtran_pregunta_al_catalogo() -> None:
+    cliente, registro, _ = _cliente(filas=[("compras.vencimientos", "tesoreria.efectos")])
+    filas = cliente.vistas_que_filtran(  # type: ignore[attr-defined]
+        ["compras", "mart"], ["tesoreria", "personal"], EXCLUIDAS_R,
+    )
+    assert filas == [("compras.vencimientos", "tesoreria.efectos")]
+    ((sql, params),) = registro
+    assert params == (["compras", "mart"], ["tesoreria", "personal"], EXCLUIDAS_R)
+    plano = _plano(sql)
+    assert plano.startswith("WITH RECURSIVE") and plano.endswith("ORDER BY 1, 2"), "solo catálogo"
+
+
+def test_f141_cliente_sql_vistas_que_filtran_es_la_clausura_del_diseno() -> None:
+    from etl_sigrid.infrastructure.postgres.postgres_client import SQL_VISTAS_QUE_FILTRAN
+
+    plano = _plano(SQL_VISTAS_QUE_FILTRAN)
+    for trozo in (
+        "FROM pg_rewrite r JOIN pg_depend d ON d.classid = 'pg_rewrite'::regclass",
+        "AND d.objid = r.oid AND d.refclassid = 'pg_class'::regclass",
+        "AND d.refobjid <> r.ev_class",  # la regla depende de su propia vista
+        "WHERE nvis.nspname = ANY(%s) UNION SELECT a.vista, l.objeto FROM alcance a "
+        "JOIN lecturas l ON l.vista = a.objeto",  # vista sobre vista
+        "WHERE nobj.nspname = ANY(%s) OR nobj.nspname || '.' || obj.relname = ANY(%s)",
+    ):
+        assert trozo in plano, trozo
+    for escritura in ("INSERT", "UPDATE", "DELETE", "GRANT", "REVOKE"):
+        assert escritura not in plano
+
+
+def test_f141_cliente_vistas_que_filtran_sin_esquemas_no_abre_conexion() -> None:
+    cliente, registro, aperturas = _cliente(filas=[("x.y", "z.w")])
+    assert cliente.vistas_que_filtran([], ["tesoreria"], []) == []  # type: ignore[attr-defined]
+    assert registro == [] and aperturas == []
+
+
+def test_f141_cliente_objetos_vigilados() -> None:
+    from etl_sigrid.infrastructure.postgres.postgres_client import SQL_OBJETOS_VIGILADOS
+
+    cliente, registro, _ = _cliente(filas=[("contabilidad.mayor",)])
+    assert cliente.objetos_vigilados(["contabilidad"], "mayor") == [  # type: ignore[attr-defined]
+        "contabilidad.mayor"
+    ]
+    assert registro == [(SQL_OBJETOS_VIGILADOS, (["contabilidad"], "mayor"))]
+    assert _plano(SQL_OBJETOS_VIGILADOS) == (
+        "SELECT n.nspname || '.' || c.relname FROM pg_class c "
+        "JOIN pg_namespace n ON n.oid = c.relnamespace "
+        "WHERE c.relkind IN ('r', 'v', 'm', 'p', 'f') AND n.nspname = ANY(%s) "
+        "AND c.relname ~* %s ORDER BY 1"
+    )
+
+
+def test_f141_cliente_objetos_vigilados_sin_esquemas_no_abre_conexion() -> None:
+    cliente, registro, aperturas = _cliente(filas=[("x.mayor",)])
+    assert cliente.objetos_vigilados([], "mayor") == []  # type: ignore[attr-defined]
+    assert registro == [] and aperturas == []
+
+
+def test_f141_cliente_pertenencias() -> None:
+    from etl_sigrid.infrastructure.postgres.postgres_client import SQL_PERTENENCIAS
+
+    cliente, registro, _ = _cliente(filas=[(GRUPO,), (ESTANDAR,)])
+    assert cliente.pertenencias(LOGIN) == [GRUPO, ESTANDAR]  # type: ignore[attr-defined]
+    assert registro == [(SQL_PERTENENCIAS, (LOGIN,))]
+    assert _plano(SQL_PERTENENCIAS) == (
+        "SELECT DISTINCT g.rolname FROM pg_auth_members m "
+        "JOIN pg_roles g ON g.oid = m.roleid JOIN pg_roles u ON u.oid = m.member "
+        "WHERE u.rolname = %s ORDER BY 1"
+    ), "los roles de los que ES miembro, no sus miembros (el administrador lo es del grupo)"
+
+
+def test_f141_cliente_apply_perfil_restringido_solo_lo_que_existe() -> None:
+    from etl_sigrid.infrastructure.postgres import grants
+
+    cliente, registro, _ = _cliente(
+        esquemas=["mart", "contabilidad", "tesoreria"],
+        tablas={"contabilidad.mayor", "mart.v_x"},
+    )
+    sentencias = cliente.apply_perfil_restringido(  # type: ignore[attr-defined]
+        GRUPO, DUENO, ["mart", "contabilidad", "fantasma"],
+        ["contabilidad.mayor", "contabilidad.saldos_cuenta_mes", "mart.v_x", "fantasma.t"],
+    )
+    assert sentencias == grants.build_perfil_restringido_statements(
+        GRUPO, DUENO, ["mart", "contabilidad"], database="sigrid_dm",
+        excluded=["contabilidad.mayor", "contabilidad.saldos_cuenta_mes", "mart.v_x",
+                  "fantasma.t"],
+        missing=["contabilidad.saldos_cuenta_mes"],
+    )
+    assert [s for s, _ in registro] == sentencias, "ejecuta exactamente lo que devuelve"
+    assert sentencias[-2:] == [
+        f'REVOKE ALL PRIVILEGES ON TABLE "contabilidad"."mayor" FROM "{GRUPO}"',
+        f'REVOKE ALL PRIVILEGES ON TABLE "mart"."v_x" FROM "{GRUPO}"',
+    ]
+
+
+def test_f141_cliente_apply_perfil_restringido_lo_anota(monkeypatch: pytest.MonkeyPatch) -> None:
+    from etl_sigrid.infrastructure.postgres import postgres_client
+
+    anotado: list[tuple[str, dict]] = []
+
+    class _Log:
+        def info(self, evento: str, **datos: object) -> None:
+            anotado.append((evento, datos))
+
+        def warning(self, evento: str, **datos: object) -> None:
+            anotado.append((evento, datos))
+
+    monkeypatch.setattr(postgres_client, "logger", _Log())
+    cliente, _, _ = _cliente(esquemas=["mart"], tablas=set())
+    cliente.apply_perfil_restringido(GRUPO, DUENO, ["mart", "otro"], ["mart.t"])  # type: ignore[attr-defined]
+    assert anotado == [
+        ("grants_perfil_restringido_esquemas_inexistentes", {"role": GRUPO, "schemas": ["otro"]}),
+        ("grants_perfil_restringido_aplicados",
+         {"role": GRUPO, "schemas": ["mart"], "revocados": [], "ausentes": ["mart.t"],
+          "statements": 4}),
+    ]
+
+
+def test_f141_cliente_apply_perfil_restringido_sin_esquemas_no_abre_conexion() -> None:
+    cliente, registro, aperturas = _cliente(esquemas=["mart"])
+    assert cliente.apply_perfil_restringido(GRUPO, DUENO, ["otro"], []) == [  # type: ignore[attr-defined]
+    ], "sin esquemas existentes no hay nada que conceder (ni siquiera CONNECT)"
+    assert registro == [] and aperturas == []
