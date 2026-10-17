@@ -1394,8 +1394,8 @@ def test_f141_r23_comprobacion_final() -> None:
         "JOIN pg_roles AS g ON g.oid = m.roleid\n"
         f"WHERE r.rolname = '{LOGIN}'"
     ) in final, "las pertenencias del login: solo el grupo"
-    for esquema in ESQUEMAS_R + ["tesoreria", "personal", "raw", RESTR_C,
-                                 "tesoreria_restringida", "compras_restringida"]:
+    for esquema in [*ESQUEMAS_R, "tesoreria", "personal", "raw", RESTR_C,
+                    "tesoreria_restringida", "compras_restringida"]:
         assert f"has_schema_privilege('{LOGIN}', '{esquema}', 'USAGE')" in final, esquema
     for tabla in ("contabilidad.mayor", "contabilidad.saldos_cuenta_mes",
                   "contabilidad.plan_cuentas", "compras.vencimientos"):

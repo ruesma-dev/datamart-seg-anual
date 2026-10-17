@@ -19,7 +19,7 @@ En `azure-apps`, commit propio sin push (`a520a62`). **Nada se ejecutó contra A
 | `docs/ARCHITECTURE.md`, `docs/runbook_postgres_azure.md` | Siete roles, el bloque del restringido, la obligación de F-127; tabla de roles y §13 P0-P9 + vuelta atrás |
 | Renombre (texto) | dos docstrings de build, `contabilidad/00_setup.sql`, cinco tests de F-135/F-136/F-037/F-138 |
 | `../azure-apps/datamart_seg_anual.md`, `mcp_bbdd.md` | Sección «El perfil RESTRINGIDO del MCP» con E1-E8 y fila en «Qué expone»; en `mcp_bbdd.md` una línea-enlace |
-| `tests/test_f141_perfil_restringido.py` (nuevo) | 138 tests |
+| `tests/test_f141_perfil_restringido.py` (nuevo) | 140 tests |
 
 ## 2. Decisiones y desviaciones (justificadas)
 
@@ -117,11 +117,11 @@ IPv4; con `127.0.0.1`, inmediato (nada del código).
 
 | Evidencia | Valor real |
 |---|---|
-| Tests de F-141 | **139 passed** en 6,01 s (`tests/test_f141_perfil_restringido.py`) |
-| Suite completa (`bash harness/init.sh`) | <SUITE> |
-| Cobertura de líneas cambiadas | <COBERTURA> |
+| Tests de F-141 | **140 passed** en 5,08 s (`tests/test_f141_perfil_restringido.py`; el barrido R25 suma este informe) |
+| Suite completa (`bash harness/init.sh`) | **8224 passed, 249 skipped**, 0 fallos; `ENTORNO LISTO` (commit `346fdd8`; después solo un arreglo de ruff en un test) |
+| Cobertura de líneas cambiadas | `PUERTA COBERTURA: 100.0% de 227 líneas cambiadas cubiertas (227/227, umbral 80%, nivel critico)` |
 | Mutación (`python -m harness.mutacion --feature F-141 --workers 3 --timeout 9000`) | **56 generados, 56 evaluados, 52 muertos, 4 supervivientes, 0 timeouts**, 14.715,6 s (línea base 1.149-1.162 s por worker). Análisis en `progress/mutacion_F-141.md`: el 4 era un hueco real del LOG, cerrado con test nuevo (RED pegado arriba); los 1-3 son EQUIVALENTES (`split(".", 1)[0]` ≡ `split(".", 2)[0]`), **pendientes de aceptación del humano** |
-| Tiempo de la suite | <TIEMPO> |
+| Tiempo de la suite | 1.612,54 s (26 min 52 s) con medición de cobertura, en una máquina compartida con otras sesiones |
 
 La primera campaña (`rc=3`, sin veredictos) agotó los 600 s de la línea base con 4 workers en una
 máquina compartida con otras sesiones; se relanzó con `--workers 3 --timeout 9000` (patrón de
