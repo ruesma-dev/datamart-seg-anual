@@ -9,6 +9,14 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-17 · F-141 · IMPLEMENTACIÓN en curso (implementer)
+
+- Tarea en curso: ver la lista de `specs/F-141-perfil-restringido/tasks.md` (marcadas `[x]`).
+- `init.sh` de arranque: 7403 passed y 1 fallo (`test_f135_settings_env_example_documenta_las_tres`)
+  provocado por la edición de T1 de `.env.example` mientras la suite corría (68 min); el árbol de
+  partida (`386da30`) estaba en verde hasta ese punto. Se arregla con el literal de T2.
+- Decisiones y desviaciones: en `progress/impl_F-141.md`.
+
 ## 2026-10-17 · F-141 · SPEC APROBADA por el humano (`spec_ready`)
 
 > **Aprobada el 2026-10-17.** Última decisión: los usuarios de Sigrid de `compras`
