@@ -50,8 +50,8 @@ def test_f141_r1_defectos_del_vocabulario() -> None:
 
     assert DEFAULT_PERFIL_RESTRINGIDO_GROUP == GRUPO
     assert DEFAULT_PERFIL_RESTRINGIDO_LOGIN == LOGIN
-    assert DEFAULT_PERFIL_RESTRINGIDO_SCHEMAS == ",".join(ESQUEMAS_R)
-    assert DEFAULT_PERFIL_RESTRINGIDO_EXCLUDED_TABLES == ",".join(EXCLUIDAS_R)
+    assert ",".join(ESQUEMAS_R) == DEFAULT_PERFIL_RESTRINGIDO_SCHEMAS
+    assert ",".join(EXCLUIDAS_R) == DEFAULT_PERFIL_RESTRINGIDO_EXCLUDED_TABLES
     pg = PostgresSettings(_env_file=None)
     assert pg.perfil_restringido_group == GRUPO
     assert pg.perfil_restringido_login == LOGIN
@@ -221,7 +221,7 @@ def test_f141_r20_r24_en_02_roles_solo_dentro_del_renombre() -> None:
 def test_f141_grants_excepciones_nominales_de_d4() -> None:
     from etl_sigrid.infrastructure.postgres import grants
 
-    assert grants.EXCEPCIONES_FILTRACION_RESTRINGIDO == {v: "tesoreria" for v in EXCEPCIONES}
+    assert {v: "tesoreria" for v in EXCEPCIONES} == grants.EXCEPCIONES_FILTRACION_RESTRINGIDO
     assert grants.PATRON_VIGILADO_RESTRINGIDO == "mayor"
     assert grants.ESQUEMAS_ORIGEN_DE_VISTAS == ("raw",)
 
@@ -269,9 +269,9 @@ def test_f141_grants_tablas_origen_de_adjuntos_casan_con_f139() -> None:
     from etl_sigrid.infrastructure.postgres import grants
     from tests.test_f139_limite import ORIGEN_POR_FAMILIA
 
-    assert grants.TABLAS_ORIGEN_ADJUNTOS == tuple(
+    assert tuple(
         f"compras.{tabla}" for tabla, _ in ORIGEN_POR_FAMILIA.values()
-    )
+    ) == grants.TABLAS_ORIGEN_ADJUNTOS
     assert grants.OBJETO_ADJUNTOS == "compras.documento_adjuntos"
 
 
@@ -285,7 +285,7 @@ def _conflicto(esquemas: list[str], **cambios: list[str]) -> list[str]:
     from etl_sigrid.infrastructure.postgres.grants import perfil_restringido_en_conflicto
 
     listas = {
-        "consumo": ESQUEMAS_R + ["tesoreria", "personal"],
+        "consumo": [*ESQUEMAS_R, "tesoreria", "personal"],
         "vetados": _VETADOS,
         "restringidos": _RESTRINGIDOS,
         "total_vetados": ["raw"],
@@ -302,15 +302,15 @@ def test_f141_grants_r5_los_defectos_no_chocan() -> None:
     ("extra", "cambios"),
     [
         ("otro", {}),  # fuera del consumo
-        ("raw", {"consumo": ESQUEMAS_R + ["raw"]}),  # vetado al estándar
-        ("compras_restringida", {"consumo": ESQUEMAS_R + ["compras_restringida"],
+        ("raw", {"consumo": [*ESQUEMAS_R, "raw"]}),  # vetado al estándar
+        ("compras_restringida", {"consumo": [*ESQUEMAS_R, "compras_restringida"],
                                  "vetados": ["raw"]}),  # de lo restringido
-        ("stg2", {"consumo": ESQUEMAS_R + ["stg2"], "total_vetados": ["raw", "stg2"]}),
+        ("stg2", {"consumo": [*ESQUEMAS_R, "stg2"], "total_vetados": ["raw", "stg2"]}),
     ],
     ids=["fuera-del-consumo", "vetado", "restringido", "vetado-al-total"],
 )
 def test_f141_grants_r5_cada_lista_que_choca(extra: str, cambios: dict) -> None:
-    assert _conflicto(ESQUEMAS_R + [extra, extra], **cambios) == [extra], (
+    assert _conflicto([*ESQUEMAS_R, extra, extra], **cambios) == [extra], (
         "en orden y sin repetir, solo los que chocan"
     )
 
@@ -335,7 +335,7 @@ def test_f141_grants_r8_origenes_de_adjuntos() -> None:
     from etl_sigrid.infrastructure.postgres.grants import origenes_de_adjuntos_sin_leer
 
     assert origenes_de_adjuntos_sin_leer(ESQUEMAS_R, EXCLUIDAS_R) == []
-    assert origenes_de_adjuntos_sin_leer(ESQUEMAS_R, EXCLUIDAS_R + ["compras.facturas"]) == [
+    assert origenes_de_adjuntos_sin_leer(ESQUEMAS_R, [*EXCLUIDAS_R, "compras.facturas"]) == [
         "compras.facturas"
     ]
     sin_compras = [s for s in ESQUEMAS_R if s != "compras"]
@@ -354,11 +354,7 @@ def test_f141_grants_r8_origenes_de_adjuntos() -> None:
 def test_f141_grants_r12_esquemas_ajenos_del_catalogo() -> None:
     from etl_sigrid.infrastructure.postgres.grants import esquemas_ajenos
 
-    catalogo = ESQUEMAS_R + [
-        "tesoreria", "personal", "raw", "contabilidad_restringida", "pg_catalog",
-        "information_schema", "pg_toast", "pg_temp_3", "pg_toast_temp_3", "public",
-        "nuevo", "tesoreria",
-    ]
+    catalogo = [*ESQUEMAS_R, "tesoreria", "personal", "raw", "contabilidad_restringida", "pg_catalog", "information_schema", "pg_toast", "pg_temp_3", "pg_toast_temp_3", "public", "nuevo", "tesoreria"]
     assert esquemas_ajenos(catalogo, ESQUEMAS_R) == [
         "contabilidad_restringida", "nuevo", "personal", "raw", "tesoreria",
     ], "ordenados, sin repetir y sin los del sistema"
@@ -651,9 +647,7 @@ def test_f141_cliente_apply_perfil_restringido_sin_esquemas_no_abre_conexion() -
 
 RESTR_C = "contabilidad_restringida"
 #: lo que hoy hay en el catálogo (informe del spec-author §1-§2) más el sistema
-CATALOGO = ESQUEMAS_R + ["tesoreria", "personal", "raw", RESTR_C, "tesoreria_restringida",
-                         "compras_restringida", "public", "pg_catalog", "information_schema",
-                         "pg_toast"]
+CATALOGO = [*ESQUEMAS_R, "tesoreria", "personal", "raw", RESTR_C, "tesoreria_restringida", "compras_restringida", "public", "pg_catalog", "information_schema", "pg_toast"]
 AJENOS = ["compras_restringida", RESTR_C, "personal", "raw", "tesoreria",
           "tesoreria_restringida"]
 #: lo que hoy devuelve la clausura en Azure (informe §9-§10): solo las tres de D4
@@ -684,60 +678,60 @@ class _ClienteFalso:
         if self.falla_en == que:
             raise RuntimeError(f"se cayó la conexión en {que}")
 
-    def role_exists(self, role):  # noqa: ANN001, ANN201
+    def role_exists(self, role):
         self.llamadas.append(("role_exists", role))
         return role in self.existen
 
-    def list_schemas(self):  # noqa: ANN201
+    def list_schemas(self):
         self.llamadas.append(("catalogo",))
         return list(CATALOGO)
 
     def apply_readonly_grants(self, readonly_role, owner_role, schemas, excluded_tables=(),
-                              vetoed_schemas=()):  # noqa: ANN001, ANN201
+                              vetoed_schemas=()):
         self.llamadas.append(("general", readonly_role))
         return ["G1", "G2"]
 
-    def apply_restricted_grants(self, role, owner_role, schemas):  # noqa: ANN001, ANN201
+    def apply_restricted_grants(self, role, owner_role, schemas):
         self.llamadas.append(("autorizado", role))
         return ["A1"]
 
-    def apply_veto(self, role, owner_role, schemas):  # noqa: ANN001, ANN201
+    def apply_veto(self, role, owner_role, schemas):
         self.llamadas.append(("veto", role, owner_role, list(schemas)))
         return ["V"] * len(list(schemas))
 
-    def lecturas_indebidas(self, role, schemas, tables):  # noqa: ANN001, ANN201
+    def lecturas_indebidas(self, role, schemas, tables):
         self.llamadas.append(("verifica", role, list(schemas), list(tables)))
         return list(self.indebidas.get(role, []))
 
-    def esquemas_sin_usage(self, role, schemas):  # noqa: ANN001, ANN201
+    def esquemas_sin_usage(self, role, schemas):
         self.llamadas.append(("usage", role, list(schemas)))
         return list(self.sin_usage.get(role, []))
 
-    def vistas_que_filtran(self, schemas, foreign_schemas, tables):  # noqa: ANN001, ANN201
+    def vistas_que_filtran(self, schemas, foreign_schemas, tables):
         self.llamadas.append(("filtran", list(schemas), list(foreign_schemas), list(tables)))
         self._quizas_falla("filtran")
         return list(self.filas)
 
-    def objetos_vigilados(self, schemas, pattern):  # noqa: ANN001, ANN201
+    def objetos_vigilados(self, schemas, pattern):
         self.llamadas.append(("vigilados", list(schemas), pattern))
         return list(self.vigilados)
 
-    def pertenencias(self, role):  # noqa: ANN001, ANN201
+    def pertenencias(self, role):
         self.llamadas.append(("pertenencias", role))
         return list(self.pert.get(role, []))
 
-    def apply_perfil_restringido(self, role, owner_role, schemas, revoked):  # noqa: ANN001, ANN201
+    def apply_perfil_restringido(self, role, owner_role, schemas, revoked):
         self.llamadas.append(("perfil", role, owner_role, list(schemas), list(revoked)))
         return ["R1", "R2", "R3"]
 
 
-def _settings(**pg: object):  # noqa: ANN202
+def _settings(**pg: object):
     from types import SimpleNamespace
 
     base: dict[str, object] = {
         "readonly_role": ESTANDAR,
         "set_role": DUENO,
-        "consumption_schema_list": ESQUEMAS_R + ["tesoreria", "personal"],
+        "consumption_schema_list": [*ESQUEMAS_R, "tesoreria", "personal"],
         "excluded_table_list": ["raw.emp"],
         "vetoed_schema_list": [RESTR_C, "tesoreria_restringida", "compras_restringida", "raw"],
         "restricted_role": AUTORIZADO,
@@ -753,7 +747,7 @@ def _settings(**pg: object):  # noqa: ANN202
     return SimpleNamespace(postgres=SimpleNamespace(**base))
 
 
-def _paso(cliente: _ClienteFalso, **pg: object):  # noqa: ANN202
+def _paso(cliente: _ClienteFalso, **pg: object):
     from etl_sigrid.application.steps.apply_grants_step import ApplyGrantsStep
 
     return ApplyGrantsStep(_settings(**pg), client=cliente).run()
@@ -847,7 +841,7 @@ def test_f141_r4_vacios_no_chocan_entre_si() -> None:
 def test_f141_r5_esquemas_que_no_puede_tener_para_en_seco() -> None:
     cliente = _ClienteFalso()
     mensaje = _para_en_seco(cliente, _paso(
-        cliente, perfil_restringido_schema_list=ESQUEMAS_R + ["raw", "nuevo"],
+        cliente, perfil_restringido_schema_list=[*ESQUEMAS_R, "raw", "nuevo"],
     ))
     assert "PG_PERFIL_RESTRINGIDO_SCHEMAS" in mensaje and "(raw, nuevo)" in mensaje
 
@@ -855,7 +849,7 @@ def test_f141_r5_esquemas_que_no_puede_tener_para_en_seco() -> None:
 def test_f141_r5_tesoreria_entera_tambien() -> None:
     """Dársela es configuración válida del consumo, pero sigue en el consumo: no choca."""
     cliente = _ClienteFalso(filas=[])
-    resultado = _paso(cliente, perfil_restringido_schema_list=ESQUEMAS_R + ["tesoreria"])
+    resultado = _paso(cliente, perfil_restringido_schema_list=[*ESQUEMAS_R, "tesoreria"])
     assert resultado.status.name == "SUCCESS", "R5 mira el consumo y los vetos, no la regla"
 
 
@@ -870,7 +864,7 @@ def test_f141_r6_sin_meta_para_en_seco() -> None:
 def test_f141_r7_excluida_mal_escrita_o_ajena_para_en_seco(mala: str) -> None:
     cliente = _ClienteFalso()
     mensaje = _para_en_seco(cliente, _paso(
-        cliente, perfil_restringido_excluded_table_list=EXCLUIDAS_R + [mala],
+        cliente, perfil_restringido_excluded_table_list=[*EXCLUIDAS_R, mala],
     ))
     assert "PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES" in mensaje and f"({mala})" in mensaje
 
@@ -878,7 +872,7 @@ def test_f141_r7_excluida_mal_escrita_o_ajena_para_en_seco(mala: str) -> None:
 def test_f141_r8_un_origen_de_adjuntos_excluido_para_en_seco() -> None:
     cliente = _ClienteFalso()
     mensaje = _para_en_seco(cliente, _paso(
-        cliente, perfil_restringido_excluded_table_list=EXCLUIDAS_R + ["compras.contratos"],
+        cliente, perfil_restringido_excluded_table_list=[*EXCLUIDAS_R, "compras.contratos"],
     ))
     assert "compras.documento_adjuntos" in mensaje and "(compras.contratos)" in mensaje
     assert "F-139" in mensaje
@@ -886,9 +880,7 @@ def test_f141_r8_un_origen_de_adjuntos_excluido_para_en_seco() -> None:
 
 def test_f141_r8_excluyendo_tambien_los_adjuntos_pasa() -> None:
     cliente = _ClienteFalso()
-    resultado = _paso(cliente, perfil_restringido_excluded_table_list=EXCLUIDAS_R + [
-        "compras.contratos", "compras.documento_adjuntos",
-    ])
+    resultado = _paso(cliente, perfil_restringido_excluded_table_list=[*EXCLUIDAS_R, "compras.contratos", "compras.documento_adjuntos"])
     assert resultado.status.name == "SUCCESS"
 
 
@@ -906,3 +898,273 @@ def test_f141_r4_r8_sin_grupo_no_mira_su_configuracion() -> None:
     resultado = _paso(cliente, perfil_restringido_group="  ", perfil_restringido_login=ESTANDAR,
                       perfil_restringido_schema_list=["raw"])
     assert resultado.status.name == "SUCCESS"
+
+
+# --- R9-R19 · el bloque del restringido (T6) --------------------------------
+
+_SIN_RAW = [s for s in AJENOS if s != "raw"]
+#: lo de antes, tal cual: estándar, autorizado, total y la postcondición del estándar
+_CAMINO_ANTERIOR = [
+    ("role_exists", ESTANDAR),
+    ("general", ESTANDAR),
+    ("role_exists", AUTORIZADO),
+    ("autorizado", AUTORIZADO),
+    ("role_exists", TOTAL),
+    ("veto", TOTAL, DUENO, ["raw"]),
+    ("verifica", TOTAL, ["raw"], ["raw.emp"]),
+    ("usage", TOTAL, [*ESQUEMAS_R, "tesoreria", "personal", RESTR_C, "tesoreria_restringida", "compras_restringida"]),
+    ("verifica", ESTANDAR, [RESTR_C, "tesoreria_restringida", "compras_restringida", "raw"],
+     ["raw.emp"]),
+]
+
+
+def _claves_restringido(resultado: object) -> dict:
+    return {k: v for k, v in resultado.metadata.items()  # type: ignore[attr-defined]
+            if k.endswith("_restringido") or k == "excepciones_sobrantes"}
+
+
+def test_f141_r11_r12_camino_normal_en_orden_y_el_ultimo(log: _Log) -> None:
+    cliente = _ClienteFalso()
+    resultado = _paso(cliente)
+    assert resultado.status.name == "SUCCESS", resultado.error_message
+    assert cliente.llamadas == [*_CAMINO_ANTERIOR, ("role_exists", GRUPO), ("role_exists", LOGIN), ("catalogo",), ("filtran", ESQUEMAS_R, _SIN_RAW, EXCLUIDAS_R), ("vigilados", ESQUEMAS_R, "mayor"), ("perfil", GRUPO, DUENO, ESQUEMAS_R, EXCLUIDAS_R), ("veto", GRUPO, DUENO, AJENOS), ("verifica", GRUPO, AJENOS, EXCLUIDAS_R), ("verifica", LOGIN, AJENOS, EXCLUIDAS_R), ("pertenencias", LOGIN), ("pertenencias", GRUPO), ("usage", LOGIN, ESQUEMAS_R)], "el bloque del restringido es el ÚLTIMO; al login no se le concede nada"
+    assert _claves_restringido(resultado) == {
+        "rol_restringido": GRUPO,
+        "login_restringido": LOGIN,
+        "verificacion_restringido": "ok",
+        "filtraciones_restringido": "ok",
+        "vigilados_restringido": "ok",
+        "pertenencias_restringido": "ok",
+        "acceso_restringido": "ok",
+        "excepciones_sobrantes": "ok",
+    }
+    assert log.avisos == []
+
+
+def test_f141_r19_rows_processed_suma_las_del_restringido() -> None:
+    resultado = _paso(_ClienteFalso())
+    assert resultado.rows_processed == 2 + 1 + 1 + 3 + len(AJENOS)
+
+
+def test_f141_r9_sin_grupo_no_se_toca_nada(log: _Log) -> None:
+    cliente = _ClienteFalso()
+    resultado = _paso(cliente, perfil_restringido_group="")
+    assert resultado.status.name == "SUCCESS"
+    assert cliente.llamadas == _CAMINO_ANTERIOR
+    assert _claves_restringido(resultado) == {
+        "rol_restringido": "(sin configurar)",
+        **{k: "no aplica" for k in ("login_restringido", "verificacion_restringido",
+                                    "filtraciones_restringido", "vigilados_restringido",
+                                    "pertenencias_restringido", "acceso_restringido",
+                                    "excepciones_sobrantes")},
+    }
+    assert resultado.rows_processed == 2 + 1 + 1
+    assert log.avisos == []
+
+
+def test_f141_r9_una_configuracion_anterior_a_f141_es_sin_configurar() -> None:
+    """Sin los campos nuevos (la de un test de F-136, o un objeto viejo): sin configurar."""
+    from types import SimpleNamespace
+
+    from etl_sigrid.application.steps.apply_grants_step import ApplyGrantsStep
+
+    ajustes = vars(_settings().postgres)
+    viejos = {k: v for k, v in ajustes.items() if not k.startswith("perfil_restringido")}
+    cliente = _ClienteFalso()
+    resultado = ApplyGrantsStep(SimpleNamespace(postgres=SimpleNamespace(**viejos)),
+                                client=cliente).run()
+    assert resultado.status.name == "SUCCESS"
+    assert cliente.llamadas == _CAMINO_ANTERIOR
+    assert resultado.metadata["rol_restringido"] == "(sin configurar)"
+
+
+def test_f141_r10_grupo_inexistente_avisa_y_sigue(log: _Log) -> None:
+    cliente = _ClienteFalso(existen=(ESTANDAR, AUTORIZADO, TOTAL, LOGIN))
+    resultado = _paso(cliente)
+    assert resultado.status.name == "SUCCESS"
+    assert cliente.llamadas == [*_CAMINO_ANTERIOR, ("role_exists", GRUPO)], (
+        "ninguna sentencia ni pregunta sobre un grupo que no existe"
+    )
+    assert log.avisos == [("apply_grants_restringido_inexistente",
+                           {"role": GRUPO, "detalle": "créalo con infra/sql/02_roles.sql"})]
+    assert resultado.metadata["rol_restringido"] == f"{GRUPO} (no existe)"
+    assert resultado.metadata["verificacion_restringido"] == "no aplica"
+    assert resultado.metadata["excepciones_sobrantes"] == "no aplica"
+    assert resultado.rows_processed == 2 + 1 + 1
+
+
+def test_f141_r10_grupo_inexistente_no_tapa_un_fallo_del_estandar() -> None:
+    cliente = _ClienteFalso(existen=(ESTANDAR, AUTORIZADO, TOTAL),
+                            indebidas={ESTANDAR: ["raw (USAGE)"]})
+    resultado = _paso(cliente)
+    assert resultado.status.name == "FAILED"
+    assert (resultado.error_message or "").startswith(f"el rol '{ESTANDAR}' sigue leyendo")
+
+
+def test_f141_r13_una_vista_que_filtra_se_revoca_y_falla() -> None:
+    filas = [*FILAS_HOY, ("mart.v_nueva", "tesoreria.efectos"), ("mart.v_nueva", "personal.recursos"), ("compras.vencimientos", "personal.recursos")]
+    cliente = _ClienteFalso(filas=filas)
+    resultado = _paso(cliente)
+    assert resultado.status.name == "FAILED"
+    revocar = [*EXCLUIDAS_R, "mart.v_nueva", "compras.vencimientos"]
+    assert ("perfil", GRUPO, DUENO, ESQUEMAS_R, revocar) in cliente.llamadas, (
+        "revocada ANTES de terminar, cada vista una vez: es la alarma, no la protección"
+    )
+    assert ("verifica", GRUPO, AJENOS, revocar) in cliente.llamadas
+    mensaje = resultado.error_message or ""
+    assert (
+        "mart.v_nueva -> tesoreria.efectos, mart.v_nueva -> personal.recursos, "
+        "compras.vencimientos -> personal.recursos"
+    ) in mensaje, "cada vista y lo que alcanza"
+    assert f"'{GRUPO}'" in mensaje and "F-141" in mensaje
+    assert resultado.metadata["filtraciones_restringido"] == [
+        "mart.v_nueva -> tesoreria.efectos", "mart.v_nueva -> personal.recursos",
+        "compras.vencimientos -> personal.recursos",
+    ]
+    assert resultado.metadata["excepciones_sobrantes"] == "ok"
+
+
+def test_f141_r13_raw_no_es_filtracion_y_lo_no_suyo_sale_del_catalogo() -> None:
+    cliente = _ClienteFalso()
+    _paso(cliente)
+    ((_, _, ajenos, _),) = [c for c in cliente.llamadas if c[0] == "filtran"]
+    assert "raw" not in ajenos and "tesoreria" in ajenos and "personal" in ajenos
+
+
+def test_f141_r14_un_vigilado_sin_excluir_se_revoca_y_falla() -> None:
+    cliente = _ClienteFalso(vigilados=["contabilidad.mayor", "mart.mayor_analitico"])
+    resultado = _paso(cliente)
+    assert resultado.status.name == "FAILED"
+    revocar = [*EXCLUIDAS_R, "mart.mayor_analitico"]
+    assert ("perfil", GRUPO, DUENO, ESQUEMAS_R, revocar) in cliente.llamadas
+    mensaje = resultado.error_message or ""
+    assert "mart.mayor_analitico" in mensaje and "contabilidad.mayor," not in mensaje
+    assert "PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES" in mensaje and "F-127" in mensaje
+    assert resultado.metadata["vigilados_restringido"] == ["mart.mayor_analitico"]
+
+
+def test_f141_r14_una_vista_que_filtra_y_es_vigilada_se_revoca_una_vez() -> None:
+    cliente = _ClienteFalso(filas=[*FILAS_HOY, ("mart.mayor_x", "tesoreria.efectos")],
+                            vigilados=["mart.mayor_x"])
+    _paso(cliente)
+    assert ("perfil", GRUPO, DUENO, ESQUEMAS_R, [*EXCLUIDAS_R, "mart.mayor_x"]) in cliente.llamadas
+
+
+def test_f141_r15_excepcion_sobrante_avisa_y_no_falla(log: _Log) -> None:
+    cliente = _ClienteFalso(filas=FILAS_HOY[:1])
+    resultado = _paso(cliente)
+    assert resultado.status.name == "SUCCESS"
+    sobrantes = ["compras.v_control_forma_pago", "compras.v_facturas_pago"]
+    assert resultado.metadata["excepciones_sobrantes"] == sobrantes
+    assert ("apply_grants_restringido_excepcion_sobrante",
+            {"role": GRUPO, "excepciones": sobrantes,
+             "detalle": "ya no leen la cartera: quítalas de EXCEPCIONES_FILTRACION_RESTRINGIDO"},
+            ) in log.avisos
+
+
+@pytest.mark.parametrize("quien", [GRUPO, LOGIN])
+def test_f141_r16_si_el_grupo_o_el_login_leen_algo_falla_con_la_lista(quien: str) -> None:
+    cliente = _ClienteFalso(indebidas={quien: ["tesoreria (USAGE)", "personal.recursos (SELECT)"]})
+    resultado = _paso(cliente)
+    assert resultado.status.name == "FAILED"
+    mensaje = resultado.error_message or ""
+    assert (f"el perfil restringido '{quien}' lee lo que no debe: tesoreria (USAGE), "
+            "personal.recursos (SELECT)") in mensaje
+    assert "5 quinquies" in mensaje and "PUBLIC" in mensaje
+    assert resultado.metadata["verificacion_restringido"] == {
+        quien: ["tesoreria (USAGE)", "personal.recursos (SELECT)"]
+    }
+
+
+def test_f141_r17_pertenencias_indebidas_fallan() -> None:
+    cliente = _ClienteFalso(pertenencias={LOGIN: [GRUPO, ESTANDAR], GRUPO: [TOTAL]})
+    resultado = _paso(cliente)
+    assert resultado.status.name == "FAILED"
+    indebidas = [f"{LOGIN} -> {ESTANDAR}", f"{GRUPO} -> {TOTAL}"]
+    assert resultado.metadata["pertenencias_restringido"] == indebidas
+    mensaje = resultado.error_message or ""
+    assert ", ".join(indebidas) in mensaje and "5 quinquies" in mensaje
+
+
+def test_f141_r18_login_inexistente_avisa_y_mira_solo_el_grupo(log: _Log) -> None:
+    cliente = _ClienteFalso(existen=(ESTANDAR, AUTORIZADO, TOTAL, GRUPO))
+    resultado = _paso(cliente)
+    assert resultado.status.name == "SUCCESS"
+    restringido = cliente.llamadas[len(_CAMINO_ANTERIOR):]
+    assert ("verifica", LOGIN, AJENOS, EXCLUIDAS_R) not in restringido
+    assert ("pertenencias", LOGIN) not in restringido
+    assert ("pertenencias", GRUPO) in restringido and ("usage", GRUPO, ESQUEMAS_R) in restringido
+    assert ("apply_grants_restringido_login_inexistente",
+            {"role": LOGIN, "detalle": "créalo con infra/sql/02_roles.sql"}) in log.avisos
+    assert resultado.metadata["login_restringido"] == f"{LOGIN} (no existe)"
+    assert resultado.metadata["pertenencias_restringido"] == "ok"
+
+
+def test_f141_r18_login_sin_configurar_mira_solo_el_grupo(log: _Log) -> None:
+    cliente = _ClienteFalso()
+    resultado = _paso(cliente, perfil_restringido_login=" ")
+    assert resultado.status.name == "SUCCESS"
+    assert ("role_exists", "") not in cliente.llamadas
+    assert resultado.metadata["login_restringido"] == "(sin configurar)"
+    assert ("usage", GRUPO, ESQUEMAS_R) in cliente.llamadas
+    assert log.avisos == []
+
+
+def test_f141_r18_le_falta_usage_solo_avisa(log: _Log) -> None:
+    cliente = _ClienteFalso(sin_usage={LOGIN: ["stg"]})
+    resultado = _paso(cliente)
+    assert resultado.status.name == "SUCCESS", "leer de menos no expone nada"
+    assert resultado.metadata["acceso_restringido"] == ["stg"]
+    assert ("apply_grants_restringido_incompleto",
+            {"role": LOGIN, "faltan": ["stg"],
+             "detalle": "le falta la pertenencia o el GRANT: punto 5 quinquies de "
+                        "infra/sql/02_roles.sql"}) in log.avisos
+
+
+def test_f141_r19_los_tres_fallan_un_solo_mensaje_en_orden() -> None:
+    cliente = _ClienteFalso(
+        indebidas={ESTANDAR: ["raw.pag (SELECT)"], TOTAL: ["raw (USAGE)"],
+                   GRUPO: ["personal (USAGE)"]},
+        vigilados=["mart.mayor_y"],
+    )
+    resultado = _paso(cliente)
+    assert resultado.status.name == "FAILED"
+    mensaje = resultado.error_message or ""
+    posiciones = [mensaje.index(t) for t in (
+        f"el rol '{ESTANDAR}' sigue leyendo lo vetado: raw.pag (SELECT)",
+        f"el login total '{TOTAL}' lee lo vetado: raw (USAGE)",
+        "mart.mayor_y",
+        f"el perfil restringido '{GRUPO}' lee lo que no debe: personal (USAGE)",
+    )]
+    assert posiciones == sorted(posiciones), "estándar, total y restringido, en ese orden"
+    assert resultado.metadata["verificacion"] == ["raw.pag (SELECT)"]
+    assert resultado.metadata["verificacion_total"] == ["raw (USAGE)"]
+
+
+def test_f141_r19_lo_del_estandar_el_autorizado_y_el_total_no_cambia() -> None:
+    con = _ClienteFalso()
+    sin = _ClienteFalso()
+    _paso(con)
+    _paso(sin, perfil_restringido_group="")
+    assert con.llamadas[:len(_CAMINO_ANTERIOR)] == sin.llamadas == _CAMINO_ANTERIOR
+
+
+def test_f141_paso_un_fallo_del_cliente_en_el_restringido_es_failed() -> None:
+    cliente = _ClienteFalso(falla_en="filtran")
+    resultado = _paso(cliente)
+    assert resultado.status.name == "FAILED"
+    assert "se cayó la conexión en filtran" in (resultado.error_message or "")
+    assert not [c for c in cliente.llamadas if c[0] == "perfil"], "nada concedido a medias"
+
+
+def test_f141_paso_sin_nombres_a_mano_y_docstring() -> None:
+    from etl_sigrid.application.steps import apply_grants_step
+
+    fuente = Path(apply_grants_step.__file__).read_text(encoding="utf-8")
+    ejecutable = "\n".join(f for f in fuente.splitlines() if not f.lstrip().startswith("#"))
+    codigo = ejecutable.split('"""', 2)[2]
+    for nombre in (GRUPO, LOGIN, AUTORIZADO, RETIRADO):
+        assert nombre not in codigo, "los nombres salen de la configuración, no del paso"
+    doc = apply_grants_step.__doc__ or ""
+    for cosa in ("F-141", "restringido", "5 quinquies", "excepciones", "mayor"):
+        assert cosa in doc, f"el docstring no explica {cosa}"
