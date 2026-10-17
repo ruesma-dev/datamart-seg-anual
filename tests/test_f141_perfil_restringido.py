@@ -1395,3 +1395,82 @@ def test_f141_r21_provision_exige_restringido_pwd_y_no_la_pasa() -> None:
     for linea in codigo.splitlines():
         if "psql" in linea:
             assert "PWD" not in linea.upper(), linea
+
+
+# ===========================================================================
+# R25 · ni contraseña, ni oid, ni UPN, ni login de persona en lo de F-141 (T8)
+# ===========================================================================
+
+#: un oid de Entra (y cualquier GUID: suscripción, tenant)
+_PATRON_GUID = r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"
+#: un UPN o un correo: algo@dominio.tld
+_PATRON_UPN = r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+"
+#: las personas del perfil total (F-136): el diccionario y los papeles dicen «perfil total»
+_PERSONAS = ("Antonio", "Vicente", "Pablo", "Gris")
+#: los únicos roles que `02_roles.sql` puede crear o a los que puede conceder
+_ROLES_DEL_REPOSITORIO = {DUENO, "sigrid_dm_app", ESTANDAR, AUTORIZADO, TOTAL, GRUPO, LOGIN}
+
+
+def _ficheros_de_f141() -> list[Path]:
+    fijos = [
+        RAIZ / "infra" / "sql" / "02_roles.sql",
+        RAIZ / "infra" / "15_provision_db.ps1",
+        RAIZ / "docs" / "runbook_postgres_azure.md",
+        RAIZ / "progress" / "spec_F-141.md",
+    ]
+    spec = sorted((RAIZ / "specs").glob("F-141-*/*.md"))
+    # `mutacion_F-141.md` no: lo escribe el arnés con SHA de git y rutas de worktree.
+    informes = [r for r in (RAIZ / "progress" / "impl_F-141.md",
+                            RAIZ / "progress" / "review_F-141.md") if r.exists()]
+    return fijos + spec + informes
+
+
+def _hallazgos(texto: str) -> list[str]:
+    import re
+
+    from tests.test_f005_grants import buscar_secretos
+
+    # La ruta de la spec («perfil-restringido/requirements») tiene la forma de
+    # una clave generada para el patrón de F-005: se quita, y solo ella.
+    texto = texto.replace("specs/F-141-perfil-restringido/", "specs/F-141/")
+    return (
+        buscar_secretos(texto)
+        + re.findall(_PATRON_GUID, texto)
+        + re.findall(_PATRON_UPN, texto)
+        + [p for p in _PERSONAS if re.search(rf"\b{p}\b", texto)]
+    )
+
+
+def test_f141_r25_los_ficheros_vigilados_existen() -> None:
+    ficheros = _ficheros_de_f141()
+    assert all(ruta.exists() for ruta in ficheros)
+    assert len([r for r in ficheros if "specs" in r.parts]) == 3, "requirements, design y tasks"
+
+
+@pytest.mark.parametrize("ruta", _ficheros_de_f141(), ids=lambda r: r.name)
+def test_f141_r25_sin_secretos_oid_upn_ni_personas(ruta: Path) -> None:
+    assert _hallazgos(ruta.read_text(encoding="utf-8-sig")) == []
+
+
+def test_f141_r25_02_roles_solo_crea_y_concede_a_roles_del_repositorio() -> None:
+    """Un login de persona entraría por un `CREATE ROLE` o un `GRANT ... TO` suyo."""
+    import re
+
+    sql = _roles_sql()
+    creados = set(re.findall(r"CREATE ROLE (\w+)", sql))
+    concedidos = set(re.findall(r"\bTO\s+(\w+)\s*(?:WITH\b|;|')", sql))
+    concedidos -= {"TABLES"}  # `GRANT SELECT ON TABLES TO x` deja `TABLES` delante
+    assert creados == _ROLES_DEL_REPOSITORIO - {DUENO}, creados
+    assert concedidos <= _ROLES_DEL_REPOSITORIO, concedidos - _ROLES_DEL_REPOSITORIO
+
+
+def test_f141_r25_el_barrido_caza_lo_que_debe() -> None:
+    """Muestras SINTÉTICAS, construidas aquí para no dejar ninguna en el árbol."""
+    guid = "-".join("0" * n for n in (8, 4, 4, 4, 12)).replace("0", "a", 1)
+    upn = "nombre" + "@" + "empresa.es"
+    hexa = "ab12" * 16
+    for muestra in (guid, upn, hexa, "PASSWORD 'algo'", "Pablo"):
+        assert _hallazgos(f"texto {muestra} texto"), muestra
+    for legitimo in ("$env:RESTRINGIDO_PWD", "PASSWORD :'restringido_pwd'",
+                     "pg-password-restringido", "<otro>"):
+        assert _hallazgos(legitimo) == [], legitimo
