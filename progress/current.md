@@ -11,6 +11,14 @@
 
 ## 2026-10-18 · F-141 · FUSIONADA en main (APROBADO en pasada 2) · despliegue T14-T15 hoy
 
+> **T14 HECHO (líder, 2026-10-18 09:0x hora local, por orden del humano «despliega»):** merge `d7f0abb`
+> (dev `70c69bc`); imagen `r20261018-0903` construida en el ACR y job `caj-datamart-seg-dev`
+> actualizado; `az containerapp job show` devuelve ese tag. Antes, P0: ninguna ejecución en curso
+> (nocturna del 18 en Succeeded) y el job no fija `PG_RESTRICTED_ROLE` (usa el nombre nuevo por
+> defecto). **T15 (humano) tiene que hacerse HOY, antes de la nocturna de las 00:00 UTC**: la imagen
+> espera `sigrid_dm_autorizado_ro`, que solo existe tras `02_roles.sql`. Vuelta atrás: imagen
+> `r20261015-0915` el mismo día.
+
 - T1-T13 hechos (commits `e6b11e2` … `de9656f`); en `azure-apps`, `a520a62` sin push. F-141 de nuevo en
   `in_progress` en `features.json` (2026-10-18; estuvo `blocked` por R30, nota de abajo). T14-T17 son MANUALES
   (humano/líder), con su comando exacto abajo.
