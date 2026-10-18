@@ -90,15 +90,13 @@ Revisión completa (pasada 1) · `git diff main...HEAD`, HEAD `9ddc2f7`, merge-b
 
 | Checkpoint | Estado | Nota |
 |---|---|---|
-| C1 `init.sh` exit 0 | [x] | 2026-10-19: **8437 passed, 254 skipped** en 1504,7 s; ENTORNO LISTO |
-| C1 ficheros del arnés | [x] | |
+| C1 `init.sh` exit 0 y ficheros del arnés | [x] | 2026-10-19: **8437 passed, 254 skipped** en 1504,7 s; ENTORNO LISTO |
 | C2 una sola `in_progress` | [x] | solo F-128 |
 | C2 rama | [x] | `feature/F-128-importes-cabecera-factura` |
 | C2 `current.md` | [x] | la entrada de F-128 encima; lo de debajo es anterior a la rama (deuda heredada) |
 | C2 `done` con history | [x] | F-128 no se marca `done`. Aparte, en `main`: F-044, F-047, F-141 y F-144 están `done` sin entrada en `history.md`, deuda que no es de esta rama |
 | C3 hexagonal | [x] | dominio solo con stdlib; SQL `NN_nombre.sql` en `compras/` y `retenciones/` |
-| C3 primera línea con ruta | [x] | ficheros nuevos comprobados |
-| C3 sin prints, secretos ni dependencias | [x] | sin dependencias nuevas; R23 pasa |
+| C3 ruta en la 1.ª línea; sin prints, secretos ni dependencias | [x] | ficheros nuevos comprobados; R23 pasa |
 | C3 semántica Sigrid | [x] | `totdoc`/`totpag`/`reccla`, grano protegido (agregado por documento antes del JOIN, sin `WHERE` externo); amb/fas, origen/mes y `obrfasamb` no aplican |
 | C3 bis | N/A | no toca `docs/referencia/` |
 | C4 trazabilidad | [x] | R1-R34 con tests `test_f128_rN_*`, 135 en verde; R35-R36 son MANUAL |
@@ -115,11 +113,8 @@ Revisión completa (pasada 1) · `git diff main...HEAD`, HEAD `9ddc2f7`, merge-b
 | C4 bis RM1 SHA de HEAD | [ ] | **cambio 3**: `0fa7305` ≠ HEAD (diferencia trivial, pero hay que repetir de todos modos) |
 | C4 bis RM2 tiempo coherente | [ ] | **cambio 3** |
 | C4 bis RM5 | N/A | rigor `estandar` y sin supervivientes |
-| C4 bis RM6 | [x] | no se quitó ninguna guarda |
-| C4 bis campaña MANUAL | N/A | la campaña fue automática, con 22 mutantes |
-| C4 bis supervivientes analizados | [x] | no hay |
+| C4 bis RM6, supervivientes, campaña MANUAL, N/A sin motivo | [x] | no se quitó ninguna guarda; no hay supervivientes; la campaña fue automática (no aplica la MANUAL); ningún N/A sin motivo |
 | C4 bis «Evidencias» | [x] | los cuatro números y los workers (en serie, explicado) |
-| C4 bis ningún N/A sin motivo | [x] | |
 | C4 ter | N/A | sin `harness/rutas_sensibles.json` |
 | C5 `tasks.md` | [x] | T1-T15 y T18 `[x]` con sus commits; T16-T17 son MANUAL del humano, tras el merge |
 | C5 sin temporales | [x] | `git status` limpio |
@@ -130,22 +125,10 @@ Revisión completa (pasada 1) · `git diff main...HEAD`, HEAD `9ddc2f7`, merge-b
 | Req. | Test |
 |---|---|
 | R1-R4 | `test_f128_dominio.py` (`r1`-`r4`, más el inventario) |
-| R5-R11, R32 | `test_f128_sql.py` (`r5`/`r9`/`r10` prefijo y orden, `r6_r7`, `r8`, `r11`, `r32`) |
-| R12-R14, R19, R24, R33 | `test_f128_sql.py` (`r12_r13_*`, `r14`, `r19`, `r24`, `r33`) |
-| R15-R18 | `test_f128_sql.py` (`r15`-`r18`, `r18_r22_la_vista_lee_solo_retenciones`) |
+| R5-R19, R24, R32, R33 | `test_f128_sql.py` (`test_f128_rN_*` de cada uno; R13 en `r12_r13_*`, R7 en `r6_r7_*`) |
 | R20-R23 | `test_f128_restringida.py` |
 | R25-R31, R34 | `test_f128_diccionario.py` |
 | R35-R36 | MANUAL (humano), T16-T17 |
-
-## Lo que está bien y no hay que tocar
-
-- El SQL: recargos agregados POR DOCUMENTO antes de unirse; los joins nuevos de `facturas`,
-  detrás del lateral; `07_cuadre_factura.sql` lee solo `raw` y `retenciones`;
-  `fn_es_retencion_garantia` está copiada y fijada por test (R19); el `FULL JOIN` con
-  `IS NOT DISTINCT FROM` respeta el grano único de `saldo_contable`.
-- Diccionario: ficha de R30 con el aviso al principio; `R-COMPRAS-RESTRINGIDA` con el mismo
-  `ambito`; RETESP y AGR avisados; la relación sale desde la tabla restringida (desviación 4,
-  bien razonada).
 
 ## Propuesta de automejora (para el humano, no aplicada)
 
