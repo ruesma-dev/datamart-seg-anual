@@ -85,6 +85,35 @@
 -- de necesidad al albarán (igual en el 99,9 % de las 295.210 enlazadas). El
 -- enlace a la necesidad es DIRECTO por `dncide`/`dncproide`, no por
 -- `docoritip`/`linoriide`: 378.010 de 1.162.871 líneas de albarán (32,5 %).
+--
+-- F-128 (2026-10-18) · LA CABECERA ENTERA DE LA FACTURA Y DEL ALBARÁN. Hasta
+-- aquí `facturas` y `albaranes` solo daban quién, cuándo y su estado: el
+-- importe había que sumarlo de las líneas, que van SIN IVA y sin retenciones.
+-- Ahora, AL FINAL y sin mover ni una columna de las de siempre, publican los
+-- importes de la cabecera, su obra y centro de cabecera, el contrato de la
+-- factura y lo que el proveedor puso en el documento. Medido el 2026-10-17
+-- sobre las 167.458 facturas y los 314.042 albaranes de `raw`, 0 excepciones:
+--
+--   · `totdoc = totbas + totiva`: el TOTAL del documento, CON IVA y ANTES de
+--     retenciones (`total_factura` / `total_documento`).
+--   · `tot = totpag` en el 100 %: se publica solo `totpag` (`total_a_pagar`).
+--   · `totdoc − totpag` es la RETENCIÓN, y es exactamente Σ cuota de los
+--     recargos de clase 3 (fiscal), 4 y 5 (garantía) en el 100 % de las
+--     facturas: 25,31 M € = 24,04 M garantía + 1,27 M fiscal.
+--   · D2-B (humano, 2026-10-17): garantía = clases 4 y 5. El `RETESP` (44
+--     facturas, 871.193 €) es de clase 1, DESCUENTO: está en
+--     `importe_descuentos` y NO en `importe_retenciones`.
+--   · La retención del albarán y la de su factura son LA MISMA vista dos
+--     veces: no se suman.
+--
+-- Los recargos de cada documento (`dcfrec`, `dcarec`) son tablas propias y se
+-- construyen ANTES que albaranes y facturas, que los agregan POR DOCUMENTO
+-- antes de unirse (guarda de grano). La CUENTA BANCARIA del proveedor que
+-- lleva el documento (`ban*`, D4-B) NO va a `compras`: la última sección de
+-- este fichero la deja en `compras_restringida.documento_cuenta_bancaria`,
+-- solo para el perfil total, y ningún otro bloque la publica ni la lee.
+-- Fuera, por decisión del humano: `empide` y `hor` (F-134), el desajuste
+-- cabecera-línea (F-093) y los catálogos no ingeridos (`cocide` → F-143).
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
@@ -186,6 +215,74 @@ WHERE EXISTS (SELECT 1 FROM raw.ctr c WHERE c.ide = l.docide);
 ALTER TABLE compras.contrato_lineas ADD PRIMARY KEY (linea_id);
 CREATE INDEX idx_com_ctrlin_ctr ON compras.contrato_lineas (contrato_id);
 CREATE INDEX idx_com_ctrlin_par ON compras.contrato_lineas (partida_id);
+
+-- ---------------------------------------------------------------------------
+-- RECARGOS Y RETENCIONES DE CADA DOCUMENTO (F-128)
+--
+-- Una fila por recargo de la cabecera (`dcfrec`, `dcarec`) cuyo documento
+-- existe, mismo patrón que las líneas. 0 huérfanos y 0 `(docide, pos)`
+-- repetidos (medido el 2026-10-17); 10 facturas repiten concepto en dos
+-- posiciones, por eso la clave es `recargo_id` y no el concepto. La clase sale
+-- de `compras.fn_clase_recargo` y la marca de garantía de
+-- `compras.fn_es_retencion_garantia` (D2-B: clases 4 y 5; `RETESP` no).
+-- `valpor` viene en tanto por uno y se publica en tanto por cien, como el
+-- porcentaje de garantía del contrato (F-067). LEFT al concepto: 3 recargos no
+-- tienen concepto. Van ANTES que albaranes y facturas porque ellos los
+-- agregan; ninguno depende de estos con `CASCADE`.
+-- ---------------------------------------------------------------------------
+DROP TABLE IF EXISTS compras.factura_recargos CASCADE;
+CREATE TABLE compras.factura_recargos AS
+SELECT
+    r.ide                                   AS recargo_id,
+    r.docide                                AS factura_id,
+    r.pos                                   AS posicion,
+    NULLIF(r.recide, 0)                     AS concepto_id,
+    x.cod                                   AS codigo_concepto,
+    x.res                                   AS concepto,
+    compras.fn_clase_recargo(r.reccla)      AS clase_recargo,
+    compras.fn_es_retencion_garantia(r.reccla) AS es_retencion_garantia,
+    COALESCE(r.bas, 0)::NUMERIC(18, 2)      AS base,
+    ROUND((r.valpor * 100)::NUMERIC, 4)     AS porcentaje,       -- 5 = 5 %
+    COALESCE(r.cuo, 0)::NUMERIC(18, 2)      AS cuota,
+    COALESCE(r.ivacuo, 0)::NUMERIC(18, 2)   AS cuota_iva,
+    COALESCE(r.valfij <> 0, FALSE)          AS valor_fijo,       -- importe fijo, no %
+    NULLIF(r.cueide, 0)                     AS cuenta_id,
+    cue.cod                                 AS cuenta_contable
+FROM raw.dcfrec r
+LEFT JOIN raw.con x   ON x.ide = r.recide
+LEFT JOIN raw.con cue ON cue.ide = NULLIF(r.cueide, 0)
+WHERE EXISTS (SELECT 1 FROM raw.dcf f WHERE f.ide = r.docide);
+
+ALTER TABLE compras.factura_recargos ADD PRIMARY KEY (recargo_id);
+CREATE INDEX idx_com_facrec_fac ON compras.factura_recargos (factura_id);
+CREATE INDEX idx_com_facrec_gar ON compras.factura_recargos (es_retencion_garantia);
+
+DROP TABLE IF EXISTS compras.albaran_recargos CASCADE;
+CREATE TABLE compras.albaran_recargos AS
+SELECT
+    r.ide                                   AS recargo_id,
+    r.docide                                AS albaran_id,
+    r.pos                                   AS posicion,
+    NULLIF(r.recide, 0)                     AS concepto_id,
+    x.cod                                   AS codigo_concepto,
+    x.res                                   AS concepto,
+    compras.fn_clase_recargo(r.reccla)      AS clase_recargo,
+    compras.fn_es_retencion_garantia(r.reccla) AS es_retencion_garantia,
+    COALESCE(r.bas, 0)::NUMERIC(18, 2)      AS base,
+    ROUND((r.valpor * 100)::NUMERIC, 4)     AS porcentaje,       -- 5 = 5 %
+    COALESCE(r.cuo, 0)::NUMERIC(18, 2)      AS cuota,
+    COALESCE(r.ivacuo, 0)::NUMERIC(18, 2)   AS cuota_iva,
+    COALESCE(r.valfij <> 0, FALSE)          AS valor_fijo,       -- importe fijo, no %
+    NULLIF(r.cueide, 0)                     AS cuenta_id,
+    cue.cod                                 AS cuenta_contable
+FROM raw.dcarec r
+LEFT JOIN raw.con x   ON x.ide = r.recide
+LEFT JOIN raw.con cue ON cue.ide = NULLIF(r.cueide, 0)
+WHERE EXISTS (SELECT 1 FROM raw.dca a WHERE a.ide = r.docide);
+
+ALTER TABLE compras.albaran_recargos ADD PRIMARY KEY (recargo_id);
+CREATE INDEX idx_com_albrec_alb ON compras.albaran_recargos (albaran_id);
+CREATE INDEX idx_com_albrec_gar ON compras.albaran_recargos (es_retencion_garantia);
 
 -- ---------------------------------------------------------------------------
 -- ALBARANES (series AC = albarán, PROF = proforma/cert. subcontrata, NTC…)
