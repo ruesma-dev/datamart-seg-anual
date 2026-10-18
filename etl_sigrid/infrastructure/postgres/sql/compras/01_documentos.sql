@@ -551,3 +551,68 @@ CREATE INDEX idx_com_faclin_obr ON compras.factura_lineas (obra_id);
 CREATE INDEX idx_com_faclin_par ON compras.factura_lineas (partida_id);
 CREATE INDEX idx_com_faclin_alb ON compras.factura_lineas (albaran_linea_id);
 CREATE INDEX idx_com_faclin_ctl ON compras.factura_lineas (contrato_linea_id);
+
+-- >>> F-128 CUENTA BANCARIA (inicio)
+-- ---------------------------------------------------------------------------
+-- LA CUENTA BANCARIA DEL PROVEEDOR EN CADA DOCUMENTO (F-128, D4-B)
+--
+-- ACCESO RESTRINGIDO: `compras_restringida` solo la lee el perfil total del
+-- MCP. Decisión del humano del 2026-10-17 (D4-B): la cuenta que lleva cada
+-- factura o albarán es dato del proveedor (y personal si es autónomo), así que
+-- NO va a `compras`. `apply_grants` concede y veta POR ESQUEMA: esta tabla
+-- queda vetada al rol estándar y fuera del perfil restringido (F-141) sin
+-- tocar `grants.py`, `settings.py` ni `02_roles.sql`.
+--
+-- Universo: `ban` (la cuenta completa, texto) informado. Es el superconjunto
+-- medido el 2026-10-17: ningún documento tiene `bancue`, `bandig` ni `banban`
+-- sin `ban`. ~17.706 facturas y ~17.756 albaranes (proformas y notas
+-- incluidas); 0 `ide` comunes entre `dcf` y `dca`, así que `documento_id` vale
+-- de clave. `cuenta_bancaria` va tal cual (IBAN o CCC, sin normalizar ni
+-- convertir): es la cuenta que llevaba el DOCUMENTO, no la ficha actual del
+-- proveedor. Fuera: `bantipide` (su catálogo `auxcueban` no se ingiere y no
+-- predice el formato) y `dca.banide` (cuenta PROPIA, interna).
+--
+-- Va AL FINAL del fichero y nadie la lee: ningún otro bloque ni objeto fuera
+-- de `compras_restringida` puede publicar `ban`, `bancue` o `bandig` ni leer
+-- esta tabla (lo barre `tests/test_f128_restringida.py`).
+-- ---------------------------------------------------------------------------
+DROP TABLE IF EXISTS compras_restringida.documento_cuenta_bancaria CASCADE;
+CREATE TABLE compras_restringida.documento_cuenta_bancaria AS
+WITH doc AS (
+    SELECT f.ide, 'FACTURA'::TEXT AS tipo, f.fecdoc, f.entide, f.banban, f.bansuc,
+           f.bandig, f.bancue, f.ban
+    FROM raw.dcf f WHERE NULLIF(btrim(f.ban), '') IS NOT NULL
+    UNION ALL
+    SELECT a.ide, 'ALBARAN'::TEXT AS tipo, a.fecdoc, a.entide, a.banban, a.bansuc,
+           a.bandig, a.bancue, a.ban
+    FROM raw.dca a WHERE NULLIF(btrim(a.ban), '') IS NOT NULL
+)
+SELECT
+    d.ide                                   AS documento_id,
+    d.tipo                                  AS tipo_documento,     -- FACTURA / ALBARAN
+    c.cod                                   AS codigo_documento,
+    compras.fn_sigrid_date(d.fecdoc)        AS fecha_documento,
+    NULLIF(d.entide, 0)                     AS proveedor_id,
+    prv.res                                 AS proveedor_nombre,
+    NULLIF(d.banban, 0)                     AS banco_id,
+    bb.res                                  AS banco,
+    NULLIF(d.bansuc, 0)                     AS sucursal_id,
+    bs.res                                  AS sucursal,
+    NULLIF(btrim(d.bandig), '')             AS digitos_control,
+    NULLIF(btrim(d.bancue), '')             AS numero_cuenta,
+    btrim(d.ban)                            AS cuenta_bancaria     -- la del DOCUMENTO
+FROM doc d
+LEFT JOIN raw.con c      ON c.ide = d.ide
+LEFT JOIN raw.con prv    ON prv.ide = NULLIF(d.entide, 0)
+LEFT JOIN raw.auxban bb  ON bb.ide = NULLIF(d.banban, 0)
+LEFT JOIN raw.auxban bs  ON bs.ide = NULLIF(d.bansuc, 0);
+
+ALTER TABLE compras_restringida.documento_cuenta_bancaria ADD PRIMARY KEY (documento_id);
+CREATE INDEX ix_comr_doc_cuenta_prv ON compras_restringida.documento_cuenta_bancaria (proveedor_id);
+
+COMMENT ON TABLE compras_restringida.documento_cuenta_bancaria IS
+'ACCESO RESTRINGIDO: solo el perfil total del MCP. La cuenta bancaria del proveedor '
+'que lleva cada factura (raw.dcf) o albaran (raw.dca, con proformas y notas) con la '
+'cuenta informada: una fila por documento. Es la cuenta del DOCUMENTO, no la ficha '
+'actual del proveedor. Decision del humano del 2026-10-17 (D4-B, F-128).';
+-- <<< F-128 CUENTA BANCARIA (fin)
