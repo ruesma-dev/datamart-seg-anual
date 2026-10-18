@@ -147,8 +147,8 @@ $ .venv/Scripts/python -m pytest tests/ -q -k "f006 or diccionario" -x
 
 | Evidencia | Valor real |
 |---|---|
-| Tests ejecutados (`bash harness/init.sh`, final) | RESULTADO_INIT |
+| Tests ejecutados (`bash harness/init.sh`, final) | **VERDE**: `8239 passed, 249 skipped, 2205 warnings`; `[OK] pytest en verde`, `PUERTA TAMAÑO` OK (impl 154/220), rama correcta |
 | Cobertura de las líneas cambiadas | `PUERTA COBERTURA: N/A` (F-144 no cambia líneas Python de producción frente a main; solo YAML y tests) |
 | Mutantes generados / supervivientes | **No aplica**: `python -m harness.mutacion --feature F-144` → «ALCANCE VACÍO en F-144: ni una línea de producción que mutar» (0 ficheros, 0 líneas; salida con código 2, sin informe a propósito). Los dientes se prueban con los dos sabotajes de arriba |
-| Tiempo de la suite | TIEMPO_INIT |
+| Tiempo de la suite | 1011,57 s (0:16:51), el que imprime pytest dentro de `init.sh` |
 | `init.sh` inicial (en `main`) | ROJO: `1 failed, 7921 passed, 248 skipped` en 2218,18 s (el test R29 de F-141) |
