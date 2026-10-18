@@ -443,7 +443,43 @@ SELECT
     est.codigo_estado                       AS estado_codigo,    -- mnemónico: APR, CON, APJO…
     est.nombre_estado                       AS estado,           -- estado_id ya traducido (tipo 15)
     compras.fn_sigrid_date(f.fecdoc)        AS fecha_factura,    -- la del documento del proveedor
-    compras.fn_sigrid_date(con.fec)         AS fecha_alta        -- la de alta en Sigrid (= `fecha`)
+    compras.fn_sigrid_date(con.fec)         AS fecha_alta,       -- la de alta en Sigrid (= `fecha`)
+    -- F-128: LA CABECERA ENTERA, también AL FINAL. Ver la cabecera del fichero.
+    -- `total_factura` = base + IVA, CON IVA y ANTES de retenciones;
+    -- `importe_retenciones` = `total_factura − total_a_pagar` = garantía +
+    -- fiscal en el 100 % (D2-B; el `RETESP` está en `importe_descuentos`).
+    COALESCE(f.impbru, 0)::NUMERIC(18, 2)   AS importe_bruto,
+    COALESCE(f.impnet, 0)::NUMERIC(18, 2)   AS importe_neto,
+    COALESCE(f.impdes, 0)::NUMERIC(18, 2)   AS importe_descuentos,
+    COALESCE(f.imprec, 0)::NUMERIC(18, 2)   AS importe_recargos,
+    COALESCE(f.totbas, 0)::NUMERIC(18, 2)   AS base_imponible,   -- SIN IVA
+    COALESCE(f.totiva, 0)::NUMERIC(18, 2)   AS cuota_iva,
+    COALESCE(f.totdoc, 0)::NUMERIC(18, 2)   AS total_factura,    -- CON IVA, antes de retenciones
+    (COALESCE(f.totdoc, 0) - COALESCE(f.totpag, 0))::NUMERIC(18, 2) AS importe_retenciones,
+    COALESCE(rec.garantia, 0)::NUMERIC(18, 2) AS importe_retencion_garantia,  -- clases 4 y 5
+    COALESCE(rec.fiscal, 0)::NUMERIC(18, 2) AS importe_retencion_fiscal,      -- clase 3
+    COALESCE(f.totpag, 0)::NUMERIC(18, 2)   AS total_a_pagar,    -- `tot` = `totpag` (100 %)
+    -- El contrato de CABECERA: 86.664 facturas; la línea directa a contrato
+    -- solo cubre 6.991.
+    NULLIF(f.ctride, 0)                     AS contrato_id,
+    -- Obra y centro de CABECERA (D1-A): para auditar la factura. Para imputar
+    -- coste manda la obra de la LÍNEA (`factura_lineas.obra_id`).
+    NULLIF(f.obride, 0)                     AS obra_cabecera_id,
+    obr.cod                                 AS codigo_obra_cabecera,
+    obr.res                                 AS nombre_obra_cabecera,
+    NULLIF(f.cenide, 0)                     AS centro_coste_cabecera_id,
+    cen.cod                                 AS codigo_centro_coste_cabecera,
+    cen.res                                 AS nombre_centro_coste_cabecera,
+    NULLIF(f.caaide, 0)                     AS cuenta_analitica_cabecera_id,
+    -- Lo que el proveedor puso en el DOCUMENTO, que puede no ser su ficha de hoy.
+    NULLIF(btrim(f.entcod), '')             AS proveedor_codigo,
+    NULLIF(btrim(f.entres), '')             AS proveedor_nombre_documento,
+    NULLIF(btrim(f.entciftip), '')          AS proveedor_tipo_identificacion,
+    NULLIF(btrim(f.entcifpai), '')          AS proveedor_pais_identificacion,
+    COALESCE(f.ivadif <> 0, FALSE)          AS iva_diferido,
+    COALESCE(f.tipisp <> 0, FALSE)          AS inversion_sujeto_pasivo,
+    compras.fn_sigrid_date(f.fecent)        AS fecha_entrega_prevista,
+    compras.fn_sigrid_date(f.feclim)        AS fecha_limite
 FROM raw.dcf f
 JOIN raw.con con          ON con.ide = f.ide
 LEFT JOIN raw.con prv_con ON prv_con.ide = NULLIF(f.entide, 0)
@@ -461,7 +497,20 @@ LEFT JOIN raw.con prv_con ON prv_con.ide = NULLIF(f.entide, 0)
 -- convierte el tipo de documento en argumento obligatorio. La proyección de
 -- arriba no cambia ni una letra: la función devuelve `codigo_estado` y
 -- `nombre_estado`, los mismos nombres que tenía el lateral.
-LEFT JOIN LATERAL compras.fn_estado_documento(15, con.est) est ON TRUE;
+LEFT JOIN LATERAL compras.fn_estado_documento(15, con.est) est ON TRUE
+-- F-128: los joins nuevos van DETRÁS del lateral del estado (lo lee
+-- `test_f083_sql` como el primero), todos LEFT y sin `WHERE` externo:
+-- count(compras.facturas) = count(raw.dcf).
+LEFT JOIN raw.con obr     ON obr.ide = NULLIF(f.obride, 0)
+LEFT JOIN raw.con cen     ON cen.ide = NULLIF(f.cenide, 0)
+-- Las retenciones, AGREGADAS POR FACTURA antes de unirse (guarda de grano).
+LEFT JOIN (
+    SELECT factura_id,
+           SUM(cuota) FILTER (WHERE es_retencion_garantia) AS garantia,
+           SUM(cuota) FILTER (WHERE clase_recargo = 'RETENCION_FISCAL') AS fiscal
+    FROM   compras.factura_recargos
+    GROUP  BY factura_id
+) rec ON rec.factura_id = f.ide;
 
 ALTER TABLE compras.facturas ADD PRIMARY KEY (factura_id);
 CREATE INDEX idx_com_fac_est ON compras.facturas (estado_id);

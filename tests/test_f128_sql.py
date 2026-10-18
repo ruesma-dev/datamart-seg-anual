@@ -383,3 +383,90 @@ def test_f128_r11_albaranes_grano_sin_where_externo():
 
 def test_f128_r10_albaranes_sin_datos_bancarios():
     assert not re.search(r"\ba\.ban\w*", _albaranes())
+
+
+FACTURAS_DE_SIEMPRE = [
+    "factura_id", "codigo_factura", "serie", "tipo_documento", "descripcion", "fecha",
+    "proveedor_id", "proveedor_nombre", "proveedor_cif", "referencia_proveedor",
+    "estado_id", "estado_codigo", "estado", "fecha_factura", "fecha_alta",
+]
+
+FACTURAS_NUEVAS = (
+    [c.format(total="total_factura") for c in IMPORTES_NUEVOS]
+    + ["contrato_id"]
+    + OBRA_CENTRO
+    + ["cuenta_analitica_cabecera_id"]
+    + PROVEEDOR
+    + ["iva_diferido", "inversion_sujeto_pasivo", "fecha_entrega_prevista", "fecha_limite"]
+)
+
+
+def _facturas() -> str:
+    return _sentencia(_texto(DOCUMENTOS), "compras.facturas")
+
+
+def test_f128_r5_facturas_prefijo_intacto_y_nuevas_en_orden():
+    assert len(FACTURAS_NUEVAS) == 27
+    assert _columnas(_facturas(), "raw.dcf f") == FACTURAS_DE_SIEMPRE + FACTURAS_NUEVAS
+
+
+def test_f128_r6_r7_facturas_importes_y_agregado_previo():
+    _comprobar_importes(
+        _facturas(), "raw.dcf f", "f", "total_factura", "compras.factura_recargos"
+    )
+
+
+def test_f128_r8_facturas_cabecera():
+    s = _facturas()
+    _comprobar_cabecera_comun(s, "raw.dcf f", "f")
+    assert _expresion(s, "raw.dcf f", "contrato_id") == "NULLIF(f.ctride, 0)"
+    assert (
+        _expresion(s, "raw.dcf f", "inversion_sujeto_pasivo")
+        == "COALESCE(f.tipisp <> 0, FALSE)"
+    )
+
+
+def test_f128_r9_facturas_grano_y_joins_tras_el_lateral():
+    s = _facturas()
+    _comprobar_grano(s, "raw.dcf f", "f")
+    resto = _tras_el_from(s, "raw.dcf f")
+    lateral = resto.index("LEFT JOIN LATERAL compras.fn_estado_documento(15, con.est) est ON TRUE")
+    for nuevo in ("raw.con obr", "raw.con cen", "compras.factura_recargos"):
+        assert resto.index(nuevo) > lateral, nuevo
+    # El lateral del estado sigue siendo el PRIMERO (lo lee `test_f083_sql`).
+    assert resto.index("LATERAL") == lateral + len("LEFT JOIN ")
+
+
+def _origen_en_sql(sentencia: str, alias: str) -> set[str]:
+    return set(re.findall(rf"(?<![\w.]){alias}\.(\w+)", sentencia))
+
+
+@pytest.mark.parametrize(
+    ("tabla", "objeto", "sentencia", "desde", "alias"),
+    [
+        ("dcf", "compras.facturas", _facturas, "raw.dcf f", "f"),
+        ("dca", "compras.albaranes", _albaranes, "raw.dca a", "a"),
+    ],
+)
+def test_f128_r3_inventario_igual_al_sql(tabla, objeto, sentencia, desde, alias):
+    """Lo que el SQL lee de la cabecera es EXACTAMENTE lo que el inventario
+    declara publicado en ese objeto, y cada ruta es una columna del SQL."""
+    s = sentencia()
+    inventario = cc.INVENTARIOS[tabla]
+    assert _origen_en_sql(s, alias) == cc.columnas_origen(inventario, objeto)
+    columnas = _columnas(s, desde)
+    assert set(cc.publicadas(inventario, objeto)) <= set(columnas)
+
+
+def test_f128_r3_v_facturas_pago_rutas_existen():
+    """Las rutas a `v_facturas_pago` (F-080, no se toca) son columnas suyas."""
+    texto = _sin_comentarios(_texto(SQL / "compras" / "06_pago_factura.sql"))
+    for columna in cc.publicadas(cc.INVENTARIO_DCF, "compras.v_facturas_pago"):
+        assert re.search(rf"\bAS {columna}\b", texto), columna
+
+
+@pytest.mark.parametrize("sentencia", [_facturas, _albaranes])
+def test_f128_r32_ni_empide_ni_hor_ni_desajuste(sentencia):
+    s = sentencia()
+    assert not re.search(r"(?<![\w.])[af]\.(empide|hor)\b", s)
+    assert not re.search(r"desajuste|diferencia_lineas|lineas_vs_cabecera", s)
