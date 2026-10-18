@@ -12,6 +12,7 @@ entra en el repositorio un valor con forma de cuenta. Sin red ni BBDD.
 from __future__ import annotations
 
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -228,3 +229,125 @@ def test_f128_r21_lo_permitido_no_salta():
         f"CREATE TABLE compras_restringida.otra AS SELECT * FROM {TABLA};"
     )
     assert infracciones(permitido, "permitido.sql") == []
+
+
+# --- R22 · los permisos por esquema la protegen sin tocar nada ----------------------
+
+ESQUEMA = "compras_restringida"
+
+
+def test_f128_r22_defectos_de_settings():
+    from config.settings import (
+        DEFAULT_PERFIL_RESTRINGIDO_SCHEMAS,
+        DEFAULT_RESTRICTED_SCHEMAS,
+        DEFAULT_TOTAL_VETOED_SCHEMAS,
+        DEFAULT_VETOED_SCHEMAS,
+        PostgresSettings,
+    )
+
+    assert ESQUEMA in DEFAULT_VETOED_SCHEMAS.split(","), "vetada al estándar"
+    assert ESQUEMA in DEFAULT_RESTRICTED_SCHEMAS.split(","), "concedida al autorizado"
+    assert ESQUEMA not in DEFAULT_TOTAL_VETOED_SCHEMAS.split(","), "el total SÍ la lee"
+    assert ESQUEMA not in DEFAULT_PERFIL_RESTRINGIDO_SCHEMAS.split(","), (
+        "el perfil restringido (F-141) NO la lee"
+    )
+    pg = PostgresSettings(_env_file=None)
+    assert ESQUEMA in pg.vetoed_schema_list
+    assert ESQUEMA in pg.restricted_schema_list
+    assert ESQUEMA not in pg.total_vetoed_schema_list
+    assert ESQUEMA not in pg.perfil_restringido_schema_list
+
+
+def test_f128_r22_grants_y_roles_no_nombran_la_tabla():
+    """Los permisos van POR ESQUEMA: ni `grants.py` ni `02_roles.sql` tienen
+    que saber que la tabla existe."""
+    for ruta in (
+        RAIZ / "etl_sigrid" / "infrastructure" / "postgres" / "grants.py",
+        RAIZ / "infra" / "sql" / "02_roles.sql",
+        RAIZ / "config" / "settings.py",
+    ):
+        assert "documento_cuenta_bancaria" not in _texto(ruta), ruta.name
+
+
+def test_f128_r22_las_guardas_del_perfil_restringido_la_cubren():
+    """F-141: el perfil restringido no ve `compras_restringida` (esquema
+    ajeno), ninguna vista nueva de F-128 en sus esquemas lee un esquema ajeno
+    y ningún objeto nuevo cae en el patrón vigilado por nombre."""
+    from config.settings import DEFAULT_PERFIL_RESTRINGIDO_SCHEMAS
+    from etl_sigrid.infrastructure.postgres.grants import (
+        PATRON_VIGILADO_RESTRINGIDO,
+        esquemas_ajenos,
+    )
+
+    suyos = DEFAULT_PERFIL_RESTRINGIDO_SCHEMAS.split(",")
+    assert ESQUEMA in esquemas_ajenos(["compras", "retenciones", ESQUEMA], suyos)
+    nuevos = [
+        "compras.factura_recargos", "compras.albaran_recargos", TABLA,
+        "retenciones.retencion_factura", "retenciones.v_cuadre_factura_obra",
+    ]
+    assert not [o for o in nuevos if re.search(PATRON_VIGILADO_RESTRINGIDO, o)]
+    # Que la única vista nueva (`v_cuadre_factura_obra`) lea solo `retenciones`
+    # —y por tanto no sea una filtración para `filtraciones_restringido`— lo
+    # fija `test_f128_sql.py::test_f128_r18_r22_la_vista_lee_solo_retenciones`.
+
+
+def _git(*args: str) -> str | None:
+    try:
+        r = subprocess.run(["git", *args], cwd=RAIZ, capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return r.stdout if r.returncode == 0 else None
+
+
+def test_f128_r22_ficheros_de_permisos_sin_cambios_respecto_a_main():
+    salida = _git("diff", "--name-only", "main...HEAD", "--",
+                  "config/settings.py", "etl_sigrid/infrastructure/postgres/grants.py",
+                  "infra/sql/02_roles.sql")
+    if salida is None:
+        pytest.skip("sin git o sin rama main: la comprobación la hace el texto de arriba")
+    assert salida.strip() == ""
+
+
+# --- R23 · ningún valor con forma de cuenta en el repositorio ----------------------
+
+#: País + 2 dígitos + 16 o más dígitos (con o sin espacios cada cuatro), o 20
+#: dígitos seguidos (CCC).
+_IBAN = re.compile(r"\b[A-Z]{2}\d{2}(?: ?\d){16,}")
+_CCC = re.compile(r"(?<!\d)\d{20}(?!\d)")
+
+
+def cuentas_en(texto: str) -> list[str]:
+    """Las cadenas con forma de IBAN o de CCC de un texto (sin devolverlas
+    enteras: solo su posición, para no repetir un valor real en el informe)."""
+    return [f"posición {m.start()}" for m in (*_IBAN.finditer(texto), *_CCC.finditer(texto))]
+
+
+def test_f128_r23_positivo_fabricado():
+    # Fabricados en tiempo de ejecución para que el propio fichero no contenga
+    # ninguna cadena con forma de cuenta.
+    iban = "XX" + "00" + "1" * 16
+    iban_espacios = "XX00" + " 1111" * 5
+    ccc = "0" * 20
+    assert cuentas_en(f"cuenta {iban} fin")
+    assert cuentas_en(f"cuenta {iban_espacios} fin")
+    assert cuentas_en(f"ccc {ccc};")
+    assert not cuentas_en("importe 17.706 y 9.939 documentos; 2026-10-17")
+    assert not cuentas_en("0" * 19)
+
+
+def test_f128_r23_barrido_de_los_ficheros_de_la_feature():
+    salida = _git("diff", "--name-only", "main...HEAD")
+    if salida is None:
+        pytest.skip("sin git o sin rama main: no se sabe qué ficheros son de F-128")
+    malos = []
+    for nombre in salida.split():
+        ruta = RAIZ / nombre
+        if not ruta.is_file():
+            continue
+        try:
+            texto = ruta.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        if cuentas_en(texto):
+            malos.append(nombre)
+    assert malos == []
