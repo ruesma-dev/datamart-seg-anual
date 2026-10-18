@@ -139,5 +139,22 @@ T10 (R33) y T13 son guardas de «no cambia»: llevan positivo fabricado en vez d
 | Tests de F-128 | `135 passed in 36.85s` (los cuatro `tests/test_f128_*.py`) |
 | Suite completa (`bash harness/init.sh`) | `bash harness/init.sh` en VERDE el 2026-10-19 («ENTORNO LISTO»): **8437 passed, 254 skipped**, 0 failed; ruff 276 avisos (deuda previa, no bloquea) |
 | Cobertura de las líneas cambiadas | **100,0 %** de 66 líneas cambiadas (66/66, umbral 80 %, línea `PUERTA COBERTURA`) |
-| Mutación (`progress/mutacion_F-128.md`) | 22 generados, 20 evaluados (muestreo estándar, semilla 20260820), **20 muertos, 0 supervivientes**, 593,9 s. Suite acotada a los 4 importadores del módulo: la campaña por defecto abortó con «LÍNEA BASE SIN TERMINAR» (600 s) y el arnés manda acotarla |
+| Mutación (`progress/mutacion_F-128.md`) | Pasada 2, sobre HEAD `546885a`: 22 generados, 20 evaluados (muestreo estándar, semilla 20260820), **20 muertos, 0 supervivientes**. Base 33,2 s y 20 mutantes 19,3 s (~1 s cada uno), con la MISMA suite acotada (los 4 importadores del módulo) en base y mutantes; la pasada 1 había medido la base sobre la suite entera |
 | Tiempo de la suite | 1225,85 s (20 min 25 s) con medición de cobertura, según la propia suite |
+
+## Pasada 2 (CHANGES_REQUESTED de `progress/review_F-128.md`, corregido)
+
+1. `R-EMPRESA-POR-DEFECTO` ya no dice que la empresa del documento «es `empide`» (en `dcf`/`dca`
+   `empide` es «Empleado», índice a `emp`; qué es, F-134): queda «no la del documento». Test nuevo
+   `test_f128_r_empresa_no_atribuye_a_empide_la_empresa`, RED antes del cambio
+   (`python -m pytest tests/test_f128_diccionario.py -q -k empide` → `1 failed`,
+   `AssertionError: assert 'empide' not in 'Es un CRITE...VERSO-OBRA`.'`), verde después. `3382803`.
+2. La misma regla distingue: `retencion_factura`, la empresa de la obra de CABECERA;
+   `v_cuadre_factura_obra`, la de la obra del par (cabecera de sus facturas o, en los pares solo
+   contables, la cascada de `retenciones.saldo_contable`), como dice su ficha. `546885a`.
+3. Mutación repetida sobre HEAD `546885a` con la MISMA suite acotada en base y mutantes (subclase
+   de `EjecutorPytest` en el script, sin tocar `harness/mutacion.py`; invocación exacta en
+   `progress/mutacion_F-128.md`): base 33,2 s, 20 mutantes en 19,3 s, **20/20 muertos**. `1e697dd`.
+
+`bash harness/init.sh` tras la pasada 2: **ENTORNO LISTO**, 8438 passed, 254 skipped en 1182,09 s;
+PUERTA COBERTURA 100,0 % (66/66); PUERTA TAMAÑO dentro de los topes.
