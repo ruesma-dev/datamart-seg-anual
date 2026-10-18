@@ -19,6 +19,8 @@
 - **Desviación (T1, justificada):** el informe §5 no clasificaba `diremp2`/`diremp3` (líneas 2-3 de
   la dirección del documento, 1,0-1,7 %, medido el 2026-10-18 en `raw`). R3 exige una entrada por
   columna: van como `RESIDUAL` con su cobertura en la nota. No se publican (como `dirdir*`).
+- Recuentos del diccionario del árbol tras F-128 (T11, v56): **234 objetos, 2000 columnas, 114 de
+  consumo** (en `main`, v55: 226 / 1864 / 109). Sin publicar: es MANUAL tras el merge.
 - En curso: ver `specs/F-128-importes-cabecera-factura/tasks.md` (las `[x]`).
 
 ## 2026-10-18 · F-144 · CERRADA (`done`, APROBADO en pasada 2) · DESPLEGADA: diccionario v55 y MCP reiniciado

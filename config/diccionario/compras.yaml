@@ -541,7 +541,58 @@ objetos:
       Cabecera de los documentos de entrega del proveedor. Bajo el mismo
       concepto de Sigrid conviven tres cosas distintas que se distinguen por
       `tipo_documento`: el albaran de material, la certificacion de
-      subcontratista (PROFORMA) y la nota de cargo (NOTA).
+      subcontratista (PROFORMA) y la nota de cargo (NOTA). Medido el
+      2026-10-17: ALBARAN 310.907, PROFORMA 2.856, NOTA 278 y OTRO 1 (314.042).
+
+      **LA CABECERA ENTERA (F-128).** Desde el 2026-10-18 la tabla publica, AL
+      FINAL y sin mover ninguna columna anterior, los importes de la cabecera
+      del documento, su forma y medio de pago, su cuenta contable, la obra y
+      el centro de CABECERA, lo que el proveedor puso en el documento y su
+      estado de facturacion en Sigrid. Identidades medidas, 0 excepciones:
+      `total_documento = base_imponible + cuota_iva` (CON IVA y ANTES de
+      retenciones) e `importe_retenciones = total_documento - total_a_pagar` =
+      `importe_retencion_garantia + importe_retencion_fiscal` salvo en 9
+      albaranes con recargos cuya diferencia no casa. Retencion total en
+      albaranes 20,71 M EUR (ALBARAN 19,28 M; PROFORMA 1,43 M; NOTA 0); las
+      NOTA suman -0,82 M (notas de cargo en negativo). **La retencion del
+      albaran y la de su factura son LA MISMA retencion vista dos veces: NO se
+      suman.** Para la retencion de un proveedor, la de la factura
+      (`compras.facturas`). Las lineas (`compras.albaran_lineas`) van SIN IVA y
+      sin retenciones: su suma es `importe_neto`, no `total_documento`. La obra
+      de cabecera es para AUDITAR el documento; para imputar coste, la de la
+      linea (`compras.albaran_lineas.obra_id`).
+
+      **LO QUE NO SE PUBLICA de la cabecera de Sigrid (`dca`)**, por motivo
+      (inventario de `etl_sigrid/domain/cabecera_compra.py`, medido el
+      2026-10-17/18). VACIO (0 %): `ivareq`, `facper`, `fecpag`, `eitide`,
+      `ivaide`, `bul`, `pes`, `volum`, `ageide`, `ageimp`, `fecrec`, `estser`,
+      `antestser`, `divcod`, `divcam`, `empconide`, `docrelide`, `paclis`,
+      `prmide`, `estped`, `antestped`, `empcif`, `cveide`, `alqide`, `alqfec`,
+      `pexide`, `divcamfec`, `ctdide`, `totbasdiv`, `totivadiv`, `totdocdiv`,
+      `totdiv`, `totpagdiv`, `cypnatide`, `refarc`, `pdpide`, `ano`, `mes`,
+      `refcom`, `emnet`, `eg3w`, `cptide`, `tipisp`, `delide`, `aoside`,
+      `PFID`, `cadcod1`, `caddir1`, `cadcod2`, `caddir2`, `cadcod3`,
+      `caddir3`, `cadcod4`, `caddir4`, `cpapai`, `cpaban`, `cpasuc`, `cpaswi`,
+      `cpatip`, `cpadiv`, `cpacue1`, `cpacue2`, `ppoide`, `clabieser`,
+      `facoriide`, `duaide`, `numregcon`, `fas`, `periodo`, `tipctr`,
+      `impavr`, `synckey`. RESIDUAL (cobertura marginal): `diremp2`,
+      `diremp3` (lineas 2-3 de la direccion, 1,5 % y 1,7 %), `emppreide`,
+      `horlim`, `eleenvio`. INTERNO (de Sigrid, sin catalogo ni significado
+      medible): `cla`, `antestfac`, `docoritip`, `docoriide`, `pasdeside`,
+      `pasori`, `tipsininv`, `dtumID`, `banide` (cuenta PROPIA, sin
+      resolver), `horfac`, `tipgar` (no predice la retencion). REDUNDANTE:
+      `tot` (= `totpag`, publicada como `total_a_pagar`), `diremp1` (=
+      `entres`). OTRA_FEATURE: `hor` y `empide` (F-134: que son exige leer el
+      log de Sigrid). CATALOGO_NO_INGERIDO: `eioide`, `almide`, `cocide`
+      (tipo de contrato de compra, F-143) y `bantipide`. NO_INGERIDO
+      (excluidas de la ingesta): `eiotex`, `eittra`, `pagtex`, `pagfor`
+      (condiciones de pago, 100 % informadas pero de 4 a 15 bytes: decision
+      del humano de no traerlas), `tex`, `dircon1`, `dirdir1`, `dircon2`,
+      `dirdir2`, `dircon3`, `dirdir3`, `emptex`, `texent`. **La cuenta bancaria
+      del proveedor que lleva el documento** (`ban`, `bancue`, `bandig`,
+      `banban`, `bansuc`) NO esta aqui: solo en
+      `compras_restringida.documento_cuenta_bancaria`, para el perfil total
+      del MCP (`R-COMPRAS-RESTRINGIDA`).
     grano: Una fila por documento de entrega. `albaran_id` es clave primaria.
     clave_negocio: [albaran_id]
     paso_etl: build_compras
@@ -586,7 +637,198 @@ objetos:
       referencia_proveedor:
         significado: El numero que el proveedor le da a su propio albaran.
         nulo_significa: El proveedor no dio referencia, o no se tecleo.
+      importe_bruto:
+        significado: >-
+          Importe bruto de la cabecera (`dca.impbru`), antes de los descuentos
+          de linea. Informado en el 98,94 %; 0 cuando el documento no lo trae.
+          Los abonos y las notas de cargo van en negativo (`R-ABONO-NEGATIVO`).
+        unidad: EUR
+        agregacion: suma
+      importe_neto:
+        significado: >-
+          Importe neto de la cabecera (`dca.impnet`): la suma de las lineas,
+          SIN IVA. Informado en el 98,94 %; 0 cuando no viene.
+        unidad: EUR
+        agregacion: suma
+      importe_descuentos:
+        significado: >-
+          Descuentos de CABECERA (`dca.impdes`, los recargos de clase
+          DESCUENTO de `compras.albaran_recargos`). Casi nunca informado (0,00
+          %). Ojo: el concepto `RETESP` es de clase DESCUENTO y aqui NO es
+          retencion de garantia (decision del 2026-10-17).
+        unidad: EUR
+        agregacion: suma
+      importe_recargos:
+        significado: >-
+          Recargos de CABECERA (`dca.imprec`, los de clase RECARGO). Casi nunca
+          informado (0,00 %).
+        unidad: EUR
+        agregacion: suma
+      base_imponible:
+        significado: >-
+          Base imponible del documento, SIN IVA (`dca.totbas` = neto -
+          descuentos + recargos). Informada en el 98,94 %.
+        unidad: EUR
+        agregacion: suma
+      cuota_iva:
+        significado: >-
+          Cuota de IVA de la cabecera (`dca.totiva`), informada en el 86,87 %.
+          Difiere documento a documento de la suma del IVA de las lineas por
+          redondeo, aunque en total casen.
+        unidad: EUR
+        agregacion: suma
+      total_documento:
+        significado: >-
+          TOTAL del documento, CON IVA y ANTES de retenciones (`dca.totdoc` =
+          `base_imponible + cuota_iva`, 0 excepciones). Informado en el 98,95
+          %. Lo que se le paga es `total_a_pagar`.
+        unidad: EUR
+        agregacion: suma
+      importe_retenciones:
+        significado: >-
+          Lo que se retiene en el documento: `total_documento - total_a_pagar`.
+          Es la retencion de garantia mas la fiscal salvo en 9 albaranes. **No
+          se suma con la de su factura**: es la misma retencion vista dos
+          veces.
+        unidad: EUR
+        agregacion: suma
+      importe_retencion_garantia:
+        significado: >-
+          Retencion de garantia del documento: suma de la cuota de sus recargos
+          de clase 4 y 5 en `compras.albaran_recargos`, agregada por albaran
+          antes de unir. 0 si no tiene. **El `RETESP` (clase DESCUENTO) no
+          esta aqui** (decision del 2026-10-17): esta en `importe_descuentos`.
+        unidad: EUR
+        agregacion: suma
+      importe_retencion_fiscal:
+        significado: >-
+          Retencion fiscal (IRPF de profesionales, arrendamientos, notarias):
+          suma de la cuota de sus recargos de clase 3. 0 si no tiene.
+        unidad: EUR
+        agregacion: suma
+      total_a_pagar:
+        significado: >-
+          Lo que se paga al proveedor (`dca.totpag`): el total menos las
+          retenciones. `dca.tot` es el mismo numero en el 100 % y no se publica.
+        unidad: EUR
+        agregacion: suma
+      fecha_documento:
+        significado: >-
+          Fecha del documento del proveedor (`dca.fecdoc`), la que pone en su
+          albaran; `fecha` es la de alta en Sigrid. Informada en el 99,99 %.
+        nulo_significa: El documento no trae fecha propia.
+        agregacion: no_sumable
+      forma_pago_id:
+        significado: Forma de pago del documento (`dca.pagide`, catalogo `compras.formas_pago`), 99,99 %.
+        nulo_significa: El documento no tiene forma de pago.
+        agregacion: no_sumable
+      forma_pago:
+        significado: Nombre de la forma de pago (`raw.auxpag`).
+        nulo_significa: Sin forma de pago, o fuera del catalogo.
+      medio_pago_id:
+        significado: Medio de pago del documento (`dca.efeide`, catalogo `raw.auxefp`), 99,99 %.
+        nulo_significa: El documento no tiene medio de pago.
+        agregacion: no_sumable
+      medio_pago:
+        significado: Nombre del medio de pago (`raw.auxefp`).
+        nulo_significa: Sin medio de pago, o fuera del catalogo.
+      cuenta_contable:
+        significado: >-
+          Codigo de la cuenta contable del documento (`con.cod` de
+          `dca.cueide`), informada en el 99,12 %.
+        nulo_significa: El documento no lleva cuenta contable.
+      obra_cabecera_id:
+        significado: >-
+          Obra de la CABECERA del documento (`dca.obride`), informada en el
+          99,98 %. Es para AUDITAR el documento; **para imputar coste manda la
+          obra de la LINEA** (`compras.albaran_lineas.obra_id`). Que cabecera y
+          lineas no coincidan es de F-093.
+        nulo_significa: El documento no tiene obra de cabecera.
+        agregacion: no_sumable
+      codigo_obra_cabecera:
+        significado: Codigo de la obra de cabecera (`con.cod`, `R-SIGRID-CON`).
+        nulo_significa: Sin obra de cabecera.
+      nombre_obra_cabecera:
+        significado: Nombre de la obra de cabecera (`con.res`).
+        nulo_significa: Sin obra de cabecera.
+      centro_coste_cabecera_id:
+        significado: >-
+          Centro de coste de la CABECERA (`dca.cenide`), 100 %. Un centro de
+          coste NO es una obra: se traduce a obra con `maestro.centros_coste`.
+        nulo_significa: El documento no tiene centro de coste de cabecera.
+        agregacion: no_sumable
+      codigo_centro_coste_cabecera:
+        significado: Codigo del centro de coste de cabecera (`con.cod`).
+        nulo_significa: Sin centro de coste de cabecera.
+      nombre_centro_coste_cabecera:
+        significado: Nombre del centro de coste de cabecera (`con.res`).
+        nulo_significa: Sin centro de coste de cabecera.
+      cuenta_analitica_cabecera_id:
+        significado: Cuenta analitica de la cabecera (`dca.caaide`), 0,33 %.
+        nulo_significa: El documento no lleva cuenta analitica (casi todos).
+        agregacion: no_sumable
+      proveedor_codigo:
+        significado: >-
+          Codigo del proveedor tal como lo lleva el DOCUMENTO (`dca.entcod`),
+          99,98 %; coincide con el de su ficha en el 99,97 %.
+        nulo_significa: El documento no lleva codigo de proveedor.
+      proveedor_nombre_documento:
+        significado: >-
+          Nombre del proveedor que lleva el DOCUMENTO (`dca.entres`), 99,99 %.
+          Es el de entonces: coincide con el nombre ACTUAL (`proveedor_nombre`)
+          solo en el 83,3 %.
+        nulo_significa: El documento no lleva nombre de proveedor.
+      proveedor_tipo_identificacion:
+        significado: >-
+          Tipo del documento identificativo del proveedor (`dca.entciftip`,
+          codigos 01 a 06), 98,65 %.
+        nulo_significa: El documento no lo lleva.
+      proveedor_pais_identificacion:
+        significado: Pais del CIF/NIF del proveedor (`dca.entcifpai`), 98,58 %.
+        nulo_significa: El documento no lo lleva.
+      iva_diferido:
+        significado: >-
+          Verdadero si el documento tiene IVA diferido (`dca.ivadif`), 7,99 %.
+          Nunca es NULL: falso si no.
+        agregacion: no_sumable
+      fecha_entrega_prevista:
+        significado: Fecha de entrega prevista (`dca.fecent`), 11,21 %.
+        nulo_significa: El documento no la lleva.
+        agregacion: no_sumable
+      fecha_limite:
+        significado: Fecha limite del documento (`dca.feclim`), 8,94 %.
+        nulo_significa: El documento no la lleva.
+        agregacion: no_sumable
+      facturado_sigrid:
+        significado: >-
+          Verdadero si Sigrid marca el documento como facturado (`dca.estfac =
+          1`; el campo esta informado en el 85,74 %). Nunca es NULL. Es la marca de la CABECERA; lo pendiente de
+          facturar de verdad se mide por linea
+          (`compras.albaran_lineas.importe_pendiente_facturar`).
+        agregacion: no_sumable
+      fecha_facturacion:
+        significado: Fecha en que se facturo segun Sigrid (`dca.fecfac`), 74,61 %.
+        nulo_significa: Sin fecha de facturacion.
+        agregacion: no_sumable
+      factura_cabecera_id:
+        significado: >-
+          Factura que la CABECERA del albaran apunta (`dca.idefac`), 17,08 %;
+          53.647 de 53.654 son una factura de `compras.facturas`. **La relacion
+          buena es por linea** (`compras.factura_lineas.albaran_id`): un albaran
+          se factura en varias facturas y la cabecera solo guarda una.
+        nulo_significa: La cabecera no apunta a ninguna factura.
+        agregacion: no_sumable
     relaciones:
+      - de: albaran_id
+        a: compras.albaran_recargos.albaran_id
+        cardinalidad: "1:N"
+        porque: >-
+          Para el detalle de los recargos y retenciones del documento (13,2 %
+          de los albaranes tienen alguno).
+      - de: obra_cabecera_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: Para la ficha de la obra de cabecera (auditar el documento, no imputar coste).
       - de: albaran_id
         a: compras.albaran_lineas.albaran_id
         cardinalidad: "1:N"
@@ -614,6 +856,7 @@ objetos:
           con LEFT JOIN, sin fila es «no marcado».
     ejemplos_preguntas:
       - Que albaranes ha traido el proveedor P este mes
+      - Cual es el total con IVA y lo retenido del albaran X
 
   albaran_lineas:
     tipo: tabla
@@ -793,6 +1036,53 @@ objetos:
       165.783 con las dos informadas, medido el 2026-09-16), con una mediana de
       4 dias, un p95 de 42 y 3.352 facturas por encima de los 90 dias. Elegir
       la equivocada desplaza cualquier serie temporal de compras.
+
+      **LA CABECERA ENTERA (F-128).** Desde el 2026-10-18 la tabla publica, AL
+      FINAL y sin mover ninguna columna anterior, los importes de la cabecera
+      de la factura, su contrato, la obra y el centro de CABECERA y lo que el
+      proveedor puso en el documento. Identidades medidas el 2026-10-17 sobre
+      las 167.458 facturas, 0 excepciones: `total_factura = base_imponible +
+      cuota_iva` (el total CON IVA y ANTES de retenciones), e
+      `importe_retenciones = total_factura - total_a_pagar =
+      importe_retencion_garantia + importe_retencion_fiscal`. Retencion total
+      25,31 M EUR = garantia 24,04 M + fiscal 1,27 M. Las lineas
+      (`compras.factura_lineas`) van SIN IVA y sin retenciones: su suma es
+      `importe_neto` (99,99 %), no `total_factura`. La obra de cabecera es
+      para AUDITAR la factura; para imputar coste, la de la linea
+      (`compras.factura_lineas.obra_id`). La retencion de la factura y la del
+      albaran del que viene son la misma: no se suman.
+
+      **LO QUE NO SE PUBLICA de la cabecera de Sigrid (`dcf`)**, por motivo
+      (inventario de `etl_sigrid/domain/cabecera_compra.py`, medido el
+      2026-10-17/18). VACIO (0 %): `ivareq`, `facper`, `fecpag`, `eitide`,
+      `ivaide`, `bul`, `pes`, `volum`, `ageide`, `ageimp`, `fecrec`, `estser`,
+      `estfac`, `antestser`, `antestfac`, `comide`, `divcod`, `divcam`,
+      `empconide`, `docrelide`, `paclis`, `tipsininv`, `prmide`, `estped`,
+      `antestped`, `empcif`, `cveide`, `alqide`, `alqfec`, `pexide`,
+      `divcamfec`, `ctdide`, `totbasdiv`, `totivadiv`, `totdocdiv`, `totdiv`,
+      `totpagdiv`, `refarc`, `pdpide`, `ano`, `mes`, `refcom`, `emnet`,
+      `eg3w`, `cptide`, `delide`, `aoside`, `PFID`, `cadcod1`, `caddir1`,
+      `cadcod2`, `caddir2`, `cadcod3`, `caddir3`, `cadcod4`, `caddir4`,
+      `cpapai`, `cpaban`, `cpasuc`, `cpaswi`, `cpatip`, `cpadiv`, `cpacue1`,
+      `cpacue2`, `ppoide`, `fecfac`, `horfac`, `idefac`, `clabieser`,
+      `facoriide`, `duaide`, `numregcon`, `fas`, `periodo`, `tipctr`,
+      `impavr`, `synckey`. RESIDUAL (cobertura marginal): `diremp2`,
+      `diremp3` (lineas 2-3 de la direccion, 1,3 % y 1,0 %), `emppreide`,
+      `horlim`, `eleenvio`. INTERNO (de Sigrid, sin catalogo ni significado
+      medible): `cla`, `docoritip`, `docoriide`, `pasdeside`, `pasori`,
+      `dtumID`, `tipgar` (no predice la retencion). REDUNDANTE: `tot` (=
+      `totpag` en el 100 %, publicada como `total_a_pagar`), `diremp1` (=
+      `entres`). OTRA_FEATURE: `hor` y `empide` (F-134: que son exige leer el
+      log de Sigrid). CATALOGO_NO_INGERIDO: `eioide`, `almide`, `cocide`
+      (tipo de contrato de compra, F-143) y `bantipide`. NO_INGERIDO
+      (excluidas de la ingesta): `eiotex`, `eittra`, `tex` (el memo de verdad
+      es `compras.documento_texto`), `dircon1`, `dirdir1`, `dircon2`,
+      `dirdir2`, `dircon3`, `dirdir3`, `emptex`, `texent`. La forma y el
+      medio de pago, la cuenta contable, el banco y la sucursal de la factura
+      estan en `compras.v_facturas_pago`. **La cuenta bancaria del proveedor
+      que lleva la factura** (`ban`, `bancue`, `bandig`) NO esta aqui: solo en
+      `compras_restringida.documento_cuenta_bancaria`, para el perfil total
+      del MCP (`R-COMPRAS-RESTRINGIDA`).
     grano: Una fila por factura o abono recibido. `factura_id` es clave primaria.
     clave_negocio: [factura_id]
     paso_etl: build_compras
@@ -899,7 +1189,185 @@ objetos:
           3.352 facturas con mas de 90 dias de diferencia.
         nulo_significa: El documento no tiene fecha de alta informada (3 facturas).
         agregacion: no_sumable
+      importe_bruto:
+        significado: >-
+          Importe bruto de la cabecera (`dcf.impbru`), antes de los descuentos
+          de LINEA: difiere de `importe_neto` en 11.334 facturas sin descuento
+          de cabecera (6,99 M EUR). Informado en el 99,98 %; 0 si no. Los
+          abonos van en negativo (`R-ABONO-NEGATIVO`).
+        unidad: EUR
+        agregacion: suma
+      importe_neto:
+        significado: >-
+          Importe neto de la cabecera (`dcf.impnet`) = la suma de las lineas
+          (`compras.factura_lineas.importe`) en el 99,99 %, SIN IVA.
+        unidad: EUR
+        agregacion: suma
+      importe_descuentos:
+        significado: >-
+          Descuentos de CABECERA (`dcf.impdes`) = suma de sus recargos de clase
+          DESCUENTO (69 de 69), 0,04 % de las facturas. **Aqui esta el
+          `RETESP`** («Retencion 5 % garantia (sin IVA)», 44 facturas, 871.193
+          EUR): Sigrid lo tiene como DESCUENTO, baja la base y por decision del
+          2026-10-17 NO es retencion de garantia ni entra en
+          `importe_retenciones`, aunque su asiento vaya a la cuenta de
+          retencion en 42 de las 44. Buscalo por `codigo_concepto` en
+          `compras.factura_recargos`.
+        unidad: EUR
+        agregacion: suma
+      importe_recargos:
+        significado: >-
+          Recargos de CABECERA (`dcf.imprec`) = suma de los recargos de clase
+          RECARGO (55 de 55), 0,03 %.
+        unidad: EUR
+        agregacion: suma
+      base_imponible:
+        significado: >-
+          Base imponible, SIN IVA (`dcf.totbas` = neto - descuentos +
+          recargos). Informada en el 99,98 %.
+        unidad: EUR
+        agregacion: suma
+      cuota_iva:
+        significado: >-
+          Cuota de IVA de la cabecera (`dcf.totiva`), 81,75 %. En total casa con
+          la del IVA de las lineas a 91 EUR, pero factura a factura difiere en
+          unas 14.400 por redondeo.
+        unidad: EUR
+        agregacion: suma
+      total_factura:
+        significado: >-
+          TOTAL de la factura CON IVA y ANTES de retenciones (`dcf.totdoc` =
+          `base_imponible + cuota_iva`, 0 excepciones), 99,99 %. Serie FR:
+          821,90 M EUR; FRGG: 96,73 M. Lo que se paga es `total_a_pagar`.
+        unidad: EUR
+        agregacion: suma
+      importe_retenciones:
+        significado: >-
+          Lo retenido en la factura: `total_factura - total_a_pagar` =
+          `importe_retencion_garantia + importe_retencion_fiscal` en el 100 %
+          (0 excepciones). Ninguna factura sin recargos tiene retencion.
+        unidad: EUR
+        agregacion: suma
+      importe_retencion_garantia:
+        significado: >-
+          Retencion de GARANTIA: suma de la cuota de los recargos de clase 4
+          (sobre total) y 5 (sobre base) en `compras.factura_recargos`, agregada
+          por factura antes de unir; 0 si no tiene. 24,04 M EUR. **El `RETESP`
+          NO esta aqui** (decision del 2026-10-17): es clase DESCUENTO y va en
+          `importe_descuentos`. Su cuadre con la contabilidad y los efectos
+          esta en `retenciones.retencion_factura`.
+        unidad: EUR
+        agregacion: suma
+      importe_retencion_fiscal:
+        significado: >-
+          Retencion FISCAL (IRPF de profesionales, arrendamientos, notarias):
+          suma de la cuota de los recargos de clase 3; 0 si no tiene. 1,27 M
+          EUR.
+        unidad: EUR
+        agregacion: suma
+      total_a_pagar:
+        significado: >-
+          Lo que se paga al proveedor (`dcf.totpag`) = total menos retenciones.
+          `dcf.tot` es el mismo numero en el 100 % y no se publica.
+        unidad: EUR
+        agregacion: suma
+      contrato_id:
+        significado: >-
+          Contrato de la CABECERA de la factura (`dcf.ctride`): 86.664
+          facturas (51,75 %), todos en `compras.contratos`. La traza por linea
+          a contrato (`compras.factura_lineas.contrato_id_directo`) solo cubre
+          6.991; para saber el contrato de una factura, esta columna.
+        nulo_significa: La cabecera no apunta a ningun contrato.
+        agregacion: no_sumable
+      obra_cabecera_id:
+        significado: >-
+          Obra de la CABECERA de la factura (`dcf.obride`), 95,98 %. Es para
+          AUDITAR la factura; **para imputar coste manda la obra de la LINEA**
+          (`compras.factura_lineas.obra_id`). Que cabecera y lineas no
+          coincidan es de F-093.
+        nulo_significa: La factura no tiene obra de cabecera.
+        agregacion: no_sumable
+      codigo_obra_cabecera:
+        significado: Codigo de la obra de cabecera (`con.cod`, `R-SIGRID-CON`).
+        nulo_significa: Sin obra de cabecera.
+      nombre_obra_cabecera:
+        significado: Nombre de la obra de cabecera (`con.res`).
+        nulo_significa: Sin obra de cabecera.
+      centro_coste_cabecera_id:
+        significado: >-
+          Centro de coste de la CABECERA (`dcf.cenide`), 97,05 %. Un centro de
+          coste NO es una obra: se traduce a obra con `maestro.centros_coste`.
+        nulo_significa: La factura no tiene centro de coste de cabecera.
+        agregacion: no_sumable
+      codigo_centro_coste_cabecera:
+        significado: Codigo del centro de coste de cabecera (`con.cod`).
+        nulo_significa: Sin centro de coste de cabecera.
+      nombre_centro_coste_cabecera:
+        significado: Nombre del centro de coste de cabecera (`con.res`).
+        nulo_significa: Sin centro de coste de cabecera.
+      cuenta_analitica_cabecera_id:
+        significado: Cuenta analitica de la cabecera (`dcf.caaide`), 1,10 %.
+        nulo_significa: La factura no lleva cuenta analitica (casi todas).
+        agregacion: no_sumable
+      proveedor_codigo:
+        significado: >-
+          Codigo del proveedor tal como lo lleva la FACTURA (`dcf.entcod`),
+          99,99 %; coincide con el de su ficha en el 99,97 %.
+        nulo_significa: La factura no lleva codigo de proveedor.
+      proveedor_nombre_documento:
+        significado: >-
+          Nombre del proveedor que lleva la FACTURA (`dcf.entres`), 99,99 %. Es
+          el de entonces: coincide con el nombre ACTUAL (`proveedor_nombre`)
+          solo en el 83,4 %.
+        nulo_significa: La factura no lleva nombre de proveedor.
+      proveedor_tipo_identificacion:
+        significado: >-
+          Tipo del documento identificativo del proveedor (`dcf.entciftip`,
+          codigos 01 a 06), 95,44 %.
+        nulo_significa: La factura no lo lleva.
+      proveedor_pais_identificacion:
+        significado: Pais del CIF/NIF del proveedor (`dcf.entcifpai`), 95,52 %.
+        nulo_significa: La factura no lo lleva.
+      iva_diferido:
+        significado: >-
+          Verdadero si la factura tiene IVA diferido (`dcf.ivadif`), 14,72 %.
+          Nunca es NULL: falso si no.
+        agregacion: no_sumable
+      inversion_sujeto_pasivo:
+        significado: >-
+          Verdadero si la factura es de inversion del sujeto pasivo
+          (`dcf.tipisp`), 0,73 %. Nunca es NULL: falso si no.
+        agregacion: no_sumable
+      fecha_entrega_prevista:
+        significado: Fecha de entrega prevista (`dcf.fecent`), 8,92 %.
+        nulo_significa: La factura no la lleva.
+        agregacion: no_sumable
+      fecha_limite:
+        significado: Fecha limite de la factura (`dcf.feclim`), 7,52 %.
+        nulo_significa: La factura no la lleva.
+        agregacion: no_sumable
     relaciones:
+      - de: factura_id
+        a: compras.factura_recargos.factura_id
+        cardinalidad: "1:N"
+        porque: >-
+          Para el detalle de los recargos y retenciones de la factura (19,7 %
+          de las facturas tienen alguno).
+      - de: factura_id
+        a: retenciones.retencion_factura.factura_id
+        cardinalidad: "1:1"
+        porque: >-
+          Para el cuadre de su retencion de garantia contra la contabilidad y
+          los efectos. Solo tienen fila las que tienen garantia o apunte de
+          retencion: con LEFT JOIN.
+      - de: contrato_id
+        a: compras.contratos.contrato_id
+        cardinalidad: "N:1"
+        porque: Para el contrato de cabecera de la factura.
+      - de: obra_cabecera_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: Para la ficha de la obra de cabecera (auditar la factura, no imputar coste).
       - de: factura_id
         a: compras.factura_lineas.factura_id
         cardinalidad: "1:N"
@@ -939,6 +1407,7 @@ objetos:
       - En que estado esta la factura X, esta aprobada o solo contabilizada
       - Cuantas facturas hay contabilizadas sin aprobar, retenidas o rechazadas
       - De que fecha es la factura X, la suya o la de alta en Sigrid
+      - Cuanto es la factura X con IVA, cuanto se le retiene y cuanto se le paga
 
   factura_lineas:
     tipo: tabla
@@ -4615,3 +5084,237 @@ objetos:
       - Que facturas han llegado despues de la liquidatoria
       - Que facturas de la obra X han llegado tras la liquidatoria de su contrato
       - Cuantos dias despues de la liquidatoria llegan las facturas tardias
+
+  factura_recargos:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **LOS RECARGOS Y RETENCIONES DE CADA FACTURA** (F-128): una fila por
+      recargo de la cabecera de una factura de proveedor (`raw.dcfrec`), con su
+      clase. 32.994 recargos en 32.922 facturas (19,7 %) el 2026-10-17. Las
+      clases (`clase_recargo`): RECARGO (financiero, materiales, va a
+      `compras.facturas.importe_recargos`), DESCUENTO (pronto pago; va a
+      `importe_descuentos`), RETENCION_FISCAL (IRPF de profesionales,
+      arrendamientos, notarias, 6.009 recargos, 1,27 M EUR), y la RETENCION DE
+      GARANTIA sobre total (158, 0,29 M) o sobre base (26.699, 23,75 M).
+      `es_retencion_garantia` marca solo las dos de garantia.
+
+      **TRAMPA `RETESP`.** El concepto `RETESP` («Retencion 5 % garantia (sin
+      IVA)», 44 facturas, 871.193 EUR) esta dado de alta en Sigrid como
+      DESCUENTO: aqui sale con `clase_recargo = 'DESCUENTO'` y
+      `es_retencion_garantia` FALSO (decision del humano del 2026-10-17). Baja
+      la base y no entra en lo retenido de la factura, aunque su asiento vaya a
+      la cuenta de retencion del proveedor en 42 de las 44. Si te preguntan por
+      el, buscalo por `codigo_concepto = 'RETESP'`.
+
+      Una factura y el albaran del que viene llevan la MISMA retencion en sus
+      dos tablas de recargos (`compras.albaran_recargos`): **no se suman**.
+    grano: >-
+      Una fila por recargo, identificada por `recargo_id` (`dcfrec.ide`), clave
+      primaria declarada. Una factura puede tener varios (10 repiten concepto en
+      dos posiciones).
+    clave_negocio: [recargo_id]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      recargo_id:
+        significado: Identificador del recargo en Sigrid (`dcfrec.ide`).
+        agregacion: no_sumable
+      factura_id:
+        significado: La factura a la que pertenece (`dcfrec.docide`).
+        agregacion: no_sumable
+      posicion:
+        significado: Orden del recargo dentro de la factura (`dcfrec.pos`).
+        agregacion: no_sumable
+      concepto_id:
+        significado: El concepto del recargo (`dcfrec.recide`, ficha en `raw.rec` / `con`).
+        nulo_significa: El recargo no tiene concepto (3 recargos).
+        agregacion: no_sumable
+      codigo_concepto:
+        significado: >-
+          Codigo del concepto (`con.cod`): `RET5`, `RET2.5`, `RET10`, `gar02`
+          (garantia sobre base), `RET5T` (sobre total), `RETESP` (clase
+          DESCUENTO, no garantia), los de IRPF...
+        nulo_significa: Sin concepto, o concepto sin ficha.
+      concepto:
+        significado: Nombre del concepto (`con.res`).
+        nulo_significa: Sin concepto, o concepto sin ficha.
+      clase_recargo:
+        significado: >-
+          Que es el recargo, por su clase de Sigrid (`dcfrec.reccla`,
+          `compras.fn_clase_recargo`). **El `RETESP` sale DESCUENTO** y no es
+          retencion de garantia (decision del 2026-10-17).
+        valores: [RECARGO, DESCUENTO, RETENCION_FISCAL, RETENCION_GARANTIA_TOTAL, RETENCION_GARANTIA_BASE, OTRA]
+      es_retencion_garantia:
+        significado: >-
+          Verdadero solo para las dos clases de garantia (4 y 5,
+          `compras.fn_es_retencion_garantia`). Nunca es NULL.
+        agregacion: no_sumable
+      base:
+        significado: Base sobre la que se aplica el recargo (`dcfrec.bas`), SIN IVA.
+        unidad: EUR
+        agregacion: no_sumable
+      porcentaje:
+        significado: >-
+          Porcentaje aplicado, en tanto por cien (5 = 5 %; Sigrid lo guarda en
+          tanto por uno). La cuota es base x porcentaje / 100 salvo en los de
+          `valor_fijo`.
+        unidad: porcentaje
+        agregacion: no_sumable
+      cuota:
+        significado: >-
+          Importe del recargo (`dcfrec.cuo`). Las retenciones van en positivo
+          (lo que se retiene); 444 cuotas negativas son de abonos.
+        unidad: EUR
+        agregacion: suma
+      cuota_iva:
+        significado: IVA del recargo (`dcfrec.ivacuo`); casi siempre 0.
+        unidad: EUR
+        agregacion: suma
+      valor_fijo:
+        significado: Verdadero si el recargo es un importe fijo y no un porcentaje. Nunca es NULL.
+        agregacion: no_sumable
+      cuenta_id:
+        significado: Cuenta contable del recargo (`dcfrec.cueide`).
+        nulo_significa: El recargo no lleva cuenta.
+        agregacion: no_sumable
+      cuenta_contable:
+        significado: Codigo de esa cuenta (`con.cod`).
+        nulo_significa: El recargo no lleva cuenta.
+    relaciones:
+      - de: factura_id
+        a: compras.facturas.factura_id
+        cardinalidad: "N:1"
+        porque: La cabecera de la factura, con lo retenido ya agregado.
+    ejemplos_preguntas:
+      - Que retenciones lleva la factura X y de que clase
+      - Que facturas del proveedor P llevan el concepto RETESP
+
+  albaran_recargos:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **LOS RECARGOS Y RETENCIONES DE CADA ALBARAN** (F-128), proformas y notas
+      incluidas: una fila por recargo de la cabecera (`raw.dcarec`), con las
+      mismas columnas y clases que `compras.factura_recargos`. 41.466 recargos
+      en 41.419 albaranes (13,2 %) el 2026-10-17; casi todos son retencion de
+      garantia sobre base (40.131, 20,59 M EUR).
+
+      **No se suma con la de la factura**: la retencion del albaran y la de su
+      factura son la misma vista dos veces. Para lo retenido a un proveedor,
+      `compras.factura_recargos`. El `RETESP` sale DESCUENTO, como en las
+      facturas.
+    grano: >-
+      Una fila por recargo, identificada por `recargo_id` (`dcarec.ide`), clave
+      primaria declarada.
+    clave_negocio: [recargo_id]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      recargo_id:
+        significado: Identificador del recargo en Sigrid (`dcarec.ide`).
+        agregacion: no_sumable
+      albaran_id:
+        significado: El albaran, proforma o nota al que pertenece (`dcarec.docide`).
+        agregacion: no_sumable
+      posicion:
+        significado: Orden del recargo dentro del documento (`dcarec.pos`).
+        agregacion: no_sumable
+      concepto_id:
+        significado: El concepto del recargo (`dcarec.recide`).
+        nulo_significa: El recargo no tiene concepto.
+        agregacion: no_sumable
+      codigo_concepto:
+        significado: Codigo del concepto (`con.cod`), como en `compras.factura_recargos`.
+        nulo_significa: Sin concepto, o concepto sin ficha.
+      concepto:
+        significado: Nombre del concepto (`con.res`).
+        nulo_significa: Sin concepto, o concepto sin ficha.
+      clase_recargo:
+        significado: >-
+          Que es el recargo, por su clase de Sigrid (`dcarec.reccla`,
+          `compras.fn_clase_recargo`). El `RETESP` sale DESCUENTO.
+        valores: [RECARGO, DESCUENTO, RETENCION_FISCAL, RETENCION_GARANTIA_TOTAL, RETENCION_GARANTIA_BASE, OTRA]
+      es_retencion_garantia:
+        significado: Verdadero solo para las clases 4 y 5. Nunca es NULL.
+        agregacion: no_sumable
+      base:
+        significado: Base sobre la que se aplica el recargo, SIN IVA.
+        unidad: EUR
+        agregacion: no_sumable
+      porcentaje:
+        significado: Porcentaje aplicado, en tanto por cien (5 = 5 %).
+        unidad: porcentaje
+        agregacion: no_sumable
+      cuota:
+        significado: >-
+          Importe del recargo (`dcarec.cuo`). No se suma con el de la factura
+          del albaran: es la misma retencion.
+        unidad: EUR
+        agregacion: suma
+      cuota_iva:
+        significado: IVA del recargo (`dcarec.ivacuo`).
+        unidad: EUR
+        agregacion: suma
+      valor_fijo:
+        significado: Verdadero si el recargo es un importe fijo. Nunca es NULL.
+        agregacion: no_sumable
+      cuenta_id:
+        significado: Cuenta contable del recargo (`dcarec.cueide`).
+        nulo_significa: El recargo no lleva cuenta.
+        agregacion: no_sumable
+      cuenta_contable:
+        significado: Codigo de esa cuenta (`con.cod`).
+        nulo_significa: El recargo no lleva cuenta.
+    relaciones:
+      - de: albaran_id
+        a: compras.albaranes.albaran_id
+        cardinalidad: "N:1"
+        porque: La cabecera del albaran, con lo retenido ya agregado.
+    ejemplos_preguntas:
+      - Que retencion lleva la proforma X
+
+  fn_clase_recargo:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de compras. Las tablas de recargos ya publican
+      la clase traducida en `clase_recargo`.
+    descripcion: >-
+      Traduce la clase de un recargo de documento de compra (`reccla`) a su
+      literal: 0 RECARGO, 1 DESCUENTO, 3 RETENCION_FISCAL, 4
+      RETENCION_GARANTIA_TOTAL, 5 RETENCION_GARANTIA_BASE; cualquier otro valor
+      o NULL, OTRA. El mapa vive una sola vez en
+      `etl_sigrid/domain/cabecera_compra.py` y un test compara el SQL con el.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_es_retencion_garantia:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de compras. Las tablas de recargos ya publican
+      la marca en `es_retencion_garantia`.
+    descripcion: >-
+      Verdadero SOLO si el recargo es retencion de garantia: clases 4 (sobre
+      total) y 5 (sobre base); falso para NULL. Tiene UN parametro a proposito:
+      por decision del humano del 2026-10-17 el concepto `RETESP` (clase 1,
+      DESCUENTO) NO cuenta como garantia, y la funcion no recibe el codigo del
+      concepto para que no se le pueda colar. `retenciones` tiene una copia
+      deliberada (`retenciones.fn_es_retencion_garantia`).
+    grano: null
+    clave_negocio: []
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []

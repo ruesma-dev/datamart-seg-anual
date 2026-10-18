@@ -153,8 +153,8 @@ def test_f128_r12_r13_recargos_columnas_y_origen(tabla, doc, desde, cabecera, al
     assert _expresion(s, desde, f"{doc}_id") == "r.docide"
     assert _expresion(s, desde, "posicion") == "r.pos"
     assert _expresion(s, desde, "concepto_id") == "NULLIF(r.recide, 0)"
-    assert _expresion(s, desde, "codigo_concepto") == "x.cod"
-    assert _expresion(s, desde, "concepto") == "x.res"
+    assert _expresion(s, desde, "codigo_concepto") == "cpt.cod"
+    assert _expresion(s, desde, "concepto") == "cpt.res"
     assert _expresion(s, desde, "clase_recargo") == "compras.fn_clase_recargo(r.reccla)"
     assert (
         _expresion(s, desde, "es_retencion_garantia")
@@ -168,7 +168,7 @@ def test_f128_r12_r13_recargos_columnas_y_origen(tabla, doc, desde, cabecera, al
     assert _expresion(s, desde, "cuenta_id") == "NULLIF(r.cueide, 0)"
     assert _expresion(s, desde, "cuenta_contable") == "cue.cod"
     resto = " ".join(s[s.index(f"FROM {desde}"):].split())
-    assert "LEFT JOIN raw.con x ON x.ide = r.recide" in resto
+    assert "LEFT JOIN raw.con cpt ON cpt.ide = r.recide" in resto
     assert "LEFT JOIN raw.con cue ON cue.ide = NULLIF(r.cueide, 0)" in resto
     assert (
         f"WHERE EXISTS (SELECT 1 FROM {cabecera} WHERE {alias}.ide = r.docide)" in resto

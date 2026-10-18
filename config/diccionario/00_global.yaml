@@ -611,7 +611,23 @@
 # `tests/test_f144_empresa_por_defecto.py`); en los objetos sin ninguna de las
 # dos el criterio no se aplica y la respuesta avisa de que mezcla las empresas.
 
-version: 55
+# version 56 (F-128, 2026-10-18): LA CABECERA ENTERA DE LA FACTURA Y DEL
+# ALBARAN. `compras.facturas` (+27 columnas) y `compras.albaranes` (+34) publican
+# AL FINAL los importes de cabecera (`total_factura`/`total_documento` CON IVA y
+# antes de retenciones, `importe_retenciones` = garantia + fiscal), la obra y el
+# centro de CABECERA, el contrato de la factura y lo que el proveedor puso en el
+# documento; sus fichas dicen que columnas de Sigrid NO se publican y por que.
+# Objetos nuevos: `compras.factura_recargos`, `compras.albaran_recargos`,
+# `compras.fn_clase_recargo`, `compras.fn_es_retencion_garantia` (garantia =
+# clases 4 y 5; el `RETESP` es DESCUENTO, decision del 2026-10-17),
+# `compras_restringida.documento_cuenta_bancaria` (la cuenta del proveedor, solo
+# perfil total), `retenciones.retencion_factura`,
+# `retenciones.v_cuadre_factura_obra` y `retenciones.fn_es_retencion_garantia`.
+# `R-COMPRAS-RESTRINGIDA` nombra la tabla nueva (mismo ambito);
+# `R-EMPRESA-POR-DEFECTO` coloca los objetos nuevos en sus listas. Sin regla
+# dura nueva ni pendientes nuevos.
+
+version: 56
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -846,7 +862,9 @@ reglas:
       `compras.v_pbi_contrato_consumo`, `compras.v_pbi_partida_coste`,
       `compras.v_pbi_proveedor_obra`, `retenciones.apuntes_contables`,
       `retenciones.fin_obra`, `retenciones.saldo_contable`,
-      `retenciones.v_retencion_contable_obra`, `personal.recursos`,
+      `retenciones.v_retencion_contable_obra`, `retenciones.retencion_factura`,
+      `retenciones.v_cuadre_factura_obra` (estas dos, la empresa de la obra de
+      CABECERA de la factura), `personal.recursos`,
       `contabilidad.plan_cuentas`, `contabilidad.mayor`,
       `contabilidad.saldos_cuenta_mes`, `contabilidad.apuntes_restringidos_mes`,
       `contabilidad_restringida.plan_cuentas`, `contabilidad_restringida.mayor`,
@@ -870,7 +888,9 @@ reglas:
       `compras.albaranes`, `compras.vencimientos`, `compras.v_facturas_pago`,
       `compras.documento_alarmas`, `compras_restringida.documento_alarmas`,
       `compras.documento_liquidatoria`, `compras.v_estado_documentos`,
-      `compras.contrato_lineas`, `personal.partes` (su cabecera; la obra que
+      `compras.contrato_lineas`, `compras.factura_recargos`,
+      `compras.albaran_recargos`, `compras_restringida.documento_cuenta_bancaria`,
+      `personal.partes` (su cabecera; la obra que
       imputa es la de `personal.partes_lineas`),
       `retenciones.v_pbi_retencion_entidad`,
       `retenciones.v_pbi_retencion_resumen`,
@@ -889,7 +909,12 @@ reglas:
       `retenciones.movimientos`, que lleva `obra_id`, y no desde las `v_pbi_*`
       agregadas. Los importes de compras por empresa salen de
       `compras.fact_compras_linea`; contar facturas o albaranes de una empresa
-      no tiene camino comprobado. `stg`, `mart`, `cierre` y `descompuestos` no
+      no tiene camino comprobado. Desde F-128 `compras.facturas` y
+      `compras.albaranes` llevan la obra de CABECERA (`obra_cabecera_id`, que NO
+      es `obra_id`): su empresa en `maestro.obras` es la de esa obra, no la del
+      documento (que es `empide`, pendiente de F-134), y un 4 % de las facturas
+      no la tiene; si el usuario la acepta como aproximacion, se filtra por ella
+      y se dice. `stg`, `mart`, `cierre` y `descompuestos` no
       tienen empresa: son el universo del seguimiento, donde esta regla no
       anade filtro y manda `R-UNIVERSO-OBRA`.
     motivo: >-
@@ -1072,6 +1097,14 @@ reglas:
       «restringida» = reservada al perfil total; el perfil RESTRINGIDO
       (administrativos) ve MENOS que el estandar y no lee este esquema
       (`R-PERFIL-RESTRINGIDO`).
+
+      Desde F-128 el esquema guarda tambien
+      `compras_restringida.documento_cuenta_bancaria`: la cuenta bancaria del
+      proveedor que lleva cada factura o albaran (decision del humano del
+      2026-10-17). Las cuentas de proveedor no tienen version general: sin el
+      perfil total, dilo y no las busques por otro camino (ni en `raw` ni
+      reconstruyendolas del banco y la sucursal de
+      `compras.v_facturas_pago`, que no son la cuenta).
     motivo: >-
       Decision del humano del 2026-10-14 (F-138, D9): las alarmas de recursos
       (familia 33) y de partes de trabajo (35) nombran a trabajadores y sus

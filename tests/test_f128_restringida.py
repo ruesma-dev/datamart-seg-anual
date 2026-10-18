@@ -107,7 +107,7 @@ def test_f128_r20_expresiones():
     esperadas = {
         "documento_id": "d.ide",
         "tipo_documento": "d.tipo",
-        "codigo_documento": "c.cod",
+        "codigo_documento": "dcon.cod",
         "fecha_documento": "compras.fn_sigrid_date(d.fecdoc)",
         "proveedor_id": "NULLIF(d.entide, 0)",
         "proveedor_nombre": "prv.res",
@@ -138,7 +138,7 @@ def test_f128_r20_lee_solo_raw_y_sin_bantipide():
     assert "bantipide" not in s and "banide" not in s
     plano = " ".join(s.split())
     for join in (
-        "LEFT JOIN raw.con c ON c.ide = d.ide",
+        "LEFT JOIN raw.con dcon ON dcon.ide = d.ide",
         "LEFT JOIN raw.con prv ON prv.ide = NULLIF(d.entide, 0)",
         "LEFT JOIN raw.auxban bb ON bb.ide = NULLIF(d.banban, 0)",
         "LEFT JOIN raw.auxban bs ON bs.ide = NULLIF(d.bansuc, 0)",

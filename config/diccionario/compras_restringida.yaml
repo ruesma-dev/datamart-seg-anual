@@ -18,6 +18,13 @@
 # F-141 (2026-10-17): «restringida» = reservada al perfil total. El perfil
 # restringido del MCP (administrativos, grupo `sigrid_dm_perfil_restringido_ro`)
 # ve MENOS que el estandar y NO la lee (`R-PERFIL-RESTRINGIDO`).
+#
+# F-128 (2026-10-18): el esquema guarda YA DOS COSAS. Ademas de las alarmas
+# completas, `documento_cuenta_bancaria`: la cuenta bancaria del proveedor que
+# lleva cada factura o albaran (D4-B del humano, 2026-10-17: es dato del
+# proveedor, y personal si es autonomo). La construye `build_compras`
+# (`01_documentos.sql`, su ultima seccion). Ni un numero de cuenta en este
+# fichero: solo agregados.
 
 version: 1
 esquema: compras_restringida
@@ -121,3 +128,105 @@ objetos:
     ejemplos_preguntas:
       - Que alarmas tienen los partes de trabajo de la obra X
       - Cuantas alarmas de recursos y de partes hay y de cuando son
+
+  documento_cuenta_bancaria:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **ACCESO RESTRINGIDO: solo el perfil total del MCP.** Si no lo tienes, la
+      consulta devuelve «permission denied»: dilo asi y no busques la cuenta
+      por otro camino (`R-COMPRAS-RESTRINGIDA`). Las cuentas de proveedor no
+      tienen version general.
+
+      **LA CUENTA BANCARIA DEL PROVEEDOR EN CADA DOCUMENTO** (F-128, decision
+      del humano del 2026-10-17, D4-B): una fila por factura (`raw.dcf`) o
+      albaran (`raw.dca`, proformas y notas incluidas) que lleva la cuenta
+      informada. Medido el 2026-10-17: 17.706 facturas (10,6 %) y 17.756
+      albaranes (5,7 %), de 638 y 530 proveedores distintos. Es la cuenta que
+      llevaba el DOCUMENTO, **no la ficha actual del proveedor**: coincide con
+      la cuenta que hoy tiene su ficha solo en el 31 % de las facturas y el
+      72 % de los albaranes (la ficha conserva cuenta en 1.032 de 9.618
+      proveedores, y 61 proveedores llevan mas de una cuenta en sus facturas).
+      Formato tal cual, sin normalizar ni convertir: con forma de IBAN el 44 %
+      de las facturas y el 68 % de los albaranes, CCC de 20 digitos casi todo el
+      resto. Banco y sucursal resueltos contra `raw.auxban`.
+
+      El banco y la sucursal de la FACTURA (no la cuenta) los publica tambien
+      `compras.v_facturas_pago` para todos los perfiles. Aqui no estan el tipo
+      de cuenta (`bantipide`, su catalogo no se ingiere) ni la cuenta PROPIA del
+      albaran (`dca.banide`).
+    grano: >-
+      Una fila por documento con cuenta, identificada por `documento_id` (el
+      `ide` de la factura o del albaran), clave primaria declarada: no hay
+      ningun `ide` comun entre facturas y albaranes.
+    clave_negocio: [documento_id]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      documento_id:
+        significado: >-
+          Identificador del documento: `compras.facturas.factura_id` si
+          `tipo_documento` es FACTURA, `compras.albaranes.albaran_id` si es
+          ALBARAN.
+        agregacion: no_sumable
+      tipo_documento:
+        significado: De que tabla viene el documento. ALBARAN incluye proformas y notas.
+        valores: [FACTURA, ALBARAN]
+      codigo_documento:
+        significado: Codigo del documento tal y como se ve en Sigrid (`con.cod`).
+        nulo_significa: El documento no tiene ficha en `con` (no deberia pasar).
+      fecha_documento:
+        significado: Fecha del documento del proveedor (`fecdoc`).
+        nulo_significa: El documento no trae fecha propia.
+        agregacion: no_sumable
+      proveedor_id:
+        significado: El proveedor del documento (`entide`).
+        nulo_significa: El documento no tiene proveedor informado.
+        agregacion: no_sumable
+      proveedor_nombre:
+        significado: Nombre ACTUAL del proveedor (`con.res`).
+        nulo_significa: Sin proveedor, o proveedor sin ficha.
+      banco_id:
+        significado: Banco de la cuenta (`banban`, catalogo `raw.auxban`).
+        nulo_significa: La cuenta no trae el banco desglosado (los IBAN sin desglose).
+        agregacion: no_sumable
+      banco:
+        significado: Nombre del banco (`raw.auxban.res`).
+        nulo_significa: Sin banco desglosado, o fuera del catalogo.
+      sucursal_id:
+        significado: Sucursal de la cuenta (`bansuc`, catalogo `raw.auxban`).
+        nulo_significa: La cuenta no trae la sucursal desglosada.
+        agregacion: no_sumable
+      sucursal:
+        significado: Nombre de la sucursal (`raw.auxban.res`).
+        nulo_significa: Sin sucursal desglosada, o fuera del catalogo.
+      digitos_control:
+        significado: Digitos de control de la cuenta (`bandig`), texto.
+        nulo_significa: La cuenta no trae el desglose (3.361 facturas y 7.817 albaranes con IBAN sin desglose).
+      numero_cuenta:
+        significado: Numero de cuenta desglosado (`bancue`), texto.
+        nulo_significa: La cuenta no trae el desglose.
+      cuenta_bancaria:
+        significado: >-
+          La cuenta completa tal como la lleva el documento (`ban`), IBAN o CCC,
+          sin normalizar. DATO DEL PROVEEDOR (personal si es autonomo). Nunca
+          es NULL: sin cuenta, el documento no esta en la tabla.
+    relaciones:
+      - de: documento_id
+        a: compras.facturas.factura_id
+        cardinalidad: "1:1"
+        porque: >-
+          La factura, cuando `tipo_documento = 'FACTURA'`. Filtra antes por
+          tipo: el mismo `documento_id` no es nunca factura y albaran a la vez.
+      - de: documento_id
+        a: compras.albaranes.albaran_id
+        cardinalidad: "1:1"
+        porque: La cabecera del albaran, cuando `tipo_documento = 'ALBARAN'`.
+      - de: proveedor_id
+        a: maestro.proveedores.proveedor_id
+        cardinalidad: "N:1"
+        porque: La ficha actual del proveedor (que puede tener hoy otra cuenta).
+    ejemplos_preguntas:
+      - A que cuenta pidio el proveedor P que se le pagara la factura X
+      - Que proveedores han cambiado de cuenta entre sus facturas

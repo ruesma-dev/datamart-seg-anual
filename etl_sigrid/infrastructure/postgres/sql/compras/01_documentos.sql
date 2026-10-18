@@ -237,8 +237,8 @@ SELECT
     r.docide                                AS factura_id,
     r.pos                                   AS posicion,
     NULLIF(r.recide, 0)                     AS concepto_id,
-    x.cod                                   AS codigo_concepto,
-    x.res                                   AS concepto,
+    cpt.cod                                 AS codigo_concepto,
+    cpt.res                                 AS concepto,
     compras.fn_clase_recargo(r.reccla)      AS clase_recargo,
     compras.fn_es_retencion_garantia(r.reccla) AS es_retencion_garantia,
     COALESCE(r.bas, 0)::NUMERIC(18, 2)      AS base,
@@ -249,7 +249,7 @@ SELECT
     NULLIF(r.cueide, 0)                     AS cuenta_id,
     cue.cod                                 AS cuenta_contable
 FROM raw.dcfrec r
-LEFT JOIN raw.con x   ON x.ide = r.recide
+LEFT JOIN raw.con cpt ON cpt.ide = r.recide
 LEFT JOIN raw.con cue ON cue.ide = NULLIF(r.cueide, 0)
 WHERE EXISTS (SELECT 1 FROM raw.dcf f WHERE f.ide = r.docide);
 
@@ -264,8 +264,8 @@ SELECT
     r.docide                                AS albaran_id,
     r.pos                                   AS posicion,
     NULLIF(r.recide, 0)                     AS concepto_id,
-    x.cod                                   AS codigo_concepto,
-    x.res                                   AS concepto,
+    cpt.cod                                 AS codigo_concepto,
+    cpt.res                                 AS concepto,
     compras.fn_clase_recargo(r.reccla)      AS clase_recargo,
     compras.fn_es_retencion_garantia(r.reccla) AS es_retencion_garantia,
     COALESCE(r.bas, 0)::NUMERIC(18, 2)      AS base,
@@ -276,7 +276,7 @@ SELECT
     NULLIF(r.cueide, 0)                     AS cuenta_id,
     cue.cod                                 AS cuenta_contable
 FROM raw.dcarec r
-LEFT JOIN raw.con x   ON x.ide = r.recide
+LEFT JOIN raw.con cpt ON cpt.ide = r.recide
 LEFT JOIN raw.con cue ON cue.ide = NULLIF(r.cueide, 0)
 WHERE EXISTS (SELECT 1 FROM raw.dca a WHERE a.ide = r.docide);
 
@@ -590,7 +590,7 @@ WITH doc AS (
 SELECT
     d.ide                                   AS documento_id,
     d.tipo                                  AS tipo_documento,     -- FACTURA / ALBARAN
-    c.cod                                   AS codigo_documento,
+    dcon.cod                                AS codigo_documento,
     compras.fn_sigrid_date(d.fecdoc)        AS fecha_documento,
     NULLIF(d.entide, 0)                     AS proveedor_id,
     prv.res                                 AS proveedor_nombre,
@@ -602,7 +602,7 @@ SELECT
     NULLIF(btrim(d.bancue), '')             AS numero_cuenta,
     btrim(d.ban)                            AS cuenta_bancaria     -- la del DOCUMENTO
 FROM doc d
-LEFT JOIN raw.con c      ON c.ide = d.ide
+LEFT JOIN raw.con dcon   ON dcon.ide = d.ide
 LEFT JOIN raw.con prv    ON prv.ide = NULLIF(d.entide, 0)
 LEFT JOIN raw.auxban bb  ON bb.ide = NULLIF(d.banban, 0)
 LEFT JOIN raw.auxban bs  ON bs.ide = NULLIF(d.bansuc, 0);
