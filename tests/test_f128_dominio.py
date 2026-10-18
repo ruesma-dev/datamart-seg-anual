@@ -168,7 +168,7 @@ def test_f128_r3_decisiones_reflejadas():
 
 def test_f128_r3_publicadas_por_objeto():
     fac = cc.publicadas(cc.INVENTARIO_DCF, "compras.facturas")
-    # `importe_retenciones` = totdoc − totpag no es la ruta de UNA columna.
+    # `importe_retenciones` = totdoc - totpag no es la ruta de UNA columna.
     assert "total_factura" in fac and "importe_retenciones" not in fac
     assert fac[:2] == ["factura_id", "proveedor_id"]
     assert "total_a_pagar" in fac

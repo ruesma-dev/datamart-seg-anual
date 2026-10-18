@@ -16,7 +16,7 @@ DOS CONTRATOS QUE EL SQL TIENE QUE CUMPLIR, escritos aquí una sola vez:
    **D2-B (humano, 2026-10-17): garantía = clases 4 y 5 y NADA MÁS.** El
    concepto `RETESP` («Retención 5 % garantía (sin IVA)», 44 facturas, 871.193 €)
    está dado de alta en Sigrid como clase 1, DESCUENTO: baja la base y NO entra
-   en `totdoc − totpag`, aunque su asiento vaya a la cuenta de retención del
+   en `totdoc - totpag`, aunque su asiento vaya a la cuenta de retención del
    proveedor en 42 de las 44. Aquí NO es garantía, y por eso la función no
    recibe el código del concepto: no hay forma de colárselo.
 
@@ -278,7 +278,7 @@ INVENTARIO_DCF: Final[dict[str, tuple[str, str]]] = {
     "tipctr": _VACIO,
     "tipgar": (
         "INTERNO",
-        "−1/0; no predice la retención (15.035 frente a 11.813 facturas con garantía)",
+        "-1/0; no predice la retención (15.035 frente a 11.813 facturas con garantía)",
     ),
     "impavr": _VACIO,
     "synckey": _VACIO,
@@ -444,7 +444,7 @@ INVENTARIO_DCA: Final[dict[str, tuple[str, str]]] = {
     "fas": _VACIO,
     "periodo": _VACIO,
     "tipctr": _VACIO,
-    "tipgar": ("INTERNO", "−1/0; no predice la retención"),
+    "tipgar": ("INTERNO", "-1/0; no predice la retención"),
     "impavr": _VACIO,
     "synckey": _VACIO,
     # Excluidas en `tables_sigrid.yaml` (medidas en Sigrid el 2026-10-17).
