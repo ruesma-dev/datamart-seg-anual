@@ -600,7 +600,15 @@
 # esta desplegada y nombra `abrir_adjunto(adjunto_id)` (su F-023, desplegada el
 # 2026-10-17): la IA localiza el `adjunto_id` en el indice y abre el original.
 
-version: 54
+# version 55 (F-144, 2026-10-18): SI NO SE INDICA EMPRESA, ES CONSTRUCCIONES
+# RUESMA. Orden del humano: «en general si no se indica empresa es construcciones
+# ruesma. es criterio general». Regla dura nueva `R-EMPRESA-POR-DEFECTO`, junto a
+# `R-CODIGO-POR-EMPRESA` (que remite a ella): sin empresa en la pregunta se
+# filtra `empresa_id = 1` en todo objeto con empresa, la IA DICE que lo ha
+# supuesto, no se aplica si se pide otra empresa, varias, el grupo o una UTE, y
+# nunca se suman empresas sin decirlo. Sin objetos ni columnas nuevos.
+
+version: 55
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -786,7 +794,10 @@ reglas:
       sirve para agregar hechos de otras empresas, porque sumaria lo de la UTE
       en la obra de Ruesma. Los hechos (`compras`, `retenciones`, `personal`)
       llevan el `obra_id` de la ficha de SU empresa y no se traducen. Contar
-      obras por codigo es contar `es_ficha_principal`, y hay que decirlo.
+      obras por codigo es contar `es_ficha_principal`, y hay que decirlo. Y si
+      la pregunta no indica empresa, es Construcciones Ruesma (`empresa_id =
+      1`), dicho en la respuesta: lo fija `R-EMPRESA-POR-DEFECTO`, que es
+      criterio general y no solo de codigos.
     motivo: >-
       Medido en solo lectura el 2026-09-23 (F-102): 922 fichas de obra para 846
       codigos, 58 codigos repetidos y ninguno repetido dentro de una empresa;
@@ -807,6 +818,43 @@ reglas:
       con su plan, y ningun codigo repetido dentro de una; en
       `contabilidad.plan_cuentas` y `contabilidad.mayor` la cuenta se pide por
       (`empresa_id`, `codigo_cuenta`) o por `clave_cuenta` ('1-4308000197').
+
+  - codigo: R-EMPRESA-POR-DEFECTO
+    titulo: Sin empresa en la pregunta, es Construcciones Ruesma (empresa_id = 1), y se dice
+    severidad: bloqueante
+    ambito: [maestro, compras, retenciones, personal, contabilidad, contabilidad_restringida, tesoreria, tesoreria_restringida]
+    regla: >-
+      Es un CRITERIO GENERAL, no solo para los codigos de obra o de recurso: si
+      la pregunta no indica empresa, se entiende Construcciones Ruesma,
+      `empresa_id = 1`, y se filtra por ella en TODO objeto que tenga empresa.
+      La columna se llama `empresa_id` en `maestro`, `compras`, `retenciones`,
+      `personal.recursos`, `contabilidad`, `tesoreria` y sus `*_restringida`,
+      y `empresa` en `maestro.centros_coste` (`maestro.centros_coste.empresa`).
+      Los hechos que solo llevan `obra_id` (las lineas de `compras`, los partes
+      de `personal`) son de la ficha de SU empresa (`R-CODIGO-POR-EMPRESA`): se
+      filtran por la `empresa_id` de esa ficha en `maestro.obras` o por la
+      `clave_obra` que empieza por `1-`. La IA DICE en la respuesta que ha
+      supuesto Construcciones Ruesma («he supuesto Construcciones Ruesma,
+      `empresa_id = 1`, porque la pregunta no indica empresa»), para que el
+      usuario lo vea y lo corrija. NO se aplica si la pregunta pide otra
+      empresa (Porsan es la 28), varias, el grupo o una UTE: entonces se
+      filtra por las que pide y, si son varias, se dice cuales entran y si van
+      por separado o sumadas. Nunca se suman empresas sin decirlo. `stg`,
+      `mart`, `cierre` y `descompuestos` no tienen empresa: son el universo del
+      seguimiento, donde esta regla no anade filtro y manda `R-UNIVERSO-OBRA`.
+    motivo: >-
+      Orden del humano del 2026-10-18, pedida primero en la sesion de
+      `mcp-bbdd` («si no se dice nada es construcciones ruesma») y confirmada
+      en este repositorio: «en general si no se indica empresa es construcciones
+      ruesma. es criterio general». Sin ella, una pregunta sin empresa sumaria
+      las 38 empresas de Sigrid --Ruesma, Porsan y cada UTE, que repiten la
+      misma obra SIN CONSOLIDAR (`R-CODIGO-POR-EMPRESA`)-- o la IA elegiria una
+      sin decirlo. Que la IA lo diga es sugerencia de `mcp-bbdd`: el usuario ve
+      el supuesto y lo corrige. Comprobado en Azure en solo lectura el
+      2026-10-18: `empresa_id = 1` es 'CONSTRUCCIONES RUESMA' en
+      `maestro.obras.nombre_empresa` (la 28 es 'PORSAN E HIJOS CONSTRUCCIONES
+      SL'), y ningun objeto de `stg`, `mart`, `cierre` ni `descompuestos`
+      tiene columna de empresa.
 
   - codigo: R-SALDO-CONTABLE
     titulo: El saldo contable no se suma con los cierres ni las aperturas
