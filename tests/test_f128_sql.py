@@ -656,3 +656,33 @@ def test_f128_r18_r22_la_vista_lee_solo_retenciones():
     cuerpo = _sentencia(_texto(CUADRE), "retenciones.v_cuadre_factura_obra", "VIEW")
     leidos = set(re.findall(r"(?<!DISTINCT )\b(?:FROM|JOIN)\s+(\w+)\.\w+", cuerpo))
     assert leidos == {"retenciones"}, leidos
+
+
+# --- R24 · los pasos ETL --------------------------------------------------------
+
+def test_f128_r24_cuadre_factura_es_el_ultimo_sub_paso_de_retenciones():
+    from etl_sigrid.application.steps import build_retenciones_step as paso
+
+    ultimo = paso.SUB_PASOS[-1]
+    assert (ultimo.name, ultimo.sql_file, ultimo.target_schema, ultimo.target_table) == (
+        "cuadre_factura", "07_cuadre_factura.sql", "retenciones", "retencion_factura"
+    )
+    assert "07_cuadre_factura.sql" in (paso.__doc__ or "")
+    assert (SQL / "retenciones" / ultimo.sql_file).is_file()
+
+
+def test_f128_r24_compras_sin_sub_paso_nuevo():
+    """Los recargos y la cuenta bancaria los deja `01_documentos.sql`, sin sub-paso
+    nuevo: `documentos` sigue contando `contratos`."""
+    from etl_sigrid.application.steps import build_compras_step as paso
+
+    ficheros = [s.sql_file for s in paso.SUB_PASOS]
+    assert ficheros.count("01_documentos.sql") == 1
+    documentos = next(s for s in paso.SUB_PASOS if s.name == "documentos")
+    assert (documentos.target_schema, documentos.target_table) == ("compras", "contratos")
+
+
+def test_f128_r24_docstring_de_build_retenciones_en_main():
+    import main
+
+    assert "07_cuadre_factura.sql" in (main.build_retenciones.callback.__doc__ or "")

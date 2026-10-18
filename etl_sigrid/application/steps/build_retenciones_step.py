@@ -15,6 +15,10 @@ Encadena los archivos SQL en orden:
     05_fin_obra.sql     - F-095/F-110: fin de obra, plazo y vencimiento por obra
     06_views_contables.sql   - F-095: cuadre contabilidad-efectos y retencion
                           contable por obra con su vencimiento
+    07_cuadre_factura.sql    - F-128: cuadre de la retencion de garantia por
+                          FACTURA (factura, mayor y efectos) y por
+                          (proveedor, obra); lee solo `raw` y `retenciones`,
+                          nunca `compras`, y por eso va el ultimo
 
 Lee de `raw.*` (cob, pag, rec, prv, con, apu, rac, obr, obrctr) y de la vista
 `maestro.centros_coste`. El sub-paso `fin_obra` lee ademas tres tablas de
@@ -101,6 +105,14 @@ SUB_PASOS: tuple[_SubStep, ...] = (
         target_table="fin_obra",
     ),
     _SubStep(name="views_contables", sql_file="06_views_contables.sql"),
+    # F-128: el cuadre por factura, el ULTIMO: lee `apuntes_contables`,
+    # `saldo_contable` y `movimientos`, que construyen los sub-pasos de arriba.
+    _SubStep(
+        name="cuadre_factura",
+        sql_file="07_cuadre_factura.sql",
+        target_schema="retenciones",
+        target_table="retencion_factura",
+    ),
 )
 
 

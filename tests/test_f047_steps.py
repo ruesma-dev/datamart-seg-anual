@@ -76,6 +76,8 @@ STEPS = {
             "04_saldo_contable.sql",
             "05_fin_obra.sql",
             "06_views_contables.sql",
+            # F-128: el cuadre de la retención de garantía por factura.
+            "07_cuadre_factura.sql",
         ],
     ),
 }
