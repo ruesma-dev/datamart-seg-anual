@@ -301,10 +301,70 @@ SELECT
     NULLIF(a.entide, 0)                     AS proveedor_id,
     prv_con.res                             AS proveedor_nombre,
     NULLIF(TRIM(a.entcif), '')              AS proveedor_cif,
-    NULLIF(TRIM(a.entref), '')              AS referencia_proveedor
+    NULLIF(TRIM(a.entref), '')              AS referencia_proveedor,
+    -- A PARTIR DE AQUÍ, TODO LO QUE AÑADE F-128, Y VA AL FINAL A PROPÓSITO:
+    -- `compras.albaranes` está en producción (Power BI, MCP). Ver la cabecera
+    -- del fichero. Proformas y notas incluidas: el grano no cambia.
+    -- Los importes de la cabecera. `total_documento` = base + IVA, ANTES de
+    -- retenciones; `importe_retenciones` = lo que se retiene (fiscal +
+    -- garantía). La retención del albarán y la de su factura NO se suman.
+    COALESCE(a.impbru, 0)::NUMERIC(18, 2)   AS importe_bruto,
+    COALESCE(a.impnet, 0)::NUMERIC(18, 2)   AS importe_neto,
+    COALESCE(a.impdes, 0)::NUMERIC(18, 2)   AS importe_descuentos,
+    COALESCE(a.imprec, 0)::NUMERIC(18, 2)   AS importe_recargos,
+    COALESCE(a.totbas, 0)::NUMERIC(18, 2)   AS base_imponible,   -- SIN IVA
+    COALESCE(a.totiva, 0)::NUMERIC(18, 2)   AS cuota_iva,
+    COALESCE(a.totdoc, 0)::NUMERIC(18, 2)   AS total_documento,  -- CON IVA, antes de retenciones
+    (COALESCE(a.totdoc, 0) - COALESCE(a.totpag, 0))::NUMERIC(18, 2) AS importe_retenciones,
+    COALESCE(rec.garantia, 0)::NUMERIC(18, 2) AS importe_retencion_garantia,  -- clases 4 y 5
+    COALESCE(rec.fiscal, 0)::NUMERIC(18, 2) AS importe_retencion_fiscal,      -- clase 3
+    COALESCE(a.totpag, 0)::NUMERIC(18, 2)   AS total_a_pagar,    -- `tot` = `totpag` (100 %)
+    compras.fn_sigrid_date(a.fecdoc)        AS fecha_documento,  -- la del documento del proveedor
+    NULLIF(a.pagide, 0)                     AS forma_pago_id,
+    pag.res                                 AS forma_pago,
+    NULLIF(a.efeide, 0)                     AS medio_pago_id,
+    efp.res                                 AS medio_pago,
+    cue.cod                                 AS cuenta_contable,
+    -- Obra y centro de CABECERA (D1-A): para auditar el documento. Para
+    -- imputar coste manda la obra de la LÍNEA (`albaran_lineas.obra_id`).
+    NULLIF(a.obride, 0)                     AS obra_cabecera_id,
+    obr.cod                                 AS codigo_obra_cabecera,
+    obr.res                                 AS nombre_obra_cabecera,
+    NULLIF(a.cenide, 0)                     AS centro_coste_cabecera_id,
+    cen.cod                                 AS codigo_centro_coste_cabecera,
+    cen.res                                 AS nombre_centro_coste_cabecera,
+    NULLIF(a.caaide, 0)                     AS cuenta_analitica_cabecera_id,
+    -- Lo que el proveedor puso en el DOCUMENTO, que puede no ser su ficha de hoy.
+    NULLIF(btrim(a.entcod), '')             AS proveedor_codigo,
+    NULLIF(btrim(a.entres), '')             AS proveedor_nombre_documento,
+    NULLIF(btrim(a.entciftip), '')          AS proveedor_tipo_identificacion,
+    NULLIF(btrim(a.entcifpai), '')          AS proveedor_pais_identificacion,
+    COALESCE(a.ivadif <> 0, FALSE)          AS iva_diferido,
+    compras.fn_sigrid_date(a.fecent)        AS fecha_entrega_prevista,
+    compras.fn_sigrid_date(a.feclim)        AS fecha_limite,
+    COALESCE(a.estfac = 1, FALSE)           AS facturado_sigrid,
+    compras.fn_sigrid_date(a.fecfac)        AS fecha_facturacion,
+    NULLIF(a.idefac, 0)                     AS factura_cabecera_id  -- la buena es por línea
 FROM raw.dca a
 JOIN raw.con con          ON con.ide = a.ide
-LEFT JOIN raw.con prv_con ON prv_con.ide = NULLIF(a.entide, 0);
+LEFT JOIN raw.con prv_con ON prv_con.ide = NULLIF(a.entide, 0)
+-- F-128: todos LEFT y ningún `WHERE` externo: los 314.042 documentos siguen.
+-- La forma y el medio de pago, de `raw` y no de `compras.formas_pago`, que se
+-- construye después (`04_formas_pago.sql`), como en CONTRATOS.
+LEFT JOIN raw.auxpag pag  ON pag.ide = NULLIF(a.pagide, 0)
+LEFT JOIN raw.auxefp efp  ON efp.ide = NULLIF(a.efeide, 0)
+LEFT JOIN raw.con cue     ON cue.ide = NULLIF(a.cueide, 0)
+LEFT JOIN raw.con obr     ON obr.ide = NULLIF(a.obride, 0)
+LEFT JOIN raw.con cen     ON cen.ide = NULLIF(a.cenide, 0)
+-- Las retenciones, AGREGADAS POR ALBARÁN antes de unirse: es la guarda de
+-- grano (un albarán con dos recargos no puede salir dos veces).
+LEFT JOIN (
+    SELECT albaran_id,
+           SUM(cuota) FILTER (WHERE es_retencion_garantia) AS garantia,
+           SUM(cuota) FILTER (WHERE clase_recargo = 'RETENCION_FISCAL') AS fiscal
+    FROM   compras.albaran_recargos
+    GROUP  BY albaran_id
+) rec ON rec.albaran_id = a.ide;
 
 ALTER TABLE compras.albaranes ADD PRIMARY KEY (albaran_id);
 CREATE INDEX idx_com_alb_ctr ON compras.albaranes (contrato_id);

@@ -202,3 +202,184 @@ def test_f128_r12_cabecera_del_fichero_explica_f128():
     assert "F-128" in cabecera
     for frase in ("totdoc", "totpag", "D2-B", "RETESP", "compras_restringida"):
         assert frase in cabecera, frase
+
+
+# --- R6-R11 · la cabecera de albaranes y facturas ---------------------------------
+
+def _nivel_cero(texto: str) -> str:
+    """El texto sin lo que va entre paréntesis (subconsultas, FILTER, llamadas)."""
+    salida, nivel = [], 0
+    for ch in texto:
+        if ch == "(":
+            nivel += 1
+        elif ch == ")":
+            nivel -= 1
+        elif nivel == 0:
+            salida.append(ch)
+    return "".join(salida)
+
+
+def _tras_el_from(sentencia: str, desde: str) -> str:
+    return " ".join(sentencia[sentencia.index(f"FROM {desde}"):].split())
+
+
+IMPORTES = [
+    ("importe_bruto", "impbru"),
+    ("importe_neto", "impnet"),
+    ("importe_descuentos", "impdes"),
+    ("importe_recargos", "imprec"),
+    ("base_imponible", "totbas"),
+    ("cuota_iva", "totiva"),
+    ("{total}", "totdoc"),
+]
+
+ALBARANES_DE_SIEMPRE = [
+    "albaran_id", "codigo_albaran", "serie", "tipo_documento", "descripcion", "fecha",
+    "contrato_id", "comparativo_id", "proveedor_id", "proveedor_nombre", "proveedor_cif",
+    "referencia_proveedor",
+]
+
+IMPORTES_NUEVOS = [
+    "importe_bruto", "importe_neto", "importe_descuentos", "importe_recargos",
+    "base_imponible", "cuota_iva", "{total}", "importe_retenciones",
+    "importe_retencion_garantia", "importe_retencion_fiscal", "total_a_pagar",
+]
+
+OBRA_CENTRO = [
+    "obra_cabecera_id", "codigo_obra_cabecera", "nombre_obra_cabecera",
+    "centro_coste_cabecera_id", "codigo_centro_coste_cabecera",
+    "nombre_centro_coste_cabecera",
+]
+
+PROVEEDOR = [
+    "proveedor_codigo", "proveedor_nombre_documento", "proveedor_tipo_identificacion",
+    "proveedor_pais_identificacion",
+]
+
+ALBARANES_NUEVAS = (
+    [c.format(total="total_documento") for c in IMPORTES_NUEVOS]
+    + ["fecha_documento", "forma_pago_id", "forma_pago", "medio_pago_id", "medio_pago",
+       "cuenta_contable"]
+    + OBRA_CENTRO
+    + ["cuenta_analitica_cabecera_id"]
+    + PROVEEDOR
+    + ["iva_diferido", "fecha_entrega_prevista", "fecha_limite", "facturado_sigrid",
+       "fecha_facturacion", "factura_cabecera_id"]
+)
+
+
+def _albaranes() -> str:
+    return _sentencia(_texto(DOCUMENTOS), "compras.albaranes")
+
+
+def test_f128_r10_albaranes_prefijo_intacto_y_nuevas_en_orden():
+    columnas = _columnas(_albaranes(), "raw.dca a")
+    assert len(ALBARANES_NUEVAS) == 34
+    assert columnas == ALBARANES_DE_SIEMPRE + ALBARANES_NUEVAS
+
+
+def _comprobar_importes(s: str, desde: str, a: str, total: str, recargos: str) -> None:
+    for alias, origen in IMPORTES:
+        alias = alias.format(total=total)
+        assert _expresion(s, desde, alias) == f"COALESCE({a}.{origen}, 0)::NUMERIC(18, 2)"
+    assert (
+        _expresion(s, desde, "total_a_pagar") == f"COALESCE({a}.totpag, 0)::NUMERIC(18, 2)"
+    )
+    assert _expresion(s, desde, "importe_retenciones") == (
+        f"(COALESCE({a}.totdoc, 0) - COALESCE({a}.totpag, 0))::NUMERIC(18, 2)"
+    )
+    assert (
+        _expresion(s, desde, "importe_retencion_garantia")
+        == "COALESCE(rec.garantia, 0)::NUMERIC(18, 2)"
+    )
+    assert (
+        _expresion(s, desde, "importe_retencion_fiscal")
+        == "COALESCE(rec.fiscal, 0)::NUMERIC(18, 2)"
+    )
+    # `tot` NO se publica: es `totpag` en el 100 %.
+    assert not re.search(rf"\b{a}\.tot\b", s)
+    # R7 · el agregado previo POR DOCUMENTO, antes de unirse (guarda de grano).
+    resto = _tras_el_from(s, desde)
+    m = re.search(
+        r"LEFT JOIN \( SELECT (\w+), SUM\(cuota\) FILTER \(WHERE es_retencion_garantia\) "
+        r"AS garantia, SUM\(cuota\) FILTER \(WHERE clase_recargo = 'RETENCION_FISCAL'\) "
+        rf"AS fiscal FROM {re.escape(recargos)} GROUP BY (\w+) \) rec ON rec\.(\w+) = {a}\.ide",
+        resto.replace("(SELECT", "( SELECT").replace("albaran_id)", "albaran_id )")
+        .replace("factura_id)", "factura_id )"),
+    )
+    assert m, resto
+    assert m.group(1) == m.group(2) == m.group(3)
+
+
+def test_f128_r6_r7_albaranes_importes_y_agregado_previo():
+    _comprobar_importes(
+        _albaranes(), "raw.dca a", "a", "total_documento", "compras.albaran_recargos"
+    )
+
+
+def _comprobar_cabecera_comun(s: str, desde: str, a: str) -> None:
+    """R8: ids con 0 a NULL, nombres de `raw.con`, textos vacíos a NULL, fechas
+    con `fn_sigrid_date`, booleanos nunca NULL."""
+    esperadas = {
+        "obra_cabecera_id": f"NULLIF({a}.obride, 0)",
+        "codigo_obra_cabecera": "obr.cod",
+        "nombre_obra_cabecera": "obr.res",
+        "centro_coste_cabecera_id": f"NULLIF({a}.cenide, 0)",
+        "codigo_centro_coste_cabecera": "cen.cod",
+        "nombre_centro_coste_cabecera": "cen.res",
+        "cuenta_analitica_cabecera_id": f"NULLIF({a}.caaide, 0)",
+        "proveedor_codigo": f"NULLIF(btrim({a}.entcod), '')",
+        "proveedor_nombre_documento": f"NULLIF(btrim({a}.entres), '')",
+        "proveedor_tipo_identificacion": f"NULLIF(btrim({a}.entciftip), '')",
+        "proveedor_pais_identificacion": f"NULLIF(btrim({a}.entcifpai), '')",
+        "iva_diferido": f"COALESCE({a}.ivadif <> 0, FALSE)",
+        "fecha_entrega_prevista": f"compras.fn_sigrid_date({a}.fecent)",
+        "fecha_limite": f"compras.fn_sigrid_date({a}.feclim)",
+    }
+    for alias, expr in esperadas.items():
+        assert _expresion(s, desde, alias) == expr, alias
+    resto = _tras_el_from(s, desde)
+    assert f"LEFT JOIN raw.con obr ON obr.ide = NULLIF({a}.obride, 0)" in resto
+    assert f"LEFT JOIN raw.con cen ON cen.ide = NULLIF({a}.cenide, 0)" in resto
+
+
+def test_f128_r8_albaranes_cabecera():
+    _comprobar_cabecera_comun(_albaranes(), "raw.dca a", "a")
+
+
+def test_f128_r11_albaranes_pago_cuenta_y_facturacion():
+    s = _albaranes()
+    esperadas = {
+        "fecha_documento": "compras.fn_sigrid_date(a.fecdoc)",
+        "forma_pago_id": "NULLIF(a.pagide, 0)",
+        "forma_pago": "pag.res",
+        "medio_pago_id": "NULLIF(a.efeide, 0)",
+        "medio_pago": "efp.res",
+        "cuenta_contable": "cue.cod",
+        "facturado_sigrid": "COALESCE(a.estfac = 1, FALSE)",
+        "fecha_facturacion": "compras.fn_sigrid_date(a.fecfac)",
+        "factura_cabecera_id": "NULLIF(a.idefac, 0)",
+    }
+    for alias, expr in esperadas.items():
+        assert _expresion(s, "raw.dca a", alias) == expr, alias
+    resto = _tras_el_from(s, "raw.dca a")
+    assert "LEFT JOIN raw.auxpag pag ON pag.ide = NULLIF(a.pagide, 0)" in resto
+    assert "LEFT JOIN raw.auxefp efp ON efp.ide = NULLIF(a.efeide, 0)" in resto
+    assert "LEFT JOIN raw.con cue ON cue.ide = NULLIF(a.cueide, 0)" in resto
+
+
+def _comprobar_grano(s: str, desde: str, a: str) -> None:
+    """R9/R11: sin `WHERE` externo y, aparte del `JOIN raw.con con` de siempre,
+    solo `LEFT JOIN`."""
+    resto = _nivel_cero(_tras_el_from(s, desde))
+    assert " WHERE " not in f" {resto} ", resto
+    internos = re.findall(r"(?<!LEFT) JOIN (\S+ \S+)", resto)
+    assert internos == ["raw.con con"], internos
+
+
+def test_f128_r11_albaranes_grano_sin_where_externo():
+    _comprobar_grano(_albaranes(), "raw.dca a", "a")
+
+
+def test_f128_r10_albaranes_sin_datos_bancarios():
+    assert not re.search(r"\ba\.ban\w*", _albaranes())
