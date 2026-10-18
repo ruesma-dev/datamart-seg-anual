@@ -320,3 +320,14 @@ def test_f128_r34_el_mapa_de_claude_md():
     assert "F-128" in texto
     assert "`compras_restringida.documento_cuenta_bancaria`" in texto
     assert "`retenciones.retencion_factura`" in texto
+
+
+def test_f128_r34_azure_apps_describe_lo_expuesto():
+    if not AZURE_APPS.is_file():
+        pytest.skip("azure-apps no está junto a este repositorio")
+    texto = _plano(AZURE_APPS.read_text(encoding="utf-8"))
+    assert "(F-128, 2026-10-18)" in texto
+    for objeto in ("compras.factura_recargos", "compras.albaran_recargos",
+                   "compras_restringida.documento_cuenta_bancaria",
+                   "retenciones.retencion_factura", "retenciones.v_cuadre_factura_obra"):
+        assert f"`{objeto}`" in texto, objeto
