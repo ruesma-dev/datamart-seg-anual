@@ -19,6 +19,23 @@
 > espera `sigrid_dm_autorizado_ro`, que solo existe tras `02_roles.sql`. Vuelta atrás: imagen
 > `r20261015-0915` el mismo día.
 
+> **T15 HECHO (humano guiado por el líder, 2026-10-18 ~09:00 UTC).** P0 conforme (de día, sin
+> ejecución en curso, imagen `r20261018-0903`, `psql` 16.4). P2-P3: `pg-password-restringido` en
+> `kv-mcp-bbdd-dev` (64). P4: huella de antes 626 líneas; `02_roles.sql` con `ON_ERROR_STOP` →
+> «F-141: grupo autorizado renombrado», `mcp_sigrid_dm_restringido: contraseña fijada`, las otras tres
+> SIN CAMBIOS, `COMMIT`; siete roles con `rolsuper = f`; el login con una sola pertenencia
+> (`sigrid_dm_perfil_restringido_ro`, hereda t, set_role f); `t` en sus diez esquemas y `f` en
+> `tesoreria`, `personal`, `raw` y las tres `*_restringida`; `mayor = f`, `saldos_cuenta_mes = f`,
+> `plan_cuentas = t`, `vencimientos = t`, `conecta = t`; cero privilegios propios. P6: R31 nueve
+> `permission denied`, R32 una fila en las seis; `apply-grants` SUCCESS (09:00:48) con
+> `verificacion_restringido`, `pertenencias_restringido` y `filtraciones_restringido` a `ok`. P7: R33
+> huella idéntica (`Compare-Object` vacío); diccionario **v54** publicado (226 objetos, 1.864 columnas,
+> 26 reglas, hash `77ae01c81270`; `check-diccionario` OK) y MCP reiniciado (`ca-mcp-bbdd-dev--0000020`).
+> Nota operativa: la contraseña de `ruesmaadmin` la tecleó el humano (no está en ningún vault); `psql`
+> no está en el PATH del puesto (`C:\Program Files\PostgreSQLin`). `azure-apps` al día
+> (`34a292f`, F-141 desplegada). **Queda T16** (nocturna del 19, R34) y **T17** (contrato E1-E8 a
+> `mcp-bbdd`, entregado por mensaje el 18-10).
+
 - T1-T13 hechos (commits `e6b11e2` … `de9656f`); en `azure-apps`, `a520a62` sin push. F-141 de nuevo en
   `in_progress` en `features.json` (2026-10-18; estuvo `blocked` por R30, nota de abajo). T14-T17 son MANUALES
   (humano/líder), con su comando exacto abajo.
