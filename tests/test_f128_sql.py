@@ -470,3 +470,189 @@ def test_f128_r32_ni_empide_ni_hor_ni_desajuste(sentencia):
     s = sentencia()
     assert not re.search(r"(?<![\w.])[af]\.(empide|hor)\b", s)
     assert not re.search(r"desajuste|diferencia_lineas|lineas_vs_cabecera", s)
+
+
+# --- R15-R19 · el cuadre de la retención de garantía por factura -----------------
+
+COLUMNAS_RETENCION_FACTURA = [
+    "factura_id", "codigo_factura", "fecha_alta", "fecha_factura", "proveedor_id",
+    "proveedor_nombre", "obra_id", "empresa_id", "codigo_obra", "clave_obra",
+    "nombre_obra", "retencion_factura", "retencion_contable", "diferencia_contable",
+    "efectos_generados", "efectos_vivos", "diferencia_efectos", "categoria_contable",
+    "categoria_efectos",
+]
+
+COLUMNAS_CUADRE_OBRA = [
+    "proveedor_id", "proveedor_nombre", "obra_id", "empresa_id", "codigo_obra",
+    "clave_obra", "nombre_obra", "retencion_facturas", "altas_contables", "diferencia",
+    "num_facturas", "num_facturas_descuadre", "categoria",
+]
+
+
+def _select_externo(sentencia: str) -> tuple[str, str]:
+    """(CTE, SELECT de primer nivel) de `WITH ... SELECT ...`."""
+    nivel = 0
+    for i, ch in enumerate(sentencia):
+        nivel += (ch == "(") - (ch == ")")
+        if nivel == 0 and sentencia.startswith("SELECT", i) and i > 0:
+            return sentencia[:i], sentencia[i:]
+    raise AssertionError("sin SELECT de primer nivel")
+
+
+def _retencion_factura() -> tuple[str, str]:
+    return _select_externo(_sentencia(_texto(CUADRE), "retenciones.retencion_factura"))
+
+
+def _cuadre_obra() -> tuple[str, str]:
+    return _select_externo(
+        _sentencia(_texto(CUADRE), "retenciones.v_cuadre_factura_obra", "VIEW")
+    )
+
+
+def _cte(cte: str, nombre: str) -> str:
+    """El cuerpo de la CTE `nombre AS ( ... )`, en una línea."""
+    m = re.search(rf"\b{nombre} AS \(", cte)
+    assert m, f"no está la CTE {nombre}"
+    nivel, i = 1, m.end()
+    while nivel:
+        nivel += (cte[i] == "(") - (cte[i] == ")")
+        i += 1
+    return " ".join(cte[m.end(): i - 1].split())
+
+
+def test_f128_r19_funcion_copiada_de_compras():
+    _, cab_c, cuerpo_c = _funcion(_texto(SETUP_COMPRAS), "compras.fn_es_retencion_garantia")
+    params, cab_r, cuerpo_r = _funcion(
+        _texto(SETUP_RETENCIONES), "retenciones.fn_es_retencion_garantia"
+    )
+    assert params == "reccla INT"
+    assert " ".join(cuerpo_r.split()) == " ".join(cuerpo_c.split())
+    assert " ".join(cab_r.split()) == " ".join(cab_c.split())
+    assert re.search(
+        r"COMMENT ON FUNCTION retenciones\.fn_es_retencion_garantia\(INT\) IS",
+        _texto(SETUP_RETENCIONES),
+    )
+
+
+def test_f128_r15_retencion_factura_columnas():
+    _, select = _retencion_factura()
+    assert _columnas(select, "universo u") == COLUMNAS_RETENCION_FACTURA
+
+
+def test_f128_r15_lee_solo_raw_y_retenciones():
+    texto = _sin_comentarios(_texto(CUADRE))
+    sin_literales = re.sub(r"'[^']*'", "''", texto)
+    origenes = set(re.findall(r"(?<!DISTINCT )\b(?:FROM|JOIN)\s+(\w+)\.\w+", sin_literales))
+    assert origenes == {"raw", "retenciones"}, origenes
+    leidas = set(re.findall(r"(?<!DISTINCT )\b(?:FROM|JOIN)\s+(\w+\.\w+)", sin_literales))
+    assert leidas == {
+        "raw.dcfrec", "raw.dcf", "raw.con", "retenciones.apuntes_contables",
+        "retenciones.movimientos", "retenciones.saldo_contable",
+        "retenciones.retencion_factura",
+    }, leidas
+    assert "compras." not in sin_literales
+
+
+def test_f128_r15_universo_y_garantia_agregada_antes_de_unir():
+    cte, select = _retencion_factura()
+    garantia = _cte(cte, "garantia")
+    assert "FROM raw.dcfrec r" in garantia
+    assert "WHERE retenciones.fn_es_retencion_garantia(r.reccla)" in garantia
+    assert "GROUP BY r.docide" in garantia
+    universo = _cte(cte, "universo")
+    assert "FROM garantia WHERE ABS(retencion) >= 0.01" in universo
+    assert "UNION SELECT documento_id FROM contable" in universo
+    resto = _tras_el_from(select, "universo u")
+    assert "JOIN raw.dcf f ON f.ide = u.factura_id" in resto
+    assert "JOIN raw.con c ON c.ide = f.ide" in resto
+    assert "LEFT JOIN raw.con ob ON ob.ide = NULLIF(f.obride, 0)" in resto
+    assert " WHERE " not in f" {_nivel_cero(resto)} "
+
+
+def test_f128_r16_lados_del_cuadre():
+    cte, select = _retencion_factura()
+    contable = _cte(cte, "contable")
+    assert "FROM retenciones.apuntes_contables" in contable
+    assert "clase IN ('ALTA', 'BAJA')" in contable
+    assert "documento_id IS NOT NULL" in contable and "GROUP BY documento_id" in contable
+    efectos = _cte(cte, "efectos")
+    assert "FROM retenciones.movimientos" in efectos
+    assert "sentido = 'PROVEEDOR'" in efectos
+    assert "FILTER (WHERE estado <> 'BAJA' OR estado_sigrid = 14) AS generados" in efectos
+    assert "FILTER (WHERE estado = 'VIVA') AS vivos" in efectos
+    e = {a: x for x, a in _proyeccion(select, "universo u")}
+    assert e["retencion_factura"] == "COALESCE(g.retencion, 0)::NUMERIC(18, 2)"
+    assert e["retencion_contable"] == "ct.importe::NUMERIC(18, 2)"
+    assert e["diferencia_contable"] == "(COALESCE(g.retencion, 0) - ct.importe)::NUMERIC(18, 2)"
+    assert e["efectos_generados"] == "e.generados::NUMERIC(18, 2)"
+    assert e["efectos_vivos"] == "e.vivos::NUMERIC(18, 2)"
+    assert e["diferencia_efectos"] == "(COALESCE(g.retencion, 0) - e.generados)::NUMERIC(18, 2)"
+    assert e["obra_id"] == "NULLIF(f.obride, 0)"
+    assert e["empresa_id"] == "ob.emp"
+    assert e["clave_obra"] == "ob.emp::text || '-' || ob.cod"
+
+
+def _literales_case(expr: str) -> list[str]:
+    return re.findall(r"(?:THEN|ELSE) '([A-Z_]+)'", expr)
+
+
+def test_f128_r17_categorias_en_orden():
+    _, select = _retencion_factura()
+    e = {a: x for x, a in _proyeccion(select, "universo u")}
+    contable = e["categoria_contable"]
+    assert _literales_case(contable) == ["SOLO_CONTABLE", "SIN_APUNTE", "CUADRA", "DIFIERE"]
+    assert "WHEN ABS(COALESCE(g.retencion, 0)) < 0.01 THEN 'SOLO_CONTABLE'" in contable
+    assert "WHEN ct.importe IS NULL THEN 'SIN_APUNTE'" in contable
+    assert "WHEN ABS(COALESCE(g.retencion, 0) - ct.importe) < 0.01 THEN 'CUADRA'" in contable
+    efectos = e["categoria_efectos"]
+    assert _literales_case(efectos) == ["SIN_EFECTOS", "CUADRA", "DIFIERE"]
+    assert "WHEN e.generados IS NULL THEN 'SIN_EFECTOS'" in efectos
+    assert "WHEN ABS(COALESCE(g.retencion, 0) - e.generados) < 0.01 THEN 'CUADRA'" in efectos
+
+
+def test_f128_r15_pk_indices_y_comment():
+    sql = _texto(CUADRE)
+    assert "DROP TABLE IF EXISTS retenciones.retencion_factura CASCADE;" in sql
+    assert "ALTER TABLE retenciones.retencion_factura ADD PRIMARY KEY (factura_id);" in sql
+    assert re.search(r"CREATE INDEX \w+ ON retenciones\.retencion_factura \(proveedor_id\);", sql)
+    assert re.search(r"CREATE INDEX \w+ ON retenciones\.retencion_factura \(obra_id\);", sql)
+    assert "COMMENT ON TABLE retenciones.retencion_factura IS" in sql
+    assert "DROP VIEW IF EXISTS retenciones.v_cuadre_factura_obra CASCADE;" in sql
+    assert "COMMENT ON VIEW retenciones.v_cuadre_factura_obra IS" in sql
+
+
+def test_f128_r18_cuadre_por_proveedor_y_obra():
+    cte, select = _cuadre_obra()
+    assert _columnas(select, "x") == COLUMNAS_CUADRE_OBRA
+    plano = " ".join(cte.split())
+    assert "FROM retenciones.retencion_factura" in plano
+    assert "GROUP BY proveedor_id, obra_id" in plano
+    assert (
+        "FULL JOIN retenciones.saldo_contable c ON c.proveedor_id = f.proveedor_id "
+        "AND c.obra_id IS NOT DISTINCT FROM f.obra_id"
+    ) in plano
+    assert (
+        "COUNT(*) FILTER (WHERE categoria_contable <> 'CUADRA') AS num_facturas_descuadre"
+        in plano
+    )
+    assert "COALESCE(c.altas, 0)::NUMERIC(18, 2) AS altas_contables" in plano
+    e = {a: x for x, a in _proyeccion(select, "x")}
+    assert _literales_case(e["categoria"]) == [
+        "CUADRA", "SOLO_FACTURAS", "SOLO_CONTABILIDAD", "FACTURAS_MAYOR", "CONTABILIDAD_MAYOR",
+    ]
+    assert (
+        "WHEN ABS(x.retencion_facturas - x.altas_contables) < 1 THEN 'CUADRA'" in e["categoria"]
+    )
+    assert e["diferencia"] == "(x.retencion_facturas - x.altas_contables)::NUMERIC(18, 2)"
+    resto = _tras_el_from(select, "x")
+    assert resto.endswith(
+        "WHERE ABS(x.retencion_facturas) >= 1 OR ABS(x.altas_contables) >= 1"
+    ), resto
+
+
+def test_f128_r18_r22_la_vista_lee_solo_retenciones():
+    """Para `filtraciones_restringido` (F-141): la única vista nueva no alcanza
+    ningún esquema ajeno al perfil restringido."""
+    cuerpo = _sentencia(_texto(CUADRE), "retenciones.v_cuadre_factura_obra", "VIEW")
+    leidos = set(re.findall(r"(?<!DISTINCT )\b(?:FROM|JOIN)\s+(\w+)\.\w+", cuerpo))
+    assert leidos == {"retenciones"}, leidos
