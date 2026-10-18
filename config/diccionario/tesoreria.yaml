@@ -23,6 +23,10 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
+      **No disponible para el perfil restringido** (F-141, `R-PERFIL-RESTRINGIDO`):
+      con su login la consulta devuelve «permission denied», y eso no se rodea:
+      responde que el perfil no lo incluye.
+
       **LA CARTERA DE COBROS Y PAGOS** (F-037, fase 1): una fila por EFECTO de
       Sigrid -cada pago a proveedor o acreedor (`raw.pag`, sentido `PAGO`) y
       cada cobro de cliente (`raw.cob`, sentido `COBRO`)-, con su tercero, su
@@ -313,6 +317,10 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
+      **No disponible para el perfil restringido** (F-141, `R-PERFIL-RESTRINGIDO`):
+      con su login la consulta devuelve «permission denied», y eso no se rodea:
+      responde que el perfil no lo incluye.
+
       **CUANTO LE FALTA A LA CARTERA GENERAL** (F-037): por empresa, sentido,
       ano y mes de vencimiento y estado, cuantos efectos de PERSONAL (nominas,
       embargos, cuotas) no estan en `tesoreria.efectos` (37.053 pagos y 0

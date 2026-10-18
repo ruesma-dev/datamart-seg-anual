@@ -55,6 +55,10 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
+      **No disponible para el perfil restringido** (F-141, `R-PERFIL-RESTRINGIDO`):
+      con su login la consulta devuelve «permission denied», y eso no se rodea:
+      responde que el perfil no lo incluye.
+
       El maestro de RECURSOS de Sigrid (2.618 filas el 2026-09-18): quien o que
       puede imputar horas y coste a una obra. **No es el maestro de personal**:
       solo 1.354 filas son personas, 1.158 son consumos imputables --movil,
@@ -317,6 +321,10 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
+      **No disponible para el perfil restringido** (F-141, `R-PERFIL-RESTRINGIDO`):
+      con su login la consulta devuelve «permission denied», y eso no se rodea:
+      responde que el perfil no lo incluye.
+
       **EL HECHO**: una fila por linea de parte de trabajo (330.638 el
       2026-09-18), con su recurso, su obra, su partida, su fecha, su cantidad y
       su importe. Es lo que ata persona, horas y obra, y cubre 20 anos de
@@ -550,6 +558,10 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
+      **No disponible para el perfil restringido** (F-141, `R-PERFIL-RESTRINGIDO`):
+      con su login la consulta devuelve «permission denied», y eso no se rodea:
+      responde que el perfil no lo incluye.
+
       **LAS HORAS, y solo las horas.** Horas imputadas por obra, ano, mes y tipo
       de recurso, construida SOLO con las lineas de unidad HORA: 1.249.038,44
       horas sobre 369 obras y 445 recursos, todos personas.
@@ -662,6 +674,10 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
+      **No disponible para el perfil restringido** (F-141, `R-PERFIL-RESTRINGIDO`):
+      con su login la consulta devuelve «permission denied», y eso no se rodea:
+      responde que el perfil no lo incluye.
+
       **LA CABECERA del parte de trabajo** (F-101): una fila por parte, 6.886 el
       2026-09-23, con su codigo tal y como aparece en Sigrid, su descripcion, su
       fecha, su estado y la obra y el centro de coste de CABECERA. Las horas y
@@ -825,6 +841,10 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
+      **No disponible para el perfil restringido** (F-141, `R-PERFIL-RESTRINGIDO`):
+      con su login la consulta devuelve «permission denied», y eso no se rodea:
+      responde que el perfil no lo incluye.
+
       **LOS PRECIOS DE LA FICHA del recurso** (F-101): que tipos de hora tiene
       definidos cada recurso --laborable, extra, festiva, mes de jefe de obra,
       vacaciones...--, a que precio de coste y de venta, en que unidad y cual es
@@ -1002,6 +1022,10 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
+      **No disponible para el perfil restringido** (F-141, `R-PERFIL-RESTRINGIDO`):
+      con su login la consulta devuelve «permission denied», y eso no se rodea:
+      responde que el perfil no lo incluye.
+
       **LOS USUARIOS DE SIGRID CON SU PERSONA** (F-085): una fila por usuario
       de Sigrid (233 el 2026-10-07) con su login, su nombre, si esta
       desactivado y, cuando se puede, el EMPLEADO que es y su DNI. Es lo que

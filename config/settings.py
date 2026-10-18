@@ -139,12 +139,20 @@ DEFAULT_VETOED_SCHEMAS = "contabilidad_restringida,tesoreria_restringida,compras
 
 # El rol AUTORIZADO (F-135): grupo NOLOGIN que lee la contabilidad completa. Lo
 # crea `infra/sql/02_roles.sql`; quién es miembro lo decide Negocio (Juan
-# Romero, D8) y se da con `GRANT sigrid_dm_restringido_ro TO <login>`. Hoy no lo
+# Romero, D8) y se da con `GRANT sigrid_dm_autorizado_ro TO <login>`. Hoy no lo
 # usa ningún cliente: el MCP tendría que conectar con él según quién pregunta
 # (`mcp-bbdd`, su F-008) y Power BI necesita rol propio (F-087). Desde F-037 lee
 # también la cartera completa de cobros y pagos (`tesoreria_restringida`), y
 # desde F-138 las alarmas completas de los documentos (`compras_restringida`).
-DEFAULT_RESTRICTED_ROLE = "sigrid_dm_restringido_ro"
+#
+# F-141 (D6, 2026-10-16) lo RENOMBRA: se llamaba como el perfil restringido que
+# nace con F-141, y ese perfil ve MENOS que el estándar mientras este grupo ve
+# MÁS. `NOMBRE_AUTORIZADO_RETIRADO` es el nombre viejo: `apply_grants` FALLA sin
+# abrir conexión si `PG_RESTRICTED_ROLE` aún lo trae (un `.env` viejo dejaría
+# al total sin las tres `*_restringida` tras el primer `DROP` nocturno, con
+# solo un aviso). El renombre lo hace `infra/sql/02_roles.sql`.
+DEFAULT_RESTRICTED_ROLE = "sigrid_dm_autorizado_ro"
+NOMBRE_AUTORIZADO_RETIRADO = "sigrid_dm_restringido_ro"
 DEFAULT_RESTRICTED_SCHEMAS = "contabilidad_restringida,tesoreria_restringida,compras_restringida"
 
 # El login de acceso TOTAL del MCP (F-136): lee lo mismo que el rol general más
@@ -161,6 +169,29 @@ DEFAULT_TOTAL_ROLE = "mcp_sigrid_dm_total"
 # cuele en silencio: `apply_grants` exige que cada esquema de aquí esté vetado
 # al general y fuera de lo restringido y del consumo (R3).
 DEFAULT_TOTAL_VETOED_SCHEMAS = "raw"
+
+# El perfil RESTRINGIDO del MCP (F-141), para administrativos: el TERCER perfil,
+# por DEBAJO del estándar (TOTAL ⊃ ESTÁNDAR ⊃ RESTRINGIDO). OJO AL NOMBRE: los
+# esquemas `*_restringida` son lo que ve MÁS (solo el perfil total, por el grupo
+# autorizado); este perfil ve MENOS y no lee ninguno de ellos.
+#
+# Reglas del humano, literales (D3 del 2026-10-16 y P1-P2 del 2026-10-17):
+# «ven como el estándar, menos el mayor, menos el mayor analítico, menos la
+# cartera de cobros (pero sí a retenciones)» y «personal también quítalo, y
+# saldos cuenta también». Y D4: «compras debe poder verse», incluidas las tres
+# vistas de pago que leen la cartera (excepción nominal en `grants.py`).
+#
+# Un grupo NOLOGIN lleva los permisos y un login miembro conecta (D8); los dos
+# los crea `infra/sql/02_roles.sql`. La lista de esquemas es EXPLÍCITA: un
+# esquema de consumo nuevo NO le llega solo. Los objetos excluidos son la lista
+# extensible de D2 (el mayor analítico de F-127 tiene que entrar aquí si no
+# lleva «mayor» en el nombre). Grupo vacío = no se mira el perfil.
+DEFAULT_PERFIL_RESTRINGIDO_GROUP = "sigrid_dm_perfil_restringido_ro"
+DEFAULT_PERFIL_RESTRINGIDO_LOGIN = "mcp_sigrid_dm_restringido"
+DEFAULT_PERFIL_RESTRINGIDO_SCHEMAS = (
+    "mart,cierre,compras,maestro,retenciones,contabilidad,descompuestos,stg,aux,_meta"
+)
+DEFAULT_PERFIL_RESTRINGIDO_EXCLUDED_TABLES = "contabilidad.mayor,contabilidad.saldos_cuenta_mes"
 
 # Tablas que el rol del MCP NO puede leer, aunque su esquema esté en la lista
 # de arriba. Formato `esquema.tabla`, separadas por comas.
@@ -298,6 +329,27 @@ class PostgresSettings(BaseSettings):
         description="Esquemas, separados por comas, que el login total NO lee nunca "
                     "(F-136). Ver DEFAULT_TOTAL_VETOED_SCHEMAS.",
     )
+    perfil_restringido_group: str = Field(
+        DEFAULT_PERFIL_RESTRINGIDO_GROUP,
+        description="Grupo NOLOGIN del perfil RESTRINGIDO del MCP (F-141), el que lleva "
+                    "sus permisos. Vacío = no se mira el perfil; si no existe, "
+                    "apply_grants avisa y sigue.",
+    )
+    perfil_restringido_login: str = Field(
+        DEFAULT_PERFIL_RESTRINGIDO_LOGIN,
+        description="Login del perfil restringido (F-141), miembro SOLO de su grupo. "
+                    "apply_grants comprueba lo que lee y sus pertenencias.",
+    )
+    perfil_restringido_schemas: str = Field(
+        DEFAULT_PERFIL_RESTRINGIDO_SCHEMAS,
+        description="Esquemas, separados por comas, que lee el perfil restringido "
+                    "(F-141). Ver DEFAULT_PERFIL_RESTRINGIDO_GROUP.",
+    )
+    perfil_restringido_excluded_tables: str = Field(
+        DEFAULT_PERFIL_RESTRINGIDO_EXCLUDED_TABLES,
+        description="Objetos 'esquema.tabla', separados por comas, que el perfil "
+                    "restringido NO lee aunque su esquema sea suyo (F-141, D2).",
+    )
     # --- Troceo del build de stg.plan_mensual (F-019) ----------------------
     # El 2026-08-09 ese build llenó el disco del servidor compartido (93,4 %) y
     # dejó a albaranes y partes en solo-lectura diez minutos. Estos tres valores
@@ -429,6 +481,18 @@ class PostgresSettings(BaseSettings):
     def total_vetoed_schema_list(self) -> list[str]:
         """`total_vetoed_schemas` como lista, sin blancos ni entradas vacías (F-136)."""
         return [s.strip() for s in self.total_vetoed_schemas.split(",") if s.strip()]
+
+    @property
+    def perfil_restringido_schema_list(self) -> list[str]:
+        """`perfil_restringido_schemas` como lista, sin blancos ni vacíos (F-141)."""
+        return [s.strip() for s in self.perfil_restringido_schemas.split(",") if s.strip()]
+
+    @property
+    def perfil_restringido_excluded_table_list(self) -> list[str]:
+        """`perfil_restringido_excluded_tables` como lista, sin blancos ni vacíos (F-141)."""
+        return [
+            t.strip() for t in self.perfil_restringido_excluded_tables.split(",") if t.strip()
+        ]
 
     @property
     def conninfo(self) -> str:

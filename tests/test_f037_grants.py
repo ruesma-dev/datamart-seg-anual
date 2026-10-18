@@ -3,7 +3,7 @@
 F-037 · Los permisos de `tesoreria` y `tesoreria_restringida` (R20-R22).
 
 Patrón de F-135/F-136: el rol ESTÁNDAR (`mcp_sigrid_dm_ro`) lee `tesoreria` y
-nunca `tesoreria_restringida`; el AUTORIZADO (`sigrid_dm_restringido_ro`) la
+nunca `tesoreria_restringida`; el AUTORIZADO (`sigrid_dm_autorizado_ro`) la
 lee; el TOTAL (`mcp_sigrid_dm_total`) la lee por pertenencia, sin GRANT propio,
 y sigue sin leer `raw`. Todo vive en `config/settings.py` (listas), en
 `apply_grants` (cada noche) y en `infra/sql/02_roles.sql` (provisión).
@@ -84,7 +84,7 @@ def test_f037_r20_settings_los_comentarios_lo_explican() -> None:
 # ===========================================================================
 
 ESTANDAR = "mcp_sigrid_dm_ro"
-AUTORIZADO = "sigrid_dm_restringido_ro"
+AUTORIZADO = "sigrid_dm_autorizado_ro"
 TOTAL = "mcp_sigrid_dm_total"
 DUENO = "sigrid_dm_etl"
 
@@ -286,10 +286,10 @@ def test_f037_r22_el_autorizado_recibe_la_restringida() -> None:
     sql = _roles_sql()
     tramo = sql.split("-- 5 ter.")[1].split("-- 5 quater.")[0]
     for sentencia in (
-        f"GRANT USAGE ON SCHEMA {RESTR_T} TO sigrid_dm_restringido_ro;",
-        f"GRANT SELECT ON ALL TABLES IN SCHEMA {RESTR_T} TO sigrid_dm_restringido_ro;",
+        f"GRANT USAGE ON SCHEMA {RESTR_T} TO sigrid_dm_autorizado_ro;",
+        f"GRANT SELECT ON ALL TABLES IN SCHEMA {RESTR_T} TO sigrid_dm_autorizado_ro;",
         f"ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl IN SCHEMA {RESTR_T} "
-        "GRANT SELECT ON TABLES TO sigrid_dm_restringido_ro;",
+        "GRANT SELECT ON TABLES TO sigrid_dm_autorizado_ro;",
     ):
         assert sentencia in tramo, f"falta: {sentencia}"
     assert tramo.index(f"GRANT USAGE ON SCHEMA {RESTR_T}") > tramo.index("SET ROLE sigrid_dm_etl;")

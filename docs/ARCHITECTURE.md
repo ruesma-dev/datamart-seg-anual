@@ -54,7 +54,7 @@ rol general no debe leer vive físicamente en otro que nunca se le concede.
 `contabilidad_restringida` lleva la contabilidad COMPLETA —las tres tablas de
 F-056 con las mismas filas, columnas y cifras, y en el mayor tres columnas más:
 `restringido`, `motivo_restriccion` y `saldo_acumulado_visible`— y solo la lee
-el grupo `sigrid_dm_restringido_ro` (NOLOGIN; sus miembros los decide Negocio).
+el grupo `sigrid_dm_autorizado_ro` (NOLOGIN; sus miembros los decide Negocio).
 `contabilidad` pasa a ser la GENERAL, la que leen el MCP y Power BI: sin los
 apuntes de PERSONAL (los asientos de nómina enteros y las cuentas de
 trabajadores: 55.504 apuntes, el 2,55 %, criterio en
@@ -661,17 +661,22 @@ fallo con cualquier tolerancia.
   nocturna—. Base propia y no esquema compartido: PostgreSQL
   no permite consultas entre bases, y esa es la frontera que impide que el rol
   de lectura vea `albaranes`.
-- **Cinco roles.** `sigrid_dm_etl` (grupo `NOLOGIN`) es el propietario de todo;
+- **Siete roles.** `sigrid_dm_etl` (grupo `NOLOGIN`) es el propietario de todo;
   `sigrid_dm_app` (login, contraseña en Key Vault) es el que usa el ETL y es
   miembro del grupo; `mcp_sigrid_dm_ro` (login) es el rol GENERAL (estándar) de
   solo lectura, el del MCP y hoy también el de Power BI; desde F-135
-  `sigrid_dm_restringido_ro` (grupo `NOLOGIN`) es el rol AUTORIZADO que lee la
-  contabilidad completa; y desde F-136 `mcp_sigrid_dm_total` (login, contraseña
-  SOLO en `kv-mcp-bbdd-dev/pg-password-total`) es el acceso TOTAL del MCP:
-  miembro de los dos anteriores (`WITH INHERIT TRUE, SET FALSE`, punto 5 quater
-  de `02_roles.sql`), lee lo de ambos y NUNCA `raw` (decisión del humano del
-  2026-10-12: «siempre fuera»). No tiene ningún GRANT propio: todo le llega por
-  pertenencia. Autenticación por contraseña: habilitar Entra es una operación de
+  `sigrid_dm_autorizado_ro` (grupo `NOLOGIN`) es el rol AUTORIZADO que lee la
+  contabilidad completa (F-141 lo renombró: su nombre anterior decía
+  «restringido» y es el que ve MÁS); desde F-136 `mcp_sigrid_dm_total` (login,
+  contraseña SOLO en `kv-mcp-bbdd-dev/pg-password-total`) es el acceso TOTAL del
+  MCP: miembro de los dos anteriores (`WITH INHERIT TRUE, SET FALSE`,
+  punto 5 quater de `02_roles.sql`), lee lo de ambos y NUNCA `raw` (decisión del humano
+  del 2026-10-12: «siempre fuera»), sin ningún GRANT propio; y desde F-141 el
+  perfil RESTRINGIDO (administrativos), que ve MENOS que el estándar: el grupo
+  `sigrid_dm_perfil_restringido_ro` (`NOLOGIN`, lleva los permisos) y su login
+  `mcp_sigrid_dm_restringido` (contraseña SOLO en
+  `kv-mcp-bbdd-dev/pg-password-restringido`), miembro solo del grupo (punto 5
+  quinquies). Autenticación por contraseña: habilitar Entra es una operación de
   servidor y se descartó para no tocar las otras dos bases. El modo
   `PG_AUTH_MODE=entra` existe en el código, probado, pero inactivo.
 - **`PG_SET_ROLE=sigrid_dm_etl`** en cada sesión: los objetos deben tener
@@ -689,7 +694,7 @@ fallo con cualquier tolerancia.
   `tesoreria` (la general, F-037), `descompuestos`, `stg`, `aux` y `_meta`— y
   NO lee los de `PG_VETOED_SCHEMAS`: `contabilidad_restringida`,
   `tesoreria_restringida`, `compras_restringida` (F-138) y `raw`. El
-  AUTORIZADO (`sigrid_dm_restringido_ro`) lee `contabilidad_restringida`,
+  AUTORIZADO (`sigrid_dm_autorizado_ro`) lee `contabilidad_restringida`,
   `tesoreria_restringida` y `compras_restringida` (`PG_RESTRICTED_SCHEMAS`);
   el total, las tres por pertenencia. El dueño y el administrador lo leen todo, como
   siempre. `apply_grants`, cada noche y en este orden: (1) si un esquema está a
@@ -715,6 +720,49 @@ fallo con cualquier tolerancia.
   `acceso_total`: leer de menos no expone nada). Si el total no existe, avisa y
   sigue. La nocturna no puede darle las pertenencias (no tiene ADMIN OPTION
   sobre los grupos): eso es `02_roles.sql`, que corre el humano (runbook §12).
+- **El perfil restringido en `apply_grants`, desde F-141.** Regla del humano:
+  «ven como el estándar, menos el mayor, menos el mayor analítico, menos la
+  cartera de cobros (pero sí a retenciones)» y «personal también quítalo, y
+  saldos cuenta también». Lo nombran `PG_PERFIL_RESTRINGIDO_GROUP` y
+  `PG_PERFIL_RESTRINGIDO_LOGIN`; lee `PG_PERFIL_RESTRINGIDO_SCHEMAS` (lista
+  EXPLÍCITA: el consumo menos `tesoreria` y `personal`) menos
+  `PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES` (`contabilidad.mayor` y
+  `contabilidad.saldos_cuenta_mes`); el job no lleva variables nuevas. Antes de
+  abrir conexión, FAILED si `PG_RESTRICTED_ROLE` trae el nombre retirado del
+  autorizado, si el grupo o el login coinciden con otro rol, si sus esquemas no
+  son del consumo o están vetados o restringidos, si falta `_meta`, si un objeto
+  excluido está mal escrito o si leería `compras.documento_adjuntos` sin sus
+  documentos de origen (F-139, D1). Su bloque es el ÚLTIMO y no cambia nada de lo
+  anterior: le concede lo suyo con el privilegio por defecto SIEMPRE en REVOKE
+  (lo que nazca no lo lee hasta que la nocturna lo ha mirado), le veta todo
+  esquema del CATÁLOGO que no es suyo (hoy `tesoreria`, `personal`, `raw` y las
+  `*_restringida`; mañana, cualquiera que nadie haya listado) y busca en el
+  catálogo, vista sobre vista (`pg_rewrite` + `pg_depend`), las vistas suyas que
+  leen lo que no ve: una vista se ejecuta con los permisos de su dueño, y es la
+  trampa de dar esquemas sueltos. Salvo `raw` (lo leen las vistas curadas) y las
+  tres vistas de pago de `compras` (`vencimientos`, `v_facturas_pago`,
+  `v_control_forma_pago`: «compras debe poder verse», excepción NOMINAL en
+  `EXCEPCIONES_FILTRACION_RESTRINGIDO`, con un test que falla si sobra), cada una
+  se le REVOCA y el paso termina en FAILED (`filtraciones_restringido`); igual
+  con un objeto con «mayor» en el nombre sin excluir (`vigilados_restringido`).
+  Después pregunta al catálogo si el grupo o el login leen algo de lo que no
+  deben (`verificacion_restringido`) y si el login es miembro de algo más que su
+  grupo, o el grupo de algo (`pertenencias_restringido`): FAILED en el mismo
+  mensaje que el estándar y el total. Grupo vacío: nada; grupo o login ausentes,
+  o una excepción que ya no lee la cartera (`excepciones_sobrantes`): aviso.
+  `02_roles.sql` hace lo mismo al provisionar (punto 5 quinquies: la mitad del
+  dueño, como `sigrid_dm_etl`, y la del administrador, con la pertenencia).
+  Sin `personal` siguen visibles los logins y nombres de usuarios de Sigrid de
+  `compras.documento_procesos`, `documento_alarmas.creada_por` y
+  `documento_adjuntos.subido_por`: el humano lo aceptó («deja visible compras»).
+  La guarda solo ve vistas y nombres: una TABLA nueva con datos del mayor o de
+  la cartera en un esquema del perfil la vería; la regla `R-PERFIL-RESTRINGIDO`
+  del diccionario y este aviso son la mitigación.
+- **El mayor analítico y F-127.** Hoy no está publicado (es `raw.apa`, 709.403
+  filas). Cuando F-127 lo publique, su spec TIENE que añadirlo a
+  `PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES` si su nombre no lleva «mayor»: con
+  «mayor» en el nombre y sin excluir, la nocturna se lo revoca al perfil
+  restringido y falla, pero con otro nombre nadie lo vería.
 - **Lo que NO es de este repositorio** (F-135, F-136): que el MCP conecte con
   el login total según quién pregunta (por oid, fuera de todo repositorio) y que
   su lista blanca admita `contabilidad_restringida`, `tesoreria_restringida` y
@@ -722,7 +770,11 @@ fallo con cualquier tolerancia.
   y `tesoreria` en las dos conexiones (`mcp-bbdd`, su F-008, con el contrato en
   `azure-apps/datamart_seg_anual.md`): hasta entonces el MCP no ve la cartera; y que Power BI tenga rol
   propio (F-087). Hasta entonces el login total existe pero ningún cliente lo
-  usa: nadie lee lo que no debía, y quien debe verlo lo tiene en Sigrid.
+  usa: nadie lee lo que no debía, y quien debe verlo lo tiene en Sigrid. Lo
+  mismo con el login del perfil restringido (F-141): elegirlo según quién
+  pregunta es de `mcp-bbdd`, con el contrato E1-E8 en
+  `azure-apps/datamart_seg_anual.md` (por defecto restringido, nunca hacia
+  arriba). Power BI no entra en F-141.
 - **La recuperación es volver a ejecutar el ETL, no restaurar**: el PITR es de
   servidor entero y arrastraría `albaranes` y `partes` al pasado.
 - Procedimiento completo: `docs/runbook_postgres_azure.md`.

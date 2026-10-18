@@ -9,6 +9,136 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-18 · F-141 · FUSIONADA en main (APROBADO en pasada 2) · despliegue T14-T15 hoy
+
+- T1-T13 hechos (commits `e6b11e2` … `de9656f`); en `azure-apps`, `a520a62` sin push. F-141 de nuevo en
+  `in_progress` en `features.json` (2026-10-18; estuvo `blocked` por R30, nota de abajo). T14-T17 son MANUALES
+  (humano/líder), con su comando exacto abajo.
+- **Review pasada 1: CHANGES_REQUESTED solo por evidencia** (`progress/review_F-141.md`): la
+  aceptación de los equivalentes y las MANUAL con su comando. Resuelto sin tocar código.
+- Mutación: 56 mutantes, 52 muertos, 4 supervivientes (1 cerrado con test nuevo; 3 EQUIVALENTES
+  `split(".", 1)[0]` → `split(".", 2)[0]` en `grants.py:393`, `grants.py:426` y
+  `postgres_client.py:1633`). **ACEPTADOS por el humano el 2026-10-17** (por chat con el líder:
+  «acepto»); anotado bajo cada «Decisión» de `progress/mutacion_F-141.md`.
+- Para el líder: la ficha de F-127 en `features.json` nombra aún el grupo autorizado con el
+  nombre retirado y debe excluir su mayor analítico de `PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES`.
+- Informe: `progress/impl_F-141.md` (decisiones, desviaciones y evidencias).
+
+> **DESBLOQUEADA (implementer, 2026-10-18).** El bloqueo por R30 (fila de riesgos de
+> `azure-apps/mcp_bbdd.md` que nombraba F-141 sin enlazar al contrato) lo resolvió la sesión de
+> `mcp-bbdd` (commit `63e1bfa` en `azure-apps`); el líder comprobó `-k r30` en verde. Aquí no se
+> ha tocado `azure-apps`.
+>
+> **Ampliación de alcance aprobada por el humano el 2026-10-17** (pequeña, misma v54): la ficha de
+> `compras.documento_adjuntos` (`config/diccionario/compras.yaml`) ya no dice que la herramienta
+> de `mcp-bbdd` «NO ESTA DESPLEGADA»: nombra `abrir_adjunto(adjunto_id)` (F-023 de `mcp-bbdd`,
+> desplegada el 2026-10-17 y verificada por el humano con Claude y ChatGPT), dice que la IA
+> localiza el `adjunto_id` en el índice, que el original llega sin convertir (imágenes visibles;
+> PDF y ofimática como binario; conversión = F-142) y que los permisos son la regla D1 de F-139.
+> Se mantienen los 17 ficheros > 20 MB (no había tope de 64 MB en la ficha). Test de F-139
+> (`tests/test_f139_limite.py`, R2) cambiado para exigir la redacción nueva, con fase RED. Línea
+> añadida a la entrada de la versión 54 en `00_global.yaml`. Detalle en `progress/impl_F-141.md` §5 bis.
+
+### F-141 · Verificaciones MANUAL, con su comando exacto (tras el APROBADO y el merge)
+
+Sacadas de `specs/F-141-perfil-restringido/tasks.md` (T14-T17) y del runbook
+`docs/runbook_postgres_azure.md` §13 (P0-P9), donde está el bloque completo. Una sola sesión de
+Windows PowerShell 5.1, **de día (07:00-21:00 UTC)** y sin imprimir nunca un valor. Variables (ya
+en el runbook): `$rgJ = "rg-datamart-seg-dev"; $job = "caj-datamart-seg-dev"; $kvMcp =
+"kv-mcp-bbdd-dev"; $roles = "infra\sql\02_roles.sql"; $q = @("--query", "value", "-o", "tsv")`.
+`$dsn` es `"host=<host> dbname=sigrid_dm user=<admin> sslmode=require"` (`<host>`, el servidor
+compartido; `<admin>`, su administrador); `psql` lleva las opciones DELANTE y pide la contraseña,
+que nunca va en la línea de órdenes. **La imagen (T14) y `02_roles.sql` (T15) van el MISMO día,
+entre dos nocturnas** (runbook §13, cabecera).
+
+**T14 · Despliegue de la imagen** (humano o líder con autorización), tras el merge:
+`powershell -NoProfile -File infra/70_build_image.ps1` →
+`powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag rAAAAMMDD-hhmm publicado>` →
+`az containerapp job show -g $rgJ -n $job --query "properties.template.containers[0].image" -o tsv`
+(= ese tag).
+
+**T15 · Alta del perfil y renombre del grupo, runbook §13 P0-P7** (humano):
+
+1. P0, puerta (solo lectura): `[DateTime]::UtcNow.ToString("HH:mm")` (entre 07:00 y 21:00),
+   `az containerapp job execution list -g $rgJ -n $job -o table` (ninguna en curso), el
+   `az containerapp job show` de T14 (el tag con F-141) y `psql --version` (15 o posterior).
+2. P2-P3, el vault primero y releído al entorno (función `Nueva-Clave` de P1):
+   `az keyvault secret set --vault-name $kvMcp --name pg-password-restringido --value $v -o none`
+   y `$env:RESTRINGIDO_PWD = az keyvault secret show --vault-name $kvMcp --name pg-password-restringido @q`
+   (longitud 64; si no, `throw`).
+3. P4, **R33 antes**: la consulta `$huella` del runbook (P4) →
+   `psql -X -A -t -c $huella $dsn | Set-Content -Encoding utf8 $antes`; y el fichero:
+   `psql -X -v ON_ERROR_STOP=1 -f $roles $dsn` → `F-141: grupo autorizado renombrado` (o «sin
+   renombre»), `mcp_sigrid_dm_restringido: contraseña fijada`, las otras tres SIN CAMBIOS, `COMMIT`,
+   siete roles con `rolsuper = f`, una pertenencia del login (`hereda = t`, `set_role = f`), `t` en
+   sus diez esquemas y `f` en `tesoreria`, `personal`, `raw` y las tres `*_restringida`, `mayor = f`,
+   `saldos_cuenta_mes = f`, `plan_cuentas = t`, `vencimientos = t`, `conecta = t`, cero privilegios
+   propios. P5: `Remove-Item Env:RESTRINGIDO_PWD`.
+4. P6, con el login real
+   (`$dsnR = "host=<host> dbname=sigrid_dm user=mcp_sigrid_dm_restringido sslmode=require"`;
+   `$env:PGPASSWORD` leído del vault con `@q` y retirado con `Remove-Item Env:PGPASSWORD`):
+   - **R31, negativa**: `foreach ($t in $no) { psql -X -c "SELECT 1 FROM $t LIMIT 1" $dsnR }` con
+     `$no` = `contabilidad.mayor`, `contabilidad.saldos_cuenta_mes`, `tesoreria.efectos`,
+     `personal.recursos`, `raw.obr`, `contabilidad_restringida.mayor`,
+     `tesoreria_restringida.efectos`, `compras_restringida.documento_alarmas`, y
+     `psql -X -c "BEGIN" -c "CREATE TABLE compras.f141_x (x int)" -c "ROLLBACK" $dsnR`
+     → `permission denied` en las nueve.
+   - **R32, positiva**: el mismo `foreach` con `$si` = `compras.vencimientos`,
+     `compras.v_facturas_pago`, `contabilidad.plan_cuentas`, `retenciones.movimientos`,
+     `mart.fact_seguimiento_mensual`, `_meta.v_diccionario` → una fila en cada una; y
+     `psql -X -c "SELECT count(*) FROM compras.documento_adjuntos"` con `$dsnR` y con `$dsn` → el
+     mismo recuento.
+   - Si el `.env` del puesto fija `PG_RESTRICTED_ROLE` con el nombre retirado, se corrige a
+     `sigrid_dm_autorizado_ro` antes (R3). `python main.py apply-grants` → SUCCESS con
+     `verificacion_restringido`, `pertenencias_restringido` y `filtraciones_restringido` a `ok`.
+5. P7, **R33 después**: `psql -X -A -t -c $huella $dsn | Set-Content -Encoding utf8 $despues` y
+   `Compare-Object (Get-Content $antes) (Get-Content $despues)` → SIN salida (el estándar y el
+   total leen lo mismo que antes). Después, con autorización del humano (escritura en `_meta`):
+   `python main.py publicar-diccionario` (v54, o la siguiente a la de `main`) y reinicio del MCP:
+   `$rev = az containerapp show -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --query properties.latestReadyRevisionName -o tsv`
+   → `az containerapp revision restart -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --revision $rev -o none`.
+   Resultados (sin valores) a esta sección.
+
+**T16 · P8, la nocturna siguiente, sin ejecutar nada a mano** (humano o líder, solo lectura):
+`az containerapp job execution list -g $rgJ -n $job -o table` (la nocturna en Succeeded) y, con
+cualquier login que lea `_meta`, **R34**:
+`SELECT started_at, status, metadata->>'verificacion' AS verificacion, metadata->>'verificacion_total' AS verificacion_total, metadata->>'verificacion_restringido' AS verificacion_restringido, metadata->>'pertenencias_restringido' AS pertenencias_restringido FROM _meta.etl_runs WHERE step = 'apply_grants' ORDER BY started_at DESC LIMIT 3;`
+→ SUCCESS y los cuatro `ok`.
+
+**T17 · P9, el contrato a `mcp-bbdd`** (líder): entregar las cláusulas E1-E8 de
+`azure-apps/datamart_seg_anual.md` (perfil restringido, F-141; commit local `a520a62`, push del
+humano), comprobables con
+`git -C C:\Users\pgris\PycharmProjects\azure-apps log -1 --stat a520a62`. Su feature, su
+despliegue y las listas de oid son de `mcp-bbdd`. Y avisar de que la ficha de F-127 excluya su
+mayor analítico de `PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES` si no lleva «mayor» en el nombre.
+
+**Vuelta atrás**: runbook §13, «Vuelta atrás» (P2-P3 no cambian la base; `02_roles.sql` es
+reejecutable; deshacer el renombre con `ALTER ROLE sigrid_dm_autorizado_ro RENAME TO` el nombre
+de `NOMBRE_AUTORIZADO_RETIRADO` y volver a la imagen anterior el mismo día).
+
+## 2026-10-17 · F-141 · SPEC APROBADA por el humano (`spec_ready`)
+
+> **Aprobada el 2026-10-17.** Última decisión: los usuarios de Sigrid de `compras`
+> (`documento_adjuntos.subido_por`, `documento_alarmas.creada_por`, `documento_procesos`) siguen
+> visibles para el restringido: «deja visible compras». El líder lanza el implementer.
+
+> Rama `feature/F-141-perfil-restringido`. Spec en `specs/F-141-perfil-restringido/`
+> (requirements 146/150, design 250/250, 17 tareas); mediciones en `progress/spec_F-141.md` (§9,
+> la segunda pasada). Nada de código.
+
+- **Qué ve el restringido** (D3 + P1-P2 del 2026-10-17): todo lo del estándar menos
+  `contabilidad.mayor`, `contabilidad.saldos_cuenta_mes`, `tesoreria` y `personal` enteros;
+  `retenciones` sí; `compras` entero, incluidas `vencimientos`, `v_facturas_pago` y
+  `v_control_forma_pago` (D4: excepciones nominales de la guarda; por ellas ve el estado de pago).
+  Medido: ninguna vista que ve lee `personal` ni `saldos_cuenta_mes`. Siguen visibles los logins y
+  nombres de usuarios de Sigrid de tres tablas de `compras` (design §11).
+- **El mayor analítico NO está publicado** (es `raw.apa`; lo publicará F-127): la nocturna vigila
+  objetos con «mayor» en el nombre (revoca y FAILED) y **la ficha de F-127 debe decir que excluye
+  su mayor analítico de `PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES`** (para el líder).
+- Nombre (D6): el grupo autorizado pasa a `sigrid_dm_autorizado_ro` (renombre en `02_roles.sql`,
+  imagen el mismo día); el perfil es `sigrid_dm_perfil_restringido_ro` + `mcp_sigrid_dm_restringido`.
+  Diccionario: la versión siguiente a la de `main` al fusionar (hoy main = 53).
+
 ## 2026-10-17 · F-139 · CERRADA (`done`) · `abrir_adjunto` verificado con Claude y con ChatGPT
 
 > **Cierre (líder, 2026-10-17), por orden del humano («ha funcionado en chatgpt puedes cerrar»):**

@@ -5,7 +5,7 @@ esquemas, con el patrón de F-135.
 
 * `tesoreria_restringida` — la cartera COMPLETA: una fila por efecto de
   `raw.pag` y `raw.cob`, con `restringido` y `motivo_restriccion`. Solo la leen
-  el grupo `sigrid_dm_restringido_ro` y el login total (y el dueño).
+  el grupo `sigrid_dm_autorizado_ro` y el login total (y el dueño).
 * `tesoreria` — la GENERAL, la que leen el MCP y Power BI: sin los pagos de
   PERSONAL (nóminas, embargos, cuotas; criterio en `domain/tesoreria.py`), y
   con solo RECUENTOS de lo que falta, nunca importes.
