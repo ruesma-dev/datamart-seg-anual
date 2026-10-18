@@ -299,3 +299,24 @@ def test_f128_r31_version_la_siguiente_a_la_de_main():
 def test_f128_r31_historia_de_versiones():
     assert int(_yaml("00_global.yaml")["version"]) >= VERSION_F128
     assert f"# version {VERSION_F128} (F-128, " in GLOBAL.read_text(encoding="utf-8")
+
+
+# --- R34 · la documentación de fuera del diccionario ---------------------------------------
+
+ARQUITECTURA = RAIZ / "docs" / "ARCHITECTURE.md"
+CLAUDE_MD = RAIZ / "CLAUDE.md"
+AZURE_APPS = RAIZ.parent / "azure-apps" / "datamart_seg_anual.md"
+
+
+def test_f128_r34_architecture_explica_la_semantica():
+    texto = _plano(ARQUITECTURA.read_text(encoding="utf-8"))
+    for frase in ("`totdoc`", "`tot`", "`totpag`", "`reccla`", "`RETESP`", "(F-128)",
+                  "`compras_restringida.documento_cuenta_bancaria`"):
+        assert frase in texto, frase
+
+
+def test_f128_r34_el_mapa_de_claude_md():
+    texto = _plano(CLAUDE_MD.read_text(encoding="utf-8"))
+    assert "F-128" in texto
+    assert "`compras_restringida.documento_cuenta_bancaria`" in texto
+    assert "`retenciones.retencion_factura`" in texto
