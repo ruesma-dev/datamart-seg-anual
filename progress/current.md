@@ -32,7 +32,7 @@
 > huella idéntica (`Compare-Object` vacío); diccionario **v54** publicado (226 objetos, 1.864 columnas,
 > 26 reglas, hash `77ae01c81270`; `check-diccionario` OK) y MCP reiniciado (`ca-mcp-bbdd-dev--0000020`).
 > Nota operativa: la contraseña de `ruesmaadmin` la tecleó el humano (no está en ningún vault); `psql`
-> no está en el PATH del puesto (`C:\Program Files\PostgreSQLin`). `azure-apps` al día
+> no está en el PATH del puesto (`C:\Program Files\PostgreSQL\16\bin`). `azure-apps` al día
 > (`34a292f`, F-141 desplegada). **Queda T16** (nocturna del 19, R34) y **T17** (contrato E1-E8 a
 > `mcp-bbdd`, entregado por mensaje el 18-10).
 
