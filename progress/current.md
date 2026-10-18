@@ -9,6 +9,18 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-18 · F-128 · `in_progress` (implementer) · cabecera de factura y albarán
+
+- Rama `feature/F-128-importes-cabecera-factura`; `main` fusionado (`3c55cf9`: F-139, F-141, F-144,
+  diccionario v55). Conflictos de `features.json`/`BACKLOG.md` resueltos conservando F-143 y F-144.
+- Consecuencias del merge (no son decisiones nuevas): diccionario de F-128 = **v56**; perfiles de
+  F-141 (la tabla nueva de `compras_restringida` solo para el total); objetos nuevos de F-128 en
+  la lista correcta de `R-EMPRESA-POR-DEFECTO`.
+- **Desviación (T1, justificada):** el informe §5 no clasificaba `diremp2`/`diremp3` (líneas 2-3 de
+  la dirección del documento, 1,0-1,7 %, medido el 2026-10-18 en `raw`). R3 exige una entrada por
+  columna: van como `RESIDUAL` con su cobertura en la nota. No se publican (como `dirdir*`).
+- En curso: ver `specs/F-128-importes-cabecera-factura/tasks.md` (las `[x]`).
+
 ## 2026-10-18 · F-144 · CERRADA (`done`, APROBADO en pasada 2) · DESPLEGADA: diccionario v55 y MCP reiniciado
 
 > Regla `R-EMPRESA-POR-DEFECTO` (bloqueante), orden del humano: «en general si no se indica empresa es

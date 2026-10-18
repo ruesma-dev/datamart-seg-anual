@@ -1996,7 +1996,7 @@
         "La cuenta bancaria del proveedor de cada factura y albarán se publica SOLO en `compras_restringida` (perfil total): el rol estándar y el perfil restringido de F-141 no la leen, y ningún valor real de cuenta queda en el repositorio (D4-B)",
         "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
       ],
-      "status": "spec_ready",
+      "status": "in_progress",
       "sdd": true,
       "rigor": "estandar",
       "priority": 4,
