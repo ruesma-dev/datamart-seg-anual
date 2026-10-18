@@ -1640,28 +1640,20 @@ def test_f141_r27_cabecera_de_los_yaml_restringida(fichero: str) -> None:
     assert "F-141" in cabecera and "perfil restringido" in cabecera and "NO la lee" in cabecera
 
 
-def _version_de_main() -> int:
-    import subprocess
-
-    import yaml
-
-    salida = subprocess.run(
-        ["git", "show", "main:config/diccionario/00_global.yaml"],
-        cwd=RAIZ, capture_output=True, text=True, encoding="utf-8",
-    )
-    if salida.returncode != 0:  # pragma: no cover - un clon sin la rama main
-        pytest.skip("no hay rama main con la que comparar")
-    return int(yaml.safe_load(salida.stdout)["version"])
+#: La versión que F-141 publicó. Hasta F-144 los dos tests de R29 la comparaban con la de
+#: `main` («la siguiente a la de main») y con la versión VIGENTE: en la rama eran ciertos, pero
+#: tras el merge `main` ya lleva la 54 (54 >= 55, rojo) y la siguiente feature que suba la
+#: versión deja sin entrada F-141 a la vigente. Se fija la 54, como hace F-139 con la 53.
+VERSION_F141 = 54
 
 
 def test_f141_r29_version_la_siguiente_a_la_de_main() -> None:
-    assert _yaml_dicc("00_global.yaml")["version"] >= _version_de_main() + 1
+    assert int(_yaml_dicc("00_global.yaml")["version"]) >= VERSION_F141
 
 
 def test_f141_r29_la_historia_de_versiones_cuenta_f141() -> None:
     texto = (DICC / "00_global.yaml").read_text(encoding="utf-8")
-    version = _yaml_dicc("00_global.yaml")["version"]
-    assert f"# version {version} (F-141, " in texto
+    assert f"# version {VERSION_F141} (F-141, " in texto
 
 
 def test_f141_r26_r28_sin_nombres_oid_ni_upn_en_el_diccionario() -> None:
