@@ -863,8 +863,11 @@ reglas:
       `compras.v_pbi_proveedor_obra`, `retenciones.apuntes_contables`,
       `retenciones.fin_obra`, `retenciones.saldo_contable`,
       `retenciones.v_retencion_contable_obra`, `retenciones.retencion_factura`,
-      `retenciones.v_cuadre_factura_obra` (estas dos, la empresa de la obra de
-      CABECERA de la factura), `personal.recursos`,
+      `retenciones.v_cuadre_factura_obra` (`retencion_factura`, la empresa de
+      la obra de CABECERA de la factura; `v_cuadre_factura_obra`, la de la obra
+      del par: la de cabecera de sus facturas o, en los pares que solo estan en
+      contabilidad, la de la cascada contable de `retenciones.saldo_contable`),
+      `personal.recursos`,
       `contabilidad.plan_cuentas`, `contabilidad.mayor`,
       `contabilidad.saldos_cuenta_mes`, `contabilidad.apuntes_restringidos_mes`,
       `contabilidad_restringida.plan_cuentas`, `contabilidad_restringida.mayor`,
