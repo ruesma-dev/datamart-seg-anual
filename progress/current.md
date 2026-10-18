@@ -9,6 +9,28 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-18 · F-144 · `in_progress` (implementer) · regla `R-EMPRESA-POR-DEFECTO`
+
+- Rama `feature/F-144-empresa-por-defecto` desde `main` (`d3b2869`). sdd=false, rigor estándar.
+- Hecho: regla dura nueva en `00_global.yaml` tras `R-CODIGO-POR-EMPRESA` (que remite a ella),
+  diccionario **v55** con su entrada de cabecera, test `tests/test_f144_empresa_por_defecto.py`
+  (RED pegado en `progress/impl_F-144.md`). Comprobado en Azure en solo lectura
+  (`_bootstrap_done = True`): `empresa_id = 1` es CONSTRUCCIONES RUESMA; la columna es `empresa_id`
+  salvo `maestro.centros_coste.empresa`; `stg`/`mart`/`cierre`/`descompuestos` no tienen empresa.
+- **Desviación justificada**: `main` estaba en ROJO antes de empezar
+  (`test_f141_r29_version_la_siguiente_a_la_de_main`: comparaba con `main` y tras el merge de F-141
+  pedía 54 >= 55). Los dos tests R29 de F-141 fijan ahora la versión 54 (patrón de F-139 con la 53).
+- Falta (MANUAL, tras el merge y con orden del humano): `publicar-diccionario`, `check-diccionario`,
+  reiniciar el MCP, avisar a `mcp-bbdd` y anotar v55 en `azure-apps/datamart_seg_anual.md`.
+- **Review pasada 1: CHANGES_REQUESTED, corregido (pasada 2 del implementer).** La regla decía que
+  todo `compras`/`retenciones` tiene `empresa_id` y no es cierto. Ahora nombra exactamente los 25
+  objetos con empresa y los 12 hechos con solo `obra_id` (el test recorre las fichas y caza el
+  siguiente que falte), y para los objetos sin ninguna de las dos dice que el criterio no se aplica,
+  que la cifra mezcla todas las empresas y que NO se dice «he supuesto Construcciones Ruesma».
+  Cruces nombrados solo los verificados en el SQL (`compras.vencimientos` → `tesoreria.efectos`;
+  retenciones desde `retenciones.movimientos`). `personal.partes_lineas` en vez de «los partes».
+  `compras_restringida` entra en el `ambito`. Misma v55. Detalle en `progress/impl_F-144.md`.
+
 ## 2026-10-18 · F-141 · FUSIONADA en main (APROBADO en pasada 2) · despliegue T14-T15 hoy
 
 > **T14 HECHO (líder, 2026-10-18 09:0x hora local, por orden del humano «despliega»):** merge `d7f0abb`

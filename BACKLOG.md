@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **131 features**, 72 abiertas (0 en curso, 1 con la spec lista, 0 bloqueadas y 71 en backlog) y 59 terminadas.
+Resumen: **131 features**, 71 abiertas (0 en curso, 1 con la spec lista, 0 bloqueadas y 70 en backlog) y 60 terminadas.
 
 ## En curso
 
@@ -23,7 +23,6 @@ _Ninguna feature bloqueada._
 
 | # | Feature | Prioridad | Rigor | Rama |
 |---|---|---|---|---|
-| F-144 | Regla del diccionario: si no se indica empresa, es Construcciones Ruesma (`empresa_id = 1`), y la IA lo dice | 1 | estandar | `feature/F-144-empresa-por-defecto` |
 | F-128 | Toda la cabecera de la factura de proveedor y del albarán (con proformas): los importes (base, IVA, retención, total y total a pagar), sus recargos y retenciones (dcfrec, dcarec) y el resto de campos de `dcf` y `dca` que hoy no se publican | 4 | estandar | `feature/F-128-importes-cabecera-factura` |
 | F-140 | La fase 2 de la cartera (F-037): los ingredientes de la proyección de caja por obra (devengo pendiente, plazos de pago pactados y retenciones), sin convertir devengo en caja | 5 | estandar | `feature/F-140-proyeccion-caja-ingredientes` |
 | F-129 | El objetivo del comparativo se mide contra la oferta de referencia del propio comparativo (oficina técnica o planificado ABC), no contra el descompuesto: hoy casa el 29 % | 6 | critico | `feature/F-129-objetivo-contra-oferta-referencia` |
@@ -118,6 +117,7 @@ _Ninguna feature bloqueada._
 | F-135 | Restringir la información de PERSONAL de la contabilidad (nóminas, cuentas de trabajadores, embargos, cajas) a quien tenga el rol autorizado, en el mayor, en raw y en el futuro mayor analítico | 1 | critico |
 | F-136 | Usuario de base de acceso TOTAL para el MCP (mcp_sigrid_dm_total) y rotación de las contraseñas expuestas | 1 | critico |
 | F-138 | Las facturas, albaranes y proformas liquidatorias: las alarmas de los documentos de Sigrid (conala) y la marca «liquidatoria» de cada documento | 1 | estandar |
+| F-144 | Regla del diccionario: si no se indica empresa, es Construcciones Ruesma (`empresa_id = 1`), y la IA lo dice | 1 | estandar |
 | F-009 | Inventario del entorno Azure existente | 2 | documental |
 | F-042 | La clave de mart.fact_seguimiento_mensual esta rota: 8.778 combinaciones duplicadas | 2 | critico |
 | F-056 | El mayor y el plan de cuentas como arbol: stg y mart sobre la contabilidad (raw por F-066) | 2 | critico |
@@ -160,12 +160,6 @@ _Ninguna feature bloqueada._
 | F-052 | La obra 0599 no esta en el datamart: 104.366 filas de presupuesto se caen por un arbol de partidas roto | 42 | critico |
 
 ## Detalle
-
-### F-144 · Regla del diccionario: si no se indica empresa, es Construcciones Ruesma (`empresa_id = 1`), y la IA lo dice
-
-estado **pendiente** · prioridad 1 · rigor `estandar` · SDD no · rama `feature/F-144-empresa-por-defecto`
-
-Nace el 2026-10-18 por orden del humano, pedida primero en la sesión de `mcp-bbdd` («si no se dice nada es construcciones ruesma. guardalo como regla en el diccionario en datamart») y confirmada aquí: «en general si no se indica empresa es construcciones ruesma. es criterio general». Regla dura nueva `R-EMPRESA-POR-DEFECTO` (bloqueante) en `config/diccionario/00_global.yaml`, junto a `R-CODIGO-POR-EMPRESA`: es un CRITERIO GENERAL, no solo de códigos. Si la pregunta no nombra empresa, se entiende Construcciones Ruesma, `empresa_id = 1` (el código ya lo fija `R-CODIGO-POR-EMPRESA`: «Ruesma (1), Porsan (28), cada UTE»), y se filtra por ella en todo objeto con empresa. La IA DICE en la respuesta que ha supuesto Construcciones Ruesma, para que el usuario lo vea y lo corrija (sugerencia de `mcp-bbdd`). No se aplica si la pregunta pide otra empresa, varias, el grupo o una UTE; y nunca se suman empresas sin decirlo. Diccionario: versión siguiente a la de `main` (hoy v54 → v55), publicar y reiniciar el MCP; avisar a `mcp-bbdd` cuando se publique. No cambia `abrir_adjunto` (la empresa sale de la fila del índice). sdd=false: cambio de texto del diccionario con sus tests. El ID F-143 lo tiene reservado la rama de F-128 (tipo de contrato de compra).
 
 ### F-128 · Toda la cabecera de la factura de proveedor y del albarán (con proformas): los importes (base, IVA, retención, total y total a pagar), sus recargos y retenciones (dcfrec, dcarec) y el resto de campos de `dcf` y `dca` que hoy no se publican
 
@@ -706,6 +700,12 @@ Nace el 2026-10-12, el día del despliegue de F-135. El humano fija quién ve la
 estado **terminada** · prioridad 1 · rigor `estandar` · SDD sí · rama `feature/F-138-facturas-liquidatorias`
 
 Nace el 2026-10-14 de un correo de **Elena Díaz** (Departamento de Control de Costes) titulado «facturas liquidatorias», pasado por el humano: «apúntalo como feature, prioridad 1». El correo NO trae texto: solo una captura de Sigrid de la factura **FR26/10035** (ZANELA FERREIRA, obra 0722) con una ventana de ALARMA de tipo «03 · INFORMATIVA» cuyo texto es «FACTURA LIQUIDATORIA». ================ LO QUE ENSEÑA LA CAPTURA: en Sigrid la liquidatoria NO es un campo de la factura sino una **alarma de texto libre** pegada al documento. Las alarmas viven en **`conala`** («Alarmas en conceptos»: `conide` -> `con`, `alaide` -> `auxala`, `alatip`, `fec1`, `fec2`, `tex`, `rol`, `usu`) y su catálogo en **`auxala`** («Alarmas (Clasificaciones)»: `cod`, `res`, `alatip`, `tipabr`, `tiplec`). **Ninguna de las dos se ingiere hoy.** ================ MEDIDO EN SIGRID EL 2026-10-14 (solo lectura, por `sigrid-api`): **46.239 alarmas**; por tipo, 03 INFORMATIVA 45.223, 02 AVISO ABONOS 343, 01 ALARMA FACT. POR INCIDENCIAS 23, 04 (sin nombre) 7 y **643 sin tipo**. **18.591 cuelgan de una factura** (`dcf`). **14.248 alarmas mencionan «LIQUIDA»**, sobre 14.232 documentos, de los que **8.811 son facturas**; el resto cuelga de otros documentos que hay que identificar (¿contratos?, ¿albaranes?). **EL TEXTO ES LIBRE Y VARÍA**: «FACTURA LIQUIDATORIA» 2.250, «LIQUIDATORIA» 2.109, «UNICA Y LIQUIDATORIA» 689, «FACTURA UNICA Y LIQUIDATORIA» 528, «FRA LIQUIDATORIA» 286, «ULTIMA Y LIQUIDATORIA» 278, «LIQUIDATORIA» con salto de línea 213, «FRA. UNICA Y LIQUIDATORIA» 159, «ÚNICA Y LIQUIDATORIA» 127…; y hay alarmas que remiten a otro sitio («VER TEXTO» 1.528, «VER NOTA» 944, «MIRAR TEXTO» 191), donde la marca puede estar en el texto del documento (`compras.documento_texto`, F-080). `fec1` sale a 0 en algún caso: hay que medir qué fecha es fiable. ================ PARA QUÉ: el correo no lo dice. Lo probable es saber qué facturas liquidan un contrato o subcontrato (ya no debería llegar ninguna más, y es cuando se libera la retención), pero **la spec lo confirma con Elena** antes de diseñar el uso. FRONTERAS: F-128 (cabecera de la factura) no lleva la marca; F-090 publicó el índice de adjuntos; F-084 la cadena contrato -> albarán -> factura, que es donde la liquidatoria tiene sentido (¿la última factura de cada contrato?). ================ AMPLIACIÓN DEL 2026-10-14, por orden del humano al lanzar la spec («vamos con la f138, también para albaranes y proformas»): la marca se publica también para ALBARANES y PROFORMAS (`dca`, series `AC` y `PROF`; las notas `NTC` las decide la spec). De las 14.248 alarmas «LIQUIDA», 5.437 no cuelgan de una factura: hay que medir cuántas son de albaranes y proformas y de qué otros documentos. ================ SPEC APROBADA el 2026-10-14 (D1-D9 decididas por el humano; D9: las alarmas de recursos y partes solo para el perfil total, en compras_restringida). Spec: specs/F-138-facturas-liquidatorias/.
+
+### F-144 · Regla del diccionario: si no se indica empresa, es Construcciones Ruesma (`empresa_id = 1`), y la IA lo dice
+
+estado **terminada** · prioridad 1 · rigor `estandar` · SDD no · rama `feature/F-144-empresa-por-defecto`
+
+Nace el 2026-10-18 por orden del humano, pedida primero en la sesión de `mcp-bbdd` («si no se dice nada es construcciones ruesma. guardalo como regla en el diccionario en datamart») y confirmada aquí: «en general si no se indica empresa es construcciones ruesma. es criterio general». Regla dura nueva `R-EMPRESA-POR-DEFECTO` (bloqueante) en `config/diccionario/00_global.yaml`, junto a `R-CODIGO-POR-EMPRESA`: es un CRITERIO GENERAL, no solo de códigos. Si la pregunta no nombra empresa, se entiende Construcciones Ruesma, `empresa_id = 1` (el código ya lo fija `R-CODIGO-POR-EMPRESA`: «Ruesma (1), Porsan (28), cada UTE»), y se filtra por ella en todo objeto con empresa. La IA DICE en la respuesta que ha supuesto Construcciones Ruesma, para que el usuario lo vea y lo corrija (sugerencia de `mcp-bbdd`). No se aplica si la pregunta pide otra empresa, varias, el grupo o una UTE; y nunca se suman empresas sin decirlo. Diccionario: versión siguiente a la de `main` (hoy v54 → v55), publicar y reiniciar el MCP; avisar a `mcp-bbdd` cuando se publique. No cambia `abrir_adjunto` (la empresa sale de la fila del índice). sdd=false: cambio de texto del diccionario con sus tests. El ID F-143 lo tiene reservado la rama de F-128 (tipo de contrato de compra). ================ CERRADA el 2026-10-18 (`done`): reviewer APROBADO en la pasada 2 (`progress/review_F-144.md`; la 1 pidió nombrar objeto a objeto dónde hay empresa y avisar en los que no), init.sh en verde y fusionada en main. Queda (MANUAL, con orden del humano): publicar la v55, `check-diccionario` (27 reglas), reiniciar el MCP y avisar a `mcp-bbdd`.
 
 ### F-009 · Inventario del entorno Azure existente
 
