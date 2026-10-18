@@ -22,4 +22,4 @@ código, tests, diccionario ni `progress/`: solo agregados (R23).
 - [x] T15: `progress/impl_F-128.md` con trazas RED/GREEN y las verificaciones MANUAL pendientes (T16-T17)  |  Verificación: `python -m harness.tamano --feature F-128`
 - [ ] T16: MANUAL (humano), design §11 pasos 1-4: imagen o `build-compras`, `build-retenciones` y `apply-grants` en Azure; inventario contra `information_schema`; cifras de R35; «permission denied» del login estándar en la tabla de R20; `python main.py check-diccionario`  |  Verificación: MANUAL (humano) (R35)
 - [ ] T17: MANUAL (humano): `python main.py publicar-diccionario`, reinicio del MCP y las dos preguntas de R36 por el conector  |  Verificación: MANUAL (humano) (R36)
-- [ ] T18: Ejecutar `bash harness/init.sh` en verde  |  Verificación: `bash harness/init.sh`
+- [x] T18: Ejecutar `bash harness/init.sh` en verde  |  Verificación: `bash harness/init.sh`

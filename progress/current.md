@@ -25,7 +25,7 @@
   los importadores del módulo: la de por defecto no cabe en los 600 s de línea base). Otras
   desviaciones menores, justificadas en el informe (alias SQL `cpt`/`dcon`, tests ajenos
   mecánicos, R31 robusto al merge, frase nueva en `R-EMPRESA-POR-DEFECTO`).
-- Falta: T18 (`bash harness/init.sh`), review; después, MANUAL del humano T16-T17 (build en
+- T18: `bash harness/init.sh` en verde el 2026-10-19 (8437 passed, cobertura 100 % de 66 líneas). Falta: review; después, MANUAL del humano T16-T17 (build en
   Azure, `apply-grants`, `check-diccionario`, publicar v56, reiniciar el MCP).
 
 ## 2026-10-18 · F-144 · CERRADA (`done`, APROBADO en pasada 2) · DESPLEGADA: diccionario v55 y MCP reiniciado

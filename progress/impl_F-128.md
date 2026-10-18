@@ -137,7 +137,7 @@ T10 (R33) y T13 son guardas de «no cambia»: llevan positivo fabricado en vez d
 | Evidencia | Valor real |
 |---|---|
 | Tests de F-128 | `135 passed in 36.85s` (los cuatro `tests/test_f128_*.py`) |
-| Suite completa (`bash harness/init.sh`) | PENDIENTE_INIT |
-| Cobertura de las líneas cambiadas | PENDIENTE_COB |
+| Suite completa (`bash harness/init.sh`) | `bash harness/init.sh` en VERDE el 2026-10-19 («ENTORNO LISTO»): **8437 passed, 254 skipped**, 0 failed; ruff 276 avisos (deuda previa, no bloquea) |
+| Cobertura de las líneas cambiadas | **100,0 %** de 66 líneas cambiadas (66/66, umbral 80 %, línea `PUERTA COBERTURA`) |
 | Mutación (`progress/mutacion_F-128.md`) | 22 generados, 20 evaluados (muestreo estándar, semilla 20260820), **20 muertos, 0 supervivientes**, 593,9 s. Suite acotada a los 4 importadores del módulo: la campaña por defecto abortó con «LÍNEA BASE SIN TERMINAR» (600 s) y el arnés manda acotarla |
-| Tiempo de la suite | PENDIENTE_T |
+| Tiempo de la suite | 1225,85 s (20 min 25 s) con medición de cobertura, según la propia suite |
