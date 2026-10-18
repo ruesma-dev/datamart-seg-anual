@@ -9,6 +9,16 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-18 · F-144 · CERRADA (`done`, APROBADO en pasada 2) · DESPLEGADA: diccionario v55 y MCP reiniciado
+
+> Regla `R-EMPRESA-POR-DEFECTO` (bloqueante), orden del humano: «en general si no se indica empresa es
+> construcciones ruesma. es criterio general». Nombra objeto a objeto dónde hay `empresa_id` (25), qué
+> hechos se filtran por `obra_id` contra `maestro.obras` (12) y en cuáles no se puede (la IA dice que la
+> cifra es de todas las empresas). Merge `e1c98ba` (dev `b591ba1`, push del humano); `init.sh` sobre main
+> fusionado: 8.256 passed (el único KO es el de «estás en main»). **v55 publicada** el 18-10 15:30 UTC
+> (226 objetos, 1.864 columnas, 27 reglas, hash `acef223dc1a9`; `check-diccionario` OK) y MCP reiniciado
+> (`ca-mcp-bbdd-dev--0000020`). Aviso a `mcp-bbdd` enviado. Siguiente: F-128 (implementer).
+
 ## 2026-10-18 · F-144 · `in_progress` (implementer) · regla `R-EMPRESA-POR-DEFECTO`
 
 - Rama `feature/F-144-empresa-por-defecto` desde `main` (`d3b2869`). sdd=false, rigor estándar.
