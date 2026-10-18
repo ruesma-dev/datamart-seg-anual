@@ -576,7 +576,7 @@ def test_f135_sub_pasos_el_docstring_dice_que_es_general_y_que_restringido() -> 
     from etl_sigrid.application.steps import build_contabilidad_step
 
     doc = build_contabilidad_step.__doc__ or ""
-    assert RESTR in doc and "sigrid_dm_restringido_ro" in doc
+    assert RESTR in doc and "sigrid_dm_autorizado_ro" in doc
     for nombre in FICHEROS:
         assert nombre in doc, f"el docstring no cita {nombre}"
 
@@ -619,7 +619,7 @@ def test_f135_diccionario_el_esquema_restringido_es_del_datamart() -> None:
     entrada = _yaml("00_global.yaml")["esquemas"][RESTR]
     assert entrada["pasos_etl"] == ["build_contabilidad"]
     assert entrada["refresco"] == "nocturno"
-    assert "sigrid_dm_restringido_ro" in entrada["para_que_sirve"]
+    assert "sigrid_dm_autorizado_ro" in entrada["para_que_sirve"]
 
 
 @pytest.mark.parametrize(
@@ -640,7 +640,7 @@ def test_f135_diccionario_fichas_del_completo_con_las_columnas_del_sql(
     assert ficha["paso_etl"] == "build_contabilidad" and ficha["refresco"] == "nocturno"
     for columna, datos in ficha["columnas"].items():
         assert datos.get("significado"), f"{RESTR}.{tabla}.{columna} sin significado"
-    assert "sigrid_dm_restringido_ro" in ficha["descripcion"]
+    assert "sigrid_dm_autorizado_ro" in ficha["descripcion"]
 
 
 @pytest.mark.parametrize("tabla", sorted(COLUMNAS_GENERALES))
@@ -680,7 +680,7 @@ def test_f135_r22_regla_dura_contabilidad_restringida() -> None:
     assert {"contabilidad", RESTR} <= set(regla["ambito"])
     texto = regla["regla"] + " " + regla["motivo"]
     for termino in (
-        "contabilidad_restringida", "sigrid_dm_restringido_ro", "incompleto",
+        "contabilidad_restringida", "sigrid_dm_autorizado_ro", "incompleto",
         "apuntes_restringidos_mes", "num_apuntes_restringidos", "NUNCA se suman",
         "retenciones", "Juan Romero",
     ):
@@ -716,7 +716,7 @@ def test_f135_docs_dicen_que_lee_cada_rol(ruta: Path) -> None:
     if not ruta.exists():
         pytest.skip(f"{ruta} no está junto a este repositorio")
     texto = ruta.read_text(encoding="utf-8")
-    for termino in ("contabilidad_restringida", "sigrid_dm_restringido_ro", "F-135", "F-087"):
+    for termino in ("contabilidad_restringida", "sigrid_dm_autorizado_ro", "F-135", "F-087"):
         assert termino in texto, f"{ruta.name} no dice «{termino}»"
     assert "F-008" in texto, f"{ruta.name} no dice que el rol por usuario es de mcp-bbdd (F-008)"
 
@@ -743,8 +743,15 @@ def test_f135_r23_la_ficha_de_f127_hereda_el_criterio_de_apa() -> None:
     datos = json.loads((RAIZ / "harness" / "features.json").read_text(encoding="utf-8"))
     f127 = next(f for f in datos["features"] if f["id"] == "F-127")
     texto = f127["description"] + " " + " ".join(f127["acceptance"])
+    from config.settings import DEFAULT_RESTRICTED_ROLE, NOMBRE_AUTORIZADO_RETIRADO
+
     for termino in ("apuide", "conide", "cuenta_analitica_contrapartida_id",
-                    "sigrid_dm_restringido_ro", "contabilidad_restringida"):
+                    "contabilidad_restringida"):
         assert termino in texto, f"la ficha de F-127 no dice «{termino}» (R23)"
+    # F-141 renombró el grupo autorizado (D6). La ficha es del líder
+    # (`features.json`): vale con el nombre nuevo o con el que tenía al escribirse.
+    assert DEFAULT_RESTRICTED_ROLE in texto or NOMBRE_AUTORIZADO_RETIRADO in texto, (
+        "la ficha de F-127 no dice con qué rol (R23)"
+    )
     assert "100.502 de las 716.007" in texto, "la cifra medida (R23)"
     assert f127["status"] == "pending", "F-135 no cambia el estado de F-127"

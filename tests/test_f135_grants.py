@@ -4,7 +4,7 @@ F-135 · Los permisos, cada noche (R15-R20).
 
 El rol GENERAL (`mcp_sigrid_dm_ro`, el del MCP y Power BI) no puede leer
 `contabilidad_restringida` ni `raw`; el rol AUTORIZADO
-(`sigrid_dm_restringido_ro`, grupo NOLOGIN) lee la contabilidad completa. Todo
+(`sigrid_dm_autorizado_ro`, grupo NOLOGIN) lee la contabilidad completa. Todo
 vive en `apply_grants`, que corre cada noche, y en `infra/sql/02_roles.sql`,
 que provisiona: hecho a mano contra la base, la nocturna lo desharía (F-068).
 
@@ -26,7 +26,7 @@ from etl_sigrid.infrastructure.postgres.grants import build_readonly_grant_state
 
 RAIZ = Path(__file__).resolve().parents[1]
 ROL = "mcp_sigrid_dm_ro"
-AUTORIZADO = "sigrid_dm_restringido_ro"
+AUTORIZADO = "sigrid_dm_autorizado_ro"
 DUENO = "sigrid_dm_etl"
 RESTR = "contabilidad_restringida"
 

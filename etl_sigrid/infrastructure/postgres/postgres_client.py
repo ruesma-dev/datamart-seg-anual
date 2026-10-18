@@ -40,6 +40,7 @@ from etl_sigrid.infrastructure.postgres.conninfo import safe_dsn
 from etl_sigrid.infrastructure.postgres.fingerprint import build_estructura_query
 from etl_sigrid.infrastructure.postgres.frescura import FilaFrescura
 from etl_sigrid.infrastructure.postgres.grants import (
+    build_perfil_restringido_statements,
     build_readonly_grant_statements,
     build_restricted_grant_statements,
     build_veto_statements,
@@ -193,6 +194,71 @@ SQL_ESQUEMAS_SIN_USAGE = """
     FROM pg_namespace n
     WHERE n.nspname = ANY(%s)
       AND NOT has_schema_privilege(%s, n.oid, 'USAGE')
+    ORDER BY 1
+"""
+
+# F-141 (R13): las vistas de los esquemas del perfil restringido que, DIRECTAMENTE
+# o por otras vistas, leen un esquema que no ve o un objeto excluido. Una vista
+# se ejecuta con los permisos de su dueño: quien la lee, lee lo que ella lee.
+# `lecturas` son las aristas vista -> relación que leen sus reglas (`pg_rewrite`
+# + `pg_depend`), sin la que cada regla tiene con su propia vista; `alcance` es
+# su clausura transitiva (vista sobre vista) desde las vistas del perfil. Solo
+# catálogo. Devuelve pares (vista, objeto alcanzado), `esquema.nombre`.
+SQL_VISTAS_QUE_FILTRAN = """
+    WITH RECURSIVE lecturas AS (
+        SELECT DISTINCT r.ev_class AS vista, d.refobjid AS objeto
+        FROM pg_rewrite r
+        JOIN pg_depend d
+          ON d.classid = 'pg_rewrite'::regclass
+         AND d.objid = r.oid
+         AND d.refclassid = 'pg_class'::regclass
+         AND d.refobjid <> r.ev_class
+    ),
+    alcance AS (
+        SELECT l.vista, l.objeto
+        FROM lecturas l
+        JOIN pg_class vis ON vis.oid = l.vista
+        JOIN pg_namespace nvis ON nvis.oid = vis.relnamespace
+        WHERE nvis.nspname = ANY(%s)
+        UNION
+        SELECT a.vista, l.objeto
+        FROM alcance a
+        JOIN lecturas l ON l.vista = a.objeto
+    )
+    SELECT DISTINCT nvis.nspname || '.' || vis.relname, nobj.nspname || '.' || obj.relname
+    FROM alcance a
+    JOIN pg_class vis ON vis.oid = a.vista
+    JOIN pg_namespace nvis ON nvis.oid = vis.relnamespace
+    JOIN pg_class obj ON obj.oid = a.objeto
+    JOIN pg_namespace nobj ON nobj.oid = obj.relnamespace
+    WHERE nobj.nspname = ANY(%s)
+       OR nobj.nspname || '.' || obj.relname = ANY(%s)
+    ORDER BY 1, 2
+"""
+
+# F-141 (R14): tablas y vistas de los esquemas del perfil cuyo nombre casa con
+# el patrón vigilado (`mayor`, sin distinguir mayúsculas): el mayor analítico
+# de F-127 que naciera sin estar excluido.
+SQL_OBJETOS_VIGILADOS = """
+    SELECT n.nspname || '.' || c.relname
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE c.relkind IN ('r', 'v', 'm', 'p', 'f')
+      AND n.nspname = ANY(%s)
+      AND c.relname ~* %s
+    ORDER BY 1
+"""
+
+# F-141 (R17): los roles de los que un rol ES miembro (no sus miembros: el
+# administrador que creó el grupo es miembro suyo con ADMIN OPTION, y eso no da
+# al grupo nada). El login del perfil solo puede serlo de su grupo; el grupo, de
+# ninguno.
+SQL_PERTENENCIAS = """
+    SELECT DISTINCT g.rolname
+    FROM pg_auth_members m
+    JOIN pg_roles g ON g.oid = m.roleid
+    JOIN pg_roles u ON u.oid = m.member
+    WHERE u.rolname = %s
     ORDER BY 1
 """
 
@@ -1475,6 +1541,100 @@ class PostgresClient:
             cur.execute(SQL_LECTURAS_TABLAS, (esquemas, tablas, role))
             con_select = [f"{fila[0]} (SELECT)" for fila in cur.fetchall()]
         return con_usage + con_select
+
+    # ---------------------------------------------------------------------
+    # El perfil RESTRINGIDO (F-141)
+    # ---------------------------------------------------------------------
+
+    def vistas_que_filtran(
+        self,
+        schemas: Iterable[str],
+        foreign_schemas: Iterable[str],
+        tables: Iterable[str],
+    ) -> list[tuple[str, str]]:
+        """Pares (vista de `schemas`, objeto de `foreign_schemas` o de `tables` que alcanza).
+
+        Clausura transitiva, vista sobre vista (`SQL_VISTAS_QUE_FILTRAN`). Solo
+        consulta el catálogo; sin esquemas no conecta.
+        """
+        esquemas = list(schemas)
+        if not esquemas:
+            return []
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_VISTAS_QUE_FILTRAN, (esquemas, list(foreign_schemas), list(tables)))
+            return [(fila[0], fila[1]) for fila in cur.fetchall()]
+
+    def objetos_vigilados(self, schemas: Iterable[str], pattern: str) -> list[str]:
+        """Tablas y vistas de `schemas` cuyo nombre casa con `pattern` (F-141, R14).
+
+        Solo consulta el catálogo; sin esquemas no conecta.
+        """
+        esquemas = list(schemas)
+        if not esquemas:
+            return []
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_OBJETOS_VIGILADOS, (esquemas, pattern))
+            return [fila[0] for fila in cur.fetchall()]
+
+    def pertenencias(self, role: str) -> list[str]:
+        """Los roles de los que `role` es miembro, ordenados (F-141, R17). Solo catálogo."""
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_PERTENENCIAS, (role,))
+            return [fila[0] for fila in cur.fetchall()]
+
+    def apply_perfil_restringido(
+        self,
+        role: str,
+        owner_role: str,
+        schemas: Iterable[str],
+        revoked: Iterable[str],
+    ) -> list[str]:
+        """Da al grupo del perfil restringido lo suyo y devuelve lo ejecutado (F-141, R11).
+
+        Solo sobre los esquemas que EXISTEN (como `apply_readonly_grants`), y
+        `REVOKE` solo de los objetos de `revoked` (excluidos, vistas que filtran
+        y vigilados) que existen hoy: un REVOKE sobre un objeto ausente falla. El
+        privilegio por defecto en REVOKE no necesita el objeto: se emite igual.
+        Sin ningún esquema existente no conecta.
+        """
+        existentes = set(self.list_schemas())
+        pedidos = list(schemas)
+        aplicables = [s for s in pedidos if s in existentes]
+        inexistentes = [s for s in pedidos if s not in existentes]
+        if inexistentes:
+            logger.warning(
+                "grants_perfil_restringido_esquemas_inexistentes", role=role, schemas=inexistentes
+            )
+        if not aplicables:
+            return []
+
+        revocar = list(revoked)
+        ausentes: list[str] = []
+        for entrada in revocar:
+            esquema, tabla = partir_tabla_cualificada(entrada)
+            if esquema in aplicables and not self.table_exists(esquema, tabla):
+                ausentes.append(entrada)
+        sentencias = build_perfil_restringido_statements(
+            role,
+            owner_role,
+            aplicables,
+            database=self._target_db,
+            excluded=revocar,
+            missing=ausentes,
+        )
+        with self.connection() as conn, conn.cursor() as cur:
+            for stmt in sentencias:
+                cur.execute(stmt)
+        logger.info(
+            "grants_perfil_restringido_aplicados",
+            role=role,
+            schemas=aplicables,
+            revocados=[e for e in revocar
+                       if e.split(".", 1)[0] in aplicables and e not in ausentes],
+            ausentes=ausentes,
+            statements=len(sentencias),
+        )
+        return sentencias
 
     # ---------------------------------------------------------------------
     # Diccionario semántico (F-006)

@@ -4,7 +4,7 @@ F-136 · El login de acceso TOTAL del MCP (`mcp_sigrid_dm_total`) y la higiene
 de `psql` con las contraseñas.
 
 Vocabulario de la spec: ESTÁNDAR = `mcp_sigrid_dm_ro` (MCP y Power BI);
-AUTORIZADO = `sigrid_dm_restringido_ro` (grupo NOLOGIN de F-135); TOTAL =
+AUTORIZADO = `sigrid_dm_autorizado_ro` (grupo NOLOGIN de F-135); TOTAL =
 `mcp_sigrid_dm_total` (login nuevo, miembro de los dos); VETADOS DEL TOTAL =
 `PG_TOTAL_VETOED_SCHEMAS` (`raw`, decisión del humano: «siempre fuera»).
 
@@ -20,7 +20,7 @@ import pytest
 
 RAIZ = Path(__file__).resolve().parents[1]
 ESTANDAR = "mcp_sigrid_dm_ro"
-AUTORIZADO = "sigrid_dm_restringido_ro"
+AUTORIZADO = "sigrid_dm_autorizado_ro"
 TOTAL = "mcp_sigrid_dm_total"
 DUENO = "sigrid_dm_etl"
 RESTR = "contabilidad_restringida"
@@ -583,7 +583,9 @@ def test_f136_r12_la_comprobacion_final_mira_rolsuper_de_los_cinco() -> None:
     consulta = re.search(r"SELECT rolname, rolcanlogin, rolsuper.*?;", sql, re.DOTALL)
     assert consulta
     roles = set(re.findall(r"'(\w+)'", consulta.group(0)))
-    assert roles == {DUENO, "sigrid_dm_app", ESTANDAR, AUTORIZADO, TOTAL}
+    # F-141 añade los dos del perfil restringido: aquí, que siguen los cinco
+    # (los siete exactos los fija test_f141_r23_comprobacion_final).
+    assert roles >= {DUENO, "sigrid_dm_app", ESTANDAR, AUTORIZADO, TOTAL}
 
 
 def _tramo_transaccion(sql: str) -> tuple[int, int]:
@@ -671,7 +673,8 @@ def test_f136_r17_cada_contrasena_es_opcional_y_se_anuncia_sin_valor() -> None:
         )
         assert bloque in sql, f"falta el bloque de {login}"
         assert sql.count(f"PASSWORD :'{variable}'") == 1
-    assert sql.count("PASSWORD") == 3, "ninguna otra sentencia con contraseña"
+    # F-141 suma la del login restringido (test_f141_r21_la_contrasena_...)
+    assert sql.count("PASSWORD") == 4, "ninguna otra sentencia con contraseña"
 
 
 def test_f136_r18_guarda_antes_de_crear_nada() -> None:
@@ -1133,8 +1136,9 @@ AZURE_APPS = RAIZ.parent / "azure-apps"
 
 def test_f136_r31_arquitectura_cinco_roles_y_la_comprobacion_del_total() -> None:
     texto = (RAIZ / "docs" / "ARCHITECTURE.md").read_text(encoding="utf-8")
-    assert "**Cinco roles.**" in texto and "**Cuatro roles.**" not in texto
-    roles = texto.split("**Cinco roles.**", 1)[1].split("\n- **", 1)[0]
+    # F-141 añade los dos del perfil restringido: «Siete roles» (test_f141_r30_...)
+    assert "**Siete roles.**" in texto and "**Cuatro roles.**" not in texto
+    roles = texto.split("**Siete roles.**", 1)[1].split("\n- **", 1)[0]
     assert TOTAL in roles and "pg-password-total" in roles
     for cosa in ("PG_TOTAL_ROLE", "PG_TOTAL_VETOED_SCHEMAS", "verificacion_total",
                  "acceso_total", "5 quater"):
@@ -1212,7 +1216,7 @@ def test_f136_r32_la_regla_manda_lo_que_pidio_el_humano() -> None:
     for termino in (
         "Por defecto usa SIEMPRE `contabilidad`",
         "perfil total del MCP",
-        "sigrid_dm_restringido_ro",
+        "sigrid_dm_autorizado_ro",
         "«permission denied»",
         "no es un fallo ni algo que haya que rodear",
         "no reintentes con otra sintaxis ni busques la misma informacion por otro camino",
@@ -1241,7 +1245,7 @@ def test_f136_r33_la_ficha_del_esquema_nombra_el_login_total() -> None:
 
     entrada = _yaml_dicc("00_global.yaml")["esquemas"][RESTR]
     texto = re.sub(r"\s+", " ", entrada["para_que_sirve"])
-    assert "sigrid_dm_restringido_ro" in texto and f"`{TOTAL}`" in texto
+    assert "sigrid_dm_autorizado_ro" in texto and f"`{TOTAL}`" in texto
     assert "perfil total del MCP" in texto
     cabecera = (DICC / "contabilidad_restringida.yaml").read_text(encoding="utf-8").split("version:")[0]
     assert TOTAL in cabecera, "el comentario de cabecera del fichero, al día"

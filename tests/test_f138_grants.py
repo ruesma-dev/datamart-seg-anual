@@ -5,7 +5,7 @@ F-138 · Los permisos de `compras_restringida` (R22-R23, D9).
 Patrón «módulo + `_restringida`» de F-135 y F-037: el rol ESTÁNDAR
 (`mcp_sigrid_dm_ro`, MCP y Power BI) nunca lee `compras_restringida`, donde
 viven las alarmas de recursos (33) y partes (35); el AUTORIZADO
-(`sigrid_dm_restringido_ro`) la lee; el TOTAL (`mcp_sigrid_dm_total`) la lee
+(`sigrid_dm_autorizado_ro`) la lee; el TOTAL (`mcp_sigrid_dm_total`) la lee
 por pertenencia, sin GRANT propio. Todo vive en `config/settings.py` (listas),
 en `apply_grants` (cada noche) y en `infra/sql/02_roles.sql` (provisión).
 
@@ -170,10 +170,10 @@ def test_f138_r23_no_se_veta_al_total() -> None:
 def test_f138_r23_el_autorizado_la_recibe() -> None:
     tramo = _roles_sql().split("-- 5 ter.")[1].split("-- 5 quater.")[0]
     for sentencia in (
-        f"GRANT USAGE ON SCHEMA {RESTR} TO sigrid_dm_restringido_ro;",
-        f"GRANT SELECT ON ALL TABLES IN SCHEMA {RESTR} TO sigrid_dm_restringido_ro;",
+        f"GRANT USAGE ON SCHEMA {RESTR} TO sigrid_dm_autorizado_ro;",
+        f"GRANT SELECT ON ALL TABLES IN SCHEMA {RESTR} TO sigrid_dm_autorizado_ro;",
         f"ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl IN SCHEMA {RESTR} "
-        "GRANT SELECT ON TABLES TO sigrid_dm_restringido_ro;",
+        "GRANT SELECT ON TABLES TO sigrid_dm_autorizado_ro;",
     ):
         assert sentencia in tramo, f"falta: {sentencia}"
     assert tramo.index(f"GRANT USAGE ON SCHEMA {RESTR}") > tramo.index("SET ROLE sigrid_dm_etl;")
