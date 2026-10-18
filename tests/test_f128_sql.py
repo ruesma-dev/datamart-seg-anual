@@ -686,3 +686,36 @@ def test_f128_r24_docstring_de_build_retenciones_en_main():
     import main
 
     assert "07_cuadre_factura.sql" in (main.build_retenciones.callback.__doc__ or "")
+
+
+# --- R33 · `tables_sigrid.yaml` no cambia -----------------------------------------
+
+#: Catálogos que F-128 NO ingiere: D5-A (`auxeio`, `alm`, `auxobrcoc` → F-143) y
+#: el tipo de cuenta bancaria (`auxcueban`, D4-B).
+CATALOGOS_NO_INGERIDOS = ("auxeio", "alm", "auxobrcoc", "auxcueban")
+
+
+def problemas_tablas(datos: dict) -> list[str]:
+    """Lo que en `tables_sigrid.yaml` contradice D3-A o D5-A."""
+    tablas = {t["source_table"]: t for t in datos.get("tables", [])}
+    salida = [f"se ingiere {c}" for c in CATALOGOS_NO_INGERIDOS if c in tablas]
+    excluidas = set((tablas.get("dca") or {}).get("exclude_columns") or [])
+    salida += [f"dca ya no excluye {c}" for c in ("pagfor", "pagtex") if c not in excluidas]
+    return salida
+
+
+def test_f128_r33_tables_sigrid_sin_cambios():
+    import yaml
+
+    datos = yaml.safe_load((RAIZ / "config" / "tables_sigrid.yaml").read_text(encoding="utf-8"))
+    assert problemas_tablas(datos) == []
+
+
+def test_f128_r33_positivo_fabricado():
+    fabricado = {
+        "tables": [
+            {"source_table": "dca", "exclude_columns": ["tex", "pagtex"]},
+            {"source_table": "auxobrcoc"},
+        ]
+    }
+    assert problemas_tablas(fabricado) == ["se ingiere auxobrcoc", "dca ya no excluye pagfor"]
