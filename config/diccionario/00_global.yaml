@@ -606,7 +606,10 @@
 # `R-CODIGO-POR-EMPRESA` (que remite a ella): sin empresa en la pregunta se
 # filtra `empresa_id = 1` en todo objeto con empresa, la IA DICE que lo ha
 # supuesto, no se aplica si se pide otra empresa, varias, el grupo o una UTE, y
-# nunca se suman empresas sin decirlo. Sin objetos ni columnas nuevos.
+# nunca se suman empresas sin decirlo. Sin objetos ni columnas nuevos. La regla
+# nombra objeto a objeto donde hay empresa y donde solo `obra_id` (lo recorre
+# `tests/test_f144_empresa_por_defecto.py`); en los objetos sin ninguna de las
+# dos el criterio no se aplica y la respuesta avisa de que mezcla las empresas.
 
 version: 55
 base: sigrid_dm
@@ -822,26 +825,73 @@ reglas:
   - codigo: R-EMPRESA-POR-DEFECTO
     titulo: Sin empresa en la pregunta, es Construcciones Ruesma (empresa_id = 1), y se dice
     severidad: bloqueante
-    ambito: [maestro, compras, retenciones, personal, contabilidad, contabilidad_restringida, tesoreria, tesoreria_restringida]
+    ambito: [maestro, compras, compras_restringida, retenciones, personal, contabilidad, contabilidad_restringida, tesoreria, tesoreria_restringida]
     regla: >-
       Es un CRITERIO GENERAL, no solo para los codigos de obra o de recurso: si
       la pregunta no indica empresa, se entiende Construcciones Ruesma,
       `empresa_id = 1`, y se filtra por ella en TODO objeto que tenga empresa.
-      La columna se llama `empresa_id` en `maestro`, `compras`, `retenciones`,
-      `personal.recursos`, `contabilidad`, `tesoreria` y sus `*_restringida`,
-      y `empresa` en `maestro.centros_coste` (`maestro.centros_coste.empresa`).
-      Los hechos que solo llevan `obra_id` (las lineas de `compras`, los partes
-      de `personal`) son de la ficha de SU empresa (`R-CODIGO-POR-EMPRESA`): se
-      filtran por la `empresa_id` de esa ficha en `maestro.obras` o por la
-      `clave_obra` que empieza por `1-`. La IA DICE en la respuesta que ha
-      supuesto Construcciones Ruesma («he supuesto Construcciones Ruesma,
-      `empresa_id = 1`, porque la pregunta no indica empresa»), para que el
-      usuario lo vea y lo corrija. NO se aplica si la pregunta pide otra
-      empresa (Porsan es la 28), varias, el grupo o una UTE: entonces se
-      filtra por las que pide y, si son varias, se dice cuales entran y si van
-      por separado o sumadas. Nunca se suman empresas sin decirlo. `stg`,
-      `mart`, `cierre` y `descompuestos` no tienen empresa: son el universo del
-      seguimiento, donde esta regla no anade filtro y manda `R-UNIVERSO-OBRA`.
+      La IA DICE en la respuesta que ha supuesto Construcciones Ruesma («he
+      supuesto Construcciones Ruesma, `empresa_id = 1`, porque la pregunta no
+      indica empresa»), para que el usuario lo vea y lo corrija. NO se aplica
+      si la pregunta pide otra empresa (Porsan es la 28), varias, el grupo o
+      una UTE: entonces se filtra por las que pide y, si son varias, se dice
+      cuales entran y si van por separado o sumadas. Nunca se suman empresas
+      sin decirlo.
+      DONDE SE PUEDE FILTRAR es objeto a objeto, no esquema a esquema: en
+      `compras` y en `retenciones` la mayoria de los objetos no tiene empresa.
+      La columna de empresa la tienen exactamente estos objetos:
+      `maestro.obras`, `maestro.v_obra_fichas`, `maestro.centros_coste`,
+      `maestro.cuentas_analiticas`, `compras.comparativos`,
+      `compras.v_control_forma_pago`, `compras.v_pbi_albaranes_sin_facturar`,
+      `compras.v_pbi_contrato_consumo`, `compras.v_pbi_partida_coste`,
+      `compras.v_pbi_proveedor_obra`, `retenciones.apuntes_contables`,
+      `retenciones.fin_obra`, `retenciones.saldo_contable`,
+      `retenciones.v_retencion_contable_obra`, `personal.recursos`,
+      `contabilidad.plan_cuentas`, `contabilidad.mayor`,
+      `contabilidad.saldos_cuenta_mes`, `contabilidad.apuntes_restringidos_mes`,
+      `contabilidad_restringida.plan_cuentas`, `contabilidad_restringida.mayor`,
+      `contabilidad_restringida.saldos_cuenta_mes`, `tesoreria.efectos`,
+      `tesoreria.efectos_restringidos_mes` y `tesoreria_restringida.efectos`.
+      Se llama `empresa_id` en todos menos en `maestro.centros_coste`, donde es
+      `empresa` (`maestro.centros_coste.empresa`).
+      Solo llevan `obra_id`, sin empresa, estos hechos:
+      `compras.fact_compras_linea`, `compras.factura_lineas`,
+      `compras.albaran_lineas`, `compras.contratos`, `compras.necesidades`,
+      `compras.contrato_liquidacion`, `compras.facturas_tras_liquidacion`,
+      `maestro.proveedores_obra`, `personal.partes_lineas`,
+      `personal.v_pbi_horas_obra_mes`, `retenciones.movimientos` y
+      `retenciones.v_pbi_retencion_obra`. Su `obra_id` es la ficha de SU
+      empresa (`R-CODIGO-POR-EMPRESA`): se filtran cruzando `obra_id` con
+      `maestro.obras` y su `empresa_id = 1` (o su `clave_obra` que empieza por
+      `1-`). Las filas con `obra_id` nulo no son de ninguna empresa que se pueda
+      ver: quedan fuera del filtro y la respuesta dice cuantas son.
+      Los demas objetos de estos esquemas NO tienen empresa ni `obra_id`, y
+      mezclan las 38 empresas: entre ellos `compras.facturas`,
+      `compras.albaranes`, `compras.vencimientos`, `compras.v_facturas_pago`,
+      `compras.documento_alarmas`, `compras_restringida.documento_alarmas`,
+      `compras.documento_liquidatoria`, `compras.v_estado_documentos`,
+      `compras.contrato_lineas`, `personal.partes` (su cabecera; la obra que
+      imputa es la de `personal.partes_lineas`),
+      `retenciones.v_pbi_retencion_entidad`,
+      `retenciones.v_pbi_retencion_resumen`,
+      `retenciones.v_pbi_retenciones_vivas`,
+      `retenciones.v_pbi_retenciones_vencidas` (estas dos traen `codigo_obra`,
+      que a solas no identifica la obra) y `retenciones.v_cuadre_proveedor`.
+      En ellos NO se puede aplicar el criterio: la cifra mezcla todas las
+      empresas, y la respuesta lo dice asi («la cifra es de todas las
+      empresas: este objeto no distingue empresa») y NO dice «he supuesto
+      Construcciones Ruesma». Solo hay dos caminos comprobados para filtrarlos:
+      `compras.vencimientos` es una vista de `tesoreria.efectos` y su
+      `vencimiento_id` es el `efecto_id` de alli (clave primaria), que lleva
+      `empresa_id` y nunca vacia, asi que se cruza por ahi o se consulta
+      `tesoreria.efectos` con `sentido = 'PAGO' AND es_factura_compra`; y una
+      pregunta de retenciones por empresa se contesta desde
+      `retenciones.movimientos`, que lleva `obra_id`, y no desde las `v_pbi_*`
+      agregadas. Los importes de compras por empresa salen de
+      `compras.fact_compras_linea`; contar facturas o albaranes de una empresa
+      no tiene camino comprobado. `stg`, `mart`, `cierre` y `descompuestos` no
+      tienen empresa: son el universo del seguimiento, donde esta regla no
+      anade filtro y manda `R-UNIVERSO-OBRA`.
     motivo: >-
       Orden del humano del 2026-10-18, pedida primero en la sesion de
       `mcp-bbdd` («si no se dice nada es construcciones ruesma») y confirmada

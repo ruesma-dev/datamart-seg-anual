@@ -129,6 +129,61 @@ $ .venv/Scripts/python -m pytest tests/ -q -k "f006 or diccionario" -x
 | `severidad: bloqueante → aviso` en la regla nueva | `1 failed, 13 passed`: `assert 'aviso' == 'bloqueante'` |
 | «La IA DICE en la respuesta» → «La IA puede decir» | `1 failed, 13 passed`: `assert 'DICE en la respuesta' in ...` |
 
+## Pasada 2 · corrección del CHANGES_REQUESTED (`progress/review_F-144.md`)
+
+Misma v55, sin subir versión. Ficheros: `00_global.yaml` (regla, `ambito` y 4 líneas de la entrada
+de cabecera v55) y `tests/test_f144_empresa_por_defecto.py` (+18 casos, 32 en total).
+
+**Qué cambia en la regla.** Sale la frase falsa «la columna se llama `empresa_id` en `maestro`,
+`compras`, `retenciones`…». Entran tres listas, recorridas por el test contra las fichas:
+1. *Con columna de empresa* (exacta, 25 objetos): las 6 de `compras` (`comparativos`,
+   `v_control_forma_pago`, las 4 `v_pbi_*`), 4 de `retenciones`, 4 de `maestro`, `personal.recursos`,
+   7 de `contabilidad*` y 3 de `tesoreria*`; `maestro.centros_coste` es la única con `empresa`.
+2. *Solo `obra_id`* (exacta, 12 hechos): líneas y contratos de `compras`,
+   `maestro.proveedores_obra`, `personal.partes_lineas` (corrige «los partes de `personal`»),
+   `personal.v_pbi_horas_obra_mes`, `retenciones.movimientos` y `v_pbi_retencion_obra`; se filtran
+   por `maestro.obras.empresa_id = 1`, y las filas con `obra_id` nulo se dicen aparte.
+3. *Sin empresa ni `obra_id`* (los demás; la regla nombra 15, entre ellos los 8 del review más
+   `compras_restringida.documento_alarmas`, `personal.partes`, `retenciones.v_pbi_retenciones_vencidas`,
+   `compras.documento_liquidatoria`, `v_estado_documentos`, `contrato_lineas`,
+   `retenciones.v_cuadre_proveedor`): **NO se puede aplicar el criterio, la cifra mezcla todas las
+   empresas, la respuesta lo dice («la cifra es de todas las empresas…») y NO dice «he supuesto
+   Construcciones Ruesma»**.
+
+**Cruces nombrados, solo los verificados por lectura del código:**
+- `compras.vencimientos` → `tesoreria.efectos`: `sql/compras/05_vencimientos.sql` define la vista
+  como `SELECT efecto_id AS vencimiento_id … FROM tesoreria.efectos WHERE sentido = 'PAGO' AND
+  es_factura_compra`; `efecto_id` es clave primaria y `empresa_id` sale de `c.emp`
+  (`sql/tesoreria/01_efectos_completo.sql:72`), «nunca vacia» según su ficha.
+- Retenciones por empresa desde `retenciones.movimientos` (su `obra_id` es `maestro.obras.obra_id`,
+  ficha de la empresa del documento, medido en F-094/F-102 según su ficha) y no desde las `v_pbi_*`.
+- **No nombrado** (no verificado): contar facturas/albaranes por empresa vía sus líneas (una factura
+  podría repartirse entre fichas de varias empresas o tener líneas sin obra; no se midió) y
+  `raw.con.emp` (existe, pero `raw` no es superficie de consulta). La regla lo dice: «contar facturas
+  o albaranes de una empresa no tiene camino comprobado». El MCP `bbdd-ruesma-azure` no conectó en
+  esta sesión (404), así que no hubo medición nueva en Azure.
+
+**Desviación de la decisión 1 de la pasada 1:** `compras_restringida` entra en el `ambito`; su único
+objeto (`documento_alarmas`) no tiene empresa, y la regla tiene que llegar a su ficha para avisar.
+
+**RED** (tests nuevos con la regla de la pasada 1, antes de reescribirla):
+
+```
+$ python -m pytest tests/test_f144_empresa_por_defecto.py -q -p no:cacheprovider
+E   AssertionError: la regla no dice «NO tienen empresa ni `obra_id`»
+E   AssertionError: assert '`empresa_id...retenciones`' not in 'Es un CRITE...VERSO-OBRA`.'
+E      se llama `empresa_id` en `maestro`, `compras`, `retenciones`, `personal.recursos`, ...
+E           Los hechos que solo llevan `obra_id` (las lineas de `compras`, los partes de `personal`) ...
+E   AssertionError: la regla perdió el marcador «La columna de empresa la tienen exactamente estos objetos:»
+E   AssertionError: assert 'compras_restringida' in ['maestro', 'compras', 'retenciones', 'personal', ...]
+18 failed, 14 passed in 8.93s
+```
+
+**GREEN:** `32 passed in 12.99s`. **Dientes del recorrido:** quitar `compras.v_pbi_proveedor_obra` de
+la lista → `1 failed, 31 passed`: `faltan en la regla: ['compras.v_pbi_proveedor_obra']; sobran (sin
+columna de empresa): []` (restaurado; `32 passed`). Además, un control dentro del test planta un
+objeto inexistente y comprueba que la comparación lo ve.
+
 ## Fuera de alcance
 
 - Publicar el diccionario y reiniciar el MCP (orden expresa del líder: va tras el merge).
@@ -151,4 +206,5 @@ $ .venv/Scripts/python -m pytest tests/ -q -k "f006 or diccionario" -x
 | Cobertura de las líneas cambiadas | `PUERTA COBERTURA: N/A` (F-144 no cambia líneas Python de producción frente a main; solo YAML y tests) |
 | Mutantes generados / supervivientes | **No aplica**: `python -m harness.mutacion --feature F-144` → «ALCANCE VACÍO en F-144: ni una línea de producción que mutar» (0 ficheros, 0 líneas; salida con código 2, sin informe a propósito). Los dientes se prueban con los dos sabotajes de arriba |
 | Tiempo de la suite | 1011,57 s (0:16:51), el que imprime pytest dentro de `init.sh` |
+| `init.sh` tras la pasada 2 | **VERDE**: `8257 passed, 249 skipped` en 1450,60 s; `PUERTA COBERTURA: N/A` (sin Python de producción); `PUERTA TAMAÑO` OK (impl 209/220); `ENTORNO LISTO`. Mutación: sigue N/A, alcance vacío |
 | `init.sh` inicial (en `main`) | ROJO: `1 failed, 7921 passed, 248 skipped` en 2218,18 s (el test R29 de F-141) |
