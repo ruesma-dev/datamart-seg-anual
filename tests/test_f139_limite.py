@@ -91,20 +91,29 @@ def test_f139_r1_la_ficha_dice_como_pedir_el_fichero_sin_el_500() -> None:
 
 def test_f139_r2_la_ficha_declara_el_limite() -> None:
     descripcion = _descripcion()
-    for dato in ("mcp-bbdd", "F-139", "SIN CONVERTIR", "el ORIGINAL", "F-142",
-                 "NO ESTA DESPLEGADA"):
+    for dato in ("mcp-bbdd", "F-139", "SIN CONVERTIR", "el ORIGINAL", "F-142"):
         assert dato in descripcion, f"la ficha no dice «{dato}» (R2)"
 
 
-def test_f139_r2_la_ficha_no_afirma_que_la_herramienta_exista() -> None:
-    """Mientras `abrir_adjunto` no esté desplegada, la ficha no la nombra.
+def test_f139_r2_la_ficha_nombra_la_herramienta_desplegada() -> None:
+    """`abrir_adjunto` está desplegada desde el 2026-10-17 (F-023 de `mcp-bbdd`).
 
     Quien lee la ficha es una IA: si ve el nombre de una herramienta, la
-    llamará. Cuando `mcp-bbdd` la despliegue, se cambian la ficha y este test.
+    llamará. Hasta el despliegue la ficha no la nombraba; desde la ampliación
+    de F-141 (aprobada por el humano el 2026-10-17) la nombra con su firma, le
+    dice a la IA de dónde sale el `adjunto_id` y qué le llega, y ya no dice que
+    no exista.
     """
-    assert "abrir_adjunto" not in _texto(), (
-        "la ficha nombra `abrir_adjunto` y la herramienta aún no existe (R2)"
-    )
+    descripcion = _descripcion()
+    for dato in ("`abrir_adjunto(adjunto_id)`", "F-023", "2026-10-17",
+                 "`adjunto_id` en este indice", "imagenes se ven directamente",
+                 "como binario", "QUIEN PUEDE ABRIR EL FICHERO"):
+        assert dato in descripcion, f"la ficha no dice «{dato}» (R2, F-141)"
+    texto = _texto()
+    for caducado in ("NO ESTA DESPLEGADA", "ni el datamart ni el MCP abren"):
+        assert caducado not in texto, (
+            f"la ficha aún dice «{caducado}» y `abrir_adjunto` ya está desplegada (R2)"
+        )
 
 
 # ===========================================================================

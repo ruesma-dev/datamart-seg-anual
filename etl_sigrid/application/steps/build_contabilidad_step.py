@@ -5,7 +5,7 @@ mayor y los saldos por cuenta y mes, en DOS esquemas desde F-135.
 
 * `contabilidad_restringida` — la contabilidad COMPLETA, la de F-056 sin tocar
   una columna ni una cifra, más la marca de lo restringido. Solo la lee el grupo
-  `sigrid_dm_restringido_ro` (y el dueño y el administrador de la base).
+  `sigrid_dm_autorizado_ro` (y el dueño y el administrador de la base).
 * `contabilidad` — la GENERAL, la que leen el MCP y Power BI: sin los apuntes de
   PERSONAL (nóminas, cuentas de trabajadores, embargos; criterio en
   `domain/restriccion_personal.py`), con las cuentas de personal enmascaradas en

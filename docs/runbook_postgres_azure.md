@@ -46,8 +46,14 @@ nativos de PostgreSQL con contraseña, y la contraseña en Key Vault**.
 | `sigrid_dm_etl` | Grupo, `NOLOGIN` | **Propietario** de la base y de todos sus objetos |
 | `sigrid_dm_app` | `LOGIN` + contraseña | El ETL: el puesto del humano y el job de F-003. Miembro de `sigrid_dm_etl` |
 | `mcp_sigrid_dm_ro` | `LOGIN` + contraseña | Solo lectura, el ESTÁNDAR: el MCP (F-006) y Power BI. Sin `raw` ni `contabilidad_restringida` desde F-135 |
-| `sigrid_dm_restringido_ro` | Grupo, `NOLOGIN` | El rol AUTORIZADO (F-135): lee la contabilidad completa, `contabilidad_restringida` |
+| `sigrid_dm_autorizado_ro` | Grupo, `NOLOGIN` | El rol AUTORIZADO (F-135): lee la contabilidad completa, `contabilidad_restringida` |
 | `mcp_sigrid_dm_total` | `LOGIN` + contraseña, solo en `kv-mcp-bbdd-dev` (`pg-password-total`) | El acceso TOTAL del MCP (F-136): miembro de los dos anteriores, sin GRANT propios y **nunca `raw`**. Alta y rotación: **§12** |
+| `sigrid_dm_perfil_restringido_ro` | Grupo, `NOLOGIN` | El perfil RESTRINGIDO (F-141, administrativos): ve MENOS que el estándar, sin `contabilidad.mayor`, `contabilidad.saldos_cuenta_mes`, `tesoreria` ni `personal`. Lleva los permisos |
+| `mcp_sigrid_dm_restringido` | `LOGIN` + contraseña, solo en `kv-mcp-bbdd-dev` (`pg-password-restringido`) | El login del perfil restringido (F-141): miembro solo del grupo anterior, sin GRANT propios. Alta: **§13** |
+
+El grupo AUTORIZADO se llama `sigrid_dm_autorizado_ro` desde F-141 (antes llevaba
+«restringido» en el nombre y es justo el que ve MÁS); el renombre es el punto
+0 bis de `02_roles.sql` (§13).
 
 Por qué un grupo propietario y no un rol a secas: los objetos se crean siempre
 como `sigrid_dm_etl` gracias a `PG_SET_ROLE`. Si mañana entra un segundo
@@ -741,3 +747,199 @@ az keyvault secret list --vault-name kv-albaranes-rs9k2 --query "[].name" -o tsv
   siempre tiene el valor bueno, y se sigue en P5.
 - **Un cliente no conecta tras P6-P8**: tiene el valor viejo. El bueno está en el
   vault; nunca se vuelve a la contraseña expuesta.
+
+## 13. Alta del perfil restringido y renombre del grupo autorizado (F-141)
+
+Una sola sesión de **Windows PowerShell 5.1**, **de día** y sin imprimir nunca un
+valor. Da de alta el perfil RESTRINGIDO del MCP (administrativos), que ve MENOS
+que el estándar: el grupo `sigrid_dm_perfil_restringido_ro` (lleva los permisos)
+y su login `mcp_sigrid_dm_restringido`, y RENOMBRA el grupo autorizado a
+`sigrid_dm_autorizado_ro` (punto 0 bis de `02_roles.sql`). Elegir quién conecta
+con el login es de `mcp-bbdd` (P9). Mismas reglas que la §12: `psql` con las
+opciones delante, ninguna contraseña en su línea de órdenes, `set` con `-o none`,
+`show` asignado a una variable y el vault antes que la base.
+
+**La imagen con F-141 y `02_roles.sql` van el MISMO día, entre dos nocturnas.**
+Con la imagen nueva y el grupo aún con el nombre viejo, la nocturna creería que
+el autorizado «no existe» y el total perdería las `*_restringida` tras el primer
+`DROP`; con el nombre nuevo y la imagen vieja, lo mismo al revés. Primero se
+despliega la imagen (T14) y en la misma tarde se ejecuta esta sección.
+
+| Secreto | Login | Quién lo usa |
+|---|---|---|
+| `kv-mcp-bbdd-dev/pg-password-restringido` | `mcp_sigrid_dm_restringido` | el MCP, cuando despliegue su feature del perfil. Solo en este vault |
+
+### P0 · Puerta (solo lectura)
+
+Entre las 07:00 y las 21:00 UTC, sin ninguna ejecución del job en curso, con el
+job ya en la imagen que lleva F-141 (comprobar el tag), `psql` 15 o posterior y
+el rol `Key Vault Secrets Officer` en `kv-mcp-bbdd-dev`.
+
+```powershell
+$rgJ = "rg-datamart-seg-dev"
+$job = "caj-datamart-seg-dev"
+[DateTime]::UtcNow.ToString("HH:mm")
+az containerapp job execution list -g $rgJ -n $job -o table
+az containerapp job show -g $rgJ -n $job --query "properties.template.containers[0].image" -o tsv
+psql --version
+```
+
+### P1 · Variables
+
+Desde la raíz del repositorio, en la versión que lleva F-141.
+
+```powershell
+$env:PG_ADMIN_USER = "<administrador del servidor>"
+$kvMcp = "kv-mcp-bbdd-dev"
+$pgh   = "psql-albaranes-rs9k2.postgres.database.azure.com"
+$dsn   = "host=$pgh dbname=sigrid_dm user=$env:PG_ADMIN_USER sslmode=require"
+$roles = "infra\sql\02_roles.sql"
+$q     = @("--query", "value", "-o", "tsv")
+function Nueva-Clave {
+    $b = New-Object byte[] 32
+    [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b)
+    ($b | ForEach-Object { $_.ToString("x2") }) -join ""
+}
+```
+
+### P2 · El vault primero
+
+```powershell
+$v = Nueva-Clave
+az keyvault secret set --vault-name $kvMcp --name pg-password-restringido --value $v -o none
+if ($LASTEXITCODE -ne 0) { throw "P2: pg-password-restringido" }
+$v = $null
+```
+
+### P3 · Releer del vault al entorno
+
+```powershell
+$env:RESTRINGIDO_PWD = az keyvault secret show --vault-name $kvMcp --name pg-password-restringido @q
+if ($env:RESTRINGIDO_PWD.Length -ne 64) { throw "P3: RESTRINGIDO_PWD no mide 64" }
+```
+
+### P4 · La base
+
+Primero la HUELLA de lo que leen hoy el estándar y el total (R33): cada esquema
+y cada objeto de la base con `has_*_privilege` de los dos. Luego el fichero;
+`psql` pide la contraseña del administrador (no se ve al teclearla). Las otras
+contraseñas no cambian: sus variables no están en el entorno.
+
+```powershell
+$huella = @"
+SELECT r || ' ' || n.nspname || ' ' || has_schema_privilege(r, n.oid, 'USAGE')
+FROM unnest(ARRAY['mcp_sigrid_dm_ro', 'mcp_sigrid_dm_total']) AS r, pg_namespace n
+UNION ALL
+SELECT r || ' ' || n.nspname || '.' || c.relname || ' '
+       || has_table_privilege(r, c.oid, 'SELECT')
+FROM unnest(ARRAY['mcp_sigrid_dm_ro', 'mcp_sigrid_dm_total']) AS r, pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE c.relkind IN ('r', 'v', 'm', 'p', 'f') AND n.nspname NOT LIKE 'pg\_%'
+ORDER BY 1
+"@
+$antes = Join-Path $env:TEMP "f141_antes.txt"
+psql -X -A -t -c $huella $dsn | Set-Content -Encoding utf8 $antes
+psql -X -v ON_ERROR_STOP=1 -f $roles $dsn
+```
+
+Esperado: `F-141: grupo autorizado renombrado` (la primera vez; después, «sin
+renombre»), `mcp_sigrid_dm_restringido: contraseña fijada` y las otras tres SIN
+CAMBIOS; `COMMIT`; los siete roles con `rolsuper = f`; el login con exactamente
+una pertenencia (`sigrid_dm_perfil_restringido_ro`, `hereda = t`, `set_role =
+f`); `t` en sus diez esquemas y `f` en `tesoreria`, `personal`, `raw` y las tres
+`*_restringida`; `mayor = f`, `saldos_cuenta_mes = f`, `plan_cuentas = t`,
+`vencimientos = t`, `conecta = t`; y cero filas de privilegios propios. Si para
+con «existen los dos», no ha cambiado nada: se decide cuál sobra antes de seguir.
+
+### P5 · Fuera del entorno
+
+```powershell
+Remove-Item Env:RESTRINGIDO_PWD
+```
+
+### P6 · Negativa y positiva con el login real, y la nocturna a mano
+
+Con el login restringido (R31 y R32). Si el `.env` del puesto fija
+`PG_RESTRICTED_ROLE` con el nombre retirado, `apply-grants` para sin ejecutar
+nada (R3): el humano lo corrige a `sigrid_dm_autorizado_ro` antes.
+
+```powershell
+$dsnR = "host=$pgh dbname=sigrid_dm user=mcp_sigrid_dm_restringido sslmode=require"
+$env:PGPASSWORD = az keyvault secret show --vault-name $kvMcp --name pg-password-restringido @q
+$no = "contabilidad.mayor", "contabilidad.saldos_cuenta_mes", "tesoreria.efectos",
+      "personal.recursos", "raw.obr", "contabilidad_restringida.mayor",
+      "tesoreria_restringida.efectos", "compras_restringida.documento_alarmas"
+foreach ($t in $no) { psql -X -c "SELECT 1 FROM $t LIMIT 1" $dsnR }
+psql -X -c "BEGIN" -c "CREATE TABLE compras.f141_x (x int)" -c "ROLLBACK" $dsnR
+$si = "compras.vencimientos", "compras.v_facturas_pago", "contabilidad.plan_cuentas",
+      "retenciones.movimientos", "mart.fact_seguimiento_mensual", "_meta.v_diccionario"
+foreach ($t in $si) { psql -X -c "SELECT 1 FROM $t LIMIT 1" $dsnR }
+psql -X -c "SELECT count(*) FROM compras.documento_adjuntos" $dsnR
+Remove-Item Env:PGPASSWORD
+psql -X -c "SELECT count(*) FROM compras.documento_adjuntos" $dsn
+python main.py apply-grants
+```
+
+Esperado: `permission denied` en las ocho de `$no` y en el `CREATE TABLE` (el
+`ROLLBACK` cierra la transacción); una fila en las seis de `$si`; el recuento de
+`compras.documento_adjuntos` igual con el login y con el administrador; y
+`apply-grants` en SUCCESS con `verificacion_restringido`,
+`pertenencias_restringido` y `filtraciones_restringido` a `ok` en su fila de
+`_meta.etl_runs`.
+
+### P7 · El estándar y el total, igual que antes; diccionario y MCP
+
+La misma huella DESPUÉS de `02_roles.sql` y de `apply-grants`: tiene que salir
+idéntica (R33). `Compare-Object` sin salida = iguales. Después, el diccionario
+v54 (una ESCRITURA en `_meta`, la autoriza el humano) y el reinicio del MCP, que
+cachea el diccionario hasta reiniciar.
+
+```powershell
+$despues = Join-Path $env:TEMP "f141_despues.txt"
+psql -X -A -t -c $huella $dsn | Set-Content -Encoding utf8 $despues
+Compare-Object (Get-Content $antes) (Get-Content $despues)
+Remove-Item $antes, $despues
+python main.py publicar-diccionario
+$rgM = "rg-mcp-bbdd-dev"
+$app = "ca-mcp-bbdd-dev"
+$rev = az containerapp show -g $rgM -n $app --query properties.latestReadyRevisionName -o tsv
+az containerapp revision restart -g $rgM -n $app --revision $rev -o none
+```
+
+### P8 · La nocturna siguiente
+
+Al día siguiente, sin hacer nada a mano, la nocturna tiene que dejar
+`apply_grants` en SUCCESS con los cuatro `ok` (R34).
+
+```sql
+-- con cualquier login que lea _meta
+SELECT started_at, status, metadata->>'verificacion' AS verificacion,
+       metadata->>'verificacion_total' AS verificacion_total,
+       metadata->>'verificacion_restringido' AS verificacion_restringido,
+       metadata->>'pertenencias_restringido' AS pertenencias_restringido
+FROM _meta.etl_runs
+WHERE step = 'apply_grants'
+ORDER BY started_at DESC
+LIMIT 3;
+```
+
+### P9 · El contrato a `mcp-bbdd`
+
+Las cláusulas E1-E8 están en `azure-apps/datamart_seg_anual.md` (perfil
+restringido, F-141): login y secreto por nombre, qué lee, por defecto
+restringido con listas de oid para el estándar y el total, nunca hacia arriba,
+catálogo con su login, el perfil dicho en `estado_servidor`. Su feature, su
+despliegue y las listas de oid son de `mcp-bbdd`. Al líder: la ficha de F-127
+tiene que excluir su mayor analítico de `PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES`
+si no lleva «mayor» en el nombre.
+
+### Vuelta atrás
+
+- **P2 o P3 fallan**: la base no ha cambiado. Se repite desde P2.
+- **P4 falla**: en las guardas, la base no ha cambiado; después, el renombre y
+  los `CREATE ROLE` van antes del `BEGIN` y pueden haber entrado, y todo lo
+  demás se deshace solo. `02_roles.sql` es reejecutable: se repite P4.
+- **Hay que deshacer el renombre**: `ALTER ROLE sigrid_dm_autorizado_ro RENAME
+  TO` el nombre de `NOMBRE_AUTORIZADO_RETIRADO` (`config/settings.py`), como
+  administrador, y volver a la imagen anterior a F-141 el mismo día. El grupo y
+  el login del perfil se pueden quedar: sin cliente que los use no exponen nada.

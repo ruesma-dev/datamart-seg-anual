@@ -12,7 +12,7 @@
 -- noche. Ningun paso depende de `build_contabilidad` (R5).
 --
 -- F-135 (2026-10-11): DOS ESQUEMAS. La contabilidad COMPLETA vive en
--- `contabilidad_restringida`, que solo lee el grupo `sigrid_dm_restringido_ro`
+-- `contabilidad_restringida`, que solo lee el grupo `sigrid_dm_autorizado_ro`
 -- (y el dueno y el administrador); la GENERAL, en `contabilidad`, sin los
 -- apuntes de personal (criterio en `etl_sigrid/domain/restriccion_personal.py`)
 -- y con solo RECUENTOS de lo que falta. Los permisos van por esquema: lo que el

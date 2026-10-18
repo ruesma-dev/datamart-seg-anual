@@ -10,8 +10,9 @@
 #
 # Uso:
 #   .\15_provision_db.ps1 -AdminUser <usuario>              # plan, sin tocar nada
-#   (APP_PWD, MCP_PWD y TOTAL_PWD en el entorno, leidas de Key Vault: runbook
-#    secciones 4 y 12; nunca escritas a mano ni en un fichero)
+#   (APP_PWD, MCP_PWD, TOTAL_PWD y RESTRINGIDO_PWD en el entorno, leidas de
+#    Key Vault: runbook secciones 4, 12 y 13; nunca escritas a mano ni en un
+#    fichero. RESTRINGIDO_PWD es la del login del perfil restringido, F-141)
 #   .\15_provision_db.ps1 -AdminUser <usuario> -Ejecutar
 #
 # psql: las OPCIONES van SIEMPRE delante de la cadena de conexion, que es lo
@@ -52,6 +53,7 @@ Write-Host ("  Roles           : {0} (grupo), {1} (ETL), {2} (solo lectura)" -f 
 # Los otros dos los crea 02_roles.sql con su nombre: aqui no se escribe ningun
 # nombre de recurso (F-003, R1), solo se dice que existen.
 Write-Host "                    + grupo autorizado (F-135) y login de acceso total del MCP (F-136)"
+Write-Host "                    + grupo y login del perfil restringido del MCP (F-141)"
 Write-Host ""
 
 if (-not $AdminUser) {
@@ -87,9 +89,9 @@ if (-not $Ejecutar) {
 }
 
 # --- 2. Comprobaciones antes de escribir ------------------------------------
-if (-not $env:APP_PWD -or -not $env:MCP_PWD -or -not $env:TOTAL_PWD) {
-    Write-Host "Faltan las contrasenas en el entorno: APP_PWD, MCP_PWD y TOTAL_PWD." -ForegroundColor Red
-    Write-Host "Generalas y guardalas en Key Vault ANTES (runbook secciones 4 y 12)."
+if (-not $env:APP_PWD -or -not $env:MCP_PWD -or -not $env:TOTAL_PWD -or -not $env:RESTRINGIDO_PWD) {
+    Write-Host "Faltan las contrasenas en el entorno: APP_PWD, MCP_PWD, TOTAL_PWD y RESTRINGIDO_PWD." -ForegroundColor Red
+    Write-Host "Generalas y guardalas en Key Vault ANTES (runbook secciones 4, 12 y 13)."
     Write-Host "No se escriben nunca en un fichero del repositorio."
     exit 1
 }

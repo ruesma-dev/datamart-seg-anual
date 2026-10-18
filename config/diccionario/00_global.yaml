@@ -532,7 +532,7 @@
 # 2026-10-09. Esquema nuevo `contabilidad_restringida` con la contabilidad
 # COMPLETA (las fichas de F-056 mas `restringido`, `motivo_restriccion` y
 # `saldo_acumulado_visible` en el mayor), que solo lee
-# `sigrid_dm_restringido_ro`. `contabilidad` pasa a ser la GENERAL: sin los
+# `sigrid_dm_autorizado_ro`. `contabilidad` pasa a ser la GENERAL: sin los
 # apuntes de personal, con las 521 cuentas de personal enmascaradas en el plan,
 # `num_apuntes_restringidos` e `incompleto` en los saldos y la tabla nueva
 # `contabilidad.apuntes_restringidos_mes` (solo recuentos). Regla dura nueva
@@ -586,7 +586,32 @@
 # la misma regla vale para las filas del indice (la aplica F-141); los 17
 # ficheros de mas de 20 MB y las 305 ofertas sin fila en su tabla.
 
-version: 53
+# version 54 (F-141, 2026-10-17): EL PERFIL RESTRINGIDO (administrativos), el
+# tercero, que ve MENOS que el estandar. Regla dura nueva
+# `R-PERFIL-RESTRINGIDO`: TOTAL ⊃ ESTANDAR ⊃ RESTRINGIDO; el restringido no lee
+# `contabilidad.mayor`, `contabilidad.saldos_cuenta_mes`, `tesoreria` ni
+# `personal`, y SI las tres vistas de pago de `compras` (D4). Las fichas de lo
+# que no ve EMPIEZAN por «No disponible para el perfil restringido» y las de
+# las tres vistas de pago dicen que las lee. El grupo autorizado se renombra a
+# `sigrid_dm_autorizado_ro` (D6) y las tres `R-*-RESTRINGIDA` dicen que
+# «restringida» es del perfil total, no del perfil restringido. Sin objetos ni
+# columnas nuevos. Ampliacion aprobada por el humano el 2026-10-17: la ficha de
+# `compras.documento_adjuntos` deja de decir que la herramienta de `mcp-bbdd` no
+# esta desplegada y nombra `abrir_adjunto(adjunto_id)` (su F-023, desplegada el
+# 2026-10-17): la IA localiza el `adjunto_id` en el indice y abre el original.
+
+# version 55 (F-144, 2026-10-18): SI NO SE INDICA EMPRESA, ES CONSTRUCCIONES
+# RUESMA. Orden del humano: «en general si no se indica empresa es construcciones
+# ruesma. es criterio general». Regla dura nueva `R-EMPRESA-POR-DEFECTO`, junto a
+# `R-CODIGO-POR-EMPRESA` (que remite a ella): sin empresa en la pregunta se
+# filtra `empresa_id = 1` en todo objeto con empresa, la IA DICE que lo ha
+# supuesto, no se aplica si se pide otra empresa, varias, el grupo o una UTE, y
+# nunca se suman empresas sin decirlo. Sin objetos ni columnas nuevos. La regla
+# nombra objeto a objeto donde hay empresa y donde solo `obra_id` (lo recorre
+# `tests/test_f144_empresa_por_defecto.py`); en los objetos sin ninguna de las
+# dos el criterio no se aplica y la respuesta avisa de que mezcla las empresas.
+
+version: 55
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -772,7 +797,10 @@ reglas:
       sirve para agregar hechos de otras empresas, porque sumaria lo de la UTE
       en la obra de Ruesma. Los hechos (`compras`, `retenciones`, `personal`)
       llevan el `obra_id` de la ficha de SU empresa y no se traducen. Contar
-      obras por codigo es contar `es_ficha_principal`, y hay que decirlo.
+      obras por codigo es contar `es_ficha_principal`, y hay que decirlo. Y si
+      la pregunta no indica empresa, es Construcciones Ruesma (`empresa_id =
+      1`), dicho en la respuesta: lo fija `R-EMPRESA-POR-DEFECTO`, que es
+      criterio general y no solo de codigos.
     motivo: >-
       Medido en solo lectura el 2026-09-23 (F-102): 922 fichas de obra para 846
       codigos, 58 codigos repetidos y ninguno repetido dentro de una empresa;
@@ -793,6 +821,90 @@ reglas:
       con su plan, y ningun codigo repetido dentro de una; en
       `contabilidad.plan_cuentas` y `contabilidad.mayor` la cuenta se pide por
       (`empresa_id`, `codigo_cuenta`) o por `clave_cuenta` ('1-4308000197').
+
+  - codigo: R-EMPRESA-POR-DEFECTO
+    titulo: Sin empresa en la pregunta, es Construcciones Ruesma (empresa_id = 1), y se dice
+    severidad: bloqueante
+    ambito: [maestro, compras, compras_restringida, retenciones, personal, contabilidad, contabilidad_restringida, tesoreria, tesoreria_restringida]
+    regla: >-
+      Es un CRITERIO GENERAL, no solo para los codigos de obra o de recurso: si
+      la pregunta no indica empresa, se entiende Construcciones Ruesma,
+      `empresa_id = 1`, y se filtra por ella en TODO objeto que tenga empresa.
+      La IA DICE en la respuesta que ha supuesto Construcciones Ruesma («he
+      supuesto Construcciones Ruesma, `empresa_id = 1`, porque la pregunta no
+      indica empresa»), para que el usuario lo vea y lo corrija. NO se aplica
+      si la pregunta pide otra empresa (Porsan es la 28), varias, el grupo o
+      una UTE: entonces se filtra por las que pide y, si son varias, se dice
+      cuales entran y si van por separado o sumadas. Nunca se suman empresas
+      sin decirlo.
+      DONDE SE PUEDE FILTRAR es objeto a objeto, no esquema a esquema: en
+      `compras` y en `retenciones` la mayoria de los objetos no tiene empresa.
+      La columna de empresa la tienen exactamente estos objetos:
+      `maestro.obras`, `maestro.v_obra_fichas`, `maestro.centros_coste`,
+      `maestro.cuentas_analiticas`, `compras.comparativos`,
+      `compras.v_control_forma_pago`, `compras.v_pbi_albaranes_sin_facturar`,
+      `compras.v_pbi_contrato_consumo`, `compras.v_pbi_partida_coste`,
+      `compras.v_pbi_proveedor_obra`, `retenciones.apuntes_contables`,
+      `retenciones.fin_obra`, `retenciones.saldo_contable`,
+      `retenciones.v_retencion_contable_obra`, `personal.recursos`,
+      `contabilidad.plan_cuentas`, `contabilidad.mayor`,
+      `contabilidad.saldos_cuenta_mes`, `contabilidad.apuntes_restringidos_mes`,
+      `contabilidad_restringida.plan_cuentas`, `contabilidad_restringida.mayor`,
+      `contabilidad_restringida.saldos_cuenta_mes`, `tesoreria.efectos`,
+      `tesoreria.efectos_restringidos_mes` y `tesoreria_restringida.efectos`.
+      Se llama `empresa_id` en todos menos en `maestro.centros_coste`, donde es
+      `empresa` (`maestro.centros_coste.empresa`).
+      Solo llevan `obra_id`, sin empresa, estos hechos:
+      `compras.fact_compras_linea`, `compras.factura_lineas`,
+      `compras.albaran_lineas`, `compras.contratos`, `compras.necesidades`,
+      `compras.contrato_liquidacion`, `compras.facturas_tras_liquidacion`,
+      `maestro.proveedores_obra`, `personal.partes_lineas`,
+      `personal.v_pbi_horas_obra_mes`, `retenciones.movimientos` y
+      `retenciones.v_pbi_retencion_obra`. Su `obra_id` es la ficha de SU
+      empresa (`R-CODIGO-POR-EMPRESA`): se filtran cruzando `obra_id` con
+      `maestro.obras` y su `empresa_id = 1` (o su `clave_obra` que empieza por
+      `1-`). Las filas con `obra_id` nulo no son de ninguna empresa que se pueda
+      ver: quedan fuera del filtro y la respuesta dice cuantas son.
+      Los demas objetos de estos esquemas NO tienen empresa ni `obra_id`, y
+      mezclan las 38 empresas: entre ellos `compras.facturas`,
+      `compras.albaranes`, `compras.vencimientos`, `compras.v_facturas_pago`,
+      `compras.documento_alarmas`, `compras_restringida.documento_alarmas`,
+      `compras.documento_liquidatoria`, `compras.v_estado_documentos`,
+      `compras.contrato_lineas`, `personal.partes` (su cabecera; la obra que
+      imputa es la de `personal.partes_lineas`),
+      `retenciones.v_pbi_retencion_entidad`,
+      `retenciones.v_pbi_retencion_resumen`,
+      `retenciones.v_pbi_retenciones_vivas`,
+      `retenciones.v_pbi_retenciones_vencidas` (estas dos traen `codigo_obra`,
+      que a solas no identifica la obra) y `retenciones.v_cuadre_proveedor`.
+      En ellos NO se puede aplicar el criterio: la cifra mezcla todas las
+      empresas, y la respuesta lo dice asi («la cifra es de todas las
+      empresas: este objeto no distingue empresa») y NO dice «he supuesto
+      Construcciones Ruesma». Solo hay dos caminos comprobados para filtrarlos:
+      `compras.vencimientos` es una vista de `tesoreria.efectos` y su
+      `vencimiento_id` es el `efecto_id` de alli (clave primaria), que lleva
+      `empresa_id` y nunca vacia, asi que se cruza por ahi o se consulta
+      `tesoreria.efectos` con `sentido = 'PAGO' AND es_factura_compra`; y una
+      pregunta de retenciones por empresa se contesta desde
+      `retenciones.movimientos`, que lleva `obra_id`, y no desde las `v_pbi_*`
+      agregadas. Los importes de compras por empresa salen de
+      `compras.fact_compras_linea`; contar facturas o albaranes de una empresa
+      no tiene camino comprobado. `stg`, `mart`, `cierre` y `descompuestos` no
+      tienen empresa: son el universo del seguimiento, donde esta regla no
+      anade filtro y manda `R-UNIVERSO-OBRA`.
+    motivo: >-
+      Orden del humano del 2026-10-18, pedida primero en la sesion de
+      `mcp-bbdd` («si no se dice nada es construcciones ruesma») y confirmada
+      en este repositorio: «en general si no se indica empresa es construcciones
+      ruesma. es criterio general». Sin ella, una pregunta sin empresa sumaria
+      las 38 empresas de Sigrid --Ruesma, Porsan y cada UTE, que repiten la
+      misma obra SIN CONSOLIDAR (`R-CODIGO-POR-EMPRESA`)-- o la IA elegiria una
+      sin decirlo. Que la IA lo diga es sugerencia de `mcp-bbdd`: el usuario ve
+      el supuesto y lo corrige. Comprobado en Azure en solo lectura el
+      2026-10-18: `empresa_id = 1` es 'CONSTRUCCIONES RUESMA' en
+      `maestro.obras.nombre_empresa` (la 28 es 'PORSAN E HIJOS CONSTRUCCIONES
+      SL'), y ningun objeto de `stg`, `mart`, `cierre` ni `descompuestos`
+      tiene columna de empresa.
 
   - codigo: R-SALDO-CONTABLE
     titulo: El saldo contable no se suma con los cierres ni las aperturas
@@ -832,7 +944,7 @@ reglas:
     ambito: [contabilidad, contabilidad_restringida]
     regla: >-
       Por defecto usa SIEMPRE `contabilidad`. `contabilidad_restringida` solo la
-      lee el perfil total del MCP (y el grupo `sigrid_dm_restringido_ro`); para
+      lee el perfil total del MCP (y el grupo `sigrid_dm_autorizado_ro`); para
       cualquier otro usuario devuelve «permission denied». Eso no es un fallo
       ni algo que haya que rodear: no reintentes con otra sintaxis ni busques la
       misma informacion por otro camino (`raw` tampoco se lee). Ante ese error,
@@ -864,6 +976,10 @@ reglas:
       visible. Excepcion: `retenciones` no se recorta (8 apuntes de retencion
       de proveedor en asientos mixtos, sin dato de trabajador), asi que sus
       saldos pueden incluir apuntes que no estan en `contabilidad.mayor`.
+
+      «restringida» = reservada al perfil total; el perfil RESTRINGIDO
+      (administrativos) ve MENOS que el estandar y no lee este esquema
+      (`R-PERFIL-RESTRINGIDO`).
     motivo: >-
       Correo de Juan Romero (Dir. Administracion y Control de Costes) del
       2026-10-09: cualquier usuario con acceso al mayor podia consultar
@@ -913,7 +1029,7 @@ reglas:
     ambito: [tesoreria, tesoreria_restringida]
     regla: >-
       Por defecto usa SIEMPRE `tesoreria`. `tesoreria_restringida` solo la lee
-      el perfil total del MCP (y el grupo `sigrid_dm_restringido_ro`); para
+      el perfil total del MCP (y el grupo `sigrid_dm_autorizado_ro`); para
       cualquier otro usuario devuelve «permission denied», y eso no se rodea:
       no reintentes ni busques los pagos por otro camino (`raw` tampoco se
       lee). Responde con `tesoreria` y di que la cartera no incluye los pagos
@@ -923,6 +1039,10 @@ reglas:
       a `tesoreria_restringida` aunque sea «la completa». Los dos esquemas NUNCA
       se suman ni se unen: la completa ya contiene a la general y sumarlas
       duplica lo visible.
+
+      «restringida» = reservada al perfil total; el perfil RESTRINGIDO
+      (administrativos) ve MENOS que el estandar y no lee este esquema, y
+      tampoco la general (`tesoreria`) (`R-PERFIL-RESTRINGIDO`).
     motivo: >-
       Decision del humano del 2026-10-13 (F-037): «los pagos de nominas deben
       quedar restringidos», con el mismo espiritu que F-135 en la contabilidad.
@@ -940,7 +1060,7 @@ reglas:
     regla: >-
       Por defecto usa SIEMPRE `compras.documento_alarmas`.
       `compras_restringida.documento_alarmas` solo la lee el perfil total del
-      MCP (y el grupo `sigrid_dm_restringido_ro`); para cualquier otro usuario
+      MCP (y el grupo `sigrid_dm_autorizado_ro`); para cualquier otro usuario
       devuelve «permission denied», y eso no se rodea: no reintentes ni busques
       esas alarmas por otro camino (`raw` tampoco se lee). Responde con
       `compras.documento_alarmas` y di que no incluye las alarmas de recursos ni
@@ -948,6 +1068,10 @@ reglas:
       recursos o de partes, no vayas a `compras_restringida` aunque sea «la
       completa». Las dos tablas NUNCA se suman ni se unen: la completa ya
       contiene a la general y sumarlas duplica lo visible.
+
+      «restringida» = reservada al perfil total; el perfil RESTRINGIDO
+      (administrativos) ve MENOS que el estandar y no lee este esquema
+      (`R-PERFIL-RESTRINGIDO`).
     motivo: >-
       Decision del humano del 2026-10-14 (F-138, D9): las alarmas de recursos
       (familia 33) y de partes de trabajo (35) nombran a trabajadores y sus
@@ -955,6 +1079,62 @@ reglas:
       estandar». Son 27 de ~45.750 alarmas medidas ese dia. Mismo patron que
       `R-TESORERIA-RESTRINGIDA`: el MCP no filtra el catalogo ni el diccionario
       por perfil, asi que el titulo dice cual usar.
+
+  - codigo: R-PERFIL-RESTRINGIDO
+    titulo: El perfil restringido ve menos que el estandar; lo que no ve no se rodea
+    severidad: bloqueante
+    ambito:
+      - contabilidad.mayor
+      - contabilidad.saldos_cuenta_mes
+      - tesoreria
+      - personal
+      - retenciones.apuntes_contables
+      - compras.vencimientos
+      - compras.v_facturas_pago
+      - compras.v_control_forma_pago
+      - compras.documento_procesos
+      - compras.documento_alarmas
+      - compras.documento_adjuntos
+    regla: >-
+      Hay TRES perfiles de lectura, de mas a menos: TOTAL ⊃ ESTANDAR ⊃
+      RESTRINGIDO. El TOTAL lee lo del estandar y ademas los esquemas
+      `*_restringida`; el ESTANDAR lee todo el consumo salvo `raw` y los
+      `*_restringida`; el RESTRINGIDO (administrativos) lee lo del estandar
+      MENOS `contabilidad.mayor`, `contabilidad.saldos_cuenta_mes`, el mayor
+      analitico (cuando se publique), el esquema `tesoreria` entero (la cartera
+      de cobros y pagos) y el esquema `personal` entero. SI lee `retenciones`,
+      `compras` entero (tambien `compras.vencimientos`, `compras.v_facturas_pago`
+      y `compras.v_control_forma_pago`, por las que ve el estado de pago de las
+      facturas), `contabilidad.plan_cuentas`,
+      `contabilidad.apuntes_restringidos_mes` y el resto del consumo. OJO AL
+      NOMBRE: los esquemas `*_restringida` son del perfil TOTAL y NO del perfil
+      restringido, que no lee ninguno: «restringida» quiere decir reservada al
+      total, y el perfil restringido ve MENOS que el estandar.
+
+      Con el perfil restringido, lo que no ve devuelve «permission denied», y
+      eso no se rodea: no reintentes con otra sintaxis ni reconstruyas el dato
+      por otro camino -ni el mayor o sus saldos desde
+      `retenciones.apuntes_contables` (solo trae las cuentas de retencion), ni
+      a las personas desde los logins de `compras` (`documento_procesos`,
+      `documento_alarmas.creada_por`, `documento_adjuntos.subido_por`), ni la
+      cartera desde `compras.vencimientos` (solo los pagos de las facturas de
+      compra)-: responde que el perfil no lo incluye. El perfil de quien
+      pregunta lo dira el propio MCP (`estado_servidor`, contrato con
+      `mcp-bbdd`): no lo adivines por un error.
+    motivo: >-
+      Decisiones del humano del 2026-10-16 y 2026-10-17 (F-141): el perfil es
+      «para administrativos y gente asi», y «ven como el estandar, menos el
+      mayor, menos el mayor analitico, menos la cartera de cobros (pero si a
+      retenciones)», «personal tambien quitalo, y saldos cuenta tambien» y
+      «compras debe poder verse». Medido en Azure el 2026-10-16 y 17: de las
+      vistas de sus diez esquemas solo `compras.vencimientos`,
+      `compras.v_facturas_pago` y `compras.v_control_forma_pago` alcanzan algo
+      que el perfil no ve (`tesoreria.efectos`), y se quedan visibles como
+      excepcion nominal; ninguna lee `personal`, `contabilidad.mayor` ni
+      `contabilidad.saldos_cuenta_mes`. `apply_grants` vigila cada noche que no
+      aparezca otra (la revoca y falla) ni un objeto con «mayor» en el nombre
+      sin excluir. El MCP no filtra el catalogo ni el diccionario por perfil:
+      por eso la ficha de cada objeto que no ve empieza por el aviso.
 
   - codigo: R-DESCOMPUESTO-ORIGEN
     titulo: Los descompuestos no se mezclan entre origenes ni entre versiones
@@ -1699,7 +1879,7 @@ esquemas:
       2026-10-11, con las mismas filas, columnas y cifras, mas la marca
       `restringido` en el mayor. SOLO LO LEEN el perfil total del MCP (el
       login `mcp_sigrid_dm_total`, F-136) y el grupo autorizado
-      `sigrid_dm_restringido_ro` (sin login; sus miembros los decide Negocio):
+      `sigrid_dm_autorizado_ro` (sin login; sus miembros los decide Negocio):
       para el perfil estandar del MCP y para Power BI esta vetado, y una
       consulta devuelve «permission denied». Por defecto se usa `contabilidad`
       (`R-CONTABILIDAD-RESTRINGIDA`). No se suma con
@@ -1734,7 +1914,7 @@ esquemas:
       embargo y cuota (F-037), marcados con `restringido` y
       `motivo_restriccion`. SOLO LA LEEN el perfil total del MCP (el login
       `mcp_sigrid_dm_total`, F-136) y el grupo autorizado
-      `sigrid_dm_restringido_ro`; para el perfil estandar del MCP y para Power
+      `sigrid_dm_autorizado_ro`; para el perfil estandar del MCP y para Power
       BI esta vetada, y una consulta devuelve «permission denied». Por defecto
       se usa `tesoreria` (`R-TESORERIA-RESTRINGIDA`); no se suma con ella, y
       valen las mismas trampas del estado (`R-TESORERIA-ESTADO`).
@@ -1750,7 +1930,7 @@ esquemas:
       nombran trabajadores y bajas, marcadas con `restringido` y
       `motivo_restriccion`. SOLO LA LEEN el perfil total del MCP (el login
       `mcp_sigrid_dm_total`, F-136) y el grupo autorizado
-      `sigrid_dm_restringido_ro`; para el perfil estandar del MCP y para Power
+      `sigrid_dm_autorizado_ro`; para el perfil estandar del MCP y para Power
       BI esta vetada, y una consulta devuelve «permission denied». Por defecto
       se usa `compras.documento_alarmas` (`R-COMPRAS-RESTRINGIDA`); no se suma
       con ella.
