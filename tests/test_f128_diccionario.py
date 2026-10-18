@@ -331,3 +331,13 @@ def test_f128_r34_azure_apps_describe_lo_expuesto():
                    "compras_restringida.documento_cuenta_bancaria",
                    "retenciones.retencion_factura", "retenciones.v_cuadre_factura_obra"):
         assert f"`{objeto}`" in texto, objeto
+
+
+# --- Pasada 2 del review: R-EMPRESA-POR-DEFECTO no afirma de más -------------------------
+
+def test_f128_r_empresa_no_atribuye_a_empide_la_empresa():
+    """`empide` en `dcf`/`dca` es «Empleado» (índice a `emp`), no la empresa del
+    documento; qué es exactamente es de F-134. La regla no puede presentarlo
+    como la empresa."""
+    texto = _plano(_reglas()["R-EMPRESA-POR-DEFECTO"]["regla"])
+    assert "empide" not in texto

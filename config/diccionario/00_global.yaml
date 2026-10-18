@@ -912,8 +912,7 @@ reglas:
       no tiene camino comprobado. Desde F-128 `compras.facturas` y
       `compras.albaranes` llevan la obra de CABECERA (`obra_cabecera_id`, que NO
       es `obra_id`): su empresa en `maestro.obras` es la de esa obra, no la del
-      documento (que es `empide`, pendiente de F-134), y un 4 % de las facturas
-      no la tiene; si el usuario la acepta como aproximacion, se filtra por ella
+      documento, y un 4 % de las facturas no la tiene; si el usuario la acepta como aproximacion, se filtra por ella
       y se dice. `stg`, `mart`, `cierre` y `descompuestos` no
       tienen empresa: son el universo del seguimiento, donde esta regla no
       anade filtro y manda `R-UNIVERSO-OBRA`.
