@@ -21,7 +21,12 @@
   columna: van como `RESIDUAL` con su cobertura en la nota. No se publican (como `dirdir*`).
 - Recuentos del diccionario del árbol tras F-128 (T11, v56): **234 objetos, 2000 columnas, 114 de
   consumo** (en `main`, v55: 226 / 1864 / 109). Sin publicar: es MANUAL tras el merge.
-- En curso: ver `specs/F-128-importes-cabecera-factura/tasks.md` (las `[x]`).
+- T1-T15 hechos (commits en `progress/impl_F-128.md`); mutación 20/20 muertos (suite acotada a
+  los importadores del módulo: la de por defecto no cabe en los 600 s de línea base). Otras
+  desviaciones menores, justificadas en el informe (alias SQL `cpt`/`dcon`, tests ajenos
+  mecánicos, R31 robusto al merge, frase nueva en `R-EMPRESA-POR-DEFECTO`).
+- Falta: T18 (`bash harness/init.sh`), review; después, MANUAL del humano T16-T17 (build en
+  Azure, `apply-grants`, `check-diccionario`, publicar v56, reiniciar el MCP).
 
 ## 2026-10-18 · F-144 · CERRADA (`done`, APROBADO en pasada 2) · DESPLEGADA: diccionario v55 y MCP reiniciado
 
