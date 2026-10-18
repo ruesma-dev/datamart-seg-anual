@@ -3,11 +3,13 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **131 features**, 72 abiertas (0 en curso, 1 con la spec lista, 0 bloqueadas y 71 en backlog) y 59 terminadas.
+Resumen: **131 features**, 72 abiertas (1 en curso, 1 con la spec lista, 0 bloqueadas y 70 en backlog) y 59 terminadas.
 
 ## En curso
 
-_Ninguna feature en curso._
+| # | Feature | Prioridad | Rigor | Rama |
+|---|---|---|---|---|
+| F-144 | Regla del diccionario: si no se indica empresa, es Construcciones Ruesma (`empresa_id = 1`), y la IA lo dice | 1 | estandar | `feature/F-144-empresa-por-defecto` |
 
 ## Spec lista
 
@@ -23,7 +25,6 @@ _Ninguna feature bloqueada._
 
 | # | Feature | Prioridad | Rigor | Rama |
 |---|---|---|---|---|
-| F-144 | Regla del diccionario: si no se indica empresa, es Construcciones Ruesma (`empresa_id = 1`), y la IA lo dice | 1 | estandar | `feature/F-144-empresa-por-defecto` |
 | F-128 | Toda la cabecera de la factura de proveedor y del albarán (con proformas): los importes (base, IVA, retención, total y total a pagar), sus recargos y retenciones (dcfrec, dcarec) y el resto de campos de `dcf` y `dca` que hoy no se publican | 4 | estandar | `feature/F-128-importes-cabecera-factura` |
 | F-140 | La fase 2 de la cartera (F-037): los ingredientes de la proyección de caja por obra (devengo pendiente, plazos de pago pactados y retenciones), sin convertir devengo en caja | 5 | estandar | `feature/F-140-proyeccion-caja-ingredientes` |
 | F-129 | El objetivo del comparativo se mide contra la oferta de referencia del propio comparativo (oficina técnica o planificado ABC), no contra el descompuesto: hoy casa el 29 % | 6 | critico | `feature/F-129-objetivo-contra-oferta-referencia` |
@@ -163,7 +164,7 @@ _Ninguna feature bloqueada._
 
 ### F-144 · Regla del diccionario: si no se indica empresa, es Construcciones Ruesma (`empresa_id = 1`), y la IA lo dice
 
-estado **pendiente** · prioridad 1 · rigor `estandar` · SDD no · rama `feature/F-144-empresa-por-defecto`
+estado **en curso** · prioridad 1 · rigor `estandar` · SDD no · rama `feature/F-144-empresa-por-defecto`
 
 Nace el 2026-10-18 por orden del humano, pedida primero en la sesión de `mcp-bbdd` («si no se dice nada es construcciones ruesma. guardalo como regla en el diccionario en datamart») y confirmada aquí: «en general si no se indica empresa es construcciones ruesma. es criterio general». Regla dura nueva `R-EMPRESA-POR-DEFECTO` (bloqueante) en `config/diccionario/00_global.yaml`, junto a `R-CODIGO-POR-EMPRESA`: es un CRITERIO GENERAL, no solo de códigos. Si la pregunta no nombra empresa, se entiende Construcciones Ruesma, `empresa_id = 1` (el código ya lo fija `R-CODIGO-POR-EMPRESA`: «Ruesma (1), Porsan (28), cada UTE»), y se filtra por ella en todo objeto con empresa. La IA DICE en la respuesta que ha supuesto Construcciones Ruesma, para que el usuario lo vea y lo corrija (sugerencia de `mcp-bbdd`). No se aplica si la pregunta pide otra empresa, varias, el grupo o una UTE; y nunca se suman empresas sin decirlo. Diccionario: versión siguiente a la de `main` (hoy v54 → v55), publicar y reiniciar el MCP; avisar a `mcp-bbdd` cuando se publique. No cambia `abrir_adjunto` (la empresa sale de la fila del índice). sdd=false: cambio de texto del diccionario con sus tests. El ID F-143 lo tiene reservado la rama de F-128 (tipo de contrato de compra).
 

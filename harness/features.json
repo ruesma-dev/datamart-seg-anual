@@ -2255,7 +2255,7 @@
         "Un test fija la regla (existe, bloqueante, nombra `empresa_id = 1` y la obligación de decirlo) y los tests de diccionario existentes siguen en verde",
         "bash harness/init.sh en verde y veredicto APROBADO del reviewer; tras el merge, `publicar-diccionario`, `check-diccionario` OK y MCP reiniciado (MANUAL, con orden del humano)"
       ],
-      "status": "pending",
+      "status": "in_progress",
       "sdd": false,
       "rigor": "estandar",
       "priority": 1,
