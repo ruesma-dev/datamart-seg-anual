@@ -1493,6 +1493,17 @@ objetos:
       Caso testigo: FERMALUX (proveedor 1958815, cuenta 4108005478) tiene
       64.201,96 EUR de saldo contable y 64.201,96 EUR vivos en efectos: CUADRA
       (comprobado el 2026-09-25 en el primer build con `rac`).
+
+      **QUE FACTURAS EXPLICAN EL DESCUADRE (F-128).** Para bajar de un
+      proveedor que descuadra a sus facturas, `retenciones.retencion_factura`
+      (una fila por factura: lo retenido en ella, lo contabilizado y los
+      efectos, con su categoria) y `retenciones.v_cuadre_factura_obra` (el
+      mismo cuadre por proveedor y obra). Medido el 2026-10-17: 527 de 768
+      proveedores cuadran aqui; de los que descuadran, 100 cuadran entre
+      factura y contabilidad. **Lo que la factura NO puede explicar son los
+      efectos AGR (agrupadores): no tienen factura, 2.454 efectos y 0,82 M EUR
+      vivos.** Un proveedor cuyo descuadre esta en sus AGR no tiene ninguna
+      factura que lo explique: dilo asi.
     grano: Una fila por proveedor (`proveedor_id`), de cualquiera de los dos lados.
     clave_negocio: [proveedor_id]
     paso_etl: build_retenciones
@@ -1535,6 +1546,13 @@ objetos:
         a: maestro.proveedores.proveedor_id
         cardinalidad: "1:1"
         porque: Para el CIF y la direccion del proveedor que descuadra.
+      - de: proveedor_id
+        a: retenciones.retencion_factura.proveedor_id
+        cardinalidad: "1:N"
+        porque: >-
+          Para las facturas del proveedor que explican el descuadre (F-128):
+          filtra `categoria_contable <> 'CUADRA'` o `categoria_efectos <>
+          'CUADRA'`.
     ejemplos_preguntas:
       - Que proveedores no cuadran entre la contabilidad y los efectos de retencion
       - Cuadra la retencion del proveedor P entre contabilidad y efectos
@@ -1714,6 +1732,267 @@ objetos:
       fecha de verdad, tratando el 0 como ausencia de fecha. Es lo que hace que
       `fecha_devolucion_real` y `fecha_baja` sean nulas en vez de cero cuando
       no hay fecha.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_retenciones
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  retencion_factura:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **EL CUADRE DE LA RETENCION DE GARANTIA POR FACTURA** (F-128): para cada
+      factura de proveedor, lo retenido en la propia factura frente a lo
+      contabilizado en las cuentas de retencion y frente a los efectos que
+      genero. Es la tabla que contesta «que facturas explican el descuadre de
+      retenciones del proveedor X» (`retenciones.v_cuadre_proveedor` da el
+      descuadre; esta, las facturas).
+
+      UNIVERSO: las facturas con retencion de garantia distinta de 0 (recargos
+      de clase 4 y 5, decision del 2026-10-17) o con algun apunte ALTA o BAJA
+      de `retenciones.apuntes_contables` cuyo documento sea ella. Los apuntes
+      cuyo documento no es una factura (efectos, AGR) quedan fuera. Lee solo
+      `raw` y `retenciones`, nunca `compras`; su `retencion_factura` es la
+      misma cifra que `compras.facturas.importe_retencion_garantia`.
+
+      LOS TRES LADOS: `retencion_factura` (Σ cuota de los recargos de
+      garantia), `retencion_contable` (Σ importe de los apuntes ALTA/BAJA
+      enlazados a la factura por `rac`) y `efectos_generados` (Σ importe de
+      los efectos de retencion a proveedor de la factura que no estan de BAJA,
+      salvo los agrupados, estado 14: estan de baja pero su dinero sigue vivo
+      en el AGR; sin ellos solo cuadraban 7.793 facturas en vez de 22.729).
+
+      Reparto medido el 2026-10-17 sobre 167.488 facturas: 27.002 facturas,
+      24,04 M EUR en factura frente a 24,54 M EUR contabilizados.
+      `categoria_contable`: CUADRA 26.762 (99,1 %), SIN_APUNTE 58 (68.662
+      EUR), SOLO_CONTABLE 175 (601.729 EUR netos) y DIFIERE 7.
+      `categoria_efectos`: CUADRA 22.729 (84,2 %), SIN_EFECTOS 4.229 y DIFIERE
+      44.
+
+      **TRAMPA `RETESP`.** 42 de las 175 SOLO_CONTABLE son facturas con el
+      concepto `RETESP` («Retencion 5 % garantia (sin IVA)»): Sigrid lo tiene
+      como DESCUENTO y aqui NO es garantia (decision del 2026-10-17), asi que
+      la factura no retiene nada pero su asiento si va a la cuenta de
+      retencion. Salen SOLO_CONTABLE a proposito; si preguntan por ellas,
+      buscalas en `compras.factura_recargos` por `codigo_concepto = 'RETESP'`.
+
+      La obra es la de CABECERA de la factura, no la cascada de
+      `retenciones.apuntes_contables` (coinciden en el 99,8 %).
+    grano: >-
+      Una fila por factura (`factura_id`), clave primaria declarada.
+    clave_negocio: [factura_id]
+    paso_etl: build_retenciones
+    refresco: nocturno
+    columnas:
+      factura_id:
+        significado: La factura (`compras.facturas.factura_id`).
+        agregacion: no_sumable
+      codigo_factura:
+        significado: Codigo de la factura tal y como se ve en Sigrid.
+      fecha_alta:
+        significado: Fecha de alta de la factura en Sigrid (`con.fec`).
+        nulo_significa: La factura no tiene fecha de alta.
+        agregacion: no_sumable
+      fecha_factura:
+        significado: Fecha del documento del proveedor (`dcf.fecdoc`).
+        nulo_significa: La factura no trae fecha propia.
+        agregacion: no_sumable
+      proveedor_id:
+        significado: El proveedor de la factura.
+        nulo_significa: La factura no tiene proveedor informado.
+        agregacion: no_sumable
+      proveedor_nombre:
+        significado: Nombre actual del proveedor.
+        nulo_significa: Sin proveedor, o proveedor sin ficha.
+      obra_id:
+        significado: >-
+          Obra de CABECERA de la factura (`dcf.obride`), la ficha de su
+          empresa en `maestro.obras`.
+        nulo_significa: La factura no tiene obra de cabecera.
+        agregacion: no_sumable
+      empresa_id:
+        significado: Empresa de la obra de cabecera.
+        nulo_significa: Sin obra de cabecera.
+        agregacion: no_sumable
+      codigo_obra:
+        significado: Codigo de la obra de cabecera.
+        nulo_significa: Sin obra de cabecera.
+      clave_obra:
+        significado: Empresa y codigo de la obra (`1-<codigo>` en Ruesma).
+        nulo_significa: Sin obra de cabecera.
+      nombre_obra:
+        significado: Nombre de la obra de cabecera.
+        nulo_significa: Sin obra de cabecera.
+      retencion_factura:
+        significado: >-
+          Lo retenido de GARANTIA en la factura: suma de la cuota de sus
+          recargos de clase 4 y 5. 0 en las SOLO_CONTABLE. El `RETESP` no esta
+          aqui (decision del 2026-10-17).
+        unidad: EUR
+        agregacion: suma
+      retencion_contable:
+        significado: >-
+          Suma del importe de los apuntes ALTA y BAJA de las cuentas de
+          retencion cuyo documento es esta factura.
+        nulo_significa: La factura no tiene ningun apunte de retencion enlazado (SIN_APUNTE).
+        unidad: EUR
+        agregacion: suma
+      diferencia_contable:
+        significado: retencion_factura - retencion_contable.
+        nulo_significa: Sin apunte enlazado.
+        unidad: EUR
+        agregacion: suma
+      efectos_generados:
+        significado: >-
+          Suma del importe de los efectos de retencion a proveedor de la
+          factura que no estan de BAJA, mas los agrupados (estado 14).
+        nulo_significa: La factura no tiene efectos de retencion (SIN_EFECTOS).
+        unidad: EUR
+        agregacion: suma
+      efectos_vivos:
+        significado: La parte de esos efectos que sigue VIVA.
+        nulo_significa: La factura no tiene efectos de retencion vivos.
+        unidad: EUR
+        agregacion: suma
+      diferencia_efectos:
+        significado: retencion_factura - efectos_generados.
+        nulo_significa: Sin efectos de retencion.
+        unidad: EUR
+        agregacion: suma
+      categoria_contable:
+        significado: >-
+          Factura frente a contabilidad, evaluada en este orden: SOLO_CONTABLE
+          (la factura no retiene garantia y hay apunte), SIN_APUNTE, CUADRA
+          (diferencia de menos de 0,01 EUR) y DIFIERE.
+        valores: [SOLO_CONTABLE, SIN_APUNTE, CUADRA, DIFIERE]
+      categoria_efectos:
+        significado: >-
+          Factura frente a efectos: SIN_EFECTOS, CUADRA (menos de 0,01 EUR) y
+          DIFIERE.
+        valores: [SIN_EFECTOS, CUADRA, DIFIERE]
+    relaciones:
+      - de: factura_id
+        a: compras.facturas.factura_id
+        cardinalidad: "1:1"
+        porque: La cabecera de la factura, con sus importes y su estado.
+      - de: proveedor_id
+        a: retenciones.v_cuadre_proveedor.proveedor_id
+        cardinalidad: "N:1"
+        porque: El descuadre del proveedor que estas facturas explican.
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: La ficha de la obra de cabecera.
+    ejemplos_preguntas:
+      - Que facturas explican el descuadre de retenciones del proveedor X
+      - Cuanto se le retuvo al proveedor P en factura y cuanto esta contabilizado
+      - Que facturas tienen retencion y ningun apunte en contabilidad
+
+  v_cuadre_factura_obra:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **EL CUADRE DE LA RETENCION DE GARANTIA POR PROVEEDOR Y OBRA** (F-128):
+      la retencion de las facturas del par (`retenciones.retencion_factura`)
+      frente a las altas contables del par (`retenciones.saldo_contable`), con
+      FULL JOIN para no perder ninguna de las dos colas. Solo pares con algun
+      lado de al menos 1 EUR.
+
+      `categoria`, en este orden: CUADRA (menos de 1 EUR), SOLO_FACTURAS,
+      SOLO_CONTABILIDAD, FACTURAS_MAYOR y CONTABILIDAD_MAYOR. Medido el
+      2026-10-17: 6.109 pares, 5.304 CUADRA (86,8 %), 266 solo en
+      contabilidad y 91 solo en factura. Diferencia con
+      `retenciones.v_cuadre_proveedor`: aquella compara la contabilidad con los
+      EFECTOS por proveedor; esta compara la FACTURA con la contabilidad y baja
+      a la obra. Las altas de la contabilidad sin factura enlazada (unos 1,07 M
+      EUR, y 2,68 M de altas anteriores a 2016) caen en SOLO_CONTABILIDAD o en
+      CONTABILIDAD_MAYOR.
+    grano: >-
+      Una fila por (`proveedor_id`, `obra_id`), de cualquiera de los dos lados;
+      `obra_id` NULL es la fila sin obra del proveedor.
+    clave_negocio: [proveedor_id, obra_id]
+    paso_etl: build_retenciones
+    refresco: nocturno
+    columnas:
+      proveedor_id:
+        significado: El proveedor, de las facturas o de la contabilidad.
+        agregacion: no_sumable
+      proveedor_nombre:
+        significado: Nombre del proveedor, del lado que exista.
+      obra_id:
+        significado: >-
+          La obra: la de cabecera de las facturas o la de la cascada contable
+          de `retenciones.saldo_contable`.
+        nulo_significa: La fila sin obra del proveedor.
+        agregacion: no_sumable
+      empresa_id:
+        significado: Empresa de la obra.
+        nulo_significa: La fila sin obra.
+        agregacion: no_sumable
+      codigo_obra:
+        significado: Codigo de la obra.
+        nulo_significa: La fila sin obra.
+      clave_obra:
+        significado: Empresa y codigo de la obra.
+        nulo_significa: La fila sin obra.
+      nombre_obra:
+        significado: Nombre de la obra.
+        nulo_significa: La fila sin obra.
+      retencion_facturas:
+        significado: Suma de `retencion_factura` de las facturas del par. 0 si no hay.
+        unidad: EUR
+        agregacion: suma
+      altas_contables:
+        significado: Las altas de `retenciones.saldo_contable` del par. 0 si no hay.
+        unidad: EUR
+        agregacion: suma
+      diferencia:
+        significado: retencion_facturas - altas_contables.
+        unidad: EUR
+        agregacion: suma
+      num_facturas:
+        significado: Facturas del par en `retenciones.retencion_factura`.
+        unidad: facturas
+        agregacion: suma
+      num_facturas_descuadre:
+        significado: De ellas, las que no tienen `categoria_contable` CUADRA.
+        unidad: facturas
+        agregacion: suma
+      categoria:
+        significado: Como cuadra el par, evaluada en el orden de la lista.
+        valores: [CUADRA, SOLO_FACTURAS, SOLO_CONTABILIDAD, FACTURAS_MAYOR, CONTABILIDAD_MAYOR]
+    relaciones:
+      - de: proveedor_id
+        a: retenciones.retencion_factura.proveedor_id
+        cardinalidad: "N:N"
+        porque: >-
+          Las facturas del par: une por `(proveedor_id, obra_id)`, con
+          `IS NOT DISTINCT FROM` en la obra para la fila sin obra.
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: La ficha de la obra.
+    ejemplos_preguntas:
+      - En que obras no cuadra la retencion de las facturas del proveedor P con la contabilidad
+
+  fn_es_retencion_garantia:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de retenciones, usada solo dentro del SQL que
+      construye `retenciones.retencion_factura`.
+    descripcion: >-
+      Copia deliberada de `compras.fn_es_retencion_garantia` (F-128): verdadero
+      SOLO para las clases de recargo 4 y 5 (garantia sobre total y sobre
+      base). Existe para que el cuadre de `retenciones` no dependa del esquema
+      `compras`; un test compara los dos cuerpos. El `RETESP` (clase 1) no es
+      garantia (decision del 2026-10-17).
     grano: null
     clave_negocio: []
     paso_etl: build_retenciones

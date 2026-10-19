@@ -340,6 +340,7 @@ def test_f110_r17_step_documenta_las_tres_lecturas() -> None:
     assert (paso.name, paso.stage) == ("build_retenciones", "build_retenciones")
     assert [s.name for s in build_retenciones_step.SUB_PASOS] == [
         "setup", "movimientos", "views", "apuntes", "saldo", "fin_obra", "views_contables",
+        "cuadre_factura",  # F-128, el último
     ]
 
 

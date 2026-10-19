@@ -454,6 +454,22 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
   literales (test); dos guardas `DO` hacen fallar el paso si `raw.conala` no
   trae alarmas de factura o si la general lleva una alarma restringida. No toca
   `compras.facturas` ni `compras.albaranes` (D7).
+- **LA CABECERA DE FACTURA Y ALBARÁN: `totdoc`, `tot`, `totpag` Y `reccla`
+  (F-128).** `dcf.totdoc` (y `dca.totdoc`) es el total CON IVA y ANTES de
+  retenciones (= `totbas + totiva`); `tot` y `totpag` son el mismo número en el
+  100 % (Sigrid los documenta distintos): lo que se paga. Se publica `totpag`
+  (`total_a_pagar`). La retención es `totdoc − totpag` y es exactamente la suma
+  de `cuo` de los recargos (`dcfrec`, `dcarec`) de clase `reccla` 3 (fiscal), 4
+  y 5 (garantía sobre total y sobre base); 0 = recargo (`imprec`), 1 =
+  descuento (`impdes`). **`RETESP` es la trampa**: un concepto de garantía dado
+  de alta como DESCUENTO (clase 1): baja la base y no entra en `totdoc − totpag`,
+  aunque su asiento vaya a la cuenta de retención. Por decisión del humano
+  (D2-B) NO es garantía: las funciones `fn_es_retencion_garantia` miran solo
+  `reccla` (4 y 5). La retención del albarán y la de su factura son la misma y
+  no se suman. El cuadre por factura (`retenciones.retencion_factura`) lee solo
+  `raw` y `retenciones`. La CUENTA BANCARIA del proveedor de cada documento
+  (`ban*`) va a `compras_restringida.documento_cuenta_bancaria` (solo perfil
+  total, D4-B): `compras_restringida` guarda ya alarmas y cuentas.
 
 ## Acceso a datos
 

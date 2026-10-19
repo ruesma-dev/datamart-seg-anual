@@ -91,6 +91,13 @@ GRUPO_B_FUNCIONES = (
     # publican su resultado en `clase_liquidacion` y `clase_memo`.
     "compras.fn_texto_normalizado",
     "compras.fn_clase_liquidacion",
+    # F-128 (2026-10-18): la clase del recargo y la marca de garantía (D2-B),
+    # con el mapa del dominio. Se llaman desde `01_documentos.sql` (y la copia
+    # de `retenciones`, desde `07_cuadre_factura.sql`); las tablas de recargos
+    # ya publican su resultado en `clase_recargo` y `es_retencion_garantia`.
+    "compras.fn_clase_recargo",
+    "compras.fn_es_retencion_garantia",
+    "retenciones.fn_es_retencion_garantia",
     # F-056 (2026-09-26): la copia local de la conversion de fecha del esquema
     # `contabilidad`, por lo mismo que la de `personal`.
     "contabilidad.fn_fecha",

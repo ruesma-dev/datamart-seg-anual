@@ -46,10 +46,12 @@ APUNTES = "03_apuntes_contables.sql"
 SALDO = "04_saldo_contable.sql"
 FIN_OBRA = "05_fin_obra.sql"
 VISTAS = "06_views_contables.sql"
+#: F-128: el cuadre por factura, el último sub-paso (solo esta lista cambia).
+CUADRE_FACTURA = "07_cuadre_factura.sql"
 
 FICHEROS_RETENCIONES = [
     "00_setup.sql", "01_movimientos.sql", "02_views.sql",
-    APUNTES, SALDO, FIN_OBRA, VISTAS,
+    APUNTES, SALDO, FIN_OBRA, VISTAS, CUADRE_FACTURA,
 ]
 
 OBJETOS_NUEVOS = (
@@ -679,8 +681,10 @@ def test_f095_r27_el_step_encadena_y_cuenta(monkeypatch: pytest.MonkeyPatch) -> 
         ("retenciones", "tipos"), ("retenciones", "movimientos"),
         ("retenciones", "apuntes_contables"), ("retenciones", "saldo_contable"),
         ("retenciones", "fin_obra"),
+        # F-128: el cuadre por factura, el último sub-paso.
+        ("retenciones", "retencion_factura"),
     ]
-    assert resultado.rows_processed == 15
+    assert resultado.rows_processed == 18
 
 
 def test_f095_r21_un_fallo_en_fin_obra_sale_con_su_nombre(monkeypatch: pytest.MonkeyPatch) -> None:

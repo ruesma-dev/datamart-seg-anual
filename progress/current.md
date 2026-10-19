@@ -9,6 +9,25 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-18 · F-128 · `in_progress` (implementer) · cabecera de factura y albarán
+
+- Rama `feature/F-128-importes-cabecera-factura`; `main` fusionado (`3c55cf9`: F-139, F-141, F-144,
+  diccionario v55). Conflictos de `features.json`/`BACKLOG.md` resueltos conservando F-143 y F-144.
+- Consecuencias del merge (no son decisiones nuevas): diccionario de F-128 = **v56**; perfiles de
+  F-141 (la tabla nueva de `compras_restringida` solo para el total); objetos nuevos de F-128 en
+  la lista correcta de `R-EMPRESA-POR-DEFECTO`.
+- **Desviación (T1, justificada):** el informe §5 no clasificaba `diremp2`/`diremp3` (líneas 2-3 de
+  la dirección del documento, 1,0-1,7 %, medido el 2026-10-18 en `raw`). R3 exige una entrada por
+  columna: van como `RESIDUAL` con su cobertura en la nota. No se publican (como `dirdir*`).
+- Recuentos del diccionario del árbol tras F-128 (T11, v56): **234 objetos, 2000 columnas, 114 de
+  consumo** (en `main`, v55: 226 / 1864 / 109). Sin publicar: es MANUAL tras el merge.
+- T1-T15 hechos (commits en `progress/impl_F-128.md`); mutación 20/20 muertos (suite acotada a
+  los importadores del módulo: la de por defecto no cabe en los 600 s de línea base). Otras
+  desviaciones menores, justificadas en el informe (alias SQL `cpt`/`dcon`, tests ajenos
+  mecánicos, R31 robusto al merge, frase nueva en `R-EMPRESA-POR-DEFECTO`).
+- T18: `bash harness/init.sh` en verde el 2026-10-19 (8437 passed, cobertura 100 % de 66 líneas). Falta: review; después, MANUAL del humano T16-T17 (build en
+  Azure, `apply-grants`, `check-diccionario`, publicar v56, reiniciar el MCP).
+
 ## 2026-10-18 · F-144 · CERRADA (`done`, APROBADO en pasada 2) · DESPLEGADA: diccionario v55 y MCP reiniciado
 
 > Regla `R-EMPRESA-POR-DEFECTO` (bloqueante), orden del humano: «en general si no se indica empresa es

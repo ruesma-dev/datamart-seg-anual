@@ -104,6 +104,11 @@ class _SubStep:
 #: y por eso el mutante `and -> or` sobrevivía a la campaña.
 SUB_PASOS: tuple[_SubStep, ...] = (
     _SubStep(name="setup", sql_file="00_setup.sql"),
+    # F-128: además de contratos, albaranes, facturas y sus líneas, `01` deja
+    # los recargos de cada documento (`factura_recargos`, `albaran_recargos`) y,
+    # en su última sección, `compras_restringida.documento_cuenta_bancaria`
+    # (solo perfil total, D4-B). Sin sub-paso nuevo: el recuento sigue siendo
+    # el de `contratos`.
     _SubStep(
         name="documentos",
         sql_file="01_documentos.sql",
