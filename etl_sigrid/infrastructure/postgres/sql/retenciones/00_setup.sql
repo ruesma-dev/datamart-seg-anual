@@ -133,3 +133,28 @@ BEGIN
                      'para CLIENTE desactivado (solo cenide)';
     END IF;
 END $$;
+
+
+-- ---------------------------------------------------------------------------
+-- F-128 (2026-10-18) · QUÉ RECARGO ES RETENCIÓN DE GARANTÍA
+--
+-- COPIA DELIBERADA de `compras.fn_es_retencion_garantia` (`compras/00_setup.sql`):
+-- `retenciones` lee solo `raw`, `maestro` y sus propias tablas, y no puede
+-- depender de un esquema que construye otro paso (`build_compras`) ni de que un
+-- `DROP ... CASCADE` de `compras` se lleve el cuadre. Mismo patrón que las
+-- funciones de `tesoreria` (F-037). Los dos cuerpos los compara
+-- `tests/test_f128_sql.py` (R19): si se cambia una, se cambia la otra.
+--
+-- D2-B (humano, 2026-10-17): garantía = clases 4 y 5. El `RETESP` (clase 1)
+-- NO es garantía.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION retenciones.fn_es_retencion_garantia(reccla INT)
+RETURNS BOOLEAN
+LANGUAGE sql IMMUTABLE AS $$
+    SELECT COALESCE(reccla IN (4, 5), FALSE);
+$$;
+
+COMMENT ON FUNCTION retenciones.fn_es_retencion_garantia(INT) IS
+'Copia de compras.fn_es_retencion_garantia (F-128): verdadero SOLO para las clases de '
+'recargo 4 y 5 (retencion de garantia sobre total y sobre base). El RETESP, de clase 1, '
+'NO es garantia (D2-B, 2026-10-17).';

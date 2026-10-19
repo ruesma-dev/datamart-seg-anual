@@ -181,3 +181,51 @@ RETURNS TIMESTAMP
 LANGUAGE sql IMMUTABLE AS $$
     SELECT CASE WHEN v > 0 THEN TIMESTAMP '1899-12-30' + v * INTERVAL '1 day' END;
 $$;
+
+-- ---------------------------------------------------------------------------
+-- F-128 (2026-10-18) · LA CLASE DE LOS RECARGOS Y RETENCIONES DEL DOCUMENTO.
+--
+-- `dcfrec.reccla` / `dcarec.reccla` (= `rec.cla` del concepto) dice qué es
+-- cada recargo de la cabecera. Medido el 2026-10-17: 0 recargo (→ `imprec`),
+-- 1 descuento (→ `impdes`), 3 retención fiscal (IRPF, arrendamientos,
+-- notarías), 4 retención de garantía sobre el TOTAL, 5 sobre la BASE. Con eso
+-- `totdoc − totpag` = Σ cuota de las clases 3, 4 y 5 en el 100 % de las
+-- facturas.
+--
+-- El `CASE` es `CLASES_RECARGO` de `etl_sigrid/domain/cabecera_compra.py`
+-- (lo fija `tests/test_f128_sql.py`). Lo que no está en el mapa es `OTRA`.
+--
+-- D2-B (humano, 2026-10-17): RETENCIÓN DE GARANTÍA = CLASES 4 Y 5, sin mirar
+-- el concepto. El `RETESP` («Retención 5 % garantía (sin IVA)», 44 facturas)
+-- es de clase 1 y aquí NO es garantía. Por eso la función tiene UN parámetro.
+-- `retenciones.fn_es_retencion_garantia` es COPIA deliberada de esta (R19).
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION compras.fn_clase_recargo(reccla INT)
+RETURNS TEXT
+LANGUAGE sql IMMUTABLE AS $$
+    SELECT CASE reccla
+        WHEN 0 THEN 'RECARGO'
+        WHEN 1 THEN 'DESCUENTO'
+        WHEN 3 THEN 'RETENCION_FISCAL'
+        WHEN 4 THEN 'RETENCION_GARANTIA_TOTAL'
+        WHEN 5 THEN 'RETENCION_GARANTIA_BASE'
+        ELSE 'OTRA'
+    END;
+$$;
+
+COMMENT ON FUNCTION compras.fn_clase_recargo(INT) IS
+'Clase de un recargo de documento de compra (dcfrec/dcarec.reccla): RECARGO (0), '
+'DESCUENTO (1), RETENCION_FISCAL (3), RETENCION_GARANTIA_TOTAL (4), '
+'RETENCION_GARANTIA_BASE (5); OTRA para cualquier otro valor o NULL (F-128).';
+
+CREATE OR REPLACE FUNCTION compras.fn_es_retencion_garantia(reccla INT)
+RETURNS BOOLEAN
+LANGUAGE sql IMMUTABLE AS $$
+    SELECT COALESCE(reccla IN (4, 5), FALSE);
+$$;
+
+COMMENT ON FUNCTION compras.fn_es_retencion_garantia(INT) IS
+'Verdadero SOLO si el recargo es retencion de garantia: clases 4 (sobre total) y 5 '
+'(sobre base). Falso para NULL. Decision del 2026-10-17 (D2-B, F-128): el concepto '
+'RETESP («Retencion 5 % garantia (sin IVA)», 44 facturas) es de clase 1 (DESCUENTO) y '
+'NO cuenta como garantia aunque su asiento vaya a la cuenta de retencion.';

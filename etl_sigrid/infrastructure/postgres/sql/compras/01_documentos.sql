@@ -85,6 +85,35 @@
 -- de necesidad al albarán (igual en el 99,9 % de las 295.210 enlazadas). El
 -- enlace a la necesidad es DIRECTO por `dncide`/`dncproide`, no por
 -- `docoritip`/`linoriide`: 378.010 de 1.162.871 líneas de albarán (32,5 %).
+--
+-- F-128 (2026-10-18) · LA CABECERA ENTERA DE LA FACTURA Y DEL ALBARÁN. Hasta
+-- aquí `facturas` y `albaranes` solo daban quién, cuándo y su estado: el
+-- importe había que sumarlo de las líneas, que van SIN IVA y sin retenciones.
+-- Ahora, AL FINAL y sin mover ni una columna de las de siempre, publican los
+-- importes de la cabecera, su obra y centro de cabecera, el contrato de la
+-- factura y lo que el proveedor puso en el documento. Medido el 2026-10-17
+-- sobre las 167.458 facturas y los 314.042 albaranes de `raw`, 0 excepciones:
+--
+--   · `totdoc = totbas + totiva`: el TOTAL del documento, CON IVA y ANTES de
+--     retenciones (`total_factura` / `total_documento`).
+--   · `tot = totpag` en el 100 %: se publica solo `totpag` (`total_a_pagar`).
+--   · `totdoc − totpag` es la RETENCIÓN, y es exactamente Σ cuota de los
+--     recargos de clase 3 (fiscal), 4 y 5 (garantía) en el 100 % de las
+--     facturas: 25,31 M € = 24,04 M garantía + 1,27 M fiscal.
+--   · D2-B (humano, 2026-10-17): garantía = clases 4 y 5. El `RETESP` (44
+--     facturas, 871.193 €) es de clase 1, DESCUENTO: está en
+--     `importe_descuentos` y NO en `importe_retenciones`.
+--   · La retención del albarán y la de su factura son LA MISMA vista dos
+--     veces: no se suman.
+--
+-- Los recargos de cada documento (`dcfrec`, `dcarec`) son tablas propias y se
+-- construyen ANTES que albaranes y facturas, que los agregan POR DOCUMENTO
+-- antes de unirse (guarda de grano). La CUENTA BANCARIA del proveedor que
+-- lleva el documento (`ban*`, D4-B) NO va a `compras`: la última sección de
+-- este fichero la deja en `compras_restringida.documento_cuenta_bancaria`,
+-- solo para el perfil total, y ningún otro bloque la publica ni la lee.
+-- Fuera, por decisión del humano: `empide` y `hor` (F-134), el desajuste
+-- cabecera-línea (F-093) y los catálogos no ingeridos (`cocide` → F-143).
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
@@ -188,6 +217,74 @@ CREATE INDEX idx_com_ctrlin_ctr ON compras.contrato_lineas (contrato_id);
 CREATE INDEX idx_com_ctrlin_par ON compras.contrato_lineas (partida_id);
 
 -- ---------------------------------------------------------------------------
+-- RECARGOS Y RETENCIONES DE CADA DOCUMENTO (F-128)
+--
+-- Una fila por recargo de la cabecera (`dcfrec`, `dcarec`) cuyo documento
+-- existe, mismo patrón que las líneas. 0 huérfanos y 0 `(docide, pos)`
+-- repetidos (medido el 2026-10-17); 10 facturas repiten concepto en dos
+-- posiciones, por eso la clave es `recargo_id` y no el concepto. La clase sale
+-- de `compras.fn_clase_recargo` y la marca de garantía de
+-- `compras.fn_es_retencion_garantia` (D2-B: clases 4 y 5; `RETESP` no).
+-- `valpor` viene en tanto por uno y se publica en tanto por cien, como el
+-- porcentaje de garantía del contrato (F-067). LEFT al concepto: 3 recargos no
+-- tienen concepto. Van ANTES que albaranes y facturas porque ellos los
+-- agregan; ninguno depende de estos con `CASCADE`.
+-- ---------------------------------------------------------------------------
+DROP TABLE IF EXISTS compras.factura_recargos CASCADE;
+CREATE TABLE compras.factura_recargos AS
+SELECT
+    r.ide                                   AS recargo_id,
+    r.docide                                AS factura_id,
+    r.pos                                   AS posicion,
+    NULLIF(r.recide, 0)                     AS concepto_id,
+    cpt.cod                                 AS codigo_concepto,
+    cpt.res                                 AS concepto,
+    compras.fn_clase_recargo(r.reccla)      AS clase_recargo,
+    compras.fn_es_retencion_garantia(r.reccla) AS es_retencion_garantia,
+    COALESCE(r.bas, 0)::NUMERIC(18, 2)      AS base,
+    ROUND((r.valpor * 100)::NUMERIC, 4)     AS porcentaje,       -- 5 = 5 %
+    COALESCE(r.cuo, 0)::NUMERIC(18, 2)      AS cuota,
+    COALESCE(r.ivacuo, 0)::NUMERIC(18, 2)   AS cuota_iva,
+    COALESCE(r.valfij <> 0, FALSE)          AS valor_fijo,       -- importe fijo, no %
+    NULLIF(r.cueide, 0)                     AS cuenta_id,
+    cue.cod                                 AS cuenta_contable
+FROM raw.dcfrec r
+LEFT JOIN raw.con cpt ON cpt.ide = r.recide
+LEFT JOIN raw.con cue ON cue.ide = NULLIF(r.cueide, 0)
+WHERE EXISTS (SELECT 1 FROM raw.dcf f WHERE f.ide = r.docide);
+
+ALTER TABLE compras.factura_recargos ADD PRIMARY KEY (recargo_id);
+CREATE INDEX idx_com_facrec_fac ON compras.factura_recargos (factura_id);
+CREATE INDEX idx_com_facrec_gar ON compras.factura_recargos (es_retencion_garantia);
+
+DROP TABLE IF EXISTS compras.albaran_recargos CASCADE;
+CREATE TABLE compras.albaran_recargos AS
+SELECT
+    r.ide                                   AS recargo_id,
+    r.docide                                AS albaran_id,
+    r.pos                                   AS posicion,
+    NULLIF(r.recide, 0)                     AS concepto_id,
+    cpt.cod                                 AS codigo_concepto,
+    cpt.res                                 AS concepto,
+    compras.fn_clase_recargo(r.reccla)      AS clase_recargo,
+    compras.fn_es_retencion_garantia(r.reccla) AS es_retencion_garantia,
+    COALESCE(r.bas, 0)::NUMERIC(18, 2)      AS base,
+    ROUND((r.valpor * 100)::NUMERIC, 4)     AS porcentaje,       -- 5 = 5 %
+    COALESCE(r.cuo, 0)::NUMERIC(18, 2)      AS cuota,
+    COALESCE(r.ivacuo, 0)::NUMERIC(18, 2)   AS cuota_iva,
+    COALESCE(r.valfij <> 0, FALSE)          AS valor_fijo,       -- importe fijo, no %
+    NULLIF(r.cueide, 0)                     AS cuenta_id,
+    cue.cod                                 AS cuenta_contable
+FROM raw.dcarec r
+LEFT JOIN raw.con cpt ON cpt.ide = r.recide
+LEFT JOIN raw.con cue ON cue.ide = NULLIF(r.cueide, 0)
+WHERE EXISTS (SELECT 1 FROM raw.dca a WHERE a.ide = r.docide);
+
+ALTER TABLE compras.albaran_recargos ADD PRIMARY KEY (recargo_id);
+CREATE INDEX idx_com_albrec_alb ON compras.albaran_recargos (albaran_id);
+CREATE INDEX idx_com_albrec_gar ON compras.albaran_recargos (es_retencion_garantia);
+
+-- ---------------------------------------------------------------------------
 -- ALBARANES (series AC = albarán, PROF = proforma/cert. subcontrata, NTC…)
 -- ---------------------------------------------------------------------------
 DROP TABLE IF EXISTS compras.albaranes CASCADE;
@@ -204,10 +301,70 @@ SELECT
     NULLIF(a.entide, 0)                     AS proveedor_id,
     prv_con.res                             AS proveedor_nombre,
     NULLIF(TRIM(a.entcif), '')              AS proveedor_cif,
-    NULLIF(TRIM(a.entref), '')              AS referencia_proveedor
+    NULLIF(TRIM(a.entref), '')              AS referencia_proveedor,
+    -- A PARTIR DE AQUÍ, TODO LO QUE AÑADE F-128, Y VA AL FINAL A PROPÓSITO:
+    -- `compras.albaranes` está en producción (Power BI, MCP). Ver la cabecera
+    -- del fichero. Proformas y notas incluidas: el grano no cambia.
+    -- Los importes de la cabecera. `total_documento` = base + IVA, ANTES de
+    -- retenciones; `importe_retenciones` = lo que se retiene (fiscal +
+    -- garantía). La retención del albarán y la de su factura NO se suman.
+    COALESCE(a.impbru, 0)::NUMERIC(18, 2)   AS importe_bruto,
+    COALESCE(a.impnet, 0)::NUMERIC(18, 2)   AS importe_neto,
+    COALESCE(a.impdes, 0)::NUMERIC(18, 2)   AS importe_descuentos,
+    COALESCE(a.imprec, 0)::NUMERIC(18, 2)   AS importe_recargos,
+    COALESCE(a.totbas, 0)::NUMERIC(18, 2)   AS base_imponible,   -- SIN IVA
+    COALESCE(a.totiva, 0)::NUMERIC(18, 2)   AS cuota_iva,
+    COALESCE(a.totdoc, 0)::NUMERIC(18, 2)   AS total_documento,  -- CON IVA, antes de retenciones
+    (COALESCE(a.totdoc, 0) - COALESCE(a.totpag, 0))::NUMERIC(18, 2) AS importe_retenciones,
+    COALESCE(rec.garantia, 0)::NUMERIC(18, 2) AS importe_retencion_garantia,  -- clases 4 y 5
+    COALESCE(rec.fiscal, 0)::NUMERIC(18, 2) AS importe_retencion_fiscal,      -- clase 3
+    COALESCE(a.totpag, 0)::NUMERIC(18, 2)   AS total_a_pagar,    -- `tot` = `totpag` (100 %)
+    compras.fn_sigrid_date(a.fecdoc)        AS fecha_documento,  -- la del documento del proveedor
+    NULLIF(a.pagide, 0)                     AS forma_pago_id,
+    pag.res                                 AS forma_pago,
+    NULLIF(a.efeide, 0)                     AS medio_pago_id,
+    efp.res                                 AS medio_pago,
+    cue.cod                                 AS cuenta_contable,
+    -- Obra y centro de CABECERA (D1-A): para auditar el documento. Para
+    -- imputar coste manda la obra de la LÍNEA (`albaran_lineas.obra_id`).
+    NULLIF(a.obride, 0)                     AS obra_cabecera_id,
+    obr.cod                                 AS codigo_obra_cabecera,
+    obr.res                                 AS nombre_obra_cabecera,
+    NULLIF(a.cenide, 0)                     AS centro_coste_cabecera_id,
+    cen.cod                                 AS codigo_centro_coste_cabecera,
+    cen.res                                 AS nombre_centro_coste_cabecera,
+    NULLIF(a.caaide, 0)                     AS cuenta_analitica_cabecera_id,
+    -- Lo que el proveedor puso en el DOCUMENTO, que puede no ser su ficha de hoy.
+    NULLIF(btrim(a.entcod), '')             AS proveedor_codigo,
+    NULLIF(btrim(a.entres), '')             AS proveedor_nombre_documento,
+    NULLIF(btrim(a.entciftip), '')          AS proveedor_tipo_identificacion,
+    NULLIF(btrim(a.entcifpai), '')          AS proveedor_pais_identificacion,
+    COALESCE(a.ivadif <> 0, FALSE)          AS iva_diferido,
+    compras.fn_sigrid_date(a.fecent)        AS fecha_entrega_prevista,
+    compras.fn_sigrid_date(a.feclim)        AS fecha_limite,
+    COALESCE(a.estfac = 1, FALSE)           AS facturado_sigrid,
+    compras.fn_sigrid_date(a.fecfac)        AS fecha_facturacion,
+    NULLIF(a.idefac, 0)                     AS factura_cabecera_id  -- la buena es por línea
 FROM raw.dca a
 JOIN raw.con con          ON con.ide = a.ide
-LEFT JOIN raw.con prv_con ON prv_con.ide = NULLIF(a.entide, 0);
+LEFT JOIN raw.con prv_con ON prv_con.ide = NULLIF(a.entide, 0)
+-- F-128: todos LEFT y ningún `WHERE` externo: los 314.042 documentos siguen.
+-- La forma y el medio de pago, de `raw` y no de `compras.formas_pago`, que se
+-- construye después (`04_formas_pago.sql`), como en CONTRATOS.
+LEFT JOIN raw.auxpag pag  ON pag.ide = NULLIF(a.pagide, 0)
+LEFT JOIN raw.auxefp efp  ON efp.ide = NULLIF(a.efeide, 0)
+LEFT JOIN raw.con cue     ON cue.ide = NULLIF(a.cueide, 0)
+LEFT JOIN raw.con obr     ON obr.ide = NULLIF(a.obride, 0)
+LEFT JOIN raw.con cen     ON cen.ide = NULLIF(a.cenide, 0)
+-- Las retenciones, AGREGADAS POR ALBARÁN antes de unirse: es la guarda de
+-- grano (un albarán con dos recargos no puede salir dos veces).
+LEFT JOIN (
+    SELECT albaran_id,
+           SUM(cuota) FILTER (WHERE es_retencion_garantia) AS garantia,
+           SUM(cuota) FILTER (WHERE clase_recargo = 'RETENCION_FISCAL') AS fiscal
+    FROM   compras.albaran_recargos
+    GROUP  BY albaran_id
+) rec ON rec.albaran_id = a.ide;
 
 ALTER TABLE compras.albaranes ADD PRIMARY KEY (albaran_id);
 CREATE INDEX idx_com_alb_ctr ON compras.albaranes (contrato_id);
@@ -286,7 +443,43 @@ SELECT
     est.codigo_estado                       AS estado_codigo,    -- mnemónico: APR, CON, APJO…
     est.nombre_estado                       AS estado,           -- estado_id ya traducido (tipo 15)
     compras.fn_sigrid_date(f.fecdoc)        AS fecha_factura,    -- la del documento del proveedor
-    compras.fn_sigrid_date(con.fec)         AS fecha_alta        -- la de alta en Sigrid (= `fecha`)
+    compras.fn_sigrid_date(con.fec)         AS fecha_alta,       -- la de alta en Sigrid (= `fecha`)
+    -- F-128: LA CABECERA ENTERA, también AL FINAL. Ver la cabecera del fichero.
+    -- `total_factura` = base + IVA, CON IVA y ANTES de retenciones;
+    -- `importe_retenciones` = `total_factura − total_a_pagar` = garantía +
+    -- fiscal en el 100 % (D2-B; el `RETESP` está en `importe_descuentos`).
+    COALESCE(f.impbru, 0)::NUMERIC(18, 2)   AS importe_bruto,
+    COALESCE(f.impnet, 0)::NUMERIC(18, 2)   AS importe_neto,
+    COALESCE(f.impdes, 0)::NUMERIC(18, 2)   AS importe_descuentos,
+    COALESCE(f.imprec, 0)::NUMERIC(18, 2)   AS importe_recargos,
+    COALESCE(f.totbas, 0)::NUMERIC(18, 2)   AS base_imponible,   -- SIN IVA
+    COALESCE(f.totiva, 0)::NUMERIC(18, 2)   AS cuota_iva,
+    COALESCE(f.totdoc, 0)::NUMERIC(18, 2)   AS total_factura,    -- CON IVA, antes de retenciones
+    (COALESCE(f.totdoc, 0) - COALESCE(f.totpag, 0))::NUMERIC(18, 2) AS importe_retenciones,
+    COALESCE(rec.garantia, 0)::NUMERIC(18, 2) AS importe_retencion_garantia,  -- clases 4 y 5
+    COALESCE(rec.fiscal, 0)::NUMERIC(18, 2) AS importe_retencion_fiscal,      -- clase 3
+    COALESCE(f.totpag, 0)::NUMERIC(18, 2)   AS total_a_pagar,    -- `tot` = `totpag` (100 %)
+    -- El contrato de CABECERA: 86.664 facturas; la línea directa a contrato
+    -- solo cubre 6.991.
+    NULLIF(f.ctride, 0)                     AS contrato_id,
+    -- Obra y centro de CABECERA (D1-A): para auditar la factura. Para imputar
+    -- coste manda la obra de la LÍNEA (`factura_lineas.obra_id`).
+    NULLIF(f.obride, 0)                     AS obra_cabecera_id,
+    obr.cod                                 AS codigo_obra_cabecera,
+    obr.res                                 AS nombre_obra_cabecera,
+    NULLIF(f.cenide, 0)                     AS centro_coste_cabecera_id,
+    cen.cod                                 AS codigo_centro_coste_cabecera,
+    cen.res                                 AS nombre_centro_coste_cabecera,
+    NULLIF(f.caaide, 0)                     AS cuenta_analitica_cabecera_id,
+    -- Lo que el proveedor puso en el DOCUMENTO, que puede no ser su ficha de hoy.
+    NULLIF(btrim(f.entcod), '')             AS proveedor_codigo,
+    NULLIF(btrim(f.entres), '')             AS proveedor_nombre_documento,
+    NULLIF(btrim(f.entciftip), '')          AS proveedor_tipo_identificacion,
+    NULLIF(btrim(f.entcifpai), '')          AS proveedor_pais_identificacion,
+    COALESCE(f.ivadif <> 0, FALSE)          AS iva_diferido,
+    COALESCE(f.tipisp <> 0, FALSE)          AS inversion_sujeto_pasivo,
+    compras.fn_sigrid_date(f.fecent)        AS fecha_entrega_prevista,
+    compras.fn_sigrid_date(f.feclim)        AS fecha_limite
 FROM raw.dcf f
 JOIN raw.con con          ON con.ide = f.ide
 LEFT JOIN raw.con prv_con ON prv_con.ide = NULLIF(f.entide, 0)
@@ -304,7 +497,20 @@ LEFT JOIN raw.con prv_con ON prv_con.ide = NULLIF(f.entide, 0)
 -- convierte el tipo de documento en argumento obligatorio. La proyección de
 -- arriba no cambia ni una letra: la función devuelve `codigo_estado` y
 -- `nombre_estado`, los mismos nombres que tenía el lateral.
-LEFT JOIN LATERAL compras.fn_estado_documento(15, con.est) est ON TRUE;
+LEFT JOIN LATERAL compras.fn_estado_documento(15, con.est) est ON TRUE
+-- F-128: los joins nuevos van DETRÁS del lateral del estado (lo lee
+-- `test_f083_sql` como el primero), todos LEFT y sin `WHERE` externo:
+-- count(compras.facturas) = count(raw.dcf).
+LEFT JOIN raw.con obr     ON obr.ide = NULLIF(f.obride, 0)
+LEFT JOIN raw.con cen     ON cen.ide = NULLIF(f.cenide, 0)
+-- Las retenciones, AGREGADAS POR FACTURA antes de unirse (guarda de grano).
+LEFT JOIN (
+    SELECT factura_id,
+           SUM(cuota) FILTER (WHERE es_retencion_garantia) AS garantia,
+           SUM(cuota) FILTER (WHERE clase_recargo = 'RETENCION_FISCAL') AS fiscal
+    FROM   compras.factura_recargos
+    GROUP  BY factura_id
+) rec ON rec.factura_id = f.ide;
 
 ALTER TABLE compras.facturas ADD PRIMARY KEY (factura_id);
 CREATE INDEX idx_com_fac_est ON compras.facturas (estado_id);
@@ -345,3 +551,68 @@ CREATE INDEX idx_com_faclin_obr ON compras.factura_lineas (obra_id);
 CREATE INDEX idx_com_faclin_par ON compras.factura_lineas (partida_id);
 CREATE INDEX idx_com_faclin_alb ON compras.factura_lineas (albaran_linea_id);
 CREATE INDEX idx_com_faclin_ctl ON compras.factura_lineas (contrato_linea_id);
+
+-- >>> F-128 CUENTA BANCARIA (inicio)
+-- ---------------------------------------------------------------------------
+-- LA CUENTA BANCARIA DEL PROVEEDOR EN CADA DOCUMENTO (F-128, D4-B)
+--
+-- ACCESO RESTRINGIDO: `compras_restringida` solo la lee el perfil total del
+-- MCP. Decisión del humano del 2026-10-17 (D4-B): la cuenta que lleva cada
+-- factura o albarán es dato del proveedor (y personal si es autónomo), así que
+-- NO va a `compras`. `apply_grants` concede y veta POR ESQUEMA: esta tabla
+-- queda vetada al rol estándar y fuera del perfil restringido (F-141) sin
+-- tocar `grants.py`, `settings.py` ni `02_roles.sql`.
+--
+-- Universo: `ban` (la cuenta completa, texto) informado. Es el superconjunto
+-- medido el 2026-10-17: ningún documento tiene `bancue`, `bandig` ni `banban`
+-- sin `ban`. ~17.706 facturas y ~17.756 albaranes (proformas y notas
+-- incluidas); 0 `ide` comunes entre `dcf` y `dca`, así que `documento_id` vale
+-- de clave. `cuenta_bancaria` va tal cual (IBAN o CCC, sin normalizar ni
+-- convertir): es la cuenta que llevaba el DOCUMENTO, no la ficha actual del
+-- proveedor. Fuera: `bantipide` (su catálogo `auxcueban` no se ingiere y no
+-- predice el formato) y `dca.banide` (cuenta PROPIA, interna).
+--
+-- Va AL FINAL del fichero y nadie la lee: ningún otro bloque ni objeto fuera
+-- de `compras_restringida` puede publicar `ban`, `bancue` o `bandig` ni leer
+-- esta tabla (lo barre `tests/test_f128_restringida.py`).
+-- ---------------------------------------------------------------------------
+DROP TABLE IF EXISTS compras_restringida.documento_cuenta_bancaria CASCADE;
+CREATE TABLE compras_restringida.documento_cuenta_bancaria AS
+WITH doc AS (
+    SELECT f.ide, 'FACTURA'::TEXT AS tipo, f.fecdoc, f.entide, f.banban, f.bansuc,
+           f.bandig, f.bancue, f.ban
+    FROM raw.dcf f WHERE NULLIF(btrim(f.ban), '') IS NOT NULL
+    UNION ALL
+    SELECT a.ide, 'ALBARAN'::TEXT AS tipo, a.fecdoc, a.entide, a.banban, a.bansuc,
+           a.bandig, a.bancue, a.ban
+    FROM raw.dca a WHERE NULLIF(btrim(a.ban), '') IS NOT NULL
+)
+SELECT
+    d.ide                                   AS documento_id,
+    d.tipo                                  AS tipo_documento,     -- FACTURA / ALBARAN
+    dcon.cod                                AS codigo_documento,
+    compras.fn_sigrid_date(d.fecdoc)        AS fecha_documento,
+    NULLIF(d.entide, 0)                     AS proveedor_id,
+    prv.res                                 AS proveedor_nombre,
+    NULLIF(d.banban, 0)                     AS banco_id,
+    bb.res                                  AS banco,
+    NULLIF(d.bansuc, 0)                     AS sucursal_id,
+    bs.res                                  AS sucursal,
+    NULLIF(btrim(d.bandig), '')             AS digitos_control,
+    NULLIF(btrim(d.bancue), '')             AS numero_cuenta,
+    btrim(d.ban)                            AS cuenta_bancaria     -- la del DOCUMENTO
+FROM doc d
+LEFT JOIN raw.con dcon   ON dcon.ide = d.ide
+LEFT JOIN raw.con prv    ON prv.ide = NULLIF(d.entide, 0)
+LEFT JOIN raw.auxban bb  ON bb.ide = NULLIF(d.banban, 0)
+LEFT JOIN raw.auxban bs  ON bs.ide = NULLIF(d.bansuc, 0);
+
+ALTER TABLE compras_restringida.documento_cuenta_bancaria ADD PRIMARY KEY (documento_id);
+CREATE INDEX ix_comr_doc_cuenta_prv ON compras_restringida.documento_cuenta_bancaria (proveedor_id);
+
+COMMENT ON TABLE compras_restringida.documento_cuenta_bancaria IS
+'ACCESO RESTRINGIDO: solo el perfil total del MCP. La cuenta bancaria del proveedor '
+'que lleva cada factura (raw.dcf) o albaran (raw.dca, con proformas y notas) con la '
+'cuenta informada: una fila por documento. Es la cuenta del DOCUMENTO, no la ficha '
+'actual del proveedor. Decision del humano del 2026-10-17 (D4-B, F-128).';
+-- <<< F-128 CUENTA BANCARIA (fin)

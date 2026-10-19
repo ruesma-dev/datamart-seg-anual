@@ -109,7 +109,12 @@ confirmación cubre el plan que se enseñó, no lo que apareció después.
   «liquidatoria» de facturas, albaranes y proformas (`documento_liquidatoria`,
   `contrato_liquidacion`, `facturas_tras_liquidacion`); las de recursos y
   partes van solo a `compras_restringida`, el tercer esquema restringido (perfil
-  total), junto a `contabilidad_restringida` y `tesoreria_restringida`. **`descompuestos/` (F-097)** son de qué se compone cada
+  total), junto a `contabilidad_restringida` y `tesoreria_restringida`. Desde
+  F-128 `compras.facturas` y `compras.albaranes` publican la cabecera entera
+  (total CON IVA, retenciones de `dcfrec`/`dcarec`: garantía = clases 4 y 5, el
+  `RETESP` no) y la cuenta bancaria del proveedor de cada documento va SOLO a
+  `compras_restringida.documento_cuenta_bancaria`; el cuadre por factura vive
+  en `retenciones.retencion_factura`. **`descompuestos/` (F-097)** son de qué se compone cada
   partida, con su ORIGEN (ESTUDIO, PLANIF_JO y cada versión del master), y es
   el primer esquema INCREMENTAL: su texto lo trae `ingest_descompuestos` a
   tablas propias que `--full` no trunca (nunca `DROP` ni `TRUNCATE` de

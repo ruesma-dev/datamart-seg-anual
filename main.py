@@ -5265,6 +5265,10 @@ def build_retenciones() -> None:
       00_setup.sql        schema, función de fechas y catálogo de tipos
       01_movimientos.sql  un registro por efecto de retención (ambos sentidos)
       02_views.sql        vistas de saldo por entidad, obra, vivas y vencidas
+      03-06               F-095: la retención desde la contabilidad (apuntes,
+                          saldo, fin de obra y sus vistas)
+      07_cuadre_factura.sql  F-128: el cuadre de la retención de garantía por
+                          factura y por (proveedor, obra)
 
     Requiere haber ingerido antes cob, pag y rec.
 

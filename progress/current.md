@@ -9,6 +9,52 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-19 · F-128 · CERRADA (`done`, APROBADO en pasada 2) · FUSIONADA en main · despliegue a medias
+
+- Review: pasada 1 CHANGES_REQUESTED (`R-EMPRESA-POR-DEFECTO` atribuía a `empide` la empresa del
+  documento y decía que `v_cuadre_factura_obra` lleva siempre la empresa de la obra de cabecera;
+  informe de mutación con la línea base medida sobre la suite entera); pasada 2 APROBADO
+  (`progress/review_F-128.md`, `d106155`), mutación 20/20 reejecutada por el reviewer.
+- Merge `a24bf34` por orden del humano; `bash harness/init.sh` completo sobre `main` fusionado:
+  8437 passed, 255 skipped; único KO «Estás en 'main'» (esperado).
+- **Imagen `r20261019-0856`** construida en el ACR y **job `caj-datamart-seg-dev` actualizado** a
+  ella (líder, 2026-10-19 ~07:40 UTC, sin ejecución en curso).
+- **PENDIENTE (humano): T16-T17.** El clasificador del modo automático bloqueó al líder el
+  `apply-grants` (concesión de permisos). Los dos build NO se lanzan sin él: recrean las tablas de
+  compras y retenciones y las dejarían sin GRANT. Orden: `build-compras`, `build-retenciones`,
+  `apply-grants`, `check-declarados`, `check-diccionario`; después `publicar-diccionario` (v56) y
+  reinicio del MCP. Si no se hace a mano, la nocturna del 20 (imagen nueva) construye y publica v56
+  sola, y solo queda reiniciar el MCP y las comprobaciones de R35/R36.
+
+## 2026-10-19 · F-141 · T16 HECHA: nocturna del 19 con la imagen `r20261018-0903`
+
+- Ejecución `caj-datamart-seg-dev-29872800` Succeeded (00:00-04:49 UTC). Primer lote
+  (`20261019T000023Z-…`) cayó en la ingesta por «connection timeout expired» y se reintentó solo,
+  como el 18. Lote bueno `20261019T002127Z-…`: 125 pasos SUCCESS, 0 fallos (el 18 fueron 166
+  porque hizo la reconstrucción completa de `stg`, 61 tramos; hoy 21).
+- **R34 conforme:** `apply_grants` SUCCESS a las 04:46 con `verificacion`, `verificacion_total`,
+  `verificacion_restringido` y `pertenencias_restringido` a `ok` (también `acceso_restringido`,
+  `filtraciones_restringido`, `vigilados_restringido` y `excepciones_sobrantes`).
+
+## 2026-10-18 · F-128 · histórico de la implementación · cabecera de factura y albarán
+
+- Rama `feature/F-128-importes-cabecera-factura`; `main` fusionado (`3c55cf9`: F-139, F-141, F-144,
+  diccionario v55). Conflictos de `features.json`/`BACKLOG.md` resueltos conservando F-143 y F-144.
+- Consecuencias del merge (no son decisiones nuevas): diccionario de F-128 = **v56**; perfiles de
+  F-141 (la tabla nueva de `compras_restringida` solo para el total); objetos nuevos de F-128 en
+  la lista correcta de `R-EMPRESA-POR-DEFECTO`.
+- **Desviación (T1, justificada):** el informe §5 no clasificaba `diremp2`/`diremp3` (líneas 2-3 de
+  la dirección del documento, 1,0-1,7 %, medido el 2026-10-18 en `raw`). R3 exige una entrada por
+  columna: van como `RESIDUAL` con su cobertura en la nota. No se publican (como `dirdir*`).
+- Recuentos del diccionario del árbol tras F-128 (T11, v56): **234 objetos, 2000 columnas, 114 de
+  consumo** (en `main`, v55: 226 / 1864 / 109). Sin publicar: es MANUAL tras el merge.
+- T1-T15 hechos (commits en `progress/impl_F-128.md`); mutación 20/20 muertos (suite acotada a
+  los importadores del módulo: la de por defecto no cabe en los 600 s de línea base). Otras
+  desviaciones menores, justificadas en el informe (alias SQL `cpt`/`dcon`, tests ajenos
+  mecánicos, R31 robusto al merge, frase nueva en `R-EMPRESA-POR-DEFECTO`).
+- T18: `bash harness/init.sh` en verde el 2026-10-19 (8437 passed, cobertura 100 % de 66 líneas). Falta: review; después, MANUAL del humano T16-T17 (build en
+  Azure, `apply-grants`, `check-diccionario`, publicar v56, reiniciar el MCP).
+
 ## 2026-10-18 · F-144 · CERRADA (`done`, APROBADO en pasada 2) · DESPLEGADA: diccionario v55 y MCP reiniciado
 
 > Regla `R-EMPRESA-POR-DEFECTO` (bloqueante), orden del humano: «en general si no se indica empresa es
