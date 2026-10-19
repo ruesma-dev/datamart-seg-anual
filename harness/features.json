@@ -2279,6 +2279,22 @@
       "rigor": "estandar",
       "priority": 1,
       "branch": "feature/F-144-empresa-por-defecto"
+    },
+    {
+      "id": "F-145",
+      "title": "La ficha de los adjuntos dice cómo los abre hoy `mcp-bbdd` (F-025): por la pareja {empresa, código} con respaldo en la empresa 1, sin `ADJUNTO_AMBIGUO`",
+      "description": "Nace el 2026-10-20 por orden del humano («lánzalo ya»), tras el aviso formal de `mcp-bbdd`: su F-025 está DESPLEGADA y VERIFICADA (revisión `ca-mcp-bbdd-dev--0000021`, imagen `r20261018-1730`; 77139 de la empresa 31 abre por el respaldo, 54066 y 576 por su pareja). Lo que cambió allí y nuestros textos aún no dicen: (1) `abrir_adjunto` pide a `sigrid-api` `documents/read` con `key: {\"emp\": empresa_repositorio, \"cod\": cod_repositorio}`, SIN `id_column` ni `id_value`; (2) si `sigrid-api` responde 400 `ValueError` (sin fichero con esa pareja) o la fila trae `empresa_repositorio` nula, lo pide UNA vez más con emp = 1 y el mismo `cod`, avisa al modelo de que puede no ser el original de esa empresa y deja `respaldo=empresa_defecto` en su traza; (3) el 409 `DocumentoAmbiguoError` es `ORIGEN_AMBIGUO`; (4) `ADJUNTO_AMBIGUO` desaparece (los 2 adjuntos de D5 se piden con la empresa de su fila); (5) CONTRATO NUEVO: `mcp-bbdd` usa `empresa_repositorio` solo si llega como ENTERO; renombrarla o cambiarle el tipo rompe `abrir_adjunto` (`SIN_BINARIO` y un WARNING en su log); nula se tolera. Dónde tocar (medido por el líder): `config/diccionario/compras.yaml` (ficha de `compras.documento_adjuntos`, ~l.4383, y la columna `cod_repositorio`, ~l.4489, que dicen «`id_column: cod`»), el `COMMENT` de `sql/compras/14_documento_adjuntos.sql` si lo dice, y `azure-apps/datamart_seg_anual.md` (H5 y los dos párrafos de ~l.880 y ~l.936). `sdd=false`: cambio de texto con sus tests (que ninguna ficha vuelva a decir `id_column: cod` ni `ADJUNTO_AMBIGUO`, y que el tipo entero de `empresa_repositorio` quede fijado). Diccionario v57. DESPLIEGUE: imagen nueva y job ANTES de publicar la v57 (lección del 19-10: la nocturna republica el diccionario de la imagen).",
+      "acceptance": [
+        "La ficha de `compras.documento_adjuntos` y la de `cod_repositorio` explican la apertura por la pareja (`empresa_repositorio`, `cod_repositorio`), el respaldo con la empresa 1 y su aviso, y `ORIGEN_AMBIGUO`; ninguna ficha menciona `id_column: cod` ni `ADJUNTO_AMBIGUO`",
+        "El `COMMENT` de `14_documento_adjuntos.sql` (si hablaba de la clave) y `azure-apps/datamart_seg_anual.md` (H5 y sus párrafos) dicen lo mismo; el contrato de que `empresa_repositorio` es ENTERO y su renombrado rompe `abrir_adjunto` queda escrito allí",
+        "Un test fija que `empresa_repositorio` es entera en el SQL y que el diccionario no vuelve a mencionar `id_column: cod` ni `ADJUNTO_AMBIGUO`; diccionario v57",
+        "bash harness/init.sh en verde y veredicto APROBADO del reviewer; tras el merge, imagen y job, y después `publicar-diccionario`, `check-diccionario` y reinicio del MCP"
+      ],
+      "status": "in_progress",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 1,
+      "branch": "feature/F-145-adjuntos-clave-empresa-codigo"
     }
   ]
 }
