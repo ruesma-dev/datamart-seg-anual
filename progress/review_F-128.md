@@ -1,140 +1,137 @@
 <!-- progress/review_F-128.md -->
-Revisión completa (pasada 1) · `git diff main...HEAD`, HEAD `9ddc2f7`, merge-base `5f7db50` (= `main`)
+Revisión incremental desde 9ddc2f7 (pasada 2) · delta `9ddc2f7..4afc6bf` (commits `3382803`, `546885a`, `1e697dd`, `4afc6bf`)
 
 # F-128 · Review: la cabecera entera de factura y albarán
 
-- **Veredicto: CHANGES_REQUESTED (RECHAZADO)**. Tres cambios, todos de texto o de papeleo; el
-  código, el SQL, los tests y la protección de la cuenta bancaria están bien.
-- **Nivel de rigor:** `estandar` (declarado en `features.json`). Exige fase RED, cobertura de las
-  líneas cambiadas y campaña de mutación con supervivientes analizados. RM5 N/A por nivel.
+- **Veredicto: APPROVED (APROBADO)**.
+- **Nivel de rigor:** `estandar` (declarado en `features.json`). Exige fase RED, cobertura y
+  campaña de mutación con supervivientes analizados. RM5 no aplica: es solo para `critico`.
+- **`bash harness/init.sh` (pasada 2, 2026-10-19):** ENTORNO LISTO, exit 0, **8438 passed, 254
+  skipped** en 1190 s. PUERTA COBERTURA 100,0 % (66/66); PUERTA TAMAÑO dentro de los topes.
+- Lo aprobado en la pasada 1 —SQL, permisos de `compras_restringida`, tests ajenos y simulación
+  del merge— se da por bueno. El delta solo toca `00_global.yaml`, un test nuevo y dos informes de
+  `progress/`, sin firmas públicas ni ficheros movidos. El alcance de mutación no cambia: 528
+  líneas y 22 mutantes, recalculados sobre HEAD. La simulación del merge sigue valiendo: la
+  versión del diccionario sigue en v56 y el delta no toca ningún test de versión.
 
-## Cambios requeridos
+## Los tres cambios de la pasada 1
 
-1. **`config/diccionario/00_global.yaml:915`, `R-EMPRESA-POR-DEFECTO` (afirma de más):** «no la
-   del documento (que es `empide`, pendiente de F-134)». `empide` **no es la empresa**: en `dca`
-   y `dcf` es «Empleado», índice a `emp` (`azure-apps/sigrid_tablas.md`, las tablas `dca` y
-   `dcf`), y F-134 es justo «quién registró el documento». Las fichas de la propia rama dicen lo
-   correcto (`compras.yaml:585` y `:1075`: «que son exige leer `dbo.log`»). Quita el paréntesis
-   (basta con «no la del documento») y añade un test que impida que la regla presente `empide`
-   como la empresa. No escribas cuál es la empresa del documento: nadie lo ha medido.
-2. **`00_global.yaml:866`, el mismo paréntesis aplicado a las dos:** «(estas dos, la empresa de la
-   obra de CABECERA de la factura)». Vale para `retencion_factura`, pero **no para
-   `v_cuadre_factura_obra`**: sus pares que solo están en contabilidad (SOLO_CONTABILIDAD) toman
-   la obra y la empresa de `saldo_contable`, es decir, de la cascada contable de F-095
-   (`07_cuadre_factura.sql`, `COALESCE(f.empresa_id, c.empresa_id)`). Su propia ficha lo dice
-   bien (`retenciones.yaml:1927`). Corrígelo, por ejemplo: «`retencion_factura`, la de la obra de
-   cabecera; `v_cuadre_factura_obra`, la de la obra del par (cabecera de la factura o cascada
-   contable)».
-3. **`progress/mutacion_F-128.md`: el tiempo no es coherente (RM2) y no se midió sobre HEAD
-   (RM1).** La campaña, en serie, declara «Tiempo total» 593,9 s y «Línea base» 573,3 s. El total
-   **incluye** la línea base (`harness/mutacion.py:1263` y `:1388`), así que el informe dice que
-   juzgó 20 mutantes en 20,6 s, unos 1 s cada uno. Además la media (29,7 s) no llega a la décima
-   parte de la línea base, que es el supuesto en que RM2 manda rechazar sin reejecutar. Y 1 s por
-   mutante es imposible: solo recoger los 4 ficheros cuesta unos 17 s (mi tercera vía, abajo).
-   Lo más probable es que la línea base corriera la suite ENTERA: `EjecutorPytest.linea_base`
-   sustituye los `argumentos` por `ARGUMENTOS_LINEA_BASE`, de modo que si la acotación iba en
-   `argumentos` se pierde. Los mutantes, en cambio, se juzgaron con los 4 ficheros. Además el SHA
-   medido es `0fa7305` y no HEAD: después se tocó `cabecera_compra.py`, solo 3 caracteres en
-   literales. **Qué hacer:** repetir la campaña sobre HEAD con línea base y mutantes sobre la
-   MISMA suite acotada (los 4 `tests/test_f128_*.py`) y poner en la nota del informe la
-   invocación exacta (el código Python), para que se pueda reproducir. Resultado esperado: 20 de
-   20 muertos, con una línea base de unos 45 s y un coste por mutante de 20 a 45 s.
+1. **`empide` ya no se presenta como la empresa del documento** (`3382803`). El paréntesis ha
+   desaparecido de `00_global.yaml` (~:918) y queda «no la del documento», sin afirmar cuál es.
+   Hay un test nuevo, `test_f128_r_empresa_no_atribuye_a_empide_la_empresa`, que exige que
+   `empide` no aparezca en la regla, con su fase RED pegada en `impl_F-128.md` (`1 failed`).
+   **[x]**
+2. **La empresa de las dos tablas de `retenciones`** (`546885a`). `00_global.yaml:866-870`
+   distingue ahora entre:
+   - `retencion_factura`, que lleva la empresa de la obra de CABECERA: `ob.emp` de
+     `NULLIF(f.obride,0)`.
+   - `v_cuadre_factura_obra`, que lleva la de la obra del par: la de cabecera, o la de la
+     cascada contable de `saldo_contable` en los pares que solo están en contabilidad.
 
-## Los cinco puntos que pidió el líder
+   Lo he contrastado con `07_cuadre_factura.sql`, donde se ve `COALESCE(f.empresa_id,
+   c.empresa_id)` y el `FULL JOIN` por `obra_id`, y con la ficha `retenciones.yaml:1927`. Es
+   cierto. **[x]**
+3. **La campaña de mutación, repetida** (`1e697dd`). SHA medido `546885a`; desde ahí solo cambian
+   `progress/*.md`, así que RM1 se cumple. La línea base y los mutantes usan la MISMA suite
+   acotada mediante una subclase de `EjecutorPytest` en el script, con la invocación exacta
+   escrita en el informe y sin tocar `harness/`. Resultado: base 33,2 s, total 52,5 s y 20 de 20
+   muertos. **[x]**, con la verificación de la sección siguiente.
 
-1. **Versión y merge.** `main` (`5f7db50`) es el merge-base: el merge es fast-forward. Diccionario
-   en **v56** (main en v55). Simulé el merge en un clon de mi scratchpad (`main` +
-   `git merge` de la rama → `9ddc2f7`) y pasé allí los tests de versión de R31 (F-128), R29
-   (F-141) y F-144, R22/R23 de F-128 y los que dependen de git (`test_f015_*`, `test_f112_*`):
-   **53/53 y 132 passed (2 skipped)**. R31 aguanta el merge: si `main` ya trae «(F-128, », basta
-   con `>=`. R22 y R23 quedan vacíos tras el merge (el diff contra `main` es nulo), sin romper
-   nada. Clon borrado.
-2. **`documento_cuenta_bancaria`.** Defectos de `settings.py`: `compras_restringida` está en
-   `DEFAULT_VETOED_SCHEMAS` (:138) y en `DEFAULT_RESTRICTED_SCHEMAS` (:156), no está en
-   `TOTAL_VETOED` (`raw`) y tampoco en `DEFAULT_PERFIL_RESTRINGIDO_SCHEMAS` (:191).
-   `esquemas_ajenos` la da por ajena al perfil restringido. Ningún objeto nuevo casa con
-   `PATRON_VIGILADO_RESTRINGIDO` (`mayor`). La única vista nueva, `v_cuadre_factura_obra`, lee
-   solo `retenciones.*`, así que `filtraciones_restringido` no tiene nada que ver.
-   `retencion_factura` es TABLA (lee `raw`, como el resto de `retenciones`). `git diff
-   main...HEAD` de `grants.py`, `settings.py` y `02_roles.sql`: **vacío**. La tabla va en la
-   última sección de `01_documentos.sql` y el esquema lo crea `compras/00_setup.sql:16`. R21
-   barre todo el SQL con positivos fabricados, y R23 no encuentra ninguna cadena con forma de
-   IBAN o CCC en los ficheros de la rama.
-3. **`R-EMPRESA-POR-DEFECTO`.** Lo que es cierto contra el SQL:
-   - `retencion_factura.empresa_id` = `ob.emp` de la obra de cabecera, igual que
-     `apuntes_contables` y `maestro.v_obra_fichas`.
-   - `factura_recargos`, `albaran_recargos` y `documento_cuenta_bancaria` no tienen ni empresa
-     ni `obra_id`, y están bien en la lista de «sin».
-   - `obra_cabecera_id` cubre el 95,98 % de las facturas («un 4 % no la tiene», correcto) y se
-     relaciona con `maestro.obras.obra_id`.
+## Punto 3: por qué ~1 s por mutante ahora y 17-58 s en mi medición
 
-   Las dos afirmaciones de más son los **cambios 1 y 2**.
-4. **Tests ajenos.** Todos son ajustes mecánicos y ninguno quita una aserción:
-   - `test_f047`, `test_f095` y `test_f110` añaden el fichero o el sub-paso nuevo a sus listas
-     exactas.
-   - `rows_processed` pasa de 15 a 18 porque es 6 recuentos × 3 del doble.
-   - `test_f079` añade las 3 funciones nuevas a su inventario.
-   - `test_f073` recalcula el hash de `01_documentos.sql`, con su nota, como hicieron F-084 y
-     F-067; el prefijo de columnas lo siguen fijando `test_f083` y `test_f128_sql`.
-5. **Mutación y evidencias.** Recálculo puro sobre HEAD: alcance de 528 líneas y **22 mutantes**,
-   que cuadra con el informe. La campaña dura más de 60 s, así que no la reejecuté por la vía del
-   arnés. **Tercera vía (RM4)** sobre una copia (worktree de HEAD en el scratchpad, sin bytecode,
-   `-x` sobre los 4 `test_f128_*`, línea base verde: 134 passed y 1 skipped en 47 s): **los 22
-   mutantes mueren**, entre ellos los 20 de la muestra con la semilla 20260820, con 17 a 58 s por
-   mutante y 929,7 s en total. Worktree borrado y árbol limpio. El veredicto 20/20 es real; lo
-   que falla es el informe (cambio 3). RM3: ningún mutante es equivalente; los de las líneas 66
-   y 73 cambian lo que devuelven las funciones para 4 y 0. RM6: no se quitó ninguna guarda.
-   `init.sh` tiene los números reales (los míos, abajo).
+**Rectifico la pasada 1.** Escribí que «solo recoger los 4 ficheros cuesta unos 17 s». Era falso.
+La diferencia está en el **ORDEN de los ficheros con `-x`**:
 
-## Checkpoints
+- **En mi tercera vía (pasada 1)** puse primero `test_f128_diccionario.py`, que es el lento
+  (~30 s). Con `-x`, cada mutante corría primero sus ~40 tests en verde y caía después, en
+  `test_f128_dominio.py`: de ahí el «1 failed, 40 passed» de cada fila. Además coincidía con un
+  `init.sh` en marcha.
+- **En la invocación del implementer** va primero `test_f128_dominio.py` (dura ~1 s), y cada
+  mutante cae en él.
+
+No hay ejecución dentro del proceso ni caché: el ejecutor lanza un `python -m pytest` en un
+proceso aparte con `PYTHONDONTWRITEBYTECODE=1` y `-p no:cacheprovider`
+(`harness/mutacion.py:572-596`).
+
+**Lo he comprobado yo** sobre un worktree de HEAD `4afc6bf` en mi scratchpad, con el orden del
+implementer, `-x -rf --tb=line`, sin bytecode y sin la caché de pytest:
+
+- La línea base sale verde: 135 passed y 1 skipped en 44,5 s.
+- Los 20 mutantes de la muestra (semilla 20260820) mueren en **25,7 s**, entre **1,2 y 1,4 s**
+  cada uno.
+- Todos salen con **rc=1** («tests caídos»), con un test **FAILED** con nombre propio y por una
+  aserción. **Ningún ERROR de colección ni de importación.** El código 2 (colección interrumpida)
+  lo habría clasificado el arnés como INDETERMINADO y nunca como muerto.
+
+| Mutante | Test que lo mata |
+|---|---|
+| L50-53 claves de `CLASES_RECARGO` | `test_f128_r1_clases_recargo_exactas` |
+| L58 `{4,5}` y L61 `CLASE_FISCAL` | `test_f128_r2_garantia_y_fiscal[4/5/3-…]` |
+| L66 `is None` → `is not None` | `test_f128_r1_clase_recargo[0-RECARGO]` |
+| L73 (comparación y lógico), L78 | `test_f128_r2_garantia_y_fiscal[…]` |
+| L489, L493, L503, L504 ×3 | `test_f128_r3_publicadas_por_objeto` |
+| L519 ×2, L522 | `test_f128_r4_inventarios_reales_sin_errores` |
+
+Worktree borrado y `git status` limpio.
+
+- **RM2:** la media del informe (2,6 s) incluye la base; descontándola salen ~1,0 s por mutante,
+  lo mismo que medí yo. El informe lo explica y es coherente. El coste por mutante está por
+  encima de 1 s (1,2-1,4 s medidos). No es el caso que la regla del segundo marca como sospechoso,
+  porque el veredicto de cada mutante está comprobado test a test.
+- **RM3:** ningún mutante es equivalente.
+- **RM6:** no se quitó ninguna guarda.
+
+## Checkpoints (pasada 2; lo que no cambia, como en la pasada 1)
 
 | Checkpoint | Estado | Nota |
 |---|---|---|
-| C1 `init.sh` exit 0 y ficheros del arnés | [x] | 2026-10-19: **8437 passed, 254 skipped** en 1504,7 s; ENTORNO LISTO |
-| C2 una sola `in_progress` | [x] | solo F-128 |
-| C2 rama | [x] | `feature/F-128-importes-cabecera-factura` |
-| C2 `current.md` | [x] | la entrada de F-128 encima; lo de debajo es anterior a la rama (deuda heredada) |
-| C2 `done` con history | [x] | F-128 no se marca `done`. Aparte, en `main`: F-044, F-047, F-141 y F-144 están `done` sin entrada en `history.md`, deuda que no es de esta rama |
-| C3 hexagonal | [x] | dominio solo con stdlib; SQL `NN_nombre.sql` en `compras/` y `retenciones/` |
-| C3 ruta en la 1.ª línea; sin prints, secretos ni dependencias | [x] | ficheros nuevos comprobados; R23 pasa |
-| C3 semántica Sigrid | [x] | `totdoc`/`totpag`/`reccla`, grano protegido (agregado por documento antes del JOIN, sin `WHERE` externo); amb/fas, origen/mes y `obrfasamb` no aplican |
+| C1 `init.sh` y ficheros del arnés | [x] | 8438 passed, ENTORNO LISTO |
+| C2 una sola `in_progress` / rama | [x] | F-128 / `feature/F-128-importes-cabecera-factura` |
+| C2 `current.md` | [x] | la entrada de F-128 encima; lo de debajo es deuda anterior a la rama |
+| C2 `done` con history | [x] | F-128 todavía no es `done`. Aparte, en `main`: F-044, F-047, F-141 y F-144 están `done` sin entrada en `history.md`, deuda que no es de esta rama |
+| C3 hexagonal / ruta en la 1.ª línea / sin prints ni secretos | [x] | el delta es YAML, un test y `progress/` |
+| C3 semántica Sigrid | [x] | regla de empresa ya cierta contra el SQL (cambios 1 y 2) |
 | C3 bis | N/A | no toca `docs/referencia/` |
-| C4 trazabilidad | [x] | R1-R34 con tests `test_f128_rN_*`, 135 en verde; R35-R36 son MANUAL |
-| C4 sin red ni BBDD | [x] | solo texto, el dominio y git local |
-| C4 MANUAL listadas | [x] | T16 y T17 en `current.md` y en `impl_F-128.md` |
-| C4 dobles contra el original | [x] | la puerta de `init.sh` en verde; F-128 no añade dobles |
+| C4 trazabilidad R1-R34 | [x] | tests `test_f128_rN_*`; R35-R36 son MANUAL (T16-T17) |
+| C4 sin red ni BBDD / dobles | [x] | la puerta de dobles en verde; F-128 no añade dobles |
+| C4 MANUAL listadas | [x] | `current.md` e `impl_F-128.md` |
 | C4 bis rigor declarado | [x] | `estandar` |
-| C4 bis fase RED | [x] | trazas reales T1-T12; T10 y T13 con positivo fabricado |
-| C4 bis cobertura | [x] | `PUERTA COBERTURA` [OK]: 100,0 % de 66/66 |
-| C4 bis mutación, informe de la herramienta | [x] | totales recalculados: 22 generados, alcance 528 |
-| C4 bis muertos comprobados | [x] | más de 60 s: recálculo puro más RM4 independiente (22/22) |
-| C4 bis la campaña tardó lo debido | [ ] | **cambio 3**: 20 mutantes en ~20 s una vez descontada la base |
+| C4 bis fase RED | [x] | T1-T12 y la del test nuevo de la pasada 2 |
+| C4 bis cobertura | [x] | 100,0 % (66/66) |
+| C4 bis mutación, totales recalculados | [x] | alcance 528 y 22 generados, recalculados sobre HEAD |
+| C4 bis muertos comprobados | [x] | total de 52,5 s, menos de 60: reejecutada por mí (20/20, test a test) |
+| C4 bis la campaña tardó lo debido | [x] | 1,2-1,4 s por mutante, medido; explicado por el orden con `-x` |
 | C4 bis sin «CAMPAÑA NO VÁLIDA» | [x] | «Sin veredicto» = 0 |
-| C4 bis RM1 SHA de HEAD | [ ] | **cambio 3**: `0fa7305` ≠ HEAD (diferencia trivial, pero hay que repetir de todos modos) |
-| C4 bis RM2 tiempo coherente | [ ] | **cambio 3** |
+| C4 bis RM1 / RM2 | [x] | SHA `546885a` (después solo cambia `progress/`) / coherente una vez descontada la base |
 | C4 bis RM5 | N/A | rigor `estandar` y sin supervivientes |
-| C4 bis RM6, supervivientes, campaña MANUAL, N/A sin motivo | [x] | no se quitó ninguna guarda; no hay supervivientes; la campaña fue automática (no aplica la MANUAL); ningún N/A sin motivo |
-| C4 bis «Evidencias» | [x] | los cuatro números y los workers (en serie, explicado) |
+| C4 bis RM6, supervivientes, campaña MANUAL | [x] | ninguna guarda quitada; no hay supervivientes; la campaña es automática |
+| C4 bis «Evidencias» | [x] | actualizadas en la pasada 2 (en serie; la fila «Workers 4» se explica en la nota) |
 | C4 ter | N/A | sin `harness/rutas_sensibles.json` |
-| C5 `tasks.md` | [x] | T1-T15 y T18 `[x]` con sus commits; T16-T17 son MANUAL del humano, tras el merge |
-| C5 sin temporales | [x] | `git status` limpio |
-| C5 `features.json` | [x] | `in_progress` |
+| C5 `tasks.md` | [x] | T1-T15 y T18 `[x]`; T16-T17 son MANUAL del humano, tras el merge |
+| C5 sin temporales / `features.json` | [x] | árbol limpio / `in_progress` |
 
-## Cobertura requisito → test (resumen; detalle en `tests/test_f128_*.py`)
+## Cobertura requisito → test (resumen)
 
 | Req. | Test |
 |---|---|
-| R1-R4 | `test_f128_dominio.py` (`r1`-`r4`, más el inventario) |
-| R5-R19, R24, R32, R33 | `test_f128_sql.py` (`test_f128_rN_*` de cada uno; R13 en `r12_r13_*`, R7 en `r6_r7_*`) |
+| R1-R4 | `test_f128_dominio.py` |
+| R5-R19, R24, R32, R33 | `test_f128_sql.py` (R13 en `r12_r13_*`, R7 en `r6_r7_*`) |
 | R20-R23 | `test_f128_restringida.py` |
-| R25-R31, R34 | `test_f128_diccionario.py` |
+| R25-R31, R34 y la regla de empresa | `test_f128_diccionario.py` |
 | R35-R36 | MANUAL (humano), T16-T17 |
+
+## Después de la aprobación (humano)
+
+- Merge a `main`. Después, T16 (build en Azure, `apply-grants`, `check-diccionario`, comprobar
+  que el login estándar recibe «permission denied» en `documento_cuenta_bancaria`) y T17
+  (`publicar-diccionario` v56 y reinicio del MCP).
 
 ## Propuesta de automejora (para el humano, no aplicada)
 
 - `CHECKPOINTS.md`, RM2: añadir que el «Tiempo total» **incluye la línea base**, y que el número
-  que hay que comparar es `(total − base) × W / mutantes`. Sin eso, una base de otra suite pasa
-  la regla del «coste por mutante ≥ 1 s» (aquí da 29,7 s, cuando el real implícito es ~1 s).
+  que hay que comparar es `(total − base) × W / mutantes`.
 - `harness/mutacion.py`: que `EjecutorPytest.linea_base` conserve la acotación de los
-  `argumentos` (o que la rechace) para que la base no mida una suite distinta de la que juzga a
-  los mutantes. Vale para cualquier proyecto: va a `arnes-base`.
+  `argumentos` (el implementer tuvo que escribir una subclase para conseguirlo). Vale para
+  cualquier proyecto: va a `arnes-base`.
+- `reviewer.md`, RM4: escribir en el informe con qué ORDEN de ficheros se reejecuta. Con `-x`,
+  el orden cambia el tiempo en un factor de 30 (mi error de la pasada 1).
