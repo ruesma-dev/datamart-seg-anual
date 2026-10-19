@@ -9,7 +9,7 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-19 · F-128 · CERRADA (`done`, APROBADO en pasada 2) · FUSIONADA en main · despliegue a medias
+## 2026-10-19 · F-128 · CERRADA (`done`, APROBADO en pasada 2) · DESPLEGADA: v56 publicada y MCP reiniciado
 
 - Review: pasada 1 CHANGES_REQUESTED (`R-EMPRESA-POR-DEFECTO` atribuía a `empide` la empresa del
   documento y decía que `v_cuadre_factura_obra` lleva siempre la empresa de la obra de cabecera;
@@ -19,12 +19,27 @@
   8437 passed, 255 skipped; único KO «Estás en 'main'» (esperado).
 - **Imagen `r20261019-0856`** construida en el ACR y **job `caj-datamart-seg-dev` actualizado** a
   ella (líder, 2026-10-19 ~07:40 UTC, sin ejecución en curso).
-- **PENDIENTE (humano): T16-T17.** El clasificador del modo automático bloqueó al líder el
-  `apply-grants` (concesión de permisos). Los dos build NO se lanzan sin él: recrean las tablas de
-  compras y retenciones y las dejarían sin GRANT. Orden: `build-compras`, `build-retenciones`,
-  `apply-grants`, `check-declarados`, `check-diccionario`; después `publicar-diccionario` (v56) y
-  reinicio del MCP. Si no se hace a mano, la nocturna del 20 (imagen nueva) construye y publica v56
-  sola, y solo queda reiniciar el MCP y las comprobaciones de R35/R36.
+- **T16 HECHA (humano, 2026-10-19 ~07:56 UTC)**: el clasificador bloqueó al líder el `apply-grants`
+  y lo lanzó el humano: `build-compras`, `build-retenciones`, `apply-grants` SUCCESS (112) y
+  `check-declarados` 234/234. Comprobado por el líder (solo lectura): `check-diccionario` en
+  biyección 234 = 234; recuentos = `raw` (facturas 167.488, albaranes 314.113, recargos de factura
+  33.005, de albarán 41.474); **0 facturas** con `importe_retenciones` ≠ fiscal + garantía (9
+  albaranes sí, ya dicho en su ficha); `documento_cuenta_bancaria` 35.467 filas; categorías de
+  `v_cuadre_factura_obra` CUADRA 5.304, CONTABILIDAD_MAYOR 359, SOLO_CONTABILIDAD 266,
+  SOLO_FACTURAS 91, FACTURAS_MAYOR 89; `retencion_factura` 27.002; `has_table_privilege` sobre
+  `documento_cuenta_bancaria`: estándar `f`, restringido `f`, total `t`; `apply_grants` con las
+  cuatro verificaciones `ok`.
+- **T17 a medias (líder)**: diccionario **v56** publicado (234 objetos, 2.000 columnas, 27 reglas,
+  hash `4071a6e35a15`; `check-diccionario` OK) y MCP reiniciado (`ca-mcp-bbdd-dev--0000021`, la
+  activa hoy, imagen `mcp-bbdd:r20261018-1730`). **Falta (humano): las dos preguntas de R36 por el
+  conector.**
+- **HALLAZGO: la nocturna del 19 republicó la v54 encima de la v55.** El paso
+  `publicar_diccionario` de `run-all` publica el diccionario de la IMAGEN, y la imagen del job
+  (`r20261018-0903`, F-141) llevaba la v54; la v55 de F-144 se había publicado desde el puesto sin
+  imagen nueva. El MCP probablemente no lo notó (cachea hasta reiniciar y se había reiniciado con la
+  v55; una réplica nueva sí habría leído la v54), y la v56 de hoy
+  ya lleva F-144. Desde hoy la imagen del job lleva la v56, así que la nocturna republica lo mismo.
+  Regla: publicar el diccionario desde el puesto SOLO si la imagen del job lleva esa misma versión.
 
 ## 2026-10-19 · F-141 · T16 HECHA: nocturna del 19 con la imagen `r20261018-0903`
 
