@@ -627,7 +627,17 @@
 # `R-EMPRESA-POR-DEFECTO` coloca los objetos nuevos en sus listas. Sin regla
 # dura nueva ni pendientes nuevos.
 
-version: 56
+# version 57 (F-145, 2026-10-20): LOS ADJUNTOS SE ABREN POR LA PAREJA
+# (`empresa_repositorio`, `cod_repositorio`). Aviso formal de `mcp-bbdd`: su
+# F-025 esta desplegada y verificada. Solo cambia la ficha de
+# `compras.documento_adjuntos` y sus columnas `cod_repositorio` y
+# `empresa_repositorio`, sin objetos ni columnas nuevos: el fichero se pide a
+# `sigrid-api` con `key: {"emp": ..., "cod": ...}`; si no hay fichero con esa
+# pareja (400) o la empresa es nula, una sola vez mas con la empresa 1 y un
+# aviso; el 409 es `ORIGEN_AMBIGUO`; ya no hay un codigo que rechace los `cod`
+# repetidos. `empresa_repositorio` es ENTERO por contrato con `mcp-bbdd`.
+
+version: 57
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 

@@ -2250,7 +2250,7 @@ objetos:
     descripcion: >-
       **LOS FICHEROS ADJUNTOS («graficos» en Sigrid)** (F-090): una fila por fichero, con su nombre (`nom`), su descripcion (`res`), su fecha de alta (`fec`, entero AAAAMMDD), el login de quien lo subio (`usu`) y `cod`, la clave con la que la base DOCUMENTAL de Sigrid guarda el binario (sello temporal + login).
 
-      **EL FICHERO NO ESTA AQUI NI EN NINGUNA TABLA DEL DATAMART.** El binario vive en la base documental `ruesma_rep` de Sigrid (casa con esta tabla por `(emp, cod)` en el 99,75 %) y lo sirve `sigrid-api` (`documents/read` con `cod`); el datamart publica solo el indice.
+      **EL FICHERO NO ESTA AQUI NI EN NINGUNA TABLA DEL DATAMART.** El binario vive en la base documental `ruesma_rep` de Sigrid (casa con esta tabla por `(emp, cod)` en el 99,75 %) y lo sirve `sigrid-api` (`documents/read` con la pareja (`emp`, `cod`)); el datamart publica solo el indice.
 
       **FILTRADA EN ORIGEN** (decision D2 del humano del 2026-10-09): solo los ficheros enlazados por `raw.rcg` a una factura, contrato, comparativo, oferta o albaran (199.042 el 2026-10-09, de 289.036 en Sigrid). Los adjuntos de personal y posventa no se traen a proposito. `gratipide` (la clase de grafico de Sigrid, catalogo `auxgra`, que no se ingiere) esta a 0 en el 100 % de estos ficheros: la clase de fichero sale de la extension, en `compras.documento_adjuntos`.
 

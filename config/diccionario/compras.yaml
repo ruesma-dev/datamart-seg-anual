@@ -4380,11 +4380,14 @@ objetos:
       **EL FICHERO NO ESTA EN EL DATAMART**: el datamart publica solo el
       indice. El binario vive en la base DOCUMENTAL de Sigrid, `ruesma_rep`
       (en su propia tabla `gra`), y lo sirve `sigrid-api` con `POST
-      /api/documents/read` (`database: ruesma_rep`, `table: gra`, `id_column:
-      cod`, `id_value` = `cod_repositorio`, `blob_column: ima`, obligatorio).
+      /api/documents/read` (`database: ruesma_rep`, `table: gra`,
+      `key: {"emp": empresa_repositorio, "cod": cod_repositorio}`, sin
+      `id_column` ni `id_value`, y `blob_column: ima`, obligatorio).
       Ese `ima` es la columna del binario en `ruesma_rep.gra`, no en
       `raw.gra`, que no la trae. La base documental casa por la
-      pareja (`empresa_repositorio`, `cod_repositorio`); el `ide` NO casa. El
+      pareja (`empresa_repositorio`, `cod_repositorio`), su clave unica: un
+      `cod` solo no basta (hay `cod` repetidos en dos empresas); el `ide` NO
+      casa. El
       0,23 % de los enlaces (461) no tiene binario en la base documental: la
       fila existe y el fichero no se puede abrir. Y el 11 % de las filas
       documentales tiene el nombre vacio: el nombre bueno es `nombre_fichero`,
@@ -4400,7 +4403,16 @@ objetos:
       con esa herramienta del MCP, que lo pide a `sigrid-api` y lo entrega SIN
       CONVERTIR. Las imagenes se ven directamente; los PDF y la ofimatica (un
       `.doc` o un `.xls` tal cual) llegan como binario, y convertirlos es
-      F-142. Quien puede abrirlo lo dice la regla de abajo (QUIEN PUEDE ABRIR
+      F-142. **COMO LO PIDE (F-025 de `mcp-bbdd`, desplegada el 2026-10-18)**:
+      por la pareja de la fila, `key: {"emp": empresa_repositorio, "cod":
+      cod_repositorio}`. Si `sigrid-api` responde 400 `ValueError` (no hay
+      fichero con esa pareja) o la fila trae `empresa_repositorio` nula, lo
+      pide UNA vez mas con la empresa 1 (Construcciones Ruesma) y el mismo
+      `cod`, y avisa de que el fichero entregado puede no ser el original de
+      esa empresa (en su traza queda `respaldo=empresa_defecto`). Si la pareja
+      casa mas de un fichero, `sigrid-api` responde 409 y la herramienta
+      devuelve `ORIGEN_AMBIGUO`, sin reintentar. Quien puede abrirlo lo dice la
+      regla de abajo (QUIEN PUEDE ABRIR
       EL FICHERO, D1 de F-139): la herramienta lo comprueba con el login de
       quien pregunta antes de pedir nada. **Ficheros grandes**: 17
       ficheros pasan de 20 MB (facturas 8, contratos 4, ofertas 4,
@@ -4485,14 +4497,18 @@ objetos:
         significado: >-
           La clave con la que la base documental `ruesma_rep` guarda el fichero
           (`gra.cod`): sello temporal + login de quien lo subio
-          (`202609181420515461.jmbecedas`). Es el `id_value` que pide
-          `sigrid-api` en `documents/read` con `id_column: cod`. DATO PERSONAL
-          en su sufijo (el login).
+          (`202609181420515461.jmbecedas`). Va en la `key` de
+          `documents/read` junto a `empresa_repositorio`: el fichero se pide
+          por la pareja (`empresa_repositorio`, `cod_repositorio`), nunca por
+          el `cod` solo. DATO PERSONAL en su sufijo (el login).
       empresa_repositorio:
         significado: >-
-          Empresa del fichero (`gra.emp`). La base documental casa por la
-          pareja (`empresa_repositorio`, `cod_repositorio`): en la base de
-          negocio hay un `cod` repetido en dos empresas.
+          Empresa del fichero (`gra.emp`), ENTERO. La base documental casa por
+          la pareja (`empresa_repositorio`, `cod_repositorio`): en la base de
+          negocio hay un `cod` repetido en dos empresas. `abrir_adjunto`
+          (`mcp-bbdd`) la usa solo si llega como ENTERO: renombrarla o
+          cambiarle el tipo hace que responda `SIN_BINARIO`. Si es nula, pide el
+          fichero con la empresa 1 y avisa de que puede no ser el original.
         agregacion: no_sumable
       nombre_fichero:
         significado: >-
