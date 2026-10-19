@@ -1819,3 +1819,72 @@ ChatGPT: cerrada.
 
 Fuera de F-139: la propuesta del 500 (D6) ya está en `sigrid-api` como su F-010 (`spec_ready`
 desde el 16-10); la conversión de documentos es F-142.
+
+> **Entradas añadidas el 2026-10-20** (las pidió el reviewer de F-128: estas cinco features estaban
+> `done` sin resumen aquí). Las dos primeras, de agosto, se reconstruyen desde `features.json`.
+
+## F-047 · La base iba por detrás del repositorio: la nocturna no creaba lo que el código declara · 2026-08-28
+
+Detectada el 26-08 por `check-diccionario` (103 fichas contra 102 objetos): faltaba
+`cierre.v_pbi_planif_vs_real`. Causa raíz: la nocturna no dejaba de crearla, la DESTRUÍA:
+`sql/mart/03_agg_categoria.sql` hace `DROP TABLE … CASCADE` de `mart.fact_seguimiento_categoria`,
+de la que cuelga esa vista, y `build-cierre` no estaba en `run-all`. Absorbió el alcance de F-044:
+los build de maestros, compras, retenciones y cierre entran en la nocturna (cierre detrás de
+`mart`) y registran paso en `_meta.etl_runs`; `check-declarados` hace salir la nocturna con código
+1 si falta algo que `sql/**` declara (trinquete en `config/objetos_pendientes.yaml`).
+
+Verificado: review APROBADO en la pasada 3; imagen `r20260828-1942`, los cuatro build y
+`apply-grants` lanzados a mano (37 min), `check-declarados` 103/103, `check-diccionario` en
+biyección 103 = 103 y diccionario v10 publicado DESPUÉS de los build.
+
+## F-044 · Los cuatro build entran en la carga nocturna · 2026-08-30
+
+Decidida por el humano el 22-08 (los esquemas cierre, compras, maestro y retenciones podían ir
+arbitrariamente por detrás de `raw`/`stg`). El código lo entregó F-047. Aquí quedaban dos
+mediciones de la nocturna real: 3 h 45 terminando a las 07:45 hora local (aceptado por el humano
+el 30-08) y el pico de disco, 89,25 % sobre 32 GB a las 03:00 UTC, que motivó ampliar a 64 GB.
+
+## F-141 · El perfil RESTRINGIDO del datamart, para administrativos · 2026-10-18
+
+Tercer perfil de lectura, por debajo del estándar («para administrativos y gente así», humano
+16-10). Privilegio por esquema y tabla, sin RLS. Grupo `sigrid_dm_perfil_restringido_ro` y login
+`mcp_sigrid_dm_restringido` (contraseña solo en Key Vault); el grupo del estándar pasa a llamarse
+`sigrid_dm_autorizado_ro`. No ve `tesoreria`, `personal`, `raw`, las tres `*_restringida`, el
+mayor ni los saldos contables. `apply-grants` gana sus comprobaciones (`verificacion_restringido`,
+`pertenencias_restringido`, `filtraciones_restringido`, `vigilados_restringido`); diccionario v54;
+contrato E1-E8 con `mcp-bbdd` en `azure-apps`. Aviso de nombres: los esquemas `*_restringida` son
+los MÁS protegidos y el perfil «restringido» el que MENOS ve.
+
+Verificado: `init.sh` 8.225 passed; review APROBADO en la pasada 2 (la 1, por evidencia: el humano
+aceptó 3 mutantes equivalentes). Desplegada el 18-10: imagen `r20261018-0903`, `02_roles.sql` por
+el humano, pruebas R31-R33, v54 y MCP reiniciado. T16: la nocturna del 19 dejó `apply_grants` en
+SUCCESS con las cuatro verificaciones a `ok`. Lección: tras fusionar, `init.sh` COMPLETO sobre
+`main` (un test de versión «+1» puso `main` en rojo).
+
+## F-144 · Si no se indica empresa, es Construcciones Ruesma · 2026-10-18
+
+Regla bloqueante `R-EMPRESA-POR-DEFECTO` (orden del humano): sin empresa en la pregunta, se
+filtra `empresa_id = 1` y la respuesta lo dice; excepciones (otra empresa, varias, grupo, UTE).
+Nombra objeto a objeto dónde se aplica (25 con `empresa_id`, 12 hechos por `obra_id`) y, en los
+que no tienen ni lo uno ni lo otro, obliga a avisar de que la cifra mezcla empresas.
+`sdd=false`. Review APROBADO en la pasada 2 (la 1: afirmaba `empresa_id` en esquemas enteros).
+v55 publicada el 18-10 desde el puesto, SIN imagen nueva: la nocturna del 19 republicó la v54 de
+la imagen encima. Vuelve a estar publicada desde la v56 de F-128.
+
+## F-128 · La cabecera entera de factura y albarán · 2026-10-19
+
+Nace de los correos de Juan Romero (Dir. Administración). D1-A, D2-B, D3-A, D4-B, D5-A (humano
+17-10). `compras.facturas` y `compras.albaranes` publican AL FINAL los importes de cabecera (bruto,
+neto, base, IVA, total, retenciones fiscal y de garantía, total a pagar) y las columnas útiles de
+`dcf`/`dca`, con inventario de las 145 + 145 en `etl_sigrid/domain/cabecera_compra.py`; nuevas
+`compras.factura_recargos` y `albaran_recargos`, `retenciones.retencion_factura` y
+`retenciones.v_cuadre_factura_obra` (cuadre de la retención por factura contra la contabilidad), y
+la cuenta bancaria del proveedor solo en `compras_restringida.documento_cuenta_bancaria` (D4-B).
+Diccionario v56. `cocide` pasa a F-143.
+
+Verificado: `init.sh` 8.438 passed, cobertura 100 % (66/66); mutación 20/20. Review: pasada 1
+rechazada (dos frases de `R-EMPRESA-POR-DEFECTO` afirmaban de más y el informe de mutación medía la
+base sobre otra suite), pasada 2 APROBADO. Desplegada el 19-10: imagen `r20261019-0856`, build y
+`apply-grants` (el humano: el clasificador lo bloqueó al líder), recuentos = `raw`, 0 facturas
+descuadradas, 35.467 cuentas bancarias que el estándar y el restringido no leen, v56 y MCP
+reiniciado. Queda R36 (dos preguntas por el conector, humano).
