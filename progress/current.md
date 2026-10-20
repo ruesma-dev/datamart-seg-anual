@@ -9,6 +9,26 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-20 · INCIDENCIA · la nocturna del 20 falló (`caj-datamart-seg-dev-29874240`, Failed)
+
+- La 1.ª réplica desaparece a las 03:24 en `build_cierre` **sin evento de salida** (ni exit code ni
+  OOMKilled, ni FAILED en `etl_runs`; el Postgres no se reinició): pérdida de la réplica por la
+  plataforma. La 2.ª (03:43) empieza desde la ingesta y la mata `DeadlineExceeded` a las 07:00
+  (`replicaTimeout` 25.200 s cuenta desde las 00:00) en `mart/06_cp_tipologia.sql`; su sesión quedó
+  huérfana con AccessExclusiveLock hasta morir sola (transacción deshecha).
+- Estado dejado: `cierre.fact_cierre_mensual` vacía; perfil restringido sin SELECT en lo recreado.
+  Reparación (humano, 07:40): `apply-grants` OK (restringido: compras 33/33, mart 16/16, retenciones
+  17/17); `build-cierre` + `apply-grants` + `check-declarados` en marcha desde el puesto.
+- Aparte: desde el 17 la 1.ª réplica muere cada noche a las 00:0x con «connection timeout expired»
+  (ingesta `obrparpre`, exit code 1) y el reintento lo tapa. Pendiente de investigar.
+- Propuesta al humano: feature de robustez de la nocturna (reanudar, grants por build, límite).
+
+## 2026-10-20 · F-145 · `in_progress` · DESBLOQUEADA, al reviewer
+
+- `mcp-bbdd` enlazó las tres líneas (`azure-apps` `408c007`); `init.sh` en verde en la rama
+  (8479 passed, 254 skipped). `empresa_repositorio` verificada `integer` en Azure (solo lectura).
+- Al desplegar la v57: el MCP vigente es `ca-mcp-bbdd-dev--0000022` (F-027 de `mcp-bbdd`).
+
 ## 2026-10-20 · F-145 · `blocked` (implementer) · trabajo HECHO, `init.sh` en rojo por un test ajeno
 
 - **Hecho** (rama `feature/F-145-adjuntos-clave-empresa-codigo`, commits `b37768c` T1 RED, `599bf92` T2,
