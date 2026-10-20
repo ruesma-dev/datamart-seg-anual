@@ -253,7 +253,9 @@ def problemas_empresa_entera(sql: str) -> list[str]:
     `raw.gra.emp` es entero (`int` en Sigrid, `INTEGER` en `raw`): mientras la
     columna salga de `g.emp` sin conversión ni función, y pase al SELECT final
     sin tocar, `mcp-bbdd` la recibe como entero. Cualquier `::`, `CAST`,
-    función o renombrado lo rompe.
+    función o renombrado lo rompe, también el renombrado en el SELECT final
+    (O1 de la review, pasada 2: antes solo lo cazaba
+    `test_f090_r12_publica_exactamente_las_columnas_en_su_orden`).
     """
     plano = _sin_comentarios_sql(sql)
     problemas: list[str] = []
@@ -266,6 +268,9 @@ def problemas_empresa_entera(sql: str) -> list[str]:
     usos = re.findall(r"b\.empresa_repositorio\b(\s*::\s*\w+)?", plano)
     if usos != [""]:
         problemas.append(f"el SELECT final no pasa `b.empresa_repositorio` tal cual: {usos}")
+    alias = re.findall(r"b\.empresa_repositorio\s+AS\s+(\w+)", plano, re.I)
+    if [a for a in alias if a != "empresa_repositorio"]:
+        problemas.append(f"el SELECT final renombra `b.empresa_repositorio` a {alias}")
     if re.search(r"empresa_repositorio\s*::", plano):
         problemas.append("`empresa_repositorio` lleva una conversión de tipo")
     return problemas
@@ -289,6 +294,8 @@ def test_f145_empresa_repositorio_es_entera_en_el_sql() -> None:
         ("g.emp AS empresa_repositorio", "g.emp AS empresa"),
         ("b.empresa_repositorio,", "b.empresa_repositorio::TEXT,"),
         ("b.empresa_repositorio,", "b.empresa_repositorio::TEXT AS empresa_repositorio,"),
+        # O1 de la review: el renombrado en el SELECT final.
+        ("b.empresa_repositorio,", "b.empresa_repositorio AS empresa,"),
     ],
 )
 def test_f145_sabotaje_la_guarda_ve_cada_forma_de_romperlo(de: str, a: str) -> None:
