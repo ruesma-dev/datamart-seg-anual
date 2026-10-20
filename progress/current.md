@@ -25,7 +25,11 @@
 
 ## 2026-10-20 · F-145 · CERRADA (`done`, APROBADO en pasada 2, `5043244`) · merge `1b31d86`
 
-- Merge por orden del humano; despliegue (pasos MANUAL de abajo) en curso por el líder.
+- Merge por orden del humano. **DESPLEGADA (líder, 2026-10-20)**: imagen `r20261020-1753` en el ACR
+  y job `caj-datamart-seg-dev` actualizado a ella (15:5x UTC) ANTES de publicar; **v57 publicada**
+  16:02 UTC (234 objetos, 2.000 columnas, 27 reglas, hash `15711cff4007`), `check-diccionario` OK
+  (biyección exacta, lo publicado es el árbol); MCP `ca-mcp-bbdd-dev--0000022` reiniciado (réplica
+  nueva 16:04:06 UTC, Healthy) y `mcp-bbdd` avisado. El `COMMENT ON TABLE` nuevo entra con la nocturna.
 
 - **Pasada 1**: CHANGES_REQUESTED (`progress/review_F-145.md`). **Pasada 2** (commits `ac6ab44` T4,
   `c3d5081` T5; `azure-apps` `5602198`): el respaldo con la empresa 1 en sus tres casos (H1) en la
