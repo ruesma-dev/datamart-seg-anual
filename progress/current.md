@@ -23,7 +23,9 @@
   (ingesta `obrparpre`, exit code 1) y el reintento lo tapa. Pendiente de investigar.
 - Propuesta al humano: feature de robustez de la nocturna (reanudar, grants por build, límite).
 
-## 2026-10-20 · F-145 · `in_progress` · pasada 2 hecha (implementer), al reviewer
+## 2026-10-20 · F-145 · CERRADA (`done`, APROBADO en pasada 2, `5043244`) · merge `1b31d86`
+
+- Merge por orden del humano; despliegue (pasos MANUAL de abajo) en curso por el líder.
 
 - **Pasada 1**: CHANGES_REQUESTED (`progress/review_F-145.md`). **Pasada 2** (commits `ac6ab44` T4,
   `c3d5081` T5; `azure-apps` `5602198`): el respaldo con la empresa 1 en sus tres casos (H1) en la

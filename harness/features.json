@@ -2290,12 +2290,12 @@
         "Un test fija que `empresa_repositorio` es entera en el SQL y que el diccionario no vuelve a mencionar `id_column: cod` ni `ADJUNTO_AMBIGUO`; diccionario v57",
         "bash harness/init.sh en verde y veredicto APROBADO del reviewer; tras el merge, imagen y job, y después `publicar-diccionario`, `check-diccionario` y reinicio del MCP"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": false,
       "rigor": "estandar",
       "priority": 1,
       "branch": "feature/F-145-adjuntos-clave-empresa-codigo",
-      "notes": "2026-10-20: desbloqueada. El rojo de init.sh era R30 de F-141 por tres líneas de azure-apps/mcp_bbdd.md añadidas por la F-027 de mcp-bbdd; mcp-bbdd las enlazó a datamart_seg_anual.md (azure-apps 408c007). init.sh en verde en la rama (8479 passed, 254 skipped). empresa_repositorio verificada integer en Azure (solo lectura)."
+      "notes": "2026-10-20: desbloqueada. El rojo de init.sh era R30 de F-141 por tres líneas de azure-apps/mcp_bbdd.md añadidas por la F-027 de mcp-bbdd; mcp-bbdd las enlazó a datamart_seg_anual.md (azure-apps 408c007). init.sh en verde en la rama (8479 passed, 254 skipped). empresa_repositorio verificada integer en Azure (solo lectura). 2026-10-20: CERRADA. Review pasada 1 CHANGES_REQUESTED (H1: el respaldo con la empresa 1 descrito más amplio que el MCP; H2-H3 papeleo), pasada 2 APROBADO (5043244). Merge en main 1b31d86; init.sh verde (8486 passed). OJO (O4 del review): la redacción del respaldo de esta `description` es la del encargo y está superada; lo que vale son los TRES casos de la ficha de compras.documento_adjuntos: empresa distinta de la 1 con 400 -> una segunda petición con la 1; empresa nula -> la única petición va directamente con la 1; empresa 1 con 400 -> SIN_BINARIO sin segunda petición."
     }
   ]
 }
