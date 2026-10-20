@@ -2290,7 +2290,7 @@
         "Un test fija que `empresa_repositorio` es entera en el SQL y que el diccionario no vuelve a mencionar `id_column: cod` ni `ADJUNTO_AMBIGUO`; diccionario v57",
         "bash harness/init.sh en verde y veredicto APROBADO del reviewer; tras el merge, imagen y job, y después `publicar-diccionario`, `check-diccionario` y reinicio del MCP"
       ],
-      "status": "in_progress",
+      "status": "blocked",
       "sdd": false,
       "rigor": "estandar",
       "priority": 1,
