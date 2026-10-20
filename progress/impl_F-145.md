@@ -95,10 +95,14 @@ $ python -m pytest tests/test_f145_adjuntos_clave.py -q -p no:cacheprovider
 y previo a F-145 (`azure-apps` `2f28a8d`); la feature quedó `blocked` hasta que `mcp-bbdd` enlazó las tres
 líneas (`408c007`) y el líder lo vio en verde sobre `d36bd09` (8479 passed, 254 skipped).
 
-**Final (pasada 2)**, tal cual, sobre `@@HEAD@@`:
+**Final (pasada 2)**, tal cual, sobre ``b922f0f` (exit 0)`:
 
 ```
-@@INIT@@
+8486 passed, 254 skipped, 2215 warnings in 4705.52s (1:18:25)
+[OK] PUERTA COBERTURA: N/A (F-145: las líneas cambiadas no contienen sentencias ejecutables)
+[OK] PUERTA TAMAÑO: F-145 dentro de los topes (impl 179/220, review 140/140)
+[OK] Rama actual: feature/F-145-adjuntos-clave-empresa-codigo
+ENTORNO LISTO. Puedes trabajar.
 ```
 
 ## 6 · MANUAL pendiente (tras APROBADO y merge, en este orden)
@@ -173,7 +177,7 @@ GREEN: `tests/test_f145_adjuntos_clave.py` → `48 passed in 3.93s`.
 | Evidencia | Valor medido |
 |---|---|
 | Tests de F-145 | 48 en `tests/test_f145_adjuntos_clave.py` (41 de la pasada 1 + 7 de la 2): RED 10 (pasada 1), 8 (H1) y 1 (O1); GREEN 48/48 en 3,93 s |
-| Suite en `init.sh` (final) | @@SUITE@@ |
-| Cobertura de líneas cambiadas | @@COBERTURA@@ |
+| Suite en `init.sh` (final) | `8486 passed, 254 skipped` (0 failed), `init.sh` exit 0 sobre `b922f0f`; 7 más que los 8479 de `d36bd09`: los 7 tests nuevos de la pasada 2 |
+| Cobertura de líneas cambiadas | **N/A**: `PUERTA COBERTURA: N/A (F-145: las líneas cambiadas no contienen sentencias ejecutables)`; la única línea Python de producción tocada es un docstring |
 | Mutantes generados / supervivientes | **0 / 0, legítimo**: las únicas líneas de producción del alcance son el docstring de `documento_adjuntos.py` (pasada 1: `python -m harness.mutacion --feature F-145` → «CERO MUTANTES», salida 3; el reviewer lo recalculó con control). La pasada 2 solo toca texto y tests. Los dientes: 8 sabotajes del barrido (4 + 4 de la pasada 2) y 7 de la guarda del entero (6 + O1) |
-| Tiempo de la suite | @@TIEMPO@@ |
+| Tiempo de la suite | 4705,52 s (1:18:25), el que imprime pytest dentro de `init.sh` |
