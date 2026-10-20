@@ -4405,11 +4405,15 @@ objetos:
       `.doc` o un `.xls` tal cual) llegan como binario, y convertirlos es
       F-142. **COMO LO PIDE (F-025 de `mcp-bbdd`, desplegada el 2026-10-19)**:
       por la pareja de la fila, `key: {"emp": empresa_repositorio, "cod":
-      cod_repositorio}`. Si `sigrid-api` responde 400 `ValueError` (no hay
-      fichero con esa pareja) o la fila trae `empresa_repositorio` nula, lo
-      pide UNA vez mas con la empresa 1 (Construcciones Ruesma) y el mismo
-      `cod`, y avisa de que el fichero entregado puede no ser el original de
-      esa empresa (en su traza queda `respaldo=empresa_defecto`). Si la pareja
+      cod_repositorio}`. Si la fila trae una empresa distinta de la 1 y
+      `sigrid-api` responde 400 `ValueError` (no hay fichero con esa pareja),
+      lo pide UNA vez mas con la empresa 1 (Construcciones Ruesma) y el mismo
+      `cod`; si la fila trae `empresa_repositorio` nula, la unica peticion va
+      directamente con la empresa 1. En los dos casos avisa de que el fichero
+      entregado puede no ser el original de esa empresa (en su traza queda
+      `respaldo=empresa_defecto`). Con la empresa 1 en la fila, un 400 es
+      `SIN_BINARIO`, sin segunda peticion (lo mismo si con la 1 tampoco hay
+      fichero). Si la pareja
       casa mas de un fichero, `sigrid-api` responde 409 y la herramienta
       devuelve `ORIGEN_AMBIGUO`, sin reintentar. Quien puede abrirlo lo dice la
       regla de abajo (QUIEN PUEDE ABRIR

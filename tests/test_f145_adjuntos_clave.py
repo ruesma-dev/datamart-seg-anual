@@ -5,9 +5,12 @@ F-145 · La ficha de los adjuntos dice cómo los abre hoy `mcp-bbdd` (su F-025).
 Desde la F-025 de `mcp-bbdd` (desplegada y verificada, revisión `--0000021`,
 imagen `r20261018-1730`), `abrir_adjunto` pide el fichero a `sigrid-api` por la
 PAREJA de la fila del índice, `key: {"emp": empresa_repositorio, "cod":
-cod_repositorio}`, sin `id_column` ni `id_value`; si no hay fichero con esa
-pareja (400 `ValueError`) o la fila no trae empresa, lo pide UNA vez más con la
-empresa 1 y avisa al modelo; el 409 de `sigrid-api` es `ORIGEN_AMBIGUO`, y el
+cod_repositorio}`, sin `id_column` ni `id_value`. El respaldo con la empresa 1
+tiene TRES casos que la ficha no puede mezclar (pasada 2, H1 de la review): con
+una empresa distinta de la 1 y un 400 `ValueError`, una segunda petición con la
+1 y el mismo `cod`; con la empresa nula, la única petición va directamente con
+la 1; con la empresa 1, un 400 es `SIN_BINARIO`, sin segunda petición. En los dos
+primeros avisa al modelo. El 409 de `sigrid-api` es `ORIGEN_AMBIGUO`, y el
 código que rechazaba los `cod` repetidos desaparece.
 
 Quien lee la ficha es una IA: si la ficha le dice `id_column: cod`, pedirá así el
@@ -46,10 +49,27 @@ VERSION_F145 = 57
 
 #: Lo que ya no es verdad desde la F-025 de `mcp-bbdd`: la petición por
 #: `id_column: cod` (en cualquiera de sus formas escritas) y el código de error
-#: que rechazaba los `cod` con más de una empresa.
+#: que rechazaba los `cod` con más de una empresa. Y lo que nunca lo fue (pasada
+#: 2, H1): juntar el 400 y la empresa nula en un mismo «una vez más con la
+#: empresa 1», que atribuye a la fila sin empresa dos peticiones y a la fila de
+#: la empresa 1 un reintento que el MCP no hace.
 CADUCADO: tuple[re.Pattern[str], ...] = (
     re.compile(r"id_column`?\s*:?\s*`?\s*\"?cod\b"),
     re.compile(r"ADJUNTO_AMBIGUO"),
+    re.compile(
+        r"\bo la (?:fila (?:no )?trae (?:`?empresa_repositorio`? nula|empresa)"
+        r"|empresa es nula)",
+        re.IGNORECASE,
+    ),
+)
+
+#: Lo que la ficha y H5 tienen que decir para no mezclar los tres casos del
+#: respaldo (pasada 2, H1). `petici` acepta la palabra con y sin tilde.
+TRES_CASOS_DEL_RESPALDO = (
+    "distinta de la 1",
+    "directamente con la empresa 1",
+    "`SIN_BINARIO`",
+    "sin segunda petici",
 )
 
 
@@ -119,17 +139,28 @@ def test_f145_ni_azure_apps() -> None:
         "en `documents/read` con `id_column: cod`. DATO",
         "`POST /api/documents/read` (`id_column` `cod`).",
         "# el 409 ya no es\n# ADJUNTO_AMBIGUO",
+        "responde 400 `ValueError` (no hay fichero con esa pareja) o la fila trae\n"
+        "      `empresa_repositorio` nula, lo pide UNA vez mas con la empresa 1",
+        "# pareja (400) o la empresa es nula, una sola vez mas con la empresa 1",
+        "segunda petición con la empresa 1\n    si no hay fichero con ella o la empresa es nula",
+        "con esa pareja (400 `ValueError`) o la fila no trae empresa, lo pide UNA vez más",
     ],
 )
 def test_f145_sabotaje_el_barrido_ve_las_formas_que_habia(texto: str) -> None:
-    """Las cuatro formas en que estaba escrito, envueltas como estaban."""
+    """Las formas en que estaba escrito, envueltas como estaban: las cuatro de
+    `id_column: cod` y `ADJUNTO_AMBIGUO`, y las cuatro del respaldo mezclado
+    (ficha, comentario de la v57, ARCHITECTURE y este mismo docstring)."""
     assert caducados_en(texto), f"el barrido no ve lo caducado en {texto!r}"
 
 
 def test_f145_control_el_barrido_no_salta_con_lo_vigente() -> None:
     vigente = (
         '`key: {"emp": empresa_repositorio, "cod": cod_repositorio}`, sin '
-        "`id_column` ni `id_value`; el 409 es `ORIGEN_AMBIGUO`; `id_column: ide`"
+        "`id_column` ni `id_value`; el 409 es `ORIGEN_AMBIGUO`; `id_column: ide`. "
+        "Si la fila trae una empresa distinta de la 1 y responde 400, lo pide UNA vez "
+        "mas con la empresa 1; si la fila trae `empresa_repositorio` nula, lo pide "
+        "directamente con la empresa 1; con la empresa 1, un 400 es `SIN_BINARIO`, sin "
+        "segunda peticion. Si la fila no trae empresa, va con la 1."
     )
     assert caducados_en(vigente) == []
 
@@ -156,8 +187,33 @@ def test_f145_la_ficha_dice_la_pareja_el_respaldo_y_el_409() -> None:
         "`abrir_adjunto(adjunto_id)`",
         'filename_columns: ["cod"]',
         "blob_column: ima",
+        *TRES_CASOS_DEL_RESPALDO,
     ):
         assert contiene(descripcion, dato), f"la ficha no dice «{dato}» (F-145)"
+
+
+def _comentario_v57() -> str:
+    texto = _texto(GLOBAL)
+    inicio = texto.index(f"# version {VERSION_F145} (F-145, ")
+    return _sin_almohadillas(texto[inicio: texto.index("\n\n", inicio)])
+
+
+def _parrafo_del_limite_en_arquitectura() -> str:
+    texto = _texto(ARQUITECTURA)
+    inicio = texto.index("**El límite (F-139)**")
+    return texto[inicio: texto.index("**Quién abre cada fichero**", inicio)]
+
+
+@pytest.mark.parametrize(
+    "lector",
+    [_comentario_v57, _parrafo_del_limite_en_arquitectura],
+    ids=["comentario_v57", "architecture"],
+)
+def test_f145_el_resto_separa_el_respaldo_de_la_empresa_nula(lector) -> None:
+    """Pasada 2, H1: el comentario de la v57 y ARCHITECTURE separan los casos."""
+    texto = lector()
+    for dato in ("distinta de la 1", "directamente", "`SIN_BINARIO`"):
+        assert contiene(texto, dato), f"{lector.__name__} no dice «{dato}» (F-145, H1)"
 
 
 def test_f145_la_columna_cod_repositorio_dice_la_pareja() -> None:
@@ -260,7 +316,7 @@ def test_f145_azure_apps_dice_la_pareja_y_el_contrato() -> None:
     h5 = texto[texto.index("- **H5.**"): texto.index("- **H6.**")]
     for dato in ('"emp": empresa_repositorio', '"cod": cod_repositorio', "empresa 1",
                  "respaldo=empresa_defecto", "`ORIGEN_AMBIGUO`", "F-025",
-                 'filename_columns: ["cod"]'):
+                 'filename_columns: ["cod"]', *TRES_CASOS_DEL_RESPALDO):
         assert contiene(h5, dato), f"H5 no dice «{dato}» (F-145)"
     for dato in ("`empresa_repositorio` es ENTERO", "`SIN_BINARIO`",
                  "rompe `abrir_adjunto`"):

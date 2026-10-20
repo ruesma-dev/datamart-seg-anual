@@ -427,9 +427,11 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
   - **El límite (F-139)**: el datamart publica el ÍNDICE; abrir el ORIGINAL
     para una IA es `abrir_adjunto`, de `mcp-bbdd` (su F-023, desplegada el
     2026-10-17), que lo pide a `sigrid-api` y lo entrega sin convertir. Desde su
-    F-025 lo pide por la pareja, con una sola segunda petición con la empresa 1
-    si no hay fichero con ella o la empresa es nula; `empresa_repositorio` tiene
-    que llegarle ENTERA (F-145). Convertir `.doc`/`.xls` es F-142; abrirlo
+    F-025 lo pide por la pareja: con una empresa distinta de la 1 y un 400, una
+    sola segunda petición con la 1 y el mismo `cod`; con la empresa nula, la
+    única petición va directamente con la 1; con la empresa 1, el 400 es
+    `SIN_BINARIO`, sin segunda petición. `empresa_repositorio` tiene que
+    llegarle ENTERA (F-145). Convertir `.doc`/`.xls` es F-142; abrirlo
     desde un portal, trabajo de `portal`. El contrato
     (H1-H13) está en `azure-apps/datamart_seg_anual.md`.
   - **Quién abre cada fichero**: quien pueda leer la tabla de origen de su
