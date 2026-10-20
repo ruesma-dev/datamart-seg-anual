@@ -19,7 +19,8 @@
 -- ~199.042 filas el 2026-10-09.
 --
 -- EL BINARIO NO ESTÁ AQUÍ NI SE LEE: vive en la base documental `ruesma_rep` de
--- Sigrid y lo sirve `sigrid-api` (`documents/read` con `cod_repositorio`). Este
+-- Sigrid y lo sirve `sigrid-api` (`documents/read` con la pareja
+-- `empresa_repositorio`, `cod_repositorio`: F-025 de `mcp-bbdd`). Este
 -- SQL no nombra esa base ni las columnas de binario (`raw.gra` ni las tiene: se
 -- excluyen en la ingesta). Compras suma ~81 GB, más que el disco de 64 GB.
 --
@@ -35,6 +36,11 @@
 --
 -- DATO PERSONAL: `subido_por` (y el sufijo de `cod_repositorio`) es el LOGIN de
 -- quien subió el fichero (D3 del humano, 2026-10-09: login sí, nombre no).
+--
+-- CONTRATO CON `mcp-bbdd` (F-145): `empresa_repositorio` sale de `g.emp` TAL
+-- CUAL, ENTERA. `abrir_adjunto` la usa solo si llega como entero; renombrarla o
+-- cambiarle el tipo la rompe (`SIN_BINARIO`). Lo vigila
+-- `tests/test_f145_adjuntos_clave.py`.
 -- ============================================================================
 
 -- R15 · La guarda de huérfanos. `gra` se ingiere DETRÁS de `rcg`; si una
@@ -125,4 +131,4 @@ CREATE INDEX ix_documento_adjuntos_documento   ON compras.documento_adjuntos (do
 CREATE INDEX ix_documento_adjuntos_comparativo ON compras.documento_adjuntos (comparativo_id);
 
 COMMENT ON TABLE compras.documento_adjuntos IS
-'Indice de ficheros adjuntos (Graficos asociados de Sigrid) de facturas, contratos, comparativos, ofertas y albaranes (F-090): una fila por enlace documento-fichero (raw.rcg), con el nombre del fichero, su clase por extension, la fecha de alta y el login de quien lo subio. Clave adjunto_id (rcg.ide). El fichero NO esta en el datamart: vive en la base documental ruesma_rep de Sigrid y lo sirve sigrid-api (documents/read) con cod_repositorio. Que un documento no tenga fila es que Sigrid no tiene adjunto para el.';
+'Indice de ficheros adjuntos (Graficos asociados de Sigrid) de facturas, contratos, comparativos, ofertas y albaranes (F-090): una fila por enlace documento-fichero (raw.rcg), con el nombre del fichero, su clase por extension, la fecha de alta y el login de quien lo subio. Clave adjunto_id (rcg.ide). El fichero NO esta en el datamart: vive en la base documental ruesma_rep de Sigrid y lo sirve sigrid-api (documents/read) con la pareja (empresa_repositorio, cod_repositorio). Que un documento no tenga fila es que Sigrid no tiene adjunto para el.';

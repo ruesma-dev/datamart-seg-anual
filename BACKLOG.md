@@ -3,13 +3,11 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **133 features**, 72 abiertas (1 en curso, 1 con la spec lista, 0 bloqueadas y 70 en backlog) y 61 terminadas.
+Resumen: **133 features**, 71 abiertas (0 en curso, 1 con la spec lista, 0 bloqueadas y 70 en backlog) y 62 terminadas.
 
 ## En curso
 
-| # | Feature | Prioridad | Rigor | Rama |
-|---|---|---|---|---|
-| F-145 | La ficha de los adjuntos dice cómo los abre hoy `mcp-bbdd` (F-025): por la pareja {empresa, código} con respaldo en la empresa 1, sin `ADJUNTO_AMBIGUO` | 1 | estandar | `feature/F-145-adjuntos-clave-empresa-codigo` |
+_Ninguna feature en curso._
 
 ## Spec lista
 
@@ -120,6 +118,7 @@ _Ninguna feature bloqueada._
 | F-136 | Usuario de base de acceso TOTAL para el MCP (mcp_sigrid_dm_total) y rotación de las contraseñas expuestas | 1 | critico |
 | F-138 | Las facturas, albaranes y proformas liquidatorias: las alarmas de los documentos de Sigrid (conala) y la marca «liquidatoria» de cada documento | 1 | estandar |
 | F-144 | Regla del diccionario: si no se indica empresa, es Construcciones Ruesma (`empresa_id = 1`), y la IA lo dice | 1 | estandar |
+| F-145 | La ficha de los adjuntos dice cómo los abre hoy `mcp-bbdd` (F-025): por la pareja {empresa, código} con respaldo en la empresa 1, sin `ADJUNTO_AMBIGUO` | 1 | estandar |
 | F-009 | Inventario del entorno Azure existente | 2 | documental |
 | F-042 | La clave de mart.fact_seguimiento_mensual esta rota: 8.778 combinaciones duplicadas | 2 | critico |
 | F-056 | El mayor y el plan de cuentas como arbol: stg y mart sobre la contabilidad (raw por F-066) | 2 | critico |
@@ -163,12 +162,6 @@ _Ninguna feature bloqueada._
 | F-052 | La obra 0599 no esta en el datamart: 104.366 filas de presupuesto se caen por un arbol de partidas roto | 42 | critico |
 
 ## Detalle
-
-### F-145 · La ficha de los adjuntos dice cómo los abre hoy `mcp-bbdd` (F-025): por la pareja {empresa, código} con respaldo en la empresa 1, sin `ADJUNTO_AMBIGUO`
-
-estado **en curso** · prioridad 1 · rigor `estandar` · SDD no · rama `feature/F-145-adjuntos-clave-empresa-codigo`
-
-Nace el 2026-10-20 por orden del humano («lánzalo ya»), tras el aviso formal de `mcp-bbdd`: su F-025 está DESPLEGADA y VERIFICADA (revisión `ca-mcp-bbdd-dev--0000021`, imagen `r20261018-1730`; 77139 de la empresa 31 abre por el respaldo, 54066 y 576 por su pareja). Lo que cambió allí y nuestros textos aún no dicen: (1) `abrir_adjunto` pide a `sigrid-api` `documents/read` con `key: {"emp": empresa_repositorio, "cod": cod_repositorio}`, SIN `id_column` ni `id_value`; (2) si `sigrid-api` responde 400 `ValueError` (sin fichero con esa pareja) o la fila trae `empresa_repositorio` nula, lo pide UNA vez más con emp = 1 y el mismo `cod`, avisa al modelo de que puede no ser el original de esa empresa y deja `respaldo=empresa_defecto` en su traza; (3) el 409 `DocumentoAmbiguoError` es `ORIGEN_AMBIGUO`; (4) `ADJUNTO_AMBIGUO` desaparece (los 2 adjuntos de D5 se piden con la empresa de su fila); (5) CONTRATO NUEVO: `mcp-bbdd` usa `empresa_repositorio` solo si llega como ENTERO; renombrarla o cambiarle el tipo rompe `abrir_adjunto` (`SIN_BINARIO` y un WARNING en su log); nula se tolera. Dónde tocar (medido por el líder): `config/diccionario/compras.yaml` (ficha de `compras.documento_adjuntos`, ~l.4383, y la columna `cod_repositorio`, ~l.4489, que dicen «`id_column: cod`»), el `COMMENT` de `sql/compras/14_documento_adjuntos.sql` si lo dice, y `azure-apps/datamart_seg_anual.md` (H5 y los dos párrafos de ~l.880 y ~l.936). `sdd=false`: cambio de texto con sus tests (que ninguna ficha vuelva a decir `id_column: cod` ni `ADJUNTO_AMBIGUO`, y que el tipo entero de `empresa_repositorio` quede fijado). Diccionario v57. DESPLIEGUE: imagen nueva y job ANTES de publicar la v57 (lección del 19-10: la nocturna republica el diccionario de la imagen).
 
 ### F-140 · La fase 2 de la cartera (F-037): los ingredientes de la proyección de caja por obra (devengo pendiente, plazos de pago pactados y retenciones), sin convertir devengo en caja
 
@@ -715,6 +708,12 @@ Nace el 2026-10-14 de un correo de **Elena Díaz** (Departamento de Control de C
 estado **terminada** · prioridad 1 · rigor `estandar` · SDD no · rama `feature/F-144-empresa-por-defecto`
 
 Nace el 2026-10-18 por orden del humano, pedida primero en la sesión de `mcp-bbdd` («si no se dice nada es construcciones ruesma. guardalo como regla en el diccionario en datamart») y confirmada aquí: «en general si no se indica empresa es construcciones ruesma. es criterio general». Regla dura nueva `R-EMPRESA-POR-DEFECTO` (bloqueante) en `config/diccionario/00_global.yaml`, junto a `R-CODIGO-POR-EMPRESA`: es un CRITERIO GENERAL, no solo de códigos. Si la pregunta no nombra empresa, se entiende Construcciones Ruesma, `empresa_id = 1` (el código ya lo fija `R-CODIGO-POR-EMPRESA`: «Ruesma (1), Porsan (28), cada UTE»), y se filtra por ella en todo objeto con empresa. La IA DICE en la respuesta que ha supuesto Construcciones Ruesma, para que el usuario lo vea y lo corrija (sugerencia de `mcp-bbdd`). No se aplica si la pregunta pide otra empresa, varias, el grupo o una UTE; y nunca se suman empresas sin decirlo. Diccionario: versión siguiente a la de `main` (hoy v54 → v55), publicar y reiniciar el MCP; avisar a `mcp-bbdd` cuando se publique. No cambia `abrir_adjunto` (la empresa sale de la fila del índice). sdd=false: cambio de texto del diccionario con sus tests. El ID F-143 lo tiene reservado la rama de F-128 (tipo de contrato de compra). ================ CERRADA el 2026-10-18 (`done`): reviewer APROBADO en la pasada 2 (`progress/review_F-144.md`; la 1 pidió nombrar objeto a objeto dónde hay empresa y avisar en los que no), init.sh en verde y fusionada en main. DESPLEGADA el 2026-10-18 por orden del humano: diccionario **v55** publicado en Azure (226 objetos, 1.864 columnas, 27 reglas, hash `acef223dc1a9`; `check-diccionario` OK) y MCP reiniciado (`ca-mcp-bbdd-dev--0000020`); aviso a `mcp-bbdd`. NOTA 2026-10-19: la nocturna del 19 republicó la v54 (la de la imagen del job) encima de la v55; la regla vuelve a estar publicada desde la v56 de F-128, cuya imagen ya está en el job.
+
+### F-145 · La ficha de los adjuntos dice cómo los abre hoy `mcp-bbdd` (F-025): por la pareja {empresa, código} con respaldo en la empresa 1, sin `ADJUNTO_AMBIGUO`
+
+estado **terminada** · prioridad 1 · rigor `estandar` · SDD no · rama `feature/F-145-adjuntos-clave-empresa-codigo`
+
+Nace el 2026-10-20 por orden del humano («lánzalo ya»), tras el aviso formal de `mcp-bbdd`: su F-025 está DESPLEGADA y VERIFICADA (revisión `ca-mcp-bbdd-dev--0000021`, imagen `r20261018-1730`; 77139 de la empresa 31 abre por el respaldo, 54066 y 576 por su pareja). Lo que cambió allí y nuestros textos aún no dicen: (1) `abrir_adjunto` pide a `sigrid-api` `documents/read` con `key: {"emp": empresa_repositorio, "cod": cod_repositorio}`, SIN `id_column` ni `id_value`; (2) si `sigrid-api` responde 400 `ValueError` (sin fichero con esa pareja) o la fila trae `empresa_repositorio` nula, lo pide UNA vez más con emp = 1 y el mismo `cod`, avisa al modelo de que puede no ser el original de esa empresa y deja `respaldo=empresa_defecto` en su traza; (3) el 409 `DocumentoAmbiguoError` es `ORIGEN_AMBIGUO`; (4) `ADJUNTO_AMBIGUO` desaparece (los 2 adjuntos de D5 se piden con la empresa de su fila); (5) CONTRATO NUEVO: `mcp-bbdd` usa `empresa_repositorio` solo si llega como ENTERO; renombrarla o cambiarle el tipo rompe `abrir_adjunto` (`SIN_BINARIO` y un WARNING en su log); nula se tolera. Dónde tocar (medido por el líder): `config/diccionario/compras.yaml` (ficha de `compras.documento_adjuntos`, ~l.4383, y la columna `cod_repositorio`, ~l.4489, que dicen «`id_column: cod`»), el `COMMENT` de `sql/compras/14_documento_adjuntos.sql` si lo dice, y `azure-apps/datamart_seg_anual.md` (H5 y los dos párrafos de ~l.880 y ~l.936). `sdd=false`: cambio de texto con sus tests (que ninguna ficha vuelva a decir `id_column: cod` ni `ADJUNTO_AMBIGUO`, y que el tipo entero de `empresa_repositorio` quede fijado). Diccionario v57. DESPLIEGUE: imagen nueva y job ANTES de publicar la v57 (lección del 19-10: la nocturna republica el diccionario de la imagen).
 
 ### F-009 · Inventario del entorno Azure existente
 

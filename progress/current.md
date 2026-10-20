@@ -9,6 +9,45 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-20 · INCIDENCIA · la nocturna del 20 falló (`caj-datamart-seg-dev-29874240`, Failed)
+
+- La 1.ª réplica desaparece a las 03:24 en `build_cierre` **sin evento de salida** (ni exit code ni
+  OOMKilled, ni FAILED en `etl_runs`; el Postgres no se reinició): pérdida de la réplica por la
+  plataforma. La 2.ª (03:43) empieza desde la ingesta y la mata `DeadlineExceeded` a las 07:00
+  (`replicaTimeout` 25.200 s cuenta desde las 00:00) en `mart/06_cp_tipologia.sql`; su sesión quedó
+  huérfana con AccessExclusiveLock hasta morir sola (transacción deshecha).
+- Estado dejado: `cierre.fact_cierre_mensual` vacía; perfil restringido sin SELECT en lo recreado.
+  Reparación (humano, 07:40): `apply-grants` OK (restringido: compras 33/33, mart 16/16, retenciones
+  17/17); `build-cierre` + `apply-grants` + `check-declarados` en marcha desde el puesto.
+- Aparte: desde el 17 la 1.ª réplica muere cada noche a las 00:0x con «connection timeout expired»
+  (ingesta `obrparpre`, exit code 1) y el reintento lo tapa. Pendiente de investigar.
+- Propuesta al humano: feature de robustez de la nocturna (reanudar, grants por build, límite).
+
+## 2026-10-20 · F-145 · CERRADA (`done`, APROBADO en pasada 2, `5043244`) · merge `1b31d86`
+
+- Merge por orden del humano; despliegue (pasos MANUAL de abajo) en curso por el líder.
+
+- **Pasada 1**: CHANGES_REQUESTED (`progress/review_F-145.md`). **Pasada 2** (commits `ac6ab44` T4,
+  `c3d5081` T5; `azure-apps` `5602198`): el respaldo con la empresa 1 en sus tres casos (H1) en la
+  ficha, la v57, ARCHITECTURE y H5; tests que lo exigen, con RED; O1 aplicado; informe al día.
+  Detalle y `init.sh` final: `progress/impl_F-145.md`.
+- **Historia**: estuvo `blocked` por el rojo ajeno de F-141 R30 (`azure-apps` `2f28a8d`); `mcp-bbdd`
+  enlazó las tres líneas (`408c007`) y quedó en verde. `empresa_repositorio` verificada `integer` en
+  Azure (líder, solo lectura).
+- **MANUAL tras APROBADO y merge, EN ESTE ORDEN** (nada de esto lo hace el implementer):
+  1. Imagen: `powershell -NoProfile -File infra/70_build_image.ps1` (anota el tag que imprime).
+  2. Job a esa imagen ANTES de publicar (la nocturna republica el diccionario de la imagen del
+     job): `powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag>`.
+  3. `.venv/Scripts/python.exe main.py publicar-diccionario` (v57).
+  4. `.venv/Scripts/python.exe main.py check-diccionario`.
+  5. Reiniciar el MCP (cachea el diccionario), revisión vigente `ca-mcp-bbdd-dev--0000022`:
+     `az containerapp revision restart -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --revision ca-mcp-bbdd-dev--0000022`.
+  6. Avisar a `mcp-bbdd`: v57 publicada. De paso, su `mcp_bbdd.md` (§ de `abrir_adjunto`, ~l.218-222)
+     no distingue la fila de la empresa 1 (ahí un 400 es `SIN_BINARIO`, sin segunda petición); su
+     l.147 y su código (`cliente_documentos.py`, `leer()`) sí. Es su documento: no se toca desde aquí.
+  El `COMMENT ON TABLE` nuevo entra con la nocturna o un `build-compras`; no hace falta ingesta.
+- Sin push. Nada publicado ni desplegado.
+
 ## 2026-10-19 · F-128 · CERRADA (`done`, APROBADO en pasada 2) · DESPLEGADA: v56 publicada y MCP reiniciado
 
 - Review: pasada 1 CHANGES_REQUESTED (`R-EMPRESA-POR-DEFECTO` atribuía a `empide` la empresa del
