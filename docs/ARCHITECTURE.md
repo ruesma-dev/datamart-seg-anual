@@ -418,15 +418,21 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
   objeto: se cruza con ellos por `documento_id` y `comparativo_id`.
   - **El fichero NO se replica**: vive en la base documental de Sigrid,
     `ruesma_rep` (~81 GB solo en compras, más que el disco de 64 GB), y lo
-    sirve `sigrid-api` con `documents/read` y `cod_repositorio`, siempre con
+    sirve `sigrid-api` con `documents/read` y la pareja
+    (`empresa_repositorio`, `cod_repositorio`), siempre con
     `filename_columns: ["cod"]`: sin ello responde HTTP 500 a los nombres
     documentales no ASCII (5,7 % de los enlaces, medido el 2026-10-15). Este
     ETL no lee `ruesma_rep` ni importa librerías de documentos o de IA (test de
     F-139, con la única excepción de `openpyxl` en el paso de F-004).
   - **El límite (F-139)**: el datamart publica el ÍNDICE; abrir el ORIGINAL
-    para una IA es una herramienta de `mcp-bbdd` (todavía sin desplegar) que lo
-    pide a `sigrid-api` y lo entrega sin convertir (convertir `.doc`/`.xls` es
-    F-142); abrirlo desde un portal, trabajo de `portal`. El contrato
+    para una IA es `abrir_adjunto`, de `mcp-bbdd` (su F-023, desplegada el
+    2026-10-17), que lo pide a `sigrid-api` y lo entrega sin convertir. Desde su
+    F-025 lo pide por la pareja: con una empresa distinta de la 1 y un 400, una
+    sola segunda petición con la 1 y el mismo `cod`; con la empresa nula, la
+    única petición va directamente con la 1; con la empresa 1, el 400 es
+    `SIN_BINARIO`, sin segunda petición. `empresa_repositorio` tiene que
+    llegarle ENTERA (F-145). Convertir `.doc`/`.xls` es F-142; abrirlo
+    desde un portal, trabajo de `portal`. El contrato
     (H1-H13) está en `azure-apps/datamart_seg_anual.md`.
   - **Quién abre cada fichero**: quien pueda leer la tabla de origen de su
     familia (FACTURA `facturas`, CONTRATO `contratos`, COMPARATIVO

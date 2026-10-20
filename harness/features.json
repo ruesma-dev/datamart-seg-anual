@@ -2294,7 +2294,8 @@
       "sdd": false,
       "rigor": "estandar",
       "priority": 1,
-      "branch": "feature/F-145-adjuntos-clave-empresa-codigo"
+      "branch": "feature/F-145-adjuntos-clave-empresa-codigo",
+      "notes": "2026-10-20: desbloqueada. El rojo de init.sh era R30 de F-141 por tres líneas de azure-apps/mcp_bbdd.md añadidas por la F-027 de mcp-bbdd; mcp-bbdd las enlazó a datamart_seg_anual.md (azure-apps 408c007). init.sh en verde en la rama (8479 passed, 254 skipped). empresa_repositorio verificada integer en Azure (solo lectura)."
     }
   ]
 }

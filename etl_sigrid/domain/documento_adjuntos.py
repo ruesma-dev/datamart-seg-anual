@@ -9,8 +9,9 @@ LA FUENTE SON DOS TABLAS DE SIGRID: `rcg`, el enlace documento <-> gráfico
 fichero (`nom`), fecha de alta (`fec`, AAAAMMDD), login de quien lo subió
 (`usu`) y `cod`, la clave con la que la base DOCUMENTAL `ruesma_rep` guarda el
 binario. El binario NO entra en el datamart: lo sirve `sigrid-api` con
-`POST /api/documents/read` (`id_column` `cod`). Mediciones, en solo lectura el
-2026-10-09: `progress/spec_F-090.md`.
+`POST /api/documents/read`, por la pareja (`emp`, `cod`) desde la F-025 de
+`mcp-bbdd` (F-145). Mediciones, en solo lectura el 2026-10-09:
+`progress/spec_F-090.md`.
 
 LA REGLA LA EJECUTA SQL (`sql/compras/14_documento_adjuntos.sql`) y la ingesta
 la filtra en origen (`config/tables_sigrid.yaml`). Aquí está escrita **una sola
