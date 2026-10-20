@@ -23,27 +23,27 @@
   (ingesta `obrparpre`, exit code 1) y el reintento lo tapa. Pendiente de investigar.
 - Propuesta al humano: feature de robustez de la nocturna (reanudar, grants por build, límite).
 
-## 2026-10-20 · F-145 · `in_progress` · DESBLOQUEADA, al reviewer
+## 2026-10-20 · F-145 · `in_progress` · pasada 2 hecha (implementer), al reviewer
 
-- `mcp-bbdd` enlazó las tres líneas (`azure-apps` `408c007`); `init.sh` en verde en la rama
-  (8479 passed, 254 skipped). `empresa_repositorio` verificada `integer` en Azure (solo lectura).
-- Al desplegar la v57: el MCP vigente es `ca-mcp-bbdd-dev--0000022` (F-027 de `mcp-bbdd`).
-
-## 2026-10-20 · F-145 · `blocked` (implementer) · trabajo HECHO, `init.sh` en rojo por un test ajeno
-
-- **Hecho** (rama `feature/F-145-adjuntos-clave-empresa-codigo`, commits `b37768c` T1 RED, `599bf92` T2,
-  `37aa832` T3, `e64231b` T2 bis; `azure-apps` `4d77cbc`): fichas de `compras.documento_adjuntos`,
-  `cod_repositorio` y `empresa_repositorio` con la pareja (`emp`, `cod`), el respaldo con la empresa 1 y
-  `ORIGEN_AMBIGUO`; COMMENT y cabecera de `14_documento_adjuntos.sql`; docstring del dominio;
-  ARCHITECTURE; `raw.gra`; diccionario **v57**; H5 y su contrato en `azure-apps`. 41 tests nuevos en
-  `tests/test_f145_adjuntos_clave.py`, verdes. Detalle: `progress/impl_F-145.md`.
-- **MOTIVO DEL BLOQUEO**: `bash harness/init.sh` sale en rojo por
-  `tests/test_f141_perfil_restringido.py::test_f141_r30_mcp_bbdd_solo_enlaza_al_contrato`, que **ya
-  fallaba antes de F-145** (mismo resultado en el `init.sh` inicial: `1 failed, 8113 passed`). Causa:
-  el commit `2f28a8d` de `azure-apps` (F-027 de `mcp-bbdd`) añadió a `mcp_bbdd.md` tres líneas
-  (l.410, l.650 y l.651) que nombran `mcp_sigrid_dm_restringido`/F-141 sin enlazar a
-  `datamart_seg_anual.md`, y R30 exige que toda línea así enlace. Arreglarlo es tocar el documento de
-  `mcp-bbdd` (su dueño) o rebajar un test de F-141: los dos se salen de F-145. **Decide el humano.**
+- **Pasada 1**: CHANGES_REQUESTED (`progress/review_F-145.md`). **Pasada 2** (commits `ac6ab44` T4,
+  `c3d5081` T5; `azure-apps` `5602198`): el respaldo con la empresa 1 en sus tres casos (H1) en la
+  ficha, la v57, ARCHITECTURE y H5; tests que lo exigen, con RED; O1 aplicado; informe al día.
+  Detalle y `init.sh` final: `progress/impl_F-145.md`.
+- **Historia**: estuvo `blocked` por el rojo ajeno de F-141 R30 (`azure-apps` `2f28a8d`); `mcp-bbdd`
+  enlazó las tres líneas (`408c007`) y quedó en verde. `empresa_repositorio` verificada `integer` en
+  Azure (líder, solo lectura).
+- **MANUAL tras APROBADO y merge, EN ESTE ORDEN** (nada de esto lo hace el implementer):
+  1. Imagen: `powershell -NoProfile -File infra/70_build_image.ps1` (anota el tag que imprime).
+  2. Job a esa imagen ANTES de publicar (la nocturna republica el diccionario de la imagen del
+     job): `powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag>`.
+  3. `.venv/Scripts/python.exe main.py publicar-diccionario` (v57).
+  4. `.venv/Scripts/python.exe main.py check-diccionario`.
+  5. Reiniciar el MCP (cachea el diccionario), revisión vigente `ca-mcp-bbdd-dev--0000022`:
+     `az containerapp revision restart -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --revision ca-mcp-bbdd-dev--0000022`.
+  6. Avisar a `mcp-bbdd`: v57 publicada. De paso, su `mcp_bbdd.md` (§ de `abrir_adjunto`, ~l.218-222)
+     no distingue la fila de la empresa 1 (ahí un 400 es `SIN_BINARIO`, sin segunda petición); su
+     l.147 y su código (`cliente_documentos.py`, `leer()`) sí. Es su documento: no se toca desde aquí.
+  El `COMMENT ON TABLE` nuevo entra con la nocturna o un `build-compras`; no hace falta ingesta.
 - Sin push. Nada publicado ni desplegado.
 
 ## 2026-10-19 · F-128 · CERRADA (`done`, APROBADO en pasada 2) · DESPLEGADA: v56 publicada y MCP reiniciado

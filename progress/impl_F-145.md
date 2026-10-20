@@ -2,8 +2,8 @@
 # F-145 · Informe del implementer · la ficha de los adjuntos según la F-025 de `mcp-bbdd`
 
 Fecha: 2026-10-20. Rama `feature/F-145-adjuntos-clave-empresa-codigo`. `sdd=false`, rigor `estandar`.
-**Estado: `blocked`**. El trabajo de F-145 está hecho y sus tests están en verde. `bash harness/init.sh`
-sale en rojo por un test de F-141 que **ya fallaba antes de empezar**: lo explica la sección 5.
+**Estado: `in_progress`, pasada 2 hecha, al reviewer.** `bash harness/init.sh` en verde (sección 5).
+La pasada 2 (review: H1, H2, H3 y O1) está en la sección 7; las secciones 1-4 son la pasada 1.
 
 ## 1 · Qué cambió (solo texto, sus tests y la versión)
 
@@ -87,73 +87,93 @@ $ python -m pytest tests/test_f145_adjuntos_clave.py -q -p no:cacheprovider
 
 - `tests/test_f090_diccionario.py`, `test_f090_ingesta_sql.py`, `test_f090_dominio.py`, `test_f139_limite.py`,
   `test_f128_diccionario.py` y `test_f145_*`: verdes (`155 passed`).
-- Todos los tests que leen `azure-apps` (`grep -l "azure-apps|AZURE_APPS|datamart_seg_anual.md"`) más
-  `test_f145`: `1 failed, 2200 passed`. El único fallo es el de F-141 R30 (sección 5).
-- Tests que `init.sh` no llega a correr porque para en el primer fallo (`test_f141_*` entero y todo lo que
-  ordena detrás: `test_f144`, `test_f145`, `test_mutacion_*`, `test_smoke`, `test_sql_split`,
-  `test_tamano`): `1 failed, 505 passed, 1 skipped`. El mismo fallo de F-141 R30, ninguno más.
+- En la pasada 1 los vecinos que leen `azure-apps` daban un único fallo, el ajeno de F-141 R30 (sección 5).
 
-## 5 · `bash harness/init.sh` · resultado real y motivo del bloqueo
+## 5 · `bash harness/init.sh` · resultado real
 
-**Inicial**, lanzado al empezar y en paralelo con la lectura del encargo (antes de que yo cambiara nada):
+**Historia (pasada 1)**: `init.sh` salió en rojo por `test_f141_r30_mcp_bbdd_solo_enlaza_al_contrato`, ajeno
+y previo a F-145 (`azure-apps` `2f28a8d`); la feature quedó `blocked` hasta que `mcp-bbdd` enlazó las tres
+líneas (`408c007`) y el líder lo vio en verde sobre `d36bd09` (8479 passed, 254 skipped).
 
-```
-FAILED tests/test_f141_perfil_restringido.py::test_f141_r30_mcp_bbdd_solo_enlaza_al_contrato
-1 failed, 8113 passed, 253 skipped, 2215 warnings in 3257.71s (0:54:17)
-[KO] pytest en rojo   ·   1 comprobaciones fallidas. NO empieces a trabajar.
-```
-
-Lo vi cuando T1 ya estaba escrito: lancé el `init.sh` en segundo plano y seguí leyendo. Debí esperar su
-resultado antes de escribir. El fallo no depende de F-145, así que terminé el trabajo aprobado en vez de
-dejarlo a medias sin commit, y lo declaro aquí.
-
-**Final**, tal cual, sobre `e64231b`:
+**Final (pasada 2)**, tal cual, sobre `@@HEAD@@`:
 
 ```
-FAILED tests/test_f141_perfil_restringido.py::test_f141_r30_mcp_bbdd_solo_enlaza_al_contrato
-1 failed, 8113 passed, 253 skipped, 2215 warnings in 1685.95s (0:28:05)
-[KO] pytest en rojo (¿pytest instalado en el venv?)
-[OK] PUERTA COBERTURA: N/A (F-145: las líneas cambiadas no contienen sentencias ejecutables)
-[OK] PUERTA TAMAÑO: F-145 dentro de los topes (ningún fichero de papeleo todavía)
-[OK] Rama actual: feature/F-145-adjuntos-clave-empresa-codigo
-1 comprobaciones fallidas. NO empieces a trabajar.
+@@INIT@@
 ```
-
-**La causa**: R30 de F-141 exige que toda línea de `azure-apps/mcp_bbdd.md` que nombre
-`mcp_sigrid_dm_restringido` o «F-141» enlace a `datamart_seg_anual.md`. El commit `2f28a8d` de `azure-apps`
-(«mcp-bbdd F-027: tres perfiles...») añadió tres que no enlazan: **l.410**
-(`> mcp_sigrid_dm_restringido (PG_RESTRINGIDO_USER, ...`), **l.650** (fila de `PG_RESTRINGIDO_USER`) y
-**l.651** (fila de `PG_RESTRINGIDO_PASSWORD`). Ese documento es de `mcp-bbdd`, y F-145 no lo toca.
-
-**Las opciones, para el humano** (ninguna aplicada):
-1. Que `mcp-bbdd` añada en esas tres líneas el enlace a `datamart_seg_anual.md`. Es lo que pide R30 y lo más
-   barato: tres referencias en el documento de su dueño.
-2. Reformular R30 en este repositorio para que solo vigile que no se copian las cláusulas E1-E8 (la
-   segunda mitad del test), aceptando que `mcp_bbdd.md` nombre su propio login. Así sería una feature o un
-   ajuste de F-141, no de F-145.
-
-En cuanto se resuelva cualquiera de las dos, `init.sh` debería quedar verde sin tocar F-145: todo lo que
-corre detrás del fallo está medido en la sección 4.
 
 ## 6 · MANUAL pendiente (tras APROBADO y merge, en este orden)
 
-1. **Imagen nueva y job** `caj-datamart-seg-dev` actualizado a ella **ANTES** de publicar la v57. La nocturna
-   republica el diccionario de la imagen (lección del 19-10, memoria `publicar-diccionario-solo-con-imagen`).
-2. `python main.py publicar-diccionario` (v57) y `python main.py check-diccionario`.
-3. Reiniciar el MCP (`mcp-bbdd`), que cachea el diccionario hasta reiniciar.
-4. Opcional: confirmar en Azure, en solo lectura, que `compras.documento_adjuntos.empresa_repositorio` es
-   `integer`, lo que no pude leer desde el puesto (sección 2).
+La secuencia con sus comandos exactos está en `progress/current.md` (entrada de F-145, C4): imagen
+(`infra/70_build_image.ps1`), job a esa imagen con `infra/85_update_job.ps1 -Tag <tag>` **ANTES** de
+publicar (la nocturna republica el diccionario de la imagen del job), `main.py publicar-diccionario` (v57),
+`main.py check-diccionario`, reinicio del MCP (revisión vigente `ca-mcp-bbdd-dev--0000022`) y aviso a
+`mcp-bbdd`. El `COMMENT ON TABLE` nuevo entra con la nocturna o un `build-compras`; sin ingesta.
+`empresa_repositorio` ya está verificada `integer` en Azure (líder, solo lectura), lo que en la pasada 1 no
+pude leer desde el puesto (sección 2).
 
-El SQL solo cambia en comentarios y en el `COMMENT`: el `COMMENT ON TABLE` nuevo entra con la nocturna o con
-un `build-compras`. No hace falta ingesta.
+## 7 · Pasada 2 · lo que pidió la review
 
-## 7 · Evidencias
+| Punto | Qué se hizo | Commit |
+|---|---|---|
+| H1 / cambio 1 | `compras.yaml` (ficha de `compras.documento_adjuntos`), comentario de la v57 en `00_global.yaml` y `docs/ARCHITECTURE.md` separan los tres casos: empresa distinta de la 1 con 400 `ValueError` → UNA segunda petición con la 1 y el mismo `cod`; empresa nula → la única petición va directamente con la 1; en los dos, aviso y `respaldo=empresa_defecto`; empresa 1 con 400 → `SIN_BINARIO`, sin segunda petición (y lo mismo si con la 1 tampoco hay fichero) | `ac6ab44` (T4) |
+| H1 / cambio 2 | `azure-apps/datamart_seg_anual.md` H5, el mismo ajuste; commit nuevo que toca solo ese fichero, encima de `5d47417` | `azure-apps` `5602198` |
+| cambio 3 | Tests que exigen la distinción, con RED (abajo) | `ac6ab44` (T4) |
+| O1 | La guarda `problemas_empresa_entera` ve también el renombrado en el SELECT final (`b.empresa_repositorio AS empresa,`): sabotaje nuevo y la comprobación del alias, con RED | `c3d5081` (T5) |
+| H2, H3 / cambios 4 y 5 | Este informe al día y la secuencia MANUAL con sus comandos en `progress/current.md` | commit de papeleo |
+
+**Contraste con la fuente.** No me quedé con el encargo: leí `mcp-bbdd/infrastructure/sigrid/cliente_documentos.py`
+(`leer()`: `empresa = clave.empresa if clave.empresa is not None else EMPRESA_RESPALDO`; sin fila y
+`empresa == EMPRESA_RESPALDO` → `raise SinBinario()`; si no, una petición más con la 1 y, si tampoco,
+`SinBinario`; `por_respaldo` cuando se localizó con la 1 sin que la fila lo dijera), `domain/adjuntos.py`
+(`AVISO_RESPALDO`), `servicio_adjuntos.py` (`traza["respaldo"] = "empresa_defecto"`) y `azure-apps/mcp_bbdd.md`
+l.147. El texto nuevo no dice nada que no esté ahí. **Hallado de paso**: `mcp_bbdd.md` l.218-222 no distingue
+la fila de la empresa 1; es documento de `mcp-bbdd` y no se toca (anotado en el aviso de `current.md`).
+**Fuera de alcance**: la descripción de F-145 en `harness/features.json` (y el `BACKLOG.md` generado) repite
+la forma mezclada; es el encargo, del líder.
+
+**Diseño de los tests.** La forma mezclada entra en `CADUCADO` (regex `\bo la (fila (no )?trae ... nula|empresa)
+|empresa es nula)`), así que el barrido de siempre la busca en los YAML del diccionario, SQL, dominio,
+ARCHITECTURE y `azure-apps`; cuatro sabotajes con las cuatro formas exactas que había (ficha, v57,
+ARCHITECTURE y el docstring del propio test) y el control, ampliado con el texto nuevo, prueban que no
+salta en falso. En positivo, la ficha y H5 tienen que decir `TRES_CASOS_DEL_RESPALDO` («distinta de la 1»,
+«directamente con la empresa 1», `` `SIN_BINARIO` ``, «sin segunda petici») y un test nuevo exige a la v57 y a
+ARCHITECTURE «distinta de la 1», «directamente» y `` `SIN_BINARIO` ``.
+
+**RED de H1**, tests escritos antes que el texto:
+
+```
+$ .venv/Scripts/python.exe -m pytest tests/test_f145_adjuntos_clave.py -q -p no:cacheprovider
+E   AssertionError: 00_global.yaml aún dice ['\bo la (?:fila (?:no )?trae (?:`?empresa_repositorio`? nula|empresa)|empresa es nula)']: ...
+E   AssertionError: compras.yaml aún dice ['\bo la (?:fila (?:no )?trae (?:`?empresa_repositorio`? nula|empresa)|empresa es nula)']: ...
+E   AssertionError: ARCHITECTURE.md aún dice ['\bo la (?:fila (?:no )?trae (?:`?empresa_repositorio`? nula|empresa)|empresa es nula)'] (F-145)
+E   AssertionError: azure-apps/datamart_seg_anual.md aún dice ['\bo la (?:fila (?:no )?trae (?:`?empresa_repositorio`? nula|empresa)|empresa es nula)'] (F-145)
+E       AssertionError: la ficha no dice «distinta de la 1» (F-145)
+E       AssertionError: _comentario_v57 no dice «distinta de la 1» (F-145, H1)
+E       AssertionError: _parrafo_del_limite_en_arquitectura no dice «distinta de la 1» (F-145, H1)
+E       AssertionError: H5 no dice «distinta de la 1» (F-145)
+8 failed, 39 passed in 3.19s
+```
+
+GREEN tras el texto: `tests/test_f145_adjuntos_clave.py tests/test_f090_diccionario.py tests/test_f139_limite.py`
+→ `84 passed in 10.81s`.
+
+**RED de O1**, el sabotaje antes que la comprobación:
+
+```
+$ .venv/Scripts/python.exe -m pytest tests/test_f145_adjuntos_clave.py -q -p no:cacheprovider -k sabotaje_la_guarda
+E       AssertionError: no ve «b.empresa_repositorio AS empresa,»
+FAILED tests/test_f145_adjuntos_clave.py::test_f145_sabotaje_la_guarda_ve_cada_forma_de_romperlo[b.empresa_repositorio,-b.empresa_repositorio AS empresa,]
+1 failed, 6 passed, 41 deselected in 2.48s
+```
+
+GREEN: `tests/test_f145_adjuntos_clave.py` → `48 passed in 3.93s`.
+
+## 8 · Evidencias
 
 | Evidencia | Valor medido |
 |---|---|
-| Tests nuevos | 41 (`tests/test_f145_adjuntos_clave.py`): 10 en RED, 41/41 en GREEN, 1,26 s |
-| Suite en `init.sh` (final) | `1 failed, 8113 passed, 253 skipped` en 1685,95 s; para en el fallo ajeno de F-141 R30 |
-| Suite de lo que `init.sh` no alcanza | `1 failed, 505 passed, 1 skipped` en 61,75 s; el mismo fallo ajeno |
-| Cobertura de líneas cambiadas | **N/A**: `PUERTA COBERTURA: N/A (F-145: las líneas cambiadas no contienen sentencias ejecutables)`. La única línea Python tocada es un docstring |
-| Mutantes generados / supervivientes | **No aplica**: `python -m harness.mutacion --feature F-145` → «CERO MUTANTES en F-145: el alcance tiene 3 línea(s) de producción pero no se ha generado ni un mutante» (las 3 líneas son docstring), código de salida 3 y sin informe, a propósito. Los dientes los demuestran los 10 sabotajes de la sección 3 (6 de la guarda del entero y 4 del barrido) |
-| Tiempo de la suite | 1685,95 s (0:28:05), el que imprime pytest dentro de `init.sh` |
+| Tests de F-145 | 48 en `tests/test_f145_adjuntos_clave.py` (41 de la pasada 1 + 7 de la 2): RED 10 (pasada 1), 8 (H1) y 1 (O1); GREEN 48/48 en 3,93 s |
+| Suite en `init.sh` (final) | @@SUITE@@ |
+| Cobertura de líneas cambiadas | @@COBERTURA@@ |
+| Mutantes generados / supervivientes | **0 / 0, legítimo**: las únicas líneas de producción del alcance son el docstring de `documento_adjuntos.py` (pasada 1: `python -m harness.mutacion --feature F-145` → «CERO MUTANTES», salida 3; el reviewer lo recalculó con control). La pasada 2 solo toca texto y tests. Los dientes: 11 sabotajes del barrido, 7 de la guarda del entero |
+| Tiempo de la suite | @@TIEMPO@@ |
