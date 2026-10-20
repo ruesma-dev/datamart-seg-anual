@@ -131,8 +131,8 @@ la fila de la empresa 1; es documento de `mcp-bbdd` y no se toca (anotado en el 
 **Fuera de alcance**: la descripción de F-145 en `harness/features.json` (y el `BACKLOG.md` generado) repite
 la forma mezclada; es el encargo, del líder.
 
-**Diseño de los tests.** La forma mezclada entra en `CADUCADO` (regex `\bo la (fila (no )?trae ... nula|empresa)
-|empresa es nula)`), así que el barrido de siempre la busca en los YAML del diccionario, SQL, dominio,
+**Diseño de los tests.** La forma mezclada entra en `CADUCADO` (una regex
+que caza «o la fila trae `empresa_repositorio` nula», «o la fila no trae empresa» y «o la empresa es nula»), así que el barrido de siempre la busca en los YAML del diccionario, SQL, dominio,
 ARCHITECTURE y `azure-apps`; cuatro sabotajes con las cuatro formas exactas que había (ficha, v57,
 ARCHITECTURE y el docstring del propio test) y el control, ampliado con el texto nuevo, prueban que no
 salta en falso. En positivo, la ficha y H5 tienen que decir `TRES_CASOS_DEL_RESPALDO` («distinta de la 1»,
@@ -175,5 +175,5 @@ GREEN: `tests/test_f145_adjuntos_clave.py` → `48 passed in 3.93s`.
 | Tests de F-145 | 48 en `tests/test_f145_adjuntos_clave.py` (41 de la pasada 1 + 7 de la 2): RED 10 (pasada 1), 8 (H1) y 1 (O1); GREEN 48/48 en 3,93 s |
 | Suite en `init.sh` (final) | @@SUITE@@ |
 | Cobertura de líneas cambiadas | @@COBERTURA@@ |
-| Mutantes generados / supervivientes | **0 / 0, legítimo**: las únicas líneas de producción del alcance son el docstring de `documento_adjuntos.py` (pasada 1: `python -m harness.mutacion --feature F-145` → «CERO MUTANTES», salida 3; el reviewer lo recalculó con control). La pasada 2 solo toca texto y tests. Los dientes: 11 sabotajes del barrido, 7 de la guarda del entero |
+| Mutantes generados / supervivientes | **0 / 0, legítimo**: las únicas líneas de producción del alcance son el docstring de `documento_adjuntos.py` (pasada 1: `python -m harness.mutacion --feature F-145` → «CERO MUTANTES», salida 3; el reviewer lo recalculó con control). La pasada 2 solo toca texto y tests. Los dientes: 8 sabotajes del barrido (4 + 4 de la pasada 2) y 7 de la guarda del entero (6 + O1) |
 | Tiempo de la suite | @@TIEMPO@@ |
