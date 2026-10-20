@@ -4403,7 +4403,7 @@ objetos:
       con esa herramienta del MCP, que lo pide a `sigrid-api` y lo entrega SIN
       CONVERTIR. Las imagenes se ven directamente; los PDF y la ofimatica (un
       `.doc` o un `.xls` tal cual) llegan como binario, y convertirlos es
-      F-142. **COMO LO PIDE (F-025 de `mcp-bbdd`, desplegada el 2026-10-18)**:
+      F-142. **COMO LO PIDE (F-025 de `mcp-bbdd`, desplegada el 2026-10-19)**:
       por la pareja de la fila, `key: {"emp": empresa_repositorio, "cod":
       cod_repositorio}`. Si `sigrid-api` responde 400 `ValueError` (no hay
       fichero con esa pareja) o la fila trae `empresa_repositorio` nula, lo
