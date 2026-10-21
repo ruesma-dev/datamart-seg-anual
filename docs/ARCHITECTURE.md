@@ -426,13 +426,18 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
     F-139, con la única excepción de `openpyxl` en el paso de F-004).
   - **El límite (F-139)**: el datamart publica el ÍNDICE; abrir el ORIGINAL
     para una IA es `abrir_adjunto`, de `mcp-bbdd` (su F-023, desplegada el
-    2026-10-17), que lo pide a `sigrid-api` y lo entrega sin convertir. Desde su
+    2026-10-17), que lo pide a `sigrid-api`. Desde su F-028 (nuestra F-142,
+    desplegada el 2026-10-21) ningún fichero viaja dentro de la respuesta: a la
+    IA le llega texto por página (PDF, ofimática que Microsoft Graph convierte a
+    PDF y, de lo que Graph no convierte, texto extraído en el servidor), las
+    páginas escaneadas y las imágenes como imagen, con el parámetro `paginas`
+    (por defecto las 10 primeras), y el documento queda 24 h en un sitio de
+    SharePoint propio con un enlace solo para quien lo pidió. Desde su
     F-025 lo pide por la pareja: con una empresa distinta de la 1 y un 400, una
     sola segunda petición con la 1 y el mismo `cod`; con la empresa nula, la
     única petición va directamente con la 1; con la empresa 1, el 400 es
     `SIN_BINARIO`, sin segunda petición. `empresa_repositorio` tiene que
-    llegarle ENTERA (F-145). Convertir `.doc`/`.xls` es F-142; abrirlo
-    desde un portal, trabajo de `portal`. El contrato
+    llegarle ENTERA (F-145). Abrirlo desde un portal, trabajo de `portal`. El contrato
     (H1-H13) está en `azure-apps/datamart_seg_anual.md`.
   - **Quién abre cada fichero**: quien pueda leer la tabla de origen de su
     familia (FACTURA `facturas`, CONTRATO `contratos`, COMPARATIVO
