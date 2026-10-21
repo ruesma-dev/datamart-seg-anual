@@ -549,7 +549,7 @@ $$;
 --    «personal también quítalo, y saldos cuenta también»; y, desde F-146
 --    (2026-10-21), nada de contabilidad: el esquema entero fuera. Es lo mismo
 --    que concede la nocturna (`apply_grants`), aquí para que el grupo nazca ya
---    con su lectura: sus nueve esquemas (`DEFAULT_PERFIL_RESTRINGIDO_SCHEMAS`,
+--    con su lectura: sus esquemas (los de `DEFAULT_PERFIL_RESTRINGIDO_SCHEMAS`,
 --    un test lo vigila), el privilegio por defecto SIEMPRE en REVOKE (lo que
 --    nazca no lo lee hasta que la nocturna lo haya mirado) y el veto de todo
 --    esquema del CATÁLOGO que no sea suyo (hoy `contabilidad`, `tesoreria`,
@@ -738,7 +738,7 @@ ORDER BY table_schema, table_name, privilege_type;
 
 -- F-141: el login del perfil RESTRINGIDO. Debe salir EXACTAMENTE una
 -- pertenencia (`sigrid_dm_perfil_restringido_ro`, hereda = t, set_role = f).
--- Luego `t` en sus nueve esquemas y `f` en `contabilidad` (F-146), `tesoreria`,
+-- Luego `t` en cada esquema suyo y `f` en `contabilidad` (F-146), `tesoreria`,
 -- `personal`, `raw` y las tres `*_restringida`; `f` en las cuatro tablas de
 -- `contabilidad` y `t` en `compras.vencimientos` (vacío si el objeto aún no
 -- existe: base recién creada); `conecta = t`; y CERO filas en la última: el
