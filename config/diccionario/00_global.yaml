@@ -639,7 +639,27 @@
 # es `ORIGEN_AMBIGUO`; ya no hay un codigo que rechace los `cod` repetidos.
 # `empresa_repositorio` es ENTERO por contrato con `mcp-bbdd`.
 
-version: 57
+# version 58 (F-146, 2026-10-21): EL PERFIL RESTRINGIDO NO VE NADA DE
+# CONTABILIDAD. Decision del humano: fuera el esquema `contabilidad` ENTERO, no
+# tabla a tabla (F-141 le quitaba solo `contabilidad.mayor` y
+# `contabilidad.saldos_cuenta_mes`; le quedaban el plan de cuentas y los
+# recuentos de `contabilidad.apuntes_restringidos_mes`). `R-PERFIL-RESTRINGIDO`
+# lo dice (ambito: el esquema `contabilidad`) y las cuatro fichas de
+# `contabilidad` EMPIEZAN por «No disponible para el perfil restringido»;
+# `R-CONTABILIDAD-RESTRINGIDA` dice que tampoco lee la general. `retenciones`
+# (con `retenciones.apuntes_contables`) sigue siendo suyo. Sin objetos ni
+# columnas nuevos; el estandar y el total no cambian. AMPLIADA el 2026-10-21
+# por orden del humano: LOS ADJUNTOS LLEGAN CONVERTIDOS. La ficha de
+# `compras.documento_adjuntos` deja de decir que `abrir_adjunto` entrega el
+# original sin convertir: desde la F-028 de `mcp-bbdd` (nuestra F-142,
+# desplegada el 2026-10-21) le llega a la IA TEXTO por pagina (PDF, ofimatica
+# que Microsoft Graph convierte a PDF y texto extraido en el servidor de lo que
+# Graph no convierte), los escaneos y las imagenes como IMAGEN, el parametro
+# `paginas` (10 primeras por defecto) y el documento 24 h en un SharePoint
+# propio con un enlace solo para quien lo pidio. La pareja (`emp`, `cod`), el
+# respaldo con la empresa 1 y `ORIGEN_AMBIGUO` no cambian.
+
+version: 58
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -1017,8 +1037,8 @@ reglas:
       saldos pueden incluir apuntes que no estan en `contabilidad.mayor`.
 
       «restringida» = reservada al perfil total; el perfil RESTRINGIDO
-      (administrativos) ve MENOS que el estandar y no lee este esquema
-      (`R-PERFIL-RESTRINGIDO`).
+      (administrativos) ve MENOS que el estandar y no lee este esquema, y
+      tampoco la general (`contabilidad`) desde F-146 (`R-PERFIL-RESTRINGIDO`).
     motivo: >-
       Correo de Juan Romero (Dir. Administracion y Control de Costes) del
       2026-10-09: cualquier usuario con acceso al mayor podia consultar
@@ -1131,8 +1151,7 @@ reglas:
     titulo: El perfil restringido ve menos que el estandar; lo que no ve no se rodea
     severidad: bloqueante
     ambito:
-      - contabilidad.mayor
-      - contabilidad.saldos_cuenta_mes
+      - contabilidad
       - tesoreria
       - personal
       - retenciones.apuntes_contables
@@ -1147,20 +1166,22 @@ reglas:
       RESTRINGIDO. El TOTAL lee lo del estandar y ademas los esquemas
       `*_restringida`; el ESTANDAR lee todo el consumo salvo `raw` y los
       `*_restringida`; el RESTRINGIDO (administrativos) lee lo del estandar
-      MENOS `contabilidad.mayor`, `contabilidad.saldos_cuenta_mes`, el mayor
-      analitico (cuando se publique), el esquema `tesoreria` entero (la cartera
-      de cobros y pagos) y el esquema `personal` entero. SI lee `retenciones`,
-      `compras` entero (tambien `compras.vencimientos`, `compras.v_facturas_pago`
-      y `compras.v_control_forma_pago`, por las que ve el estado de pago de las
-      facturas), `contabilidad.plan_cuentas`,
-      `contabilidad.apuntes_restringidos_mes` y el resto del consumo. OJO AL
+      MENOS el esquema `contabilidad` entero (el plan de cuentas
+      `contabilidad.plan_cuentas`, el mayor `contabilidad.mayor`, sus saldos
+      `contabilidad.saldos_cuenta_mes` y los recuentos de
+      `contabilidad.apuntes_restringidos_mes`; tampoco el mayor analitico cuando
+      se publique), el esquema `tesoreria` entero (la cartera de cobros y pagos)
+      y el esquema `personal` entero. SI lee `retenciones`, `compras` entero
+      (tambien `compras.vencimientos`, `compras.v_facturas_pago` y
+      `compras.v_control_forma_pago`, por las que ve el estado de pago de las
+      facturas) y el resto del consumo. OJO AL
       NOMBRE: los esquemas `*_restringida` son del perfil TOTAL y NO del perfil
       restringido, que no lee ninguno: «restringida» quiere decir reservada al
       total, y el perfil restringido ve MENOS que el estandar.
 
       Con el perfil restringido, lo que no ve devuelve «permission denied», y
       eso no se rodea: no reintentes con otra sintaxis ni reconstruyas el dato
-      por otro camino -ni el mayor o sus saldos desde
+      por otro camino -ni el mayor, sus saldos o el plan de cuentas desde
       `retenciones.apuntes_contables` (solo trae las cuentas de retencion), ni
       a las personas desde los logins de `compras` (`documento_procesos`,
       `documento_alarmas.creada_por`, `documento_adjuntos.subido_por`), ni la
@@ -1181,7 +1202,12 @@ reglas:
       `contabilidad.saldos_cuenta_mes`. `apply_grants` vigila cada noche que no
       aparezca otra (la revoca y falla) ni un objeto con «mayor» en el nombre
       sin excluir. El MCP no filtra el catalogo ni el diccionario por perfil:
-      por eso la ficha de cada objeto que no ve empieza por el aviso.
+      por eso la ficha de cada objeto que no ve empieza por el aviso. F-146,
+      decision del humano del 2026-10-21: nada de contabilidad, el esquema
+      entero fuera, porque los recuentos sin el mayor no le sirven y dan idea del
+      volumen de nominas, y porque con el esquema dentro toda tabla nueva de
+      `contabilidad` le llegaria sola. `retenciones` se queda: lo necesita para
+      el cuadre de retenciones.
 
   - codigo: R-DESCOMPUESTO-ORIGEN
     titulo: Los descompuestos no se mezclan entre origenes ni entre versiones

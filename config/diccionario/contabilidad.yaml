@@ -35,6 +35,11 @@
 # `contabilidad_restringida`, que el rol general no lee. Cuanto falta, en
 # `contabilidad.apuntes_restringidos_mes` y en `incompleto` de los saldos.
 # Regla dura `R-CONTABILIDAD-RESTRINGIDA`.
+#
+# F-146 (2026-10-21, decision del humano): EL PERFIL RESTRINGIDO DEL MCP
+# (administrativos) NO LEE NADA DE ESTE ESQUEMA, ni el plan de cuentas ni los
+# recuentos (F-141 le quitaba solo el mayor y los saldos). Por eso cada ficha de
+# tabla empieza por «No disponible para el perfil restringido» (`R-PERFIL-RESTRINGIDO`).
 
 version: 1
 esquema: contabilidad
@@ -46,6 +51,11 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
+      **No disponible para el perfil restringido** (F-146, `R-PERFIL-RESTRINGIDO`):
+      ese perfil no lee nada del esquema `contabilidad`; con su login la consulta
+      devuelve «permission denied», y eso no se rodea: responde que el perfil no
+      lo incluye.
+
       **EL PLAN DE CUENTAS FINANCIERO COMO ARBOL** (F-056): una fila por nodo
       del plan de las 38 empresas, sin filtrar altas ni bajas.
 
@@ -217,9 +227,10 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
-      **No disponible para el perfil restringido** (F-141, `R-PERFIL-RESTRINGIDO`):
-      con su login la consulta devuelve «permission denied», y eso no se rodea:
-      responde que el perfil no lo incluye.
+      **No disponible para el perfil restringido** (F-141 y F-146, `R-PERFIL-RESTRINGIDO`):
+      ese perfil no lee nada del esquema `contabilidad`; con su login la consulta
+      devuelve «permission denied», y eso no se rodea: responde que el perfil no
+      lo incluye.
 
       **EL MAYOR CONTABLE GENERAL** (F-056, F-135): una fila por apunte de
       `raw.apu` SALVO LOS DE PERSONAL. El 2026-09-26 eran 2.166.701 apuntes de
@@ -428,9 +439,10 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
-      **No disponible para el perfil restringido** (F-141, `R-PERFIL-RESTRINGIDO`):
-      con su login la consulta devuelve «permission denied», y eso no se rodea:
-      responde que el perfil no lo incluye.
+      **No disponible para el perfil restringido** (F-141 y F-146, `R-PERFIL-RESTRINGIDO`):
+      ese perfil no lee nada del esquema `contabilidad`; con su login la consulta
+      devuelve «permission denied», y eso no se rodea: responde que el perfil no
+      lo incluye.
 
       **LOS SALDOS POR CUENTA Y MES** (F-056), solo de los apuntes VISIBLES
       (F-135): una fila por cuenta, empresa, ejercicio y mes con algun apunte
@@ -530,6 +542,11 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
+      **No disponible para el perfil restringido** (F-146, `R-PERFIL-RESTRINGIDO`):
+      ese perfil no lee nada del esquema `contabilidad`; con su login la consulta
+      devuelve «permission denied», y eso no se rodea: responde que el perfil no
+      lo incluye.
+
       **CUANTO LE FALTA A LA CONTABILIDAD GENERAL** (F-135): por empresa,
       ejercicio y mes, cuantos apuntes y asientos de PERSONAL no estan en
       `contabilidad.mayor` (los asientos de nomina enteros y las cuentas de

@@ -48,7 +48,7 @@ nativos de PostgreSQL con contraseña, y la contraseña en Key Vault**.
 | `mcp_sigrid_dm_ro` | `LOGIN` + contraseña | Solo lectura, el ESTÁNDAR: el MCP (F-006) y Power BI. Sin `raw` ni `contabilidad_restringida` desde F-135 |
 | `sigrid_dm_autorizado_ro` | Grupo, `NOLOGIN` | El rol AUTORIZADO (F-135): lee la contabilidad completa, `contabilidad_restringida` |
 | `mcp_sigrid_dm_total` | `LOGIN` + contraseña, solo en `kv-mcp-bbdd-dev` (`pg-password-total`) | El acceso TOTAL del MCP (F-136): miembro de los dos anteriores, sin GRANT propios y **nunca `raw`**. Alta y rotación: **§12** |
-| `sigrid_dm_perfil_restringido_ro` | Grupo, `NOLOGIN` | El perfil RESTRINGIDO (F-141, administrativos): ve MENOS que el estándar, sin `contabilidad.mayor`, `contabilidad.saldos_cuenta_mes`, `tesoreria` ni `personal`. Lleva los permisos |
+| `sigrid_dm_perfil_restringido_ro` | Grupo, `NOLOGIN` | El perfil RESTRINGIDO (F-141, administrativos): ve MENOS que el estándar, sin `contabilidad` (el esquema entero desde F-146; antes, sin el mayor y sus saldos), `tesoreria` ni `personal`. Lleva los permisos |
 | `mcp_sigrid_dm_restringido` | `LOGIN` + contraseña, solo en `kv-mcp-bbdd-dev` (`pg-password-restringido`) | El login del perfil restringido (F-141): miembro solo del grupo anterior, sin GRANT propios. Alta: **§13** |
 
 El grupo AUTORIZADO se llama `sigrid_dm_autorizado_ro` desde F-141 (antes llevaba
@@ -846,8 +846,9 @@ Esperado: `F-141: grupo autorizado renombrado` (la primera vez; después, «sin
 renombre»), `mcp_sigrid_dm_restringido: contraseña fijada` y las otras tres SIN
 CAMBIOS; `COMMIT`; los siete roles con `rolsuper = f`; el login con exactamente
 una pertenencia (`sigrid_dm_perfil_restringido_ro`, `hereda = t`, `set_role =
-f`); `t` en sus diez esquemas y `f` en `tesoreria`, `personal`, `raw` y las tres
-`*_restringida`; `mayor = f`, `saldos_cuenta_mes = f`, `plan_cuentas = t`,
+f`); `t` en sus nueve esquemas y `f` en `contabilidad` (F-146), `tesoreria`,
+`personal`, `raw` y las tres `*_restringida`; `mayor = f`, `saldos_cuenta_mes = f`,
+`plan_cuentas = f`, `apuntes_restringidos_mes = f` (las cuatro, F-146),
 `vencimientos = t`, `conecta = t`; y cero filas de privilegios propios. Si para
 con «existen los dos», no ha cambiado nada: se decide cuál sobra antes de seguir.
 
@@ -866,12 +867,13 @@ nada (R3): el humano lo corrige a `sigrid_dm_autorizado_ro` antes.
 ```powershell
 $dsnR = "host=$pgh dbname=sigrid_dm user=mcp_sigrid_dm_restringido sslmode=require"
 $env:PGPASSWORD = az keyvault secret show --vault-name $kvMcp --name pg-password-restringido @q
-$no = "contabilidad.mayor", "contabilidad.saldos_cuenta_mes", "tesoreria.efectos",
+$no = "contabilidad.mayor", "contabilidad.saldos_cuenta_mes", "contabilidad.plan_cuentas",
+      "contabilidad.apuntes_restringidos_mes", "tesoreria.efectos",
       "personal.recursos", "raw.obr", "contabilidad_restringida.mayor",
       "tesoreria_restringida.efectos", "compras_restringida.documento_alarmas"
 foreach ($t in $no) { psql -X -c "SELECT 1 FROM $t LIMIT 1" $dsnR }
 psql -X -c "BEGIN" -c "CREATE TABLE compras.f141_x (x int)" -c "ROLLBACK" $dsnR
-$si = "compras.vencimientos", "compras.v_facturas_pago", "contabilidad.plan_cuentas",
+$si = "compras.vencimientos", "compras.v_facturas_pago",
       "retenciones.movimientos", "mart.fact_seguimiento_mensual", "_meta.v_diccionario"
 foreach ($t in $si) { psql -X -c "SELECT 1 FROM $t LIMIT 1" $dsnR }
 psql -X -c "SELECT count(*) FROM compras.documento_adjuntos" $dsnR
@@ -880,8 +882,8 @@ psql -X -c "SELECT count(*) FROM compras.documento_adjuntos" $dsn
 python main.py apply-grants
 ```
 
-Esperado: `permission denied` en las ocho de `$no` y en el `CREATE TABLE` (el
-`ROLLBACK` cierra la transacción); una fila en las seis de `$si`; el recuento de
+Esperado: `permission denied` en las diez de `$no` y en el `CREATE TABLE` (el
+`ROLLBACK` cierra la transacción); una fila en las cinco de `$si`; el recuento de
 `compras.documento_adjuntos` igual con el login y con el administrador; y
 `apply-grants` en SUCCESS con `verificacion_restringido`,
 `pertenencias_restringido` y `filtraciones_restringido` a `ok` en su fila de
@@ -931,7 +933,8 @@ restringido con listas de oid para el estándar y el total, nunca hacia arriba,
 catálogo con su login, el perfil dicho en `estado_servidor`. Su feature, su
 despliegue y las listas de oid son de `mcp-bbdd`. Al líder: la ficha de F-127
 tiene que excluir su mayor analítico de `PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES`
-si no lleva «mayor» en el nombre.
+si no lleva «mayor» en el nombre y no lo publica en `contabilidad` (desde F-146
+ese esquema entero está vetado al perfil restringido).
 
 ### Vuelta atrás
 
