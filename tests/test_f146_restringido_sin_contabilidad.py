@@ -430,3 +430,68 @@ def test_f146_r6_azure_apps_describe_el_alcance_nuevo() -> None:
     assert "`contabilidad` (sin" not in contrato, "ya no lee contabilidad con exclusiones"
     e2 = contrato.split("**E2.", 1)[1].split("\n- **", 1)[0]
     assert "`contabilidad`" in _plano(e2) and "`retenciones`" in _plano(e2)
+
+
+# ===========================================================================
+# T6 · AMPLIACIÓN del 2026-10-21 («arregla ya el diccionario»): los adjuntos llegan
+# CONVERTIDOS. Aviso formal de `mcp-bbdd`: su F-028 (nuestra F-142) está desplegada
+# (`ca-mcp-bbdd-dev--0000023`, imagen `r20261021-1510`). `abrir_adjunto` ya no entrega
+# el original tal cual: TEXTO por página, escaneos e imágenes como IMAGEN, `paginas`
+# (10 primeras por defecto) y el documento 24 h en un SharePoint propio. La clave
+# (`emp`, `cod`), el respaldo con la empresa 1 y `ORIGEN_AMBIGUO` NO cambian.
+# ===========================================================================
+
+#: lo que ya no es verdad y no puede quedar como estado vigente
+CADUCADO = re.compile(r"sin convertir|incrustad|como binario", re.IGNORECASE)
+
+
+def _ficha_adjuntos() -> str:
+    return _plano(_yaml("compras.yaml")["objetos"]["documento_adjuntos"]["descripcion"])
+
+
+def test_f146_t6_la_ficha_dice_lo_que_entrega_hoy_abrir_adjunto() -> None:
+    ficha = _ficha_adjuntos()
+    for dato in ("F-028", "2026-10-21", "F-142", "TEXTO por pagina", "Microsoft Graph",
+                 "`.doc`", "`.msg`", "como IMAGEN", "`paginas`", "10 primeras",
+                 'paginas="11-20"', "24 h", "SharePoint", "solo para quien lo pidio"):
+        assert dato in ficha, f"la ficha de documento_adjuntos no dice «{dato}»"
+
+
+def test_f146_t6_la_ficha_ya_no_dice_que_llega_sin_convertir() -> None:
+    caducado = CADUCADO.findall(_ficha_adjuntos())
+    assert not caducado, f"la ficha aún da por vigente: {caducado}"
+
+
+def test_f146_t6_la_clave_y_el_respaldo_no_cambian() -> None:
+    ficha = _ficha_adjuntos()
+    for dato in ('key: {"emp": empresa_repositorio, "cod": cod_repositorio}',
+                 "empresa 1", "`SIN_BINARIO`", "`ORIGEN_AMBIGUO`", "respaldo=empresa_defecto",
+                 "QUIEN PUEDE ABRIR EL FICHERO", "`abrir_adjunto(adjunto_id)`"):
+        assert dato in ficha, f"la ficha perdió «{dato}»"
+
+
+def test_f146_t6_la_v58_cuenta_las_dos_cosas() -> None:
+    texto = (DICC / "00_global.yaml").read_text(encoding="utf-8")
+    entrada = texto.split(f"# version {VERSION_F146} (F-146, ", 1)[1].split("\nversion:", 1)[0]
+    plano = _plano(entrada.replace("#", " "))
+    for dato in ("`contabilidad`", "F-028", "F-142", "`compras.documento_adjuntos`", "`paginas`"):
+        assert dato in plano, f"la entrada de la v58 no dice «{dato}»"
+
+
+def test_f146_t6_arquitectura_al_dia() -> None:
+    texto = (RAIZ / "docs" / "ARCHITECTURE.md").read_text(encoding="utf-8")
+    punto = texto.split("**El límite (F-139)**", 1)[1].split("\n  - **", 1)[0]
+    assert not CADUCADO.findall(punto), punto
+    for dato in ("F-028", "F-142", "`paginas`", "SharePoint", "24 h"):
+        assert dato in punto, f"ARCHITECTURE (el límite de F-139) no dice «{dato}»"
+
+
+def test_f146_t6_azure_apps_al_dia() -> None:
+    texto = _azure_apps()
+    seccion = texto.split("### Abrir el original de un adjunto", 1)[1].split("\n### ", 1)[0]
+    assert not CADUCADO.findall(seccion), CADUCADO.findall(seccion)
+    for dato in ("F-028", "--0000023", "r20261021-1510", "`paginas`", "24 h", "SharePoint",
+                 "299624", "305078", "304800", "304883"):
+        assert dato in seccion, f"azure-apps (abrir un adjunto) no dice «{dato}»"
+    h5 = seccion[seccion.index("- **H5.**"): seccion.index("- **H6.**")]
+    assert '"emp": empresa_repositorio, "cod": cod_repositorio' in h5 and "ORIGEN_AMBIGUO" in h5
