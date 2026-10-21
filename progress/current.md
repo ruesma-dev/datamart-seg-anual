@@ -12,7 +12,13 @@
 ## 2026-10-21 · F-146 · CERRADA (`done`, APROBADO `6205285`) · merge `4511a33` · cierra también F-142
 
 - Merge por orden del humano (21:38 UTC); F-142 `done` (su trabajo es la F-028 de `mcp-bbdd` + la ficha de esta v58).
-  Despliegue (pasos MANUAL de abajo) en curso por el líder; `apply-grants` lo lanza el humano.
+- **DESPLEGADA (2026-10-21)**: imagen `r20261021-2339` y job actualizado (21:42 UTC) ANTES de publicar;
+  **v58 publicada** 21:44 UTC (hash `65df8f9a7a01`, 234 objetos, 2.000 columnas), `check-diccionario` OK;
+  `apply-grants` (humano) 21:49 UTC SUCCESS, todas las verificaciones `ok`; has_table_privilege: el
+  restringido no lee ninguna de las 4 de `contabilidad` ni tiene USAGE (login y grupo), estándar y total
+  sin cambios, `retenciones.apuntes_contables` sigue legible para los tres; por esquema, restringido:
+  contabilidad 0/4, tesoreria 0/2, personal 0/6, el resto completo. MCP `--0000023` reiniciado (réplica
+  nueva 21:50:36 UTC, Healthy) y `mcp-bbdd` avisado.
 
 - **Qué**: el perfil restringido del MCP (F-141) deja de ver el esquema `contabilidad` ENTERO
   (decisión del humano del 2026-10-21). `contabilidad` sale de `DEFAULT_PERFIL_RESTRINGIDO_SCHEMAS`
