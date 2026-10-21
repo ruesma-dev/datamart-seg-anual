@@ -183,15 +183,26 @@ DEFAULT_TOTAL_VETOED_SCHEMAS = "raw"
 #
 # Un grupo NOLOGIN lleva los permisos y un login miembro conecta (D8); los dos
 # los crea `infra/sql/02_roles.sql`. La lista de esquemas es EXPLÍCITA: un
-# esquema de consumo nuevo NO le llega solo. Los objetos excluidos son la lista
-# extensible de D2 (el mayor analítico de F-127 tiene que entrar aquí si no
-# lleva «mayor» en el nombre). Grupo vacío = no se mira el perfil.
+# esquema de consumo nuevo NO le llega solo.
+#
+# F-146 (decisión del humano del 2026-10-21): NADA de contabilidad. El esquema
+# `contabilidad` sale ENTERO de la lista (antes estaba, sin el mayor ni los
+# saldos: le quedaban el plan de cuentas y los recuentos de apuntes de
+# personal). Lo que no está en la lista se le veta cada noche desde el catálogo,
+# como `tesoreria` y `personal`, así que una tabla nueva de `contabilidad` (el
+# mayor analítico de F-127, si nace ahí) no le llega. `retenciones` sigue dentro.
+# La lista de objetos excluidos (D2) queda VACÍA y no puede quedarse «como red»
+# con las dos de contabilidad: R7 rechaza una exclusión de un esquema que no se
+# le concede y la nocturna pararía. Sigue siendo el mecanismo para quitar un
+# objeto suelto de un esquema que SÍ ve: si F-127 publica su mayor analítico en
+# uno de ellos y sin «mayor» en el nombre, entra aquí. Grupo vacío = no se mira
+# el perfil.
 DEFAULT_PERFIL_RESTRINGIDO_GROUP = "sigrid_dm_perfil_restringido_ro"
 DEFAULT_PERFIL_RESTRINGIDO_LOGIN = "mcp_sigrid_dm_restringido"
 DEFAULT_PERFIL_RESTRINGIDO_SCHEMAS = (
-    "mart,cierre,compras,maestro,retenciones,contabilidad,descompuestos,stg,aux,_meta"
+    "mart,cierre,compras,maestro,retenciones,descompuestos,stg,aux,_meta"
 )
-DEFAULT_PERFIL_RESTRINGIDO_EXCLUDED_TABLES = "contabilidad.mayor,contabilidad.saldos_cuenta_mes"
+DEFAULT_PERFIL_RESTRINGIDO_EXCLUDED_TABLES = ""
 
 # Tablas que el rol del MCP NO puede leer, aunque su esquema esté en la lista
 # de arriba. Formato `esquema.tabla`, separadas por comas.
@@ -348,7 +359,8 @@ class PostgresSettings(BaseSettings):
     perfil_restringido_excluded_tables: str = Field(
         DEFAULT_PERFIL_RESTRINGIDO_EXCLUDED_TABLES,
         description="Objetos 'esquema.tabla', separados por comas, que el perfil "
-                    "restringido NO lee aunque su esquema sea suyo (F-141, D2).",
+                    "restringido NO lee aunque su esquema sea suyo (F-141, D2). Vacía "
+                    "por defecto desde F-146.",
     )
     # --- Troceo del build de stg.plan_mensual (F-019) ----------------------
     # El 2026-08-09 ese build llenó el disco del servidor compartido (93,4 %) y

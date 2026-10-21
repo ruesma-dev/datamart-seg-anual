@@ -300,9 +300,18 @@ def _git(*args: str) -> str | None:
 
 
 def test_f128_r22_ficheros_de_permisos_sin_cambios_respecto_a_main():
-    salida = _git("diff", "--name-only", "main...HEAD", "--",
-                  "config/settings.py", "etl_sigrid/infrastructure/postgres/grants.py",
-                  "infra/sql/02_roles.sql")
+    """Lo que F-128 no tocó. Antes del merge, `main...HEAD`; DESPUÉS, el diff del propio
+    merge de F-128 contra su primer padre: si no, cualquier feature posterior que cambie
+    estos ficheros con motivo (F-146 los cambia) pondría este test en rojo. Mismo patrón
+    que los tests de versión del diccionario (F-141/F-144/F-145)."""
+    ficheros = ("config/settings.py", "etl_sigrid/infrastructure/postgres/grants.py",
+                "infra/sql/02_roles.sql")
+    merge = _git("log", "main", "--merges", "--format=%H", "--grep=^Merge F-128")
+    merge = (merge or "").split()
+    if merge:
+        salida = _git("diff", "--name-only", f"{merge[0]}^1", merge[0], "--", *ficheros)
+    else:
+        salida = _git("diff", "--name-only", "main...HEAD", "--", *ficheros)
     if salida is None:
         pytest.skip("sin git o sin rama main: la comprobación la hace el texto de arriba")
     assert salida.strip() == ""

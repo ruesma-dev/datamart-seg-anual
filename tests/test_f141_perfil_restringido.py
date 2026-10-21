@@ -28,9 +28,13 @@ TOTAL = "mcp_sigrid_dm_total"
 GRUPO = "sigrid_dm_perfil_restringido_ro"
 LOGIN = "mcp_sigrid_dm_restringido"
 DUENO = "sigrid_dm_etl"
-ESQUEMAS_R = ["mart", "cierre", "compras", "maestro", "retenciones", "contabilidad",
-              "descompuestos", "stg", "aux", "_meta"]
-EXCLUIDAS_R = ["contabilidad.mayor", "contabilidad.saldos_cuenta_mes"]
+#: F-146 (2026-10-21): sin `contabilidad` (el esquema entero, vetado como `tesoreria` y
+#: `personal`) y, por eso, sin objetos excluidos: las dos de contabilidad caen con su esquema.
+ESQUEMAS_R = ["mart", "cierre", "compras", "maestro", "retenciones", "descompuestos", "stg",
+              "aux", "_meta"]
+EXCLUIDAS_R: list[str] = []
+#: el consumo del estándar, que F-146 no cambia
+CONSUMO = [*ESQUEMAS_R, "contabilidad", "tesoreria", "personal"]
 EXCEPCIONES = ("compras.vencimientos", "compras.v_facturas_pago", "compras.v_control_forma_pago")
 
 
@@ -59,12 +63,13 @@ def test_f141_r1_defectos_del_vocabulario() -> None:
     assert pg.perfil_restringido_excluded_table_list == EXCLUIDAS_R
 
 
-def test_f141_r1_los_esquemas_son_el_consumo_menos_tesoreria_y_personal() -> None:
-    """Lista EXPLÍCITA, pero hoy tiene que ser exactamente eso (D3, P2)."""
+def test_f141_r1_los_esquemas_son_el_consumo_menos_tesoreria_personal_y_contabilidad() -> None:
+    """Lista EXPLÍCITA, pero hoy tiene que ser exactamente eso (D3, P2; F-146 quita contabilidad)."""
     from config.settings import PostgresSettings
 
     pg = PostgresSettings(_env_file=None)
-    esperado = [s for s in pg.consumption_schema_list if s not in ("tesoreria", "personal")]
+    esperado = [s for s in pg.consumption_schema_list
+                if s not in ("tesoreria", "personal", "contabilidad")]
     assert pg.perfil_restringido_schema_list == esperado
 
 
@@ -285,7 +290,7 @@ def _conflicto(esquemas: list[str], **cambios: list[str]) -> list[str]:
     from etl_sigrid.infrastructure.postgres.grants import perfil_restringido_en_conflicto
 
     listas = {
-        "consumo": [*ESQUEMAS_R, "tesoreria", "personal"],
+        "consumo": CONSUMO,
         "vetados": _VETADOS,
         "restringidos": _RESTRINGIDOS,
         "total_vetados": ["raw"],
@@ -323,8 +328,11 @@ def test_f141_grants_r7_excluidas_invalidas() -> None:
 
     assert excluidas_invalidas(EXCLUIDAS_R, ESQUEMAS_R) == []
     assert excluidas_invalidas(
-        ["contabilidad.mayor", "mayor", "a.b.c", ".x", "tesoreria.efectos", "mayor"], ESQUEMAS_R,
-    ) == ["mayor", "a.b.c", ".x", "tesoreria.efectos"]
+        ["compras.facturas", "mayor", "a.b.c", ".x", "tesoreria.efectos", "mayor",
+         "contabilidad.mayor"], ESQUEMAS_R,
+    ) == ["mayor", "a.b.c", ".x", "tesoreria.efectos", "contabilidad.mayor"], (
+        "desde F-146 `contabilidad` no es suyo: excluir una de sus tablas es una errata"
+    )
     assert excluidas_invalidas([], []) == []
 
 
@@ -354,9 +362,9 @@ def test_f141_grants_r8_origenes_de_adjuntos() -> None:
 def test_f141_grants_r12_esquemas_ajenos_del_catalogo() -> None:
     from etl_sigrid.infrastructure.postgres.grants import esquemas_ajenos
 
-    catalogo = [*ESQUEMAS_R, "tesoreria", "personal", "raw", "contabilidad_restringida", "pg_catalog", "information_schema", "pg_toast", "pg_temp_3", "pg_toast_temp_3", "public", "nuevo", "tesoreria"]
+    catalogo = [*CONSUMO, "raw", "contabilidad_restringida", "pg_catalog", "information_schema", "pg_toast", "pg_temp_3", "pg_toast_temp_3", "public", "nuevo", "tesoreria"]
     assert esquemas_ajenos(catalogo, ESQUEMAS_R) == [
-        "contabilidad_restringida", "nuevo", "personal", "raw", "tesoreria",
+        "contabilidad", "contabilidad_restringida", "nuevo", "personal", "raw", "tesoreria",
     ], "ordenados, sin repetir y sin los del sistema"
 
 
@@ -446,7 +454,7 @@ def test_f141_r11_build_nunca_un_grant_por_defecto_ni_escritura() -> None:
         assert "GRANT SELECT ON TABLES" not in s, "lo que nazca no lo lee hasta la comprobación"
         for palabra in ("INSERT", "UPDATE", "DELETE", "CREATE", "ALL PRIVILEGES"):
             assert not (s.startswith("GRANT") and palabra in s), s
-    assert len(sentencias) == 1 + 3 * len(ESQUEMAS_R) + 2
+    assert len(sentencias) == 1 + 3 * len(ESQUEMAS_R) + len(EXCLUIDAS_R)
 
 
 def test_f141_r11_build_una_excluida_mal_escrita_revienta() -> None:
@@ -674,8 +682,8 @@ def test_f141_cliente_apply_perfil_restringido_sin_esquemas_no_abre_conexion() -
 
 RESTR_C = "contabilidad_restringida"
 #: lo que hoy hay en el catálogo (informe del spec-author §1-§2) más el sistema
-CATALOGO = [*ESQUEMAS_R, "tesoreria", "personal", "raw", RESTR_C, "tesoreria_restringida", "compras_restringida", "public", "pg_catalog", "information_schema", "pg_toast"]
-AJENOS = ["compras_restringida", RESTR_C, "personal", "raw", "tesoreria",
+CATALOGO = [*CONSUMO, "raw", RESTR_C, "tesoreria_restringida", "compras_restringida", "public", "pg_catalog", "information_schema", "pg_toast"]
+AJENOS = ["compras_restringida", "contabilidad", RESTR_C, "personal", "raw", "tesoreria",
           "tesoreria_restringida"]
 #: lo que hoy devuelve la clausura en Azure (informe §9-§10): solo las tres de D4
 FILAS_HOY = [(v, "tesoreria.efectos") for v in EXCEPCIONES]
@@ -741,7 +749,8 @@ class _ClienteFalso:
 
     def objetos_vigilados(self, schemas, pattern):
         self.llamadas.append(("vigilados", list(schemas), pattern))
-        return list(self.vigilados)
+        # como el SQL real: solo busca en los esquemas del perfil (F-146: `contabilidad` ya no)
+        return [o for o in self.vigilados if o.split(".", 1)[0] in schemas]
 
     def pertenencias(self, role):
         self.llamadas.append(("pertenencias", role))
@@ -758,7 +767,7 @@ def _settings(**pg: object):
     base: dict[str, object] = {
         "readonly_role": ESTANDAR,
         "set_role": DUENO,
-        "consumption_schema_list": [*ESQUEMAS_R, "tesoreria", "personal"],
+        "consumption_schema_list": list(CONSUMO),
         "excluded_table_list": ["raw.emp"],
         "vetoed_schema_list": [RESTR_C, "tesoreria_restringida", "compras_restringida", "raw"],
         "restricted_role": AUTORIZADO,
@@ -939,7 +948,7 @@ _CAMINO_ANTERIOR = [
     ("role_exists", TOTAL),
     ("veto", TOTAL, DUENO, ["raw"]),
     ("verifica", TOTAL, ["raw"], ["raw.emp"]),
-    ("usage", TOTAL, [*ESQUEMAS_R, "tesoreria", "personal", RESTR_C, "tesoreria_restringida", "compras_restringida"]),
+    ("usage", TOTAL, [*CONSUMO, RESTR_C, "tesoreria_restringida", "compras_restringida"]),
     ("verifica", ESTANDAR, [RESTR_C, "tesoreria_restringida", "compras_restringida", "raw"],
      ["raw.emp"]),
 ]
@@ -1338,9 +1347,11 @@ def test_f141_r22_la_mitad_del_dueno_en_la_transaccion_y_como_dueno() -> None:
     ):
         assert sentencia in sql, sentencia
     excluidas = re.search(r"FOREACH excluida_r IN ARRAY ARRAY\[(.*?)\]", sql, re.DOTALL)
-    assert excluidas and re.findall(r"'([\w.]+)'", excluidas.group(1)) == (
-        DEFAULT_PERFIL_RESTRINGIDO_EXCLUDED_TABLES.split(",")
-    )
+    por_defecto = [t for t in DEFAULT_PERFIL_RESTRINGIDO_EXCLUDED_TABLES.split(",") if t]
+    if not por_defecto:  # F-146: sin objetos excluidos, sin bucle que los revoque
+        assert excluidas is None
+        return
+    assert excluidas and re.findall(r"'([\w.]+)'", excluidas.group(1)) == por_defecto
     assert excluidas.start() > bucle.start(), "los REVOKE de lo excluido, detrás de los GRANT"
 
 
@@ -1394,7 +1405,7 @@ def test_f141_r23_comprobacion_final() -> None:
         "JOIN pg_roles AS g ON g.oid = m.roleid\n"
         f"WHERE r.rolname = '{LOGIN}'"
     ) in final, "las pertenencias del login: solo el grupo"
-    for esquema in [*ESQUEMAS_R, "tesoreria", "personal", "raw", RESTR_C,
+    for esquema in [*CONSUMO, "raw", RESTR_C,
                     "tesoreria_restringida", "compras_restringida"]:
         assert f"has_schema_privilege('{LOGIN}', '{esquema}', 'USAGE')" in final, esquema
     for tabla in ("contabilidad.mayor", "contabilidad.saldos_cuenta_mes",
@@ -1511,7 +1522,8 @@ DICC = RAIZ / "config" / "diccionario"
 AVISO = "No disponible para el perfil restringido"
 #: los objetos de tabla o vista que el restringido no lee (R28); las funciones no cuentan
 NO_DISPONIBLES = {
-    "contabilidad.yaml": ["mayor", "saldos_cuenta_mes"],
+    # F-146: el esquema entero (las cuatro tablas; `fn_fecha` es una función)
+    "contabilidad.yaml": ["plan_cuentas", "mayor", "saldos_cuenta_mes", "apuntes_restringidos_mes"],
     "tesoreria.yaml": ["efectos", "efectos_restringidos_mes"],
     "personal.yaml": ["recursos", "partes_lineas", "v_pbi_horas_obra_mes", "partes",
                       "recursos_tipos_hora", "usuarios_sigrid"],
@@ -1562,7 +1574,7 @@ def test_f141_r26_la_regla_dice_lo_que_pidio_el_humano() -> None:
 def test_f141_r26_el_ambito_alcanza_lo_que_no_ve_y_los_atajos() -> None:
     ambito = set(_reglas()["R-PERFIL-RESTRINGIDO"]["ambito"])
     assert ambito >= {
-        "contabilidad.mayor", "contabilidad.saldos_cuenta_mes", "tesoreria", "personal",
+        "contabilidad", "tesoreria", "personal",
         "retenciones.apuntes_contables", *EXCEPCIONES,
     }
 

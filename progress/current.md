@@ -9,6 +9,70 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-21 · F-146 · CERRADA (`done`, APROBADO `6205285`) · merge `4511a33` · cierra también F-142
+
+- Merge por orden del humano (21:38 UTC); F-142 `done` (su trabajo es la F-028 de `mcp-bbdd` + la ficha de esta v58).
+  Despliegue (pasos MANUAL de abajo) en curso por el líder; `apply-grants` lo lanza el humano.
+
+- **Qué**: el perfil restringido del MCP (F-141) deja de ver el esquema `contabilidad` ENTERO
+  (decisión del humano del 2026-10-21). `contabilidad` sale de `DEFAULT_PERFIL_RESTRINGIDO_SCHEMAS`
+  y de `.env.example`; la nocturna se lo veta desde el catálogo como a `tesoreria` y `personal`
+  (sin código nuevo en `apply_grants`: lo ajeno sale de `esquemas_ajenos`). `02_roles.sql` (5
+  quinquies y comprobación final), diccionario v58, ARCHITECTURE, runbook y `azure-apps`
+  (`79bb47b`, solo `datamart_seg_anual.md`, sin push). `retenciones` no cambia; estándar y total
+  tampoco. Detalle y evidencias: `progress/impl_F-146.md`.
+- **AMPLIADA el 2026-10-21 por orden del humano** («arregla ya el diccionario»), en la MISMA v58
+  (T6): aviso formal de `mcp-bbdd`, su F-028 (nuestra F-142) está desplegada
+  (`ca-mcp-bbdd-dev--0000023`, imagen `r20261021-1510`). La ficha de `compras.documento_adjuntos`,
+  el comentario de la v58, ARCHITECTURE y `azure-apps` (`eda420c`: estado, H6, H8, H11, H13) dicen
+  lo que entrega hoy `abrir_adjunto` (texto por página, escaneos e imágenes como imagen, `paginas`,
+  24 h en SharePoint) y ya no «sin convertir». La pareja (`emp`, `cod`), el respaldo con la empresa
+  1 y `ORIGEN_AMBIGUO` no cambian. Los tests de F-139 que fijaban «SIN CONVERTIR» pasan a exigir
+  lo vigente. Nuestra F-142 sigue `pending` en el backlog: cerrarla o reescribirla es del líder.
+- **Decisión: la lista de excluidas queda VACÍA** (`PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES=`). No
+  puede quedarse «como red» con las dos de contabilidad: R7 de F-141 rechaza una exclusión de un
+  esquema que no se le concede y la nocturna pararía en seco. La red para el mayor analítico de
+  F-127 es el veto del esquema (si nace en `contabilidad`) o el vigilante «mayor» (si nace en
+  otro esquema del perfil); el comentario de `settings.py` lo dice.
+- **Desviación justificada**: `tests/test_f128_restringida.py::test_f128_r22_ficheros_de_permisos_
+  sin_cambios_respecto_a_main` comparaba `main...HEAD` y pone en rojo a TODA feature posterior que
+  cambie `settings.py`, `grants.py` o `02_roles.sql`. Tras el merge de F-128 mira ahora el diff de
+  ese merge (`a24bf34`) contra su primer padre: misma garantía, robusta al merge (patrón de los
+  tests de versión). Commit `0314381`.
+- **Aviso a `mcp-bbdd`** (no se toca su documento): `azure-apps/mcp_bbdd.md` ~l.924 dice que el
+  restringido va «sin el mayor contable»; ahora es sin `contabilidad` entera. Sin cambio de código
+  para ellos: su catálogo del restringido (E5) dejará de listar `contabilidad` tras `apply-grants`.
+- **MANUAL tras APROBADO y merge, EN ESTE ORDEN** (nada lo hace el implementer):
+  1. Imagen: `powershell -NoProfile -File infra/70_build_image.ps1` (anota el tag que imprime).
+  2. Job a esa imagen ANTES de publicar y de `apply-grants` (la nocturna republica el diccionario
+     de la imagen del job, y con la imagen vieja su `apply_grants` le DEVOLVERÍA `contabilidad` al
+     restringido cada noche): `powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag>`.
+  3. `.venv/Scripts/python.exe main.py publicar-diccionario` (v58).
+  4. `.venv/Scripts/python.exe main.py check-diccionario`.
+  5. `.venv/Scripts/python.exe main.py apply-grants` (lo lanza el HUMANO: el clasificador se lo
+     bloquea al líder). Antes, comprobar que el `.env` del puesto NO fija
+     `PG_PERFIL_RESTRINGIDO_SCHEMAS` ni `..._EXCLUDED_TABLES` (hoy no las fija: los defectos
+     viven en el código). Esperado: SUCCESS, y en su fila de `_meta.etl_runs`
+     `verificacion_restringido`, `filtraciones_restringido`, `vigilados_restringido`,
+     `pertenencias_restringido`, `verificacion` y `verificacion_total` a `ok`.
+  6. Verificación por perfil con `has_table_privilege` (solo lectura, `$dsn` del administrador del
+     runbook §13):
+     `psql -X -c "SELECT r, t, has_table_privilege(r, to_regclass(t), 'SELECT') FROM unnest(ARRAY['mcp_sigrid_dm_restringido','mcp_sigrid_dm_ro','mcp_sigrid_dm_total']) r, unnest(ARRAY['contabilidad.plan_cuentas','contabilidad.mayor','contabilidad.saldos_cuenta_mes','contabilidad.apuntes_restringidos_mes','contabilidad_restringida.mayor','retenciones.apuntes_contables']) t ORDER BY 1, 2" $dsn`
+     `psql -X -c "SELECT r, has_schema_privilege(r, 'contabilidad', 'USAGE') FROM unnest(ARRAY['mcp_sigrid_dm_restringido','sigrid_dm_perfil_restringido_ro','mcp_sigrid_dm_ro','mcp_sigrid_dm_total']) r" $dsn`
+     `psql -X -c "SELECT c.oid::regclass FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'contabilidad' AND c.relkind IN ('r','v','m','p','f') AND has_table_privilege('mcp_sigrid_dm_restringido', c.oid, 'SELECT')" $dsn`
+     Esperado: restringido `f` en las cuatro de `contabilidad` y en `contabilidad_restringida.mayor`,
+     `t` en `retenciones.apuntes_contables`, USAGE de `contabilidad` `f` (login y grupo), y CERO
+     filas en la tercera; estándar `t` en las cuatro de `contabilidad` y `f` en la restringida;
+     total `t` en las seis (igual que antes).
+  7. Reiniciar el MCP (cachea el diccionario). Leer ANTES la revisión activa (hoy
+     `ca-mcp-bbdd-dev--0000023`, la de su F-028; puede haber cambiado):
+     `az containerapp show -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --query properties.latestReadyRevisionName -o tsv`
+     y `az containerapp revision restart -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --revision <revisión>`.
+  8. Avisar a `mcp-bbdd`: v58 publicada (el restringido sin `contabilidad` y la ficha de
+     adjuntos con su F-028); su `mcp_bbdd.md` (~l.924, «sin el mayor contable»; y sus marcas
+     «F-028 pendiente de despliegue») es suyo de actualizar.
+- Sin push. Nada publicado ni desplegado.
+
 ## 2026-10-20 · INCIDENCIA · la nocturna del 20 falló (`caj-datamart-seg-dev-29874240`, Failed)
 
 - La 1.ª réplica desaparece a las 03:24 en `build_cierre` **sin evento de salida** (ni exit code ni

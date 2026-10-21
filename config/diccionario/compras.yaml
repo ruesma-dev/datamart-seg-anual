@@ -4400,10 +4400,17 @@ objetos:
       Abrir el ORIGINAL para una IA es trabajo de `mcp-bbdd`, con su
       herramienta `abrir_adjunto(adjunto_id)`, desplegada el 2026-10-17 (su
       F-023): la IA localiza el `adjunto_id` en este indice y abre el fichero
-      con esa herramienta del MCP, que lo pide a `sigrid-api` y lo entrega SIN
-      CONVERTIR. Las imagenes se ven directamente; los PDF y la ofimatica (un
-      `.doc` o un `.xls` tal cual) llegan como binario, y convertirlos es
-      F-142. **COMO LO PIDE (F-025 de `mcp-bbdd`, desplegada el 2026-10-19)**:
+      con esa herramienta del MCP, que lo pide a `sigrid-api`. **LO QUE LE
+      LLEGA A LA IA (F-028 de `mcp-bbdd`, desplegada el 2026-10-21; nuestra
+      F-142)**: ningun fichero viaja dentro de la respuesta. Le llega TEXTO por
+      pagina: de los PDF, de la ofimatica que Microsoft Graph convierte a PDF
+      (`.doc`, `.docx`, `.xlsx` pequeños...) y, de lo que Graph no convierte
+      (`.msg`, `.xlsx` grandes...), el texto extraido en el servidor; las
+      paginas escaneadas y las imagenes llegan como IMAGEN. Por defecto, las 10
+      primeras paginas; para seguir, el parametro `paginas` (por ejemplo
+      `paginas="11-20"`). El documento queda ademas 24 h en un sitio de
+      SharePoint propio de `mcp-bbdd`, con un enlace solo para quien lo pidio.
+      **COMO LO PIDE (F-025 de `mcp-bbdd`, desplegada el 2026-10-19)**:
       por la pareja de la fila, `key: {"emp": empresa_repositorio, "cod":
       cod_repositorio}`. Si la fila trae una empresa distinta de la 1 y
       `sigrid-api` responde 400 `ValueError` (no hay fichero con esa pareja),

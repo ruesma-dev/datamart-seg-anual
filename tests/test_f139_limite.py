@@ -90,8 +90,10 @@ def test_f139_r1_la_ficha_dice_como_pedir_el_fichero_sin_el_500() -> None:
 
 
 def test_f139_r2_la_ficha_declara_el_limite() -> None:
+    """Desde la F-028 de `mcp-bbdd` (nuestra F-142, 2026-10-21) el contenido llega
+    CONVERTIDO: la ficha ya no dice «SIN CONVERTIR» (ampliación de F-146)."""
     descripcion = _descripcion()
-    for dato in ("mcp-bbdd", "F-139", "SIN CONVERTIR", "el ORIGINAL", "F-142"):
+    for dato in ("mcp-bbdd", "F-139", "F-028", "el ORIGINAL", "F-142"):
         assert dato in descripcion, f"la ficha no dice «{dato}» (R2)"
 
 
@@ -106,11 +108,12 @@ def test_f139_r2_la_ficha_nombra_la_herramienta_desplegada() -> None:
     """
     descripcion = _descripcion()
     for dato in ("`abrir_adjunto(adjunto_id)`", "F-023", "2026-10-17",
-                 "`adjunto_id` en este indice", "imagenes se ven directamente",
-                 "como binario", "QUIEN PUEDE ABRIR EL FICHERO"):
-        assert dato in descripcion, f"la ficha no dice «{dato}» (R2, F-141)"
+                 "`adjunto_id` en este indice", "como IMAGEN",
+                 "TEXTO por pagina", "QUIEN PUEDE ABRIR EL FICHERO"):
+        assert dato in descripcion, f"la ficha no dice «{dato}» (R2, F-141, F-146)"
     texto = _texto()
-    for caducado in ("NO ESTA DESPLEGADA", "ni el datamart ni el MCP abren"):
+    for caducado in ("NO ESTA DESPLEGADA", "ni el datamart ni el MCP abren", "SIN CONVERTIR",
+                     "como binario"):
         assert caducado not in texto, (
             f"la ficha aún dice «{caducado}» y `abrir_adjunto` ya está desplegada (R2)"
         )
@@ -175,7 +178,7 @@ def _punto_del_indice() -> str:
 def test_f139_r6_la_arquitectura_declara_limite_aviso_y_permisos() -> None:
     punto = _punto_del_indice()
     for dato in ("F-139", "mcp-bbdd", 'filename_columns: ["cod"]', "HTTP 500",
-                 "sin convertir", "tabla de origen", "F-141"):
+                 "F-028", "tabla de origen", "F-141"):
         assert dato in punto, f"el punto de F-090 de ARCHITECTURE.md no dice «{dato}» (R6)"
     for tabla, _columna in ORIGEN_POR_FAMILIA.values():
         assert f"`{tabla}`" in punto, f"ARCHITECTURE.md no nombra `{tabla}` (R6)"
