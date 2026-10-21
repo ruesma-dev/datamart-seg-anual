@@ -18,6 +18,14 @@
   quinquies y comprobación final), diccionario v58, ARCHITECTURE, runbook y `azure-apps`
   (`79bb47b`, solo `datamart_seg_anual.md`, sin push). `retenciones` no cambia; estándar y total
   tampoco. Detalle y evidencias: `progress/impl_F-146.md`.
+- **AMPLIADA el 2026-10-21 por orden del humano** («arregla ya el diccionario»), en la MISMA v58
+  (T6): aviso formal de `mcp-bbdd`, su F-028 (nuestra F-142) está desplegada
+  (`ca-mcp-bbdd-dev--0000023`, imagen `r20261021-1510`). La ficha de `compras.documento_adjuntos`,
+  el comentario de la v58, ARCHITECTURE y `azure-apps` (`eda420c`: estado, H6, H8, H11, H13) dicen
+  lo que entrega hoy `abrir_adjunto` (texto por página, escaneos e imágenes como imagen, `paginas`,
+  24 h en SharePoint) y ya no «sin convertir». La pareja (`emp`, `cod`), el respaldo con la empresa
+  1 y `ORIGEN_AMBIGUO` no cambian. Los tests de F-139 que fijaban «SIN CONVERTIR» pasan a exigir
+  lo vigente. Nuestra F-142 sigue `pending` en el backlog: cerrarla o reescribirla es del líder.
 - **Decisión: la lista de excluidas queda VACÍA** (`PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES=`). No
   puede quedarse «como red» con las dos de contabilidad: R7 de F-141 rechaza una exclusión de un
   esquema que no se le concede y la nocturna pararía en seco. La red para el mayor analítico de
@@ -54,11 +62,12 @@
      filas en la tercera; estándar `t` en las cuatro de `contabilidad` y `f` en la restringida;
      total `t` en las seis (igual que antes).
   7. Reiniciar el MCP (cachea el diccionario). Leer ANTES la revisión activa (hoy
-     `ca-mcp-bbdd-dev--0000022`, puede haber cambiado):
+     `ca-mcp-bbdd-dev--0000023`, la de su F-028; puede haber cambiado):
      `az containerapp show -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --query properties.latestReadyRevisionName -o tsv`
      y `az containerapp revision restart -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --revision <revisión>`.
-  8. Avisar a `mcp-bbdd`: v58 publicada y el restringido sin `contabilidad`; su `mcp_bbdd.md`
-     (~l.924, «sin el mayor contable») es suyo de actualizar.
+  8. Avisar a `mcp-bbdd`: v58 publicada (el restringido sin `contabilidad` y la ficha de
+     adjuntos con su F-028); su `mcp_bbdd.md` (~l.924, «sin el mayor contable»; y sus marcas
+     «F-028 pendiente de despliegue») es suyo de actualizar.
 - Sin push. Nada publicado ni desplegado.
 
 ## 2026-10-20 · INCIDENCIA · la nocturna del 20 falló (`caj-datamart-seg-dev-29874240`, Failed)

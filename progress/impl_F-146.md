@@ -13,7 +13,12 @@ son la `description` y los `acceptance` de `harness/features.json`. Rigor `estan
 | `552fd46` T3 | diccionario v58: `00_global.yaml` (`R-PERFIL-RESTRINGIDO`, `R-CONTABILIDAD-RESTRINGIDA`, historia) y `contabilidad.yaml` |
 | `0314381` T3b | `tests/test_f128_restringida.py`: un test de F-128 robusto al merge (desviación, abajo) |
 | `f2e923b` T4 | `docs/ARCHITECTURE.md` y `docs/runbook_postgres_azure.md` |
+| `716e1b4` T2b | `02_roles.sql` sin la palabra «nueve» (la prohíbe el test R25 de F-057; la cazó el `init.sh` final) |
+| `b583c7d` T5 | este informe y la entrada de `progress/current.md` |
+| `7f30fb6` T6a | AMPLIACIÓN: tests de los adjuntos convertidos, en RED |
+| `0eaf3f4` T6b | AMPLIACIÓN: ficha de `compras.documento_adjuntos`, entrada v58, ARCHITECTURE, tests de F-139 |
 | `azure-apps` `79bb47b` | solo `datamart_seg_anual.md` (fila del restringido, sección F-141 + párrafo F-146, «Lo que NO lee», E2). Sin push |
+| `azure-apps` `eda420c` | solo `datamart_seg_anual.md`: contrato de adjuntos (estado F-028, tabla de piezas, H6, H8, H11, H13). Sin push |
 
 - **Configuración**: `DEFAULT_PERFIL_RESTRINGIDO_SCHEMAS` =
   `mart,cierre,compras,maestro,retenciones,descompuestos,stg,aux,_meta` (sin `contabilidad`) y
@@ -33,6 +38,47 @@ son la `description` y los `acceptance` de `harness/features.json`. Rigor `estan
   esquema `contabilidad` entero (…)», el «SI lee» ya no nombra contabilidad, el motivo cita la
   decisión del 2026-10-21. `R-CONTABILIDAD-RESTRINGIDA`: «…y tampoco la general (`contabilidad`)
   desde F-146». Cabecera de `contabilidad.yaml` y entrada `# version 58 (F-146, …)`.
+
+## AMPLIACIÓN T6 (orden del humano del 2026-10-21, «arregla ya el diccionario»)
+
+Aviso formal de `mcp-bbdd`: su F-028 (nuestra F-142) está desplegada y verificada desde las 13:26
+UTC (`ca-mcp-bbdd-dev--0000023`, imagen `r20261021-1510`). Misma v58, sin subir versión.
+
+- **Ficha de `compras.documento_adjuntos`**: «lo entrega SIN CONVERTIR… llegan como binario, y
+  convertirlos es F-142» pasa a «**LO QUE LE LLEGA A LA IA** (F-028 de `mcp-bbdd`, desplegada el
+  2026-10-21; nuestra F-142)»: ningún fichero dentro de la respuesta; TEXTO por página (PDF,
+  ofimática que Microsoft Graph convierte a PDF —`.doc`, `.docx`, `.xlsx` pequeños…—, texto
+  extraído en el servidor de lo que Graph no convierte —`.msg`, `.xlsx` grandes…—); escaneos e
+  imágenes como IMAGEN; `paginas` (10 primeras por defecto, `paginas="11-20"` para seguir); el
+  documento 24 h en un SharePoint propio con enlace solo para quien lo pidió. COMO LO PIDE (la
+  pareja, el respaldo con la empresa 1, `SIN_BINARIO`, `ORIGEN_AMBIGUO`) intacto.
+- **v58**: su entrada cuenta las dos cosas (restringido sin contabilidad + adjuntos convertidos).
+  Las entradas de v53/v54 no se tocan: son historia.
+- **ARCHITECTURE** (el límite de F-139) y **`azure-apps`** (estado F-028 con las cuatro pruebas de
+  `mcp-bbdd`, H6 nuevo, H8, H11 con la excepción de las 24 h, H13 resuelto; H5 intacto). Nada
+  inventado: solo lo del aviso, contrastado con `azure-apps/mcp_bbdd.md` (§ de `abrir_adjunto`),
+  que no se toca (además tenía cambios de otra sesión sin commitear; no se han añadido).
+- **Desviación**: tres tests de F-139 (`test_f139_r2_la_ficha_declara_el_limite`,
+  `…_nombra_la_herramienta_desplegada`, `test_f139_r6_…`) EXIGÍAN «SIN CONVERTIR», «como binario»,
+  «imagenes se ven directamente» y «sin convertir»: ahora exigen «F-028», «TEXTO por pagina» y
+  «como IMAGEN», y `SIN CONVERTIR`/`como binario` pasan a la lista de caducados.
+- **No hecho**: nuestra F-142 sigue `pending` en `features.json`; cerrarla o reescribirla es del líder.
+
+RED (`pytest tests/test_f146_restringido_sin_contabilidad.py -k t6 --tb=line`, antes de T6b):
+
+```
+FF.FFF                                                                   [100%]
+E   AssertionError: la ficha de documento_adjuntos no dice «F-028»
+E   AssertionError: la ficha aún da por vigente: ['SIN CONVERTIR', 'como binario']
+E   AssertionError: la entrada de la v58 no dice «F-028»
+E   AssertionError: : el datamart publica el ÍNDICE; abrir el ORIGINAL ... y lo entrega sin convertir. ...
+    assert not ['sin convertir']
+E   AssertionError: ['sin convertir', 'incrustad', 'incrustad']
+5 failed, 1 passed, 22 deselected in 2.78s
+```
+
+El que pasa en RED es `test_f146_t6_la_clave_y_el_respaldo_no_cambian`: es la guarda de lo que NO
+se toca. GREEN: F-146 + F-139 + F-145 + F-141, **234 passed**.
 
 ## Decisiones de diseño
 
@@ -97,7 +143,7 @@ T2): `18 failed, 4 passed in 1.09s`; los 13 restantes eran diccionario, docs y `
 
 ## Fase GREEN
 
-- `pytest tests/test_f146_restringido_sin_contabilidad.py`: **22 passed in 0.90s**.
+- `pytest tests/test_f146_restringido_sin_contabilidad.py`: **22 passed in 0.90s** (28 con T6).
 - F-141 + F-146 + F-128 restringida + F-135 + F-136: **322 passed** (antes del arreglo de T3b,
   `test_f128_r22_ficheros_…` era el único rojo).
 - Suites de diccionario y restringidas (52 ficheros `f006`, `f037`, `f056`, `f128`, `f135`, `f138`,
@@ -126,7 +172,7 @@ y aviso a `mcp-bbdd`. Nada de esto se ha hecho: ni Azure, ni Postgres, ni `.env`
 | Evidencia | Valor |
 |---|---|
 | Tests ejecutados (`bash harness/init.sh` final) | ver «Resultado de `init.sh`» abajo |
-| Tests de la feature | 22 nuevos (22 passed); F-141 actualizados: 143 passed |
+| Tests de la feature | 28 nuevos (22 + 6 de T6, 28 passed); F-141 actualizados: 143 passed; F-139: 3 actualizados |
 | Cobertura de las líneas cambiadas | `PUERTA COBERTURA: N/A` en el `init.sh` inicial; ver el final abajo. Las 32 líneas de producción tocadas son constantes de cadena, comentarios y docstrings |
 | Mutantes generados / supervivientes | `python -m harness.mutacion --feature F-146`: **CERO mutantes** («3 ficheros, 32 líneas de producción… no llevan código mutable»; no escribe informe). Evidencia sustituta, 4 mutantes MANUALES, los 4 cazados (abajo) |
 | Tiempo de la suite | `init.sh` inicial: 8486 passed, 254 skipped en 4090,64 s (1:08:10), máquina compartida con campañas de otros proyectos |
@@ -146,4 +192,10 @@ que el veto excluye los esquemas del perfil, no que no excluya ninguno más.
 
 ## Resultado de `init.sh`
 
-PENDIENTE_INIT
+- Inicial (antes de escribir nada): 8486 passed, 254 skipped en 4090,64 s; ENTORNO LISTO.
+- Tras T1-T5, primer intento: ROJO, `test_f057_r25_el_fichero_de_provision_trae_los_diez_esquemas`
+  (`02_roles.sql` no puede decir «nueve»: lo había escrito en dos comentarios). Corregido en T2b.
+- Tras T1-T5, segundo intento: **8510 passed, 254 skipped en 1604,03 s (26:44)**; `PUERTA
+  COBERTURA: 100.0% de 1 líneas cambiadas cubiertas (1/1)`; `PUERTA TAMAÑO: impl 149/220`;
+  ENTORNO LISTO.
+- Final, con T6: FINAL_PENDIENTE
