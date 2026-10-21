@@ -171,11 +171,11 @@ y aviso a `mcp-bbdd`. Nada de esto se ha hecho: ni Azure, ni Postgres, ni `.env`
 
 | Evidencia | Valor |
 |---|---|
-| Tests ejecutados (`bash harness/init.sh` final) | ver «Resultado de `init.sh`» abajo |
+| Tests ejecutados (`bash harness/init.sh` final) | 8516 passed, 254 skipped, 0 failed |
 | Tests de la feature | 28 nuevos (22 + 6 de T6, 28 passed); F-141 actualizados: 143 passed; F-139: 3 actualizados |
 | Cobertura de las líneas cambiadas | `PUERTA COBERTURA: N/A` en el `init.sh` inicial; ver el final abajo. Las 32 líneas de producción tocadas son constantes de cadena, comentarios y docstrings |
 | Mutantes generados / supervivientes | `python -m harness.mutacion --feature F-146`: **CERO mutantes** («3 ficheros, 32 líneas de producción… no llevan código mutable»; no escribe informe). Evidencia sustituta, 4 mutantes MANUALES, los 4 cazados (abajo) |
-| Tiempo de la suite | `init.sh` inicial: 8486 passed, 254 skipped en 4090,64 s (1:08:10), máquina compartida con campañas de otros proyectos |
+| Tiempo de la suite | `init.sh` final: 8516 passed, 254 skipped en 2738,67 s (45:38); el inicial, 4090,64 s, con la máquina compartida con campañas de otros proyectos |
 
 **Mutantes manuales** (cada uno contra F-141 + F-146 + F-128 restringida + F-135 + F-136, y
 `git checkout` después):
@@ -198,4 +198,6 @@ que el veto excluye los esquemas del perfil, no que no excluya ninguno más.
 - Tras T1-T5, segundo intento: **8510 passed, 254 skipped en 1604,03 s (26:44)**; `PUERTA
   COBERTURA: 100.0% de 1 líneas cambiadas cubiertas (1/1)`; `PUERTA TAMAÑO: impl 149/220`;
   ENTORNO LISTO.
-- Final, con T6: FINAL_PENDIENTE
+- **Final, con T6 (sobre `c55d770`): 8516 passed, 254 skipped en 2738,67 s (45:38)**; `BACKLOG.md
+  al día`; `PUERTA COBERTURA: 100.0% de 1 líneas cambiadas cubiertas (1/1, umbral 80%)`;
+  `PUERTA TAMAÑO: impl 201/220`; **ENTORNO LISTO**.
