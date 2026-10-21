@@ -40,7 +40,10 @@ es suyo sale del catálogo (`esquemas_ajenos`) y se le veta con
 `build_veto_statements`. Las vistas que leen lo que no ve son la trampa de dar
 esquemas sueltos (una vista se ejecuta con los permisos de su dueño): se le
 revocan y el paso falla, salvo las tres vistas de pago de `compras`, que el
-humano quiere visibles (D4) y son una excepción NOMINAL.
+humano quiere visibles (D4) y son una excepción NOMINAL. Desde F-146
+(2026-10-21) el perfil no ve NADA de `contabilidad`: el esquema salió de su
+lista y se le veta entero como `tesoreria` y `personal`, sin código propio,
+porque lo ajeno sale del catálogo.
 """
 
 from __future__ import annotations
@@ -306,9 +309,10 @@ EXCEPCIONES_FILTRACION_RESTRINGIDO: dict[str, str] = {
 }
 
 #: Lo que se vigila por NOMBRE en los esquemas del perfil: el mayor analítico no
-#: está publicado todavía (lo publicará F-127, desde `raw.apa`). Si nace con
-#: «mayor» en el nombre y nadie lo excluye, la nocturna se lo revoca y falla.
-#: Si F-127 le pone otro nombre, su spec TIENE que añadirlo a
+#: está publicado todavía (lo publicará F-127, desde `raw.apa`). Si nace en
+#: `contabilidad` no le llega (F-146: esquema vetado entero). Si nace en un
+#: esquema del perfil con «mayor» en el nombre y nadie lo excluye, la nocturna
+#: se lo revoca y falla; con otro nombre, la spec de F-127 TIENE que añadirlo a
 #: `PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES`.
 PATRON_VIGILADO_RESTRINGIDO = r"mayor"
 
@@ -397,9 +401,9 @@ def origenes_de_adjuntos_sin_leer(esquemas: Sequence[str], excluidas: Sequence[s
 def esquemas_ajenos(catalogo: Sequence[str], esquemas: Sequence[str]) -> list[str]:
     """Los esquemas del CATÁLOGO que no son del perfil restringido (F-141, R12).
 
-    Salen de lo que existe, no de la configuración: hoy `tesoreria`, `personal`,
-    `raw` y las tres `*_restringida`; mañana, cualquier esquema que nadie haya
-    listado. Sin los del sistema. Ordenados y sin repetir.
+    Salen de lo que existe, no de la configuración: hoy `contabilidad` (F-146),
+    `tesoreria`, `personal`, `raw` y las tres `*_restringida`; mañana, cualquier
+    esquema que nadie haya listado. Sin los del sistema. Ordenados y sin repetir.
     """
     suyos = set(esquemas)
     return sorted({

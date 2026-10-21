@@ -48,8 +48,8 @@
 --                      Quién conecta con él lo decide la F-008 de `mcp-bbdd`
 --   sigrid_dm_perfil_restringido_ro  NOLOGIN, sin contraseña (F-141). El perfil
 --                      RESTRINGIDO (administrativos), que ve MENOS que el
---                      estándar: lo de este menos `contabilidad.mayor`,
---                      `contabilidad.saldos_cuenta_mes`, `personal` y
+--                      estándar: lo de este menos `contabilidad` entera
+--                      (F-146; antes, solo el mayor y sus saldos), `personal` y
 --                      `tesoreria` (y nunca `raw` ni las `*_restringida`).
 --                      Lleva los permisos (punto 5 quinquies)
 --     └── mcp_sigrid_dm_restringido  LOGIN, contraseña SOLO en el vault del MCP
@@ -546,14 +546,16 @@ $$;
 --
 --    Reglas del humano: «ven como el estándar, menos el mayor, menos el mayor
 --    analítico, menos la cartera de cobros (pero sí a retenciones)» y
---    «personal también quítalo, y saldos cuenta también». Es lo mismo que
---    concede la nocturna (`apply_grants`), aquí para que el grupo nazca ya con
---    su lectura: sus diez esquemas (`DEFAULT_PERFIL_RESTRINGIDO_SCHEMAS`, un
---    test lo vigila), el privilegio por defecto SIEMPRE en REVOKE (lo que nazca
---    no lo lee hasta que la nocturna lo haya mirado), el REVOKE de los dos
---    objetos excluidos (`DEFAULT_PERFIL_RESTRINGIDO_EXCLUDED_TABLES`) y el veto
---    de todo esquema del CATÁLOGO que no sea suyo (hoy `tesoreria`, `personal`,
---    `raw` y las tres `*_restringida`), como la nocturna.
+--    «personal también quítalo, y saldos cuenta también»; y, desde F-146
+--    (2026-10-21), nada de contabilidad: el esquema entero fuera. Es lo mismo
+--    que concede la nocturna (`apply_grants`), aquí para que el grupo nazca ya
+--    con su lectura: sus nueve esquemas (`DEFAULT_PERFIL_RESTRINGIDO_SCHEMAS`,
+--    un test lo vigila), el privilegio por defecto SIEMPRE en REVOKE (lo que
+--    nazca no lo lee hasta que la nocturna lo haya mirado) y el veto de todo
+--    esquema del CATÁLOGO que no sea suyo (hoy `contabilidad`, `tesoreria`,
+--    `personal`, `raw` y las tres `*_restringida`), como la nocturna. Sin
+--    objetos excluidos desde F-146 (`DEFAULT_PERFIL_RESTRINGIDO_EXCLUDED_TABLES`
+--    vacía): el mayor y sus saldos caen con su esquema.
 --
 --    COMO `sigrid_dm_etl`, el mismo concedente que la nocturna: así la nocturna
 --    puede revocar lo que se conceda aquí (una vista que filtre, un objeto
@@ -563,12 +565,11 @@ $$;
 DO $$
 DECLARE
     esquema_r text;
-    excluida_r text;
     ajeno_r text;
 BEGIN
     FOREACH esquema_r IN ARRAY ARRAY[
-        'mart', 'cierre', 'compras', 'maestro', 'retenciones', 'contabilidad',
-        'descompuestos', 'stg', 'aux', '_meta'
+        'mart', 'cierre', 'compras', 'maestro', 'retenciones', 'descompuestos',
+        'stg', 'aux', '_meta'
     ]
     LOOP
         IF to_regnamespace(esquema_r) IS NOT NULL THEN
@@ -581,20 +582,11 @@ BEGIN
         END IF;
     END LOOP;
 
-    FOREACH excluida_r IN ARRAY ARRAY['contabilidad.mayor', 'contabilidad.saldos_cuenta_mes']
-    LOOP
-        IF to_regclass(excluida_r) IS NOT NULL THEN
-            EXECUTE format(
-                'REVOKE ALL PRIVILEGES ON TABLE %s FROM sigrid_dm_perfil_restringido_ro', excluida_r
-            );
-        END IF;
-    END LOOP;
-
     FOR ajeno_r IN
         SELECT nspname FROM pg_namespace
         WHERE nspname <> ALL (ARRAY[
-                  'mart', 'cierre', 'compras', 'maestro', 'retenciones', 'contabilidad',
-                  'descompuestos', 'stg', 'aux', '_meta'])
+                  'mart', 'cierre', 'compras', 'maestro', 'retenciones', 'descompuestos',
+                  'stg', 'aux', '_meta'])
           AND nspname <> ALL (ARRAY['information_schema', 'public'])
           AND nspname NOT LIKE 'pg\_%'
         ORDER BY 1
@@ -649,8 +641,8 @@ BEGIN
     FOR ajeno_r IN
         SELECT nspname FROM pg_namespace
         WHERE nspname <> ALL (ARRAY[
-                  'mart', 'cierre', 'compras', 'maestro', 'retenciones', 'contabilidad',
-                  'descompuestos', 'stg', 'aux', '_meta'])
+                  'mart', 'cierre', 'compras', 'maestro', 'retenciones', 'descompuestos',
+                  'stg', 'aux', '_meta'])
           AND nspname <> ALL (ARRAY['information_schema', 'public'])
           AND nspname NOT LIKE 'pg\_%'
         ORDER BY 1
@@ -746,11 +738,11 @@ ORDER BY table_schema, table_name, privilege_type;
 
 -- F-141: el login del perfil RESTRINGIDO. Debe salir EXACTAMENTE una
 -- pertenencia (`sigrid_dm_perfil_restringido_ro`, hereda = t, set_role = f).
--- Luego `t` en sus diez esquemas y `f` en `tesoreria`, `personal`, `raw` y las
--- tres `*_restringida`; `f` en `contabilidad.mayor` y `saldos_cuenta_mes` y `t`
--- en `contabilidad.plan_cuentas` y `compras.vencimientos` (vacío si el objeto
--- aún no existe: base recién creada); `conecta = t`; y CERO filas en la última:
--- el login no tiene ninguna concesión propia.
+-- Luego `t` en sus nueve esquemas y `f` en `contabilidad` (F-146), `tesoreria`,
+-- `personal`, `raw` y las tres `*_restringida`; `f` en las cuatro tablas de
+-- `contabilidad` y `t` en `compras.vencimientos` (vacío si el objeto aún no
+-- existe: base recién creada); `conecta = t`; y CERO filas en la última: el
+-- login no tiene ninguna concesión propia.
 SELECT g.rolname AS grupo, m.inherit_option AS hereda, m.set_option AS set_role,
        m.admin_option AS admin
 FROM pg_auth_members AS m
@@ -764,13 +756,13 @@ SELECT has_schema_privilege('mcp_sigrid_dm_restringido', 'mart', 'USAGE') AS mar
        has_schema_privilege('mcp_sigrid_dm_restringido', 'compras', 'USAGE') AS compras,
        has_schema_privilege('mcp_sigrid_dm_restringido', 'maestro', 'USAGE') AS maestro,
        has_schema_privilege('mcp_sigrid_dm_restringido', 'retenciones', 'USAGE') AS retenciones,
-       has_schema_privilege('mcp_sigrid_dm_restringido', 'contabilidad', 'USAGE') AS contabilidad,
        has_schema_privilege('mcp_sigrid_dm_restringido', 'descompuestos', 'USAGE') AS descompuestos,
        has_schema_privilege('mcp_sigrid_dm_restringido', 'stg', 'USAGE') AS stg,
        has_schema_privilege('mcp_sigrid_dm_restringido', 'aux', 'USAGE') AS aux,
        has_schema_privilege('mcp_sigrid_dm_restringido', '_meta', 'USAGE') AS meta;
 
 SELECT has_schema_privilege('mcp_sigrid_dm_restringido', 'tesoreria', 'USAGE') AS tesoreria,
+       has_schema_privilege('mcp_sigrid_dm_restringido', 'contabilidad', 'USAGE') AS contabilidad,
        has_schema_privilege('mcp_sigrid_dm_restringido', 'personal', 'USAGE') AS personal,
        has_schema_privilege('mcp_sigrid_dm_restringido', 'raw', 'USAGE') AS raw,
        has_schema_privilege('mcp_sigrid_dm_restringido', 'contabilidad_restringida', 'USAGE')
@@ -786,6 +778,8 @@ SELECT has_table_privilege('mcp_sigrid_dm_restringido', to_regclass('contabilida
            AS saldos_cuenta_mes,
        has_table_privilege('mcp_sigrid_dm_restringido', to_regclass('contabilidad.plan_cuentas'), 'SELECT')
            AS plan_cuentas,
+       has_table_privilege('mcp_sigrid_dm_restringido', to_regclass('contabilidad.apuntes_restringidos_mes'), 'SELECT')
+           AS apuntes_restringidos_mes,
        has_table_privilege('mcp_sigrid_dm_restringido', to_regclass('compras.vencimientos'), 'SELECT')
            AS vencimientos,
        has_database_privilege('mcp_sigrid_dm_restringido', current_database(), 'CONNECT') AS conecta;

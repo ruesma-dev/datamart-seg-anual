@@ -59,7 +59,9 @@ administrativos, que ve MENOS que el estándar: un grupo NOLOGIN con los permiso
 (`PG_PERFIL_RESTRINGIDO_GROUP`) y un login miembro (`PG_PERFIL_RESTRINGIDO_LOGIN`).
 Regla del humano: «ven como el estándar, menos el mayor, menos el mayor
 analítico, menos la cartera de cobros (pero sí a retenciones)», y «personal
-también quítalo, y saldos cuenta también».
+también quítalo, y saldos cuenta también». Desde F-146 (2026-10-21), nada de
+`contabilidad`: el esquema salió de `PG_PERFIL_RESTRINGIDO_SCHEMAS` y se le veta
+entero como cualquier esquema ajeno, sin código nuevo en este paso.
 
   - ANTES de abrir conexión, FAILED si `PG_RESTRICTED_ROLE` trae el nombre que
     F-141 retiró al renombrar el grupo autorizado (R3), si el grupo o el login
