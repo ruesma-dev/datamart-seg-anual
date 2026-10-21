@@ -747,9 +747,17 @@ fallo con cualquier tolerancia.
   cartera de cobros (pero sí a retenciones)» y «personal también quítalo, y
   saldos cuenta también». Lo nombran `PG_PERFIL_RESTRINGIDO_GROUP` y
   `PG_PERFIL_RESTRINGIDO_LOGIN`; lee `PG_PERFIL_RESTRINGIDO_SCHEMAS` (lista
-  EXPLÍCITA: el consumo menos `tesoreria` y `personal`) menos
-  `PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES` (`contabilidad.mayor` y
-  `contabilidad.saldos_cuenta_mes`); el job no lleva variables nuevas. Antes de
+  EXPLÍCITA: el consumo menos `tesoreria`, `personal` y, desde F-146,
+  `contabilidad` entera) menos `PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES` (vacía
+  desde F-146: hasta entonces, `contabilidad.mayor` y
+  `contabilidad.saldos_cuenta_mes`); el job no lleva variables nuevas. **F-146
+  (decisión del humano del 2026-10-21): nada de contabilidad.** Con el esquema
+  en la lista le quedaban el plan de cuentas y los recuentos de apuntes de
+  personal, y toda tabla nueva de `contabilidad` le llegaría sola; fuera de la
+  lista, se le veta entera desde el catálogo como `tesoreria` y `personal`, sin
+  código nuevo en el paso. La lista de excluidas no puede quedarse «como red»
+  con las dos de contabilidad: la guarda de objetos excluidos rechaza los de un
+  esquema que no se le concede. `retenciones` sigue siendo suyo. Antes de
   abrir conexión, FAILED si `PG_RESTRICTED_ROLE` trae el nombre retirado del
   autorizado, si el grupo o el login coinciden con otro rol, si sus esquemas no
   son del consumo o están vetados o restringidos, si falta `_meta`, si un objeto
@@ -757,8 +765,9 @@ fallo con cualquier tolerancia.
   documentos de origen (F-139, D1). Su bloque es el ÚLTIMO y no cambia nada de lo
   anterior: le concede lo suyo con el privilegio por defecto SIEMPRE en REVOKE
   (lo que nazca no lo lee hasta que la nocturna lo ha mirado), le veta todo
-  esquema del CATÁLOGO que no es suyo (hoy `tesoreria`, `personal`, `raw` y las
-  `*_restringida`; mañana, cualquiera que nadie haya listado) y busca en el
+  esquema del CATÁLOGO que no es suyo (hoy `contabilidad`, `tesoreria`,
+  `personal`, `raw` y las `*_restringida`; mañana, cualquiera que nadie haya
+  listado) y busca en el
   catálogo, vista sobre vista (`pg_rewrite` + `pg_depend`), las vistas suyas que
   leen lo que no ve: una vista se ejecuta con los permisos de su dueño, y es la
   trampa de dar esquemas sueltos. Salvo `raw` (lo leen las vistas curadas) y las
@@ -781,10 +790,11 @@ fallo con cualquier tolerancia.
   la cartera en un esquema del perfil la vería; la regla `R-PERFIL-RESTRINGIDO`
   del diccionario y este aviso son la mitigación.
 - **El mayor analítico y F-127.** Hoy no está publicado (es `raw.apa`, 709.403
-  filas). Cuando F-127 lo publique, su spec TIENE que añadirlo a
-  `PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES` si su nombre no lleva «mayor»: con
-  «mayor» en el nombre y sin excluir, la nocturna se lo revoca al perfil
-  restringido y falla, pero con otro nombre nadie lo vería.
+  filas). Si F-127 lo publica en `contabilidad`, el perfil restringido no lo ve
+  (F-146: esquema vetado entero). Si lo publica en un esquema del perfil, su spec
+  TIENE que añadirlo a `PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES` si su nombre no
+  lleva «mayor»: con «mayor» en el nombre y sin excluir, la nocturna se lo
+  revoca al perfil restringido y falla, pero con otro nombre nadie lo vería.
 - **Lo que NO es de este repositorio** (F-135, F-136): que el MCP conecte con
   el login total según quién pregunta (por oid, fuera de todo repositorio) y que
   su lista blanca admita `contabilidad_restringida`, `tesoreria_restringida` y
