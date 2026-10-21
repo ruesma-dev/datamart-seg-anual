@@ -9,7 +9,10 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-21 · F-146 · implementada (`in_progress`, pendiente del reviewer) · rama `feature/F-146-restringido-sin-contabilidad`
+## 2026-10-21 · F-146 · CERRADA (`done`, APROBADO `6205285`) · merge `4511a33` · cierra también F-142
+
+- Merge por orden del humano (21:38 UTC); F-142 `done` (su trabajo es la F-028 de `mcp-bbdd` + la ficha de esta v58).
+  Despliegue (pasos MANUAL de abajo) en curso por el líder; `apply-grants` lo lanza el humano.
 
 - **Qué**: el perfil restringido del MCP (F-141) deja de ver el esquema `contabilidad` ENTERO
   (decisión del humano del 2026-10-21). `contabilidad` sale de `DEFAULT_PERFIL_RESTRINGIDO_SCHEMAS`

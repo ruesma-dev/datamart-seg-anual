@@ -2242,11 +2242,12 @@
         "Medido el peso de la respuesta y el consumo de memoria con un contrato largo, dentro de los topes de `mcp-bbdd`",
         "Verificado desde Claude (claude.ai y Escritorio) y desde ChatGPT: el adjunto 299624 se lee y su forma de pago se puede comparar con la ficha (CONFIRMING TR 150 + RET)"
       ],
-      "status": "pending",
+      "status": "done",
       "sdd": true,
       "rigor": "estandar",
       "priority": 74,
-      "branch": "feature/F-142-convertir-adjuntos-antiguos"
+      "branch": "feature/F-142-convertir-adjuntos-antiguos",
+      "notes": "2026-10-21: CERRADA. El trabajo lo hizo mcp-bbdd en su F-028, desplegada y verificada el 2026-10-21 13:26 UTC (revisión ca-mcp-bbdd-dev--0000023): abrir_adjunto ya no incrusta el original; entrega texto por página, escaneadas e imágenes como imagen, parámetro `paginas` y enlace de 24 h en SharePoint. La parte de este repositorio (la ficha de compras.documento_adjuntos y demás textos) entró en F-146 (merge 4511a33, diccionario v58)."
     },
     {
       "id": "F-143",
@@ -2310,11 +2311,12 @@
         "Ampliación del 2026-10-21: la ficha de `compras.documento_adjuntos`, la v58, ARCHITECTURE y `azure-apps/datamart_seg_anual.md` dicen lo que entrega hoy `abrir_adjunto` (F-028 de `mcp-bbdd`: texto por página, imágenes, `paginas`, 24 h en SharePoint) y ninguno da por vigente «sin convertir» ni «incrustado» (test con RED); la clave (`emp`, `cod`), el respaldo con la empresa 1 y `ORIGEN_AMBIGUO` intactos",
         "`bash harness/init.sh` en verde y APROBADO del reviewer; la secuencia MANUAL de despliegue en `progress/current.md` con sus comandos"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": false,
       "rigor": "estandar",
       "priority": 1,
-      "branch": "feature/F-146-restringido-sin-contabilidad"
+      "branch": "feature/F-146-restringido-sin-contabilidad",
+      "notes": "2026-10-21: CERRADA. Review APROBADO (6205285; el reviewer verificó init.sh 8516 passed). Merge 4511a33 por orden del humano. Cierra también F-142 (ficha de los adjuntos según la F-028 de mcp-bbdd)."
     }
   ]
 }
