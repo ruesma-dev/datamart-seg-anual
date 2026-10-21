@@ -3,11 +3,13 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **133 features**, 71 abiertas (0 en curso, 1 con la spec lista, 0 bloqueadas y 70 en backlog) y 62 terminadas.
+Resumen: **134 features**, 72 abiertas (1 en curso, 1 con la spec lista, 0 bloqueadas y 70 en backlog) y 62 terminadas.
 
 ## En curso
 
-_Ninguna feature en curso._
+| # | Feature | Prioridad | Rigor | Rama |
+|---|---|---|---|---|
+| F-146 | El perfil restringido del MCP (el «General» de la plantilla) no ve NADA de contabilidad: fuera el esquema `contabilidad` entero, no tabla a tabla | 1 | estandar | `feature/F-146-restringido-sin-contabilidad` |
 
 ## Spec lista
 
@@ -162,6 +164,12 @@ _Ninguna feature bloqueada._
 | F-052 | La obra 0599 no esta en el datamart: 104.366 filas de presupuesto se caen por un arbol de partidas roto | 42 | critico |
 
 ## Detalle
+
+### F-146 · El perfil restringido del MCP (el «General» de la plantilla) no ve NADA de contabilidad: fuera el esquema `contabilidad` entero, no tabla a tabla
+
+estado **en curso** · prioridad 1 · rigor `estandar` · SDD no · rama `feature/F-146-restringido-sin-contabilidad`
+
+Decisión del humano del 2026-10-21. Hoy el restringido (F-141) tiene `contabilidad` en su lista de esquemas y excluye solo `contabilidad.mayor` y `contabilidad.saldos_cuenta_mes`: le quedan `contabilidad.plan_cuentas` y `contabilidad.apuntes_restringidos_mes` (recuentos de apuntes de personal). El humano quiere quitarle el plan de cuentas; se decide quitar el ESQUEMA ENTERO porque (1) el resumen de recuentos sin el mayor no sirve y da idea del volumen de nóminas y (2) con el esquema en la lista, toda tabla nueva de `contabilidad` le llegaría sola (p. ej. el mayor analítico de F-127), riesgo ya anotado en `config/settings.py`. QUÉ SE TOCA: `DEFAULT_PERFIL_RESTRINGIDO_SCHEMAS` sin `contabilidad` (y `.env.example`); la lista de excluidas deja de necesitar las dos de contabilidad (decidir si se vacía o se mantiene como red); `apply_grants` pasa `contabilidad` a los esquemas VETADOS del restringido, como `tesoreria` y `personal`; fichas de `contabilidad.*` y la regla `R-PERFIL-RESTRINGIDO` (y la de contabilidad restringida si aplica) dicen que el perfil restringido no ve la contabilidad; tests de F-141 al día; `azure-apps/datamart_seg_anual.md` (l.~133, contrato del restringido) al día; diccionario v58. FUERA: `retenciones.apuntes_contables` y el resto de `retenciones` (el restringido los sigue viendo: los necesita para el cuadre de retenciones; decisión del humano del 2026-10-21); los perfiles estándar y total no cambian; mcp-bbdd no cambia código (se le avisa: su documento dice «sin el mayor contable»). DESPLIEGUE (tras APROBADO y merge, en este orden): imagen y job; `publicar-diccionario` (v58) y `check-diccionario`; `apply-grants` (lo lanza el humano: el clasificador se lo bloquea al líder); verificar con has_table_privilege que `mcp_sigrid_dm_restringido` no lee ningún objeto de `contabilidad` y que estándar y total siguen igual; reiniciar el MCP y avisar a mcp-bbdd.
 
 ### F-054 · Glosario de negocio para la IA (`_meta.glosario`): qué significan en Ruesma la valorada, el incurrido, el ABC o la liquidatoria, y dónde están en el datamart
 

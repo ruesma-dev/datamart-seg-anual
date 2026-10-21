@@ -2297,6 +2297,23 @@
       "priority": 1,
       "branch": "feature/F-145-adjuntos-clave-empresa-codigo",
       "notes": "2026-10-20: desbloqueada. El rojo de init.sh era R30 de F-141 por tres líneas de azure-apps/mcp_bbdd.md añadidas por la F-027 de mcp-bbdd; mcp-bbdd las enlazó a datamart_seg_anual.md (azure-apps 408c007). init.sh en verde en la rama (8479 passed, 254 skipped). empresa_repositorio verificada integer en Azure (solo lectura). 2026-10-20: CERRADA. Review pasada 1 CHANGES_REQUESTED (H1: el respaldo con la empresa 1 descrito más amplio que el MCP; H2-H3 papeleo), pasada 2 APROBADO (5043244). Merge en main 1b31d86; init.sh verde (8486 passed). OJO (O4 del review): la redacción del respaldo de esta `description` es la del encargo y está superada; lo que vale son los TRES casos de la ficha de compras.documento_adjuntos: empresa distinta de la 1 con 400 -> una segunda petición con la 1; empresa nula -> la única petición va directamente con la 1; empresa 1 con 400 -> SIN_BINARIO sin segunda petición."
+    },
+    {
+      "id": "F-146",
+      "title": "El perfil restringido del MCP (el «General» de la plantilla) no ve NADA de contabilidad: fuera el esquema `contabilidad` entero, no tabla a tabla",
+      "description": "Decisión del humano del 2026-10-21. Hoy el restringido (F-141) tiene `contabilidad` en su lista de esquemas y excluye solo `contabilidad.mayor` y `contabilidad.saldos_cuenta_mes`: le quedan `contabilidad.plan_cuentas` y `contabilidad.apuntes_restringidos_mes` (recuentos de apuntes de personal). El humano quiere quitarle el plan de cuentas; se decide quitar el ESQUEMA ENTERO porque (1) el resumen de recuentos sin el mayor no sirve y da idea del volumen de nóminas y (2) con el esquema en la lista, toda tabla nueva de `contabilidad` le llegaría sola (p. ej. el mayor analítico de F-127), riesgo ya anotado en `config/settings.py`. QUÉ SE TOCA: `DEFAULT_PERFIL_RESTRINGIDO_SCHEMAS` sin `contabilidad` (y `.env.example`); la lista de excluidas deja de necesitar las dos de contabilidad (decidir si se vacía o se mantiene como red); `apply_grants` pasa `contabilidad` a los esquemas VETADOS del restringido, como `tesoreria` y `personal`; fichas de `contabilidad.*` y la regla `R-PERFIL-RESTRINGIDO` (y la de contabilidad restringida si aplica) dicen que el perfil restringido no ve la contabilidad; tests de F-141 al día; `azure-apps/datamart_seg_anual.md` (l.~133, contrato del restringido) al día; diccionario v58. FUERA: `retenciones.apuntes_contables` y el resto de `retenciones` (el restringido los sigue viendo: los necesita para el cuadre de retenciones; decisión del humano del 2026-10-21); los perfiles estándar y total no cambian; mcp-bbdd no cambia código (se le avisa: su documento dice «sin el mayor contable»). DESPLIEGUE (tras APROBADO y merge, en este orden): imagen y job; `publicar-diccionario` (v58) y `check-diccionario`; `apply-grants` (lo lanza el humano: el clasificador se lo bloquea al líder); verificar con has_table_privilege que `mcp_sigrid_dm_restringido` no lee ningún objeto de `contabilidad` y que estándar y total siguen igual; reiniciar el MCP y avisar a mcp-bbdd.",
+      "acceptance": [
+        "El perfil restringido no tiene `contabilidad` entre sus esquemas y `apply_grants` le REVOCA/veta el esquema entero (USAGE incluido), igual que `tesoreria` y `personal`; una tabla nueva de `contabilidad` no le llegaría (test)",
+        "Estándar y total no cambian: test y verificación en Azure con has_table_privilege tras el despliegue",
+        "Las fichas de `contabilidad.*` y `R-PERFIL-RESTRINGIDO` dicen que el perfil restringido no ve la contabilidad, para que la IA responda que el perfil no la incluye; diccionario v58 con test robusto al merge",
+        "`azure-apps/datamart_seg_anual.md` describe el nuevo alcance del restringido (commit local en azure-apps, solo ese fichero) y R30 sigue verde",
+        "`bash harness/init.sh` en verde y APROBADO del reviewer; la secuencia MANUAL de despliegue en `progress/current.md` con sus comandos"
+      ],
+      "status": "in_progress",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 1,
+      "branch": "feature/F-146-restringido-sin-contabilidad"
     }
   ]
 }
