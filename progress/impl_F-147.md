@@ -3,7 +3,8 @@
 > Presupuesto del contexto del MCP: resumen y entrega por regla, contenido
 > revisado, enrutado a 2 preguntas y una puerta con trinquete. Rama
 > `feature/F-147-presupuesto-contexto-mcp`. Rigor `estandar`. Commits
-> `357c20a` (T2) .. `b00d69f` (T13); `azure-apps` `db0b5c5` (commit local).
+> `357c20a` (T2) .. `b00d69f` (T13); `azure-apps` `db0b5c5` y `7cc95c2` (commits locales;
+> el segundo corrige la medida a 29.504).
 
 ## Qué cambió
 
@@ -133,6 +134,29 @@ no se pudo medir: el conector MCP `bbdd-ruesma-azure` no conecta en esta sesión
 (404); los ~86.000 de la spec incluyen los rótulos de `mcp-bbdd`. La medida
 servida tras el despliegue es MANUAL (`progress/current.md`).
 `PRESUPUESTO_MAX = 29_504` con su historia en el test (T12).
+
+## Pasada 1 de la review (CHANGES_REQUESTED) — aplicada
+
+- **Cambio 1** (`ae570b7`): el MANUAL de `current.md` reinicia la revisión del MCP leyendo antes
+  la activa, tras la comprobación de solo lectura y antes del aviso y la medida.
+- **Cambio 2** (`ae570b7`): vuelta atrás (`DROP CONSTRAINT diccionario_reglas_resumen_check` antes
+  de volver a una imagen anterior; escritura que autoriza el humano) y `7cc95c2` citado.
+- **Cambio 3** (`33aa41d`): R11 ata también el RESUMEN de `R-OBRA-ACTIVA` a la ventana (estados,
+  «N dígitos» del patrón y meses). RED forzado desatando el resumen en el árbol (luego restaurado),
+  `pytest tests/test_f147_contenido.py -k r11`:
+  ```
+  E       AssertionError: los estados que congelan, en el resumen
+  E       assert '(1, 11, 25)' in '«Obra activa» = obra VIVA de la nocturna (F-025): `estado_id` fuera de los cerrados, código que no sea de 7 dígitos y...
+  1 failed, 60 deselected in 1.60s
+  ```
+  Restaurado: `1 passed`.
+- **Observaciones** (`a40d266`): el resumen de `R-PERFILES` nombra «alarmas de recursos y partes»
+  (248 caracteres; la medida baja 1, sigue dentro del tope 29.504) y ARCHITECTURE dice que el `DO`
+  solo hace `ALTER` si faltan. **Nota de `R-OBRA-ACTIVA`**: su consulta excluye `estado_id` NULL
+  (la ventana de F-025 daría viva esa obra) y no hace `TRIM` de `codigo_obra` (`SQL_ESTADO_OBRAS`
+  sí); hoy dan lo mismo (41 = 41 en Azure). Si algún día difieren, se corrige la consulta de la regla.
+- Tests de lo tocado: F-037/136/138/141 + `test_f147_*` (370 passed) y
+  `pytest -q tests/test_f147_*.py tests/test_f006_*.py`: 2.493 passed, 251 skipped.
 
 ## Fuera de alcance / pendiente
 
