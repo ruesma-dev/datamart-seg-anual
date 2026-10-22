@@ -145,8 +145,8 @@ servida tras el despliegue es MANUAL (`progress/current.md`).
 
 | Evidencia | Valor real |
 |---|---|
-| Tests (`bash harness/init.sh`, HEAD `61e169f`) | **8.619 passed, 254 skipped, 0 failed** |
-| Tiempo de la suite | 4.950,8 s (1 h 22 min, en paralelo con la campaña de mutación) |
+| Tests (`bash harness/init.sh`, HEAD `6c845be`, el último con código) | **8.619 passed, 254 skipped, 0 failed** |
+| Tiempo de la suite | 3.961,9 s (1 h 06 min; la pasada anterior, con la mutación en paralelo, 4.950,8 s) |
 | Cobertura de líneas cambiadas | **100,0 %** (45/45, umbral 80 %) — `PUERTA COBERTURA` |
 | `init.sh` | `ENTORNO LISTO`; tamaño impl dentro del tope; ruff 276 avisos (deuda previa, igual que antes) |
 | Mutación (`python -m harness.mutacion --feature F-147 --workers 3 --timeout 6000`) | 20 de 31 evaluados (muestreo `estandar`, semilla 20260820): **19 muertos, 1 superviviente, 0 timeouts**, 12.173 s |
@@ -155,6 +155,5 @@ servida tras el despliegue es MANUAL (`progress/current.md`).
 Notas de entorno: la campaña necesitó `--timeout` a mano (la línea base son
 ~1.780 s por worker y el suelo×5 de `rigor.json` da 600 s), como en F-141. El
 primer `init.sh` de la sesión estuvo rojo por `test_f141_r30` (documento de
-`mcp-bbdd` en `azure-apps`), ya resuelto por ellos en `8545002`. Tras el último
-`init.sh` solo cambió un test (el del superviviente) y este informe: el fichero
-de tests pasa entero (`pytest tests/test_f147_presupuesto_contexto.py`, 14 passed).
+`mcp-bbdd` en `azure-apps`), ya resuelto por ellos en `8545002`. El `init.sh`
+final (`ENTORNO LISTO`) incluye ya el test reforzado del superviviente.
