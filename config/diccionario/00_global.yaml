@@ -993,9 +993,9 @@ reglas:
       - retenciones.apuntes_contables
     resumen: >-
       Usa siempre el esquema general; `*_restringida` es solo del perfil total
-      y solo si piden personal (nóminas, embargos, cuentas, alarmas de
-      partes). General y restringida nunca se suman. «permission denied» no
-      se rodea: di que el perfil no lo incluye.
+      y solo si piden personal (nóminas, embargos, cuentas, alarmas de recursos
+      y partes); nunca se suman con la general. «permission denied» no se
+      rodea: di que tu perfil no lo ve.
     regla: >-
       Tres perfiles: TOTAL ⊃ ESTANDAR ⊃ RESTRINGIDO. El TOTAL (y el grupo
       `sigrid_dm_autorizado_ro`) lee ademas los `*_restringida`; el ESTANDAR,

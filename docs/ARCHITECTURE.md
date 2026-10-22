@@ -1073,7 +1073,7 @@ poder preguntarle a nadie si algo no encaja.
   `entera` (se sirve entera siempre: `R-PERFILES`, que trata de lo que el perfil
   NO ve) o `fuera_mcp` (no se publica: `R-SIGRID-CON`, guía del ETL). Las dos
   columnas van AL FINAL de `_meta.diccionario_reglas`, con `CHECK` en la base y
-  un `DO` que las añade sin `ALTER` en cada publicación. El enrutado sirve las 2
+  un `DO` que solo hace `ALTER` si faltan (no en cada publicación). El enrutado sirve las 2
   primeras `ejemplos_preguntas` de cada ficha (`MAX_PREGUNTAS_ENRUTADO`) y cada
   `para_que_sirve` de esquema cabe en 350. **La puerta**:
   `tests/test_f147_presupuesto_contexto.py` mide desde los YAML lo que se
