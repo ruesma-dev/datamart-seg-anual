@@ -61,6 +61,19 @@ encaja: `docs/ARCHITECTURE.md`.
   la versión es lo que lee una persona. Publicar es
   `python main.py publicar-diccionario`, y contra Azure eso es una escritura:
   la autoriza el humano, no un agente.
+- **Toda regla dura de `00_global.yaml` lleva `resumen`** (F-147): la orden
+  corta, de 40 a 250 caracteres, que basta sola para no cometer el error, con
+  las columnas exactas. Es lo que se sirve en cada conversación; `regla` y
+  `motivo` son el detalle. **`entrega`** dice qué se sirve: `resumen` (por
+  defecto), `entera` (solo si la regla no le llegaría al agente por ningún
+  objeto) o `fuera_mcp` (no se publica: guía del ETL). Las cifras que envejecen
+  van al `motivo` o a la ficha, nunca al `resumen`.
+- **Lo que `contexto_bbdd` sirve entero tiene presupuesto con trinquete**
+  (`PRESUPUESTO_MAX` en `tests/test_f147_presupuesto_contexto.py`): reglas,
+  2 primeras `ejemplos_preguntas` por ficha y bloques de contexto. Si un cambio
+  lo pasa, se acorta o se sube el tope con su motivo; si lo baja más de 1.000,
+  se baja el tope. Ordena las `ejemplos_preguntas` con las 2 que mejor enrutan
+  primero, y deja el `para_que_sirve` de un esquema en 350 caracteres.
 - El diccionario describe **lo que el dato ES**, nunca cómo se decide con él.
   Un procedimiento de negocio no entra en un YAML de `config/diccionario/`.
 

@@ -1065,6 +1065,22 @@ poder preguntarle a nadie si algo no encaja.
   diccionario vive aquí y el servidor MCP no. Y el diccionario describe lo que
   el dato **es**, no cómo se decide con él: un procedimiento de negocio es otro
   repositorio.
+- **Presupuesto del contexto (F-147).** `contexto_bbdd()` de `mcp-bbdd` se
+  sirve ENTERO en cada conversación, y crecía en silencio (~86.000 caracteres
+  con la v58). Desde la v59 **toda regla dura lleva `resumen`** —la orden corta,
+  de 40 a 250 caracteres, que basta sola— y una **`entrega`**: `resumen` (se
+  sirve el resumen; `regla` y `motivo` son el detalle para `describir_tabla`),
+  `entera` (se sirve entera siempre: `R-PERFILES`, que trata de lo que el perfil
+  NO ve) o `fuera_mcp` (no se publica: `R-SIGRID-CON`, guía del ETL). Las dos
+  columnas van AL FINAL de `_meta.diccionario_reglas`, con `CHECK` en la base y
+  un `DO` que las añade sin `ALTER` en cada publicación. El enrutado sirve las 2
+  primeras `ejemplos_preguntas` de cada ficha (`MAX_PREGUNTAS_ENRUTADO`) y cada
+  `para_que_sirve` de esquema cabe en 350. **La puerta**:
+  `tests/test_f147_presupuesto_contexto.py` mide desde los YAML lo que se
+  servirá entero (reglas, enrutado y bloques de `_meta.diccionario_contexto`) y
+  falla por encima de `PRESUPUESTO_MAX` o con más de 1.000 de holgura
+  (trinquete). Cómo se compone lo servido es de `mcp-bbdd` (su F-029); cuánto se
+  publica, de aquí.
 - **La frescura no se declara, se une.** El `paso_etl` de cada ficha casa con
   `_meta.v_frescura.paso` (F-024), así que el consumidor sabe de cuándo es lo
   que está mirando sin tener que creerse un texto escrito a mano.
