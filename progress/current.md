@@ -25,8 +25,8 @@
   (las dos nuevas de la ficha de `_meta.diccionario_reglas`), 114 de consumo; 21 reglas en
   el YAML y 20 publicadas.
 - **T2-T13 hechas** (commits `357c20a`..`b00d69f`); `azure-apps` `db0b5c5` (commit local, solo
-  `datamart_seg_anual.md`). Medida (fórmula de la puerta): 78.057 → **29.513** (reglas 7.107,
-  enrutado 13.901, bloques 8.505); con el MCP de hoy, sin su F-029, lo servido ya baja a ~51.168.
+  `datamart_seg_anual.md`). Medida (fórmula de la puerta): 78.057 → **29.504** (reglas 7.107,
+  enrutado 13.901, bloques 8.496); con el MCP de hoy, sin su F-029, lo servido ya baja a ~51.287.
   Informe: `progress/impl_F-147.md`.
 - **MANUAL tras APROBADO y merge, EN ESTE ORDEN** (T14; nada lo hace el implementer):
   1. Imagen: `powershell -NoProfile -File infra/70_build_image.ps1` (anota el tag que imprime).

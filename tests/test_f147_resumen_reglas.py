@@ -203,7 +203,7 @@ def test_f147_r4_el_insert_lleva_las_columnas_nuevas_al_final() -> None:
     columnas = re.search(r"\((.*?)\)\s*VALUES", SQL_INSERT_REGLA, re.DOTALL).group(1)
     nombres = [c.strip() for c in columnas.split(",")]
 
-    assert nombres == COLUMNAS_LEIDAS_HOY + ["resumen", "entrega"]
+    assert nombres == [*COLUMNAS_LEIDAS_HOY, "resumen", "entrega"]
     assert SQL_INSERT_REGLA.count("%s") == 9
 
 
@@ -240,7 +240,7 @@ def test_f147_r4_el_create_table_conserva_las_siete_columnas_del_contrato() -> N
         DDL.read_text(encoding="utf-8"), "_meta.diccionario_reglas"
     )
 
-    assert reales == COLUMNAS_LEIDAS_HOY + ["resumen", "entrega"]
+    assert reales == [*COLUMNAS_LEIDAS_HOY, "resumen", "entrega"]
 
 
 # ---------------------------------------------------------------------------

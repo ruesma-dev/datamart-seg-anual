@@ -675,7 +675,7 @@
 # primeras `ejemplos_preguntas` son las que enrutan. 21 reglas en el YAML y
 # 20 publicadas; `_meta.diccionario_reglas` gana `resumen` y `entrega` AL
 # FINAL (contrato aditivo pactado con `mcp-bbdd`). Medida tras la feature:
-# 29.513 (tope de `tests/test_f147_presupuesto_contexto.py`).
+# 29.504 (tope de `tests/test_f147_presupuesto_contexto.py`).
 
 version: 59
 base: sigrid_dm
@@ -816,7 +816,7 @@ reglas:
       +1.695.571,87 EUR de beneficio final donde son -790.718,46, y 42 obras
       tenian la venta final inflada (511 filas-mes, 2021-2026). Decision del
       humano del 2026-09-29: sin coeficientes para cierres y analisis, y la otra
-      aparte. El coeficiente por contrato, en la ficha de
+      aparte. El coeficiente por contrato (F-099), en la ficha de
       `stg.presupuesto.importe_oficial`.
 
   - codigo: R-UNIVERSO-OBRA
@@ -894,11 +894,11 @@ reglas:
       Y si la pregunta no indica empresa, es Construcciones Ruesma
       (`R-EMPRESA-POR-DEFECTO`).
     motivo: >-
-      Medido en solo lectura (F-102, F-107 y F-056, 2026-09-23 a 26): ningun
-      codigo de obra, recurso, cuenta analitica ni cuenta contable se repite
-      dentro de una empresa y muchos se repiten entre empresas; agregando por
-      codigo, 84.233 lineas de compras de otras empresas se mezclaban con obras
-      de Ruesma.
+      Medido en solo lectura (F-102, F-107 y F-056, 2026-09-23 a 26): 922
+      fichas de obra para 846 codigos y 2.618 recursos, y ningun codigo de obra,
+      recurso, cuenta analitica ni cuenta contable repetido dentro de una
+      empresa; agregando por codigo, 84.233 lineas de compras de otras empresas
+      se mezclaban con obras de Ruesma.
 
   - codigo: R-EMPRESA-POR-DEFECTO
     titulo: Sin empresa en la pregunta, es Construcciones Ruesma (empresa_id = 1), y se dice
@@ -917,10 +917,10 @@ reglas:
       la 28), varias, el grupo o una UTE: entonces se filtra por las que pide y,
       si son varias, se dice si van por separado o sumadas. Nunca se suman
       empresas sin decirlo. Donde filtrar se decide OBJETO A OBJETO, y cada
-      ficha dice su caso: con columna de empresa (`empresa_id`; en
-      `maestro.centros_coste` se llama `empresa`), por ella; con solo `obra_id`,
-      cruzando con `maestro.obras` (su `empresa_id`, o `clave_obra` que empieza
-      por `1-`), y las filas sin obra quedan fuera y se cuentan; sin empresa ni
+      ficha dice su caso: con columna de empresa (`empresa_id`, o
+      `maestro.centros_coste.empresa`), por ella; con solo `obra_id`, cruzando
+      con `maestro.obras` (su `empresa_id`, o `clave_obra` que empieza por `1-`:
+      `R-CODIGO-POR-EMPRESA`), y las filas sin obra quedan fuera y se cuentan; sin empresa ni
       obra, el objeto mezcla las 38 empresas: la respuesta lo dice y NO dice
       «he supuesto Construcciones Ruesma» (si la ficha da un camino comprobado
       para filtrarlo, se usa ese). `stg`, `mart`, `cierre` y `descompuestos` no
@@ -933,8 +933,9 @@ reglas:
       las 38 empresas de Sigrid --Ruesma, Porsan y cada UTE, que repiten la
       misma obra SIN CONSOLIDAR (`R-CODIGO-POR-EMPRESA`)-- o la IA elegiria una
       sin decirlo. Que la IA lo diga es sugerencia de `mcp-bbdd`: el usuario ve
-      el supuesto y lo corrige. El inventario de que objeto tiene empresa, obra
-      o ninguna de las dos vive en cada ficha desde F-147.
+      el supuesto y lo corrige. `empresa_id = 1` es 'CONSTRUCCIONES RUESMA' en
+      `maestro.obras.nombre_empresa` (Azure, 2026-10-18). El inventario de que
+      objeto tiene empresa, obra o ninguna vive en cada ficha desde F-147.
 
   - codigo: R-SALDO-CONTABLE
     titulo: El saldo contable no se suma con los cierres ni las aperturas
@@ -1618,8 +1619,8 @@ convenciones:
     `maestro.proveedores_obra.importe_contratado` CON IVA. No se comparan:
     regla `R-COMPRAS-SIN-IVA`.
   fechas: >-
-    Las fechas del datamart vienen tipadas como DATE; las de Sigrid se
-    convierten en el ETL (el 0 de Sigrid es NULL, no el ano 0).
+    Las fechas del datamart son DATE. En Sigrid son enteros YYYYMMDD con 0
+    como NULL (no el ano 0); las convierte el ETL.
   timestamps: >-
     Los timestamps de `_meta` son UTC SIN zona horaria (TIMESTAMP, escritos con
     datetime.utcnow()). Compararlos contra un now() local da el desfase de

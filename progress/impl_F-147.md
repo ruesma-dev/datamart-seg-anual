@@ -122,17 +122,17 @@ GREEN: `test_f147_resumen_reglas.py` 31 passed; `test_f147_presupuesto_contexto.
 
 | Parte | v58 hoy (reglas enteras, todas las preguntas) | v59 con el MCP de hoy (sin F-029) | v59, fórmula R17 (con F-029) |
 |---|---:|---:|---:|
-| Reglas | 46.287 (27) | 24.561 (20 publicadas, enteras) | 7.107 |
+| Reglas | 46.287 (27) | 24.689 (20 publicadas, enteras) | 7.107 |
 | Enrutado | 18.102 (283 preguntas) | 18.102 | 13.901 (2 por ficha) |
-| Bloques | 13.668 (`esquemas` 10.549) | 8.505 (`esquemas` 5.931) | 8.505 |
-| **Total** | **78.057** | **51.168 (−34 %)** | **29.513 (−62 %)** |
+| Bloques | 13.668 (`esquemas` 10.549) | 8.496 (`esquemas` 5.931) | 8.496 |
+| **Total** | **78.057** | **51.287 (−34 %)** | **29.504 (−62 %)** |
 
 Azure (solo lectura, 2026-10-22) coincide al carácter con el árbol de la v58:
 reglas 46.287, bloques 13.668, enrutado 2.913 + 15.189. `contexto_bbdd()` entero
 no se pudo medir: el conector MCP `bbdd-ruesma-azure` no conecta en esta sesión
 (404); los ~86.000 de la spec incluyen los rótulos de `mcp-bbdd`. La medida
 servida tras el despliegue es MANUAL (`progress/current.md`).
-`PRESUPUESTO_MAX = 29_513` con su historia en el test (T12).
+`PRESUPUESTO_MAX = 29_504` con su historia en el test (T12).
 
 ## Fuera de alcance / pendiente
 

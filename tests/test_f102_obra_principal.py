@@ -609,10 +609,14 @@ def test_f102_r18_la_ficha_de_stg_obras_dice_donde_difiere() -> None:
 
 
 def test_f102_r18_la_regla_del_universo_tambien() -> None:
+    """F-147 (revision_reglas.md, fila 4): las cuatro obras de ficha distinta
+    salieron de la regla a la ficha de `stg.obras` (el test de arriba las exige
+    allí); la regla remite a esa ficha."""
     regla = _regla("R-UNIVERSO-OBRA")
-    texto = f"{regla['regla']} {regla['motivo']}"
+    assert "lo dice su ficha" in " ".join(regla["regla"].split())
+    texto = _texto(_ficha("stg.obras"))
     for codigo in ("0581", "0606", "0671", "0720", "F-106"):
-        assert codigo in texto, f"R-UNIVERSO-OBRA no dice «{codigo}» (R18)"
+        assert codigo in texto, f"stg.obras no dice «{codigo}» (R18)"
 
 
 def test_f102_r20_la_version_sube_sobre_la_de_main() -> None:

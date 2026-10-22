@@ -117,7 +117,8 @@ def test_f006_una_regla_sin_orden_se_sirve_antes_que_una_con_orden_1() -> None:
 def test_f006_el_orden_por_defecto_se_publica_como_cero() -> None:
     """Es el valor que acaba en `_meta` y que el MCP sirve tal cual."""
     (fila,) = filas_reglas(_dicc(reglas=(_regla("R-UNA"),)))
-    assert fila[-1] == 0
+    # `orden` es la 7.ª columna: F-147 añadió `resumen` y `entrega` DETRÁS.
+    assert fila[6] == 0
 
 
 # ---------------------------------------------------------------------------

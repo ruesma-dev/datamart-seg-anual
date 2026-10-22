@@ -51,11 +51,12 @@ def test_f144_la_regla_va_junto_a_la_del_codigo_por_empresa() -> None:
 
 def test_f144_la_regla_dice_lo_que_decidio_el_humano() -> None:
     texto = _plano(_reglas()[CODIGO]["regla"])
+    # F-147 acortó la regla a la orden (revision_reglas.md, fila 6): las frases
+    # de explicación salieron; la orden, las excepciones y las columnas, no.
     for termino in (
         "CRITERIO GENERAL", "Construcciones Ruesma", "`empresa_id = 1`",
-        "no solo para los codigos de obra o de recurso",
         # la obligacion de decirlo
-        "DICE en la respuesta", "he supuesto Construcciones Ruesma",
+        "la respuesta lo dice", "he supuesto Construcciones Ruesma",
         # las excepciones
         "otra empresa", "varias", "el grupo", "una UTE",
         "Nunca se suman empresas sin decirlo",
@@ -98,19 +99,18 @@ def test_f144_version_55_y_su_entrada_de_cabecera() -> None:
 # La pasada 1 decía «la columna se llama `empresa_id` en `compras`, `retenciones`…»,
 # y no es cierto: `compras.facturas` o `retenciones.v_pbi_retencion_resumen` no tienen
 # empresa ni obra y mezclan las 38 empresas. Con aquel texto la IA no filtraba y aun así
-# decía «he supuesto Construcciones Ruesma». Estos tests fijan la frase de los objetos
-# sin empresa y recorren las fichas para que la lista de la regla sea exacta: el
-# siguiente objeto publicado con empresa u `obra_id` tiene que entrar en ella.
+# decía «he supuesto Construcciones Ruesma».
+#
+# F-147 (2026-10-22, decisión del humano): el inventario de la regla —tres listas que
+# había que mantener exactas a mano— sale a las FICHAS. La regla dice el método (con
+# empresa, por ella; con solo obra, por `maestro.obras`; sin nada, «mezcla las 38
+# empresas») y cada ficha sin empresa ni obra lo dice de sí misma. Estos tests vigilan
+# ahora eso: que la frase esté donde hace falta y que no mienta donde está.
 # ---------------------------------------------------------------------------
 
 #: Columnas que permiten aplicar el criterio sin cruzar con nada.
 COLUMNAS_EMPRESA = ("empresa_id", "empresa")
-#: Marcadores que parten la regla en sus tres listas (el orden importa).
-MARCA_CON_EMPRESA = "La columna de empresa la tienen exactamente estos objetos:"
-MARCA_SOLO_OBRA = "Solo llevan `obra_id`"
-MARCA_SIN_EMPRESA = "NO tienen empresa ni `obra_id`"
-
-_NOMBRE = re.compile(r"`([a-z_]+\.[a-z_]+)`")
+FRASE_SIN_EMPRESA = "mezcla las 38 empresas"
 
 
 def _fichas() -> dict[str, dict]:
@@ -128,27 +128,16 @@ def _columnas(ficha: dict) -> set[str]:
     return set((ficha.get("columnas") or {}).keys())
 
 
-def _tramos() -> tuple[set[str], set[str], set[str]]:
-    """Los objetos que la regla nombra en cada una de sus tres listas."""
-    texto = _plano(_reglas()[CODIGO]["regla"])
-    for marca in (MARCA_CON_EMPRESA, MARCA_SOLO_OBRA, MARCA_SIN_EMPRESA):
-        assert marca in texto, f"la regla perdió el marcador «{marca}»"
-    a = texto.index(MARCA_CON_EMPRESA)
-    b = texto.index(MARCA_SOLO_OBRA)
-    c = texto.index(MARCA_SIN_EMPRESA)
-    assert a < b < c, "las tres listas van en orden: con empresa, solo obra, sin nada"
-    cuantos = lambda t: set(_NOMBRE.findall(t))  # noqa: E731
-    return cuantos(texto[a:b]), cuantos(texto[b:c]), cuantos(texto[c:])
+def _dice_que_mezcla(ficha: dict) -> bool:
+    return FRASE_SIN_EMPRESA in _plano(str(ficha.get("descripcion", ""))).lower()
 
 
 def test_f144_la_regla_dice_que_sin_empresa_no_se_puede_suponer_ruesma() -> None:
     texto = _plano(_reglas()[CODIGO]["regla"])
     for termino in (
-        MARCA_SIN_EMPRESA,
-        "NO se puede aplicar el criterio",
-        "mezcla todas las empresas",
-        "la cifra es de todas las empresas",
+        "sin empresa ni obra", FRASE_SIN_EMPRESA,
         "NO dice «he supuesto Construcciones Ruesma»",
+        "cada ficha dice su caso",
     ):
         assert termino in texto, f"la regla no dice «{termino}»"
 
@@ -157,7 +146,6 @@ def test_f144_ya_no_afirma_que_todo_compras_tiene_empresa() -> None:
     texto = _plano(_reglas()[CODIGO]["regla"])
     assert "`empresa_id` en `maestro`, `compras`, `retenciones`" not in texto
     assert "los partes de `personal`" not in texto
-    assert "`personal.partes_lineas`" in texto
 
 
 @pytest.mark.parametrize(
@@ -169,56 +157,26 @@ def test_f144_ya_no_afirma_que_todo_compras_tiene_empresa() -> None:
      "retenciones.v_pbi_retenciones_vivas", "retenciones.v_pbi_retenciones_vencidas"],
 )
 def test_f144_nombra_los_objetos_sin_empresa_que_cazo_el_review(objeto: str) -> None:
-    _, _, sin_empresa = _tramos()
-    assert objeto in sin_empresa, f"`{objeto}` no tiene empresa ni obra y la regla no lo dice"
-
-
-def test_f144_la_lista_con_empresa_es_exacta() -> None:
-    fichas = _fichas()
-    con_empresa, _, _ = _tramos()
-    reales = {n for n, f in fichas.items() if _columnas(f) & set(COLUMNAS_EMPRESA)}
-    assert con_empresa == reales, (
-        f"faltan en la regla: {sorted(reales - con_empresa)}; "
-        f"sobran (sin columna de empresa): {sorted(con_empresa - reales)}"
+    assert _dice_que_mezcla(_fichas()[objeto]), (
+        f"`{objeto}` no tiene empresa ni obra y su ficha no lo dice"
     )
 
 
-def test_f144_la_lista_de_solo_obra_es_exacta() -> None:
+def test_f144_lo_que_dice_que_mezcla_de_verdad_no_tiene_empresa_ni_obra() -> None:
+    """El sentido contrario: una ficha con empresa u `obra_id` que dijese «mezcla las
+    38 empresas» haría que la IA no filtrase pudiendo."""
+    for nombre, ficha in _fichas().items():
+        if _dice_que_mezcla(ficha):
+            cols = _columnas(ficha) & {*COLUMNAS_EMPRESA, "obra_id"}
+            assert not cols, f"`{nombre}` dice que mezcla y tiene {sorted(cols)}"
+
+
+def test_f144_control_el_recorrido_lee_fichas_con_y_sin_empresa() -> None:
     fichas = _fichas()
-    _, solo_obra, _ = _tramos()
-    reales = {
-        n for n, f in fichas.items()
-        if "obra_id" in _columnas(f) and not _columnas(f) & set(COLUMNAS_EMPRESA)
-    }
-    # `maestro.obras` se nombra en el tramo como destino del cruce, no como hecho
-    assert solo_obra - {"maestro.obras"} == reales, (
-        f"faltan en la regla: {sorted(reales - solo_obra)}; "
-        f"sobran: {sorted(solo_obra - reales - {'maestro.obras'})}"
-    )
-
-
-def test_f144_lo_que_nombra_sin_empresa_de_verdad_no_la_tiene() -> None:
-    fichas = _fichas()
-    _, _, sin_empresa = _tramos()
-    # los cruces citados en el tramo (destinos con empresa) no son objetos sin empresa
-    destinos = {"tesoreria.efectos", "retenciones.movimientos", "maestro.obras",
-                "personal.partes_lineas", "compras.fact_compras_linea",
-                "compras.factura_lineas", "compras.albaran_lineas"}
-    for nombre in sin_empresa - destinos:
-        assert nombre in fichas, f"`{nombre}` no es un objeto publicado de los esquemas del ámbito"
-        cols = _columnas(fichas[nombre])
-        assert not cols & {"empresa_id", "empresa", "obra_id"}, (
-            f"`{nombre}` sí tiene {sorted(cols & {'empresa_id', 'empresa', 'obra_id'})}"
-        )
-
-
-def test_f144_control_el_recorrido_ve_un_objeto_con_empresa_sin_nombrar() -> None:
-    fichas = _fichas()
-    con_empresa, _, _ = _tramos()
-    reales = {n for n, f in fichas.items() if _columnas(f) & set(COLUMNAS_EMPRESA)}
-    assert len(reales) >= 20, "el recorrido de fichas no lee nada"
-    plantado = reales | {"compras.objeto_plantado"}
-    assert con_empresa != plantado
+    con_empresa = {n for n, f in fichas.items() if _columnas(f) & set(COLUMNAS_EMPRESA)}
+    que_mezclan = {n for n, f in fichas.items() if _dice_que_mezcla(f)}
+    assert len(con_empresa) >= 20, "el recorrido de fichas no lee nada"
+    assert len(que_mezclan) >= 11, "el recorrido no ve la frase en las fichas"
 
 
 def test_f144_el_ambito_alcanza_a_compras_restringida() -> None:
