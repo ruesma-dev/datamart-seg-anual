@@ -55,7 +55,7 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
-      **No disponible para el perfil restringido** (F-141, `R-PERFIL-RESTRINGIDO`):
+      **No disponible para el perfil restringido** (F-141, `R-PERFILES`):
       con su login la consulta devuelve «permission denied», y eso no se rodea:
       responde que el perfil no lo incluye.
 
@@ -321,7 +321,7 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
-      **No disponible para el perfil restringido** (F-141, `R-PERFIL-RESTRINGIDO`):
+      **No disponible para el perfil restringido** (F-141, `R-PERFILES`):
       con su login la consulta devuelve «permission denied», y eso no se rodea:
       responde que el perfil no lo incluye.
 
@@ -558,7 +558,7 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
-      **No disponible para el perfil restringido** (F-141, `R-PERFIL-RESTRINGIDO`):
+      **No disponible para el perfil restringido** (F-141, `R-PERFILES`):
       con su login la consulta devuelve «permission denied», y eso no se rodea:
       responde que el perfil no lo incluye.
 
@@ -674,7 +674,7 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
-      **No disponible para el perfil restringido** (F-141, `R-PERFIL-RESTRINGIDO`):
+      **No disponible para el perfil restringido** (F-141, `R-PERFILES`):
       con su login la consulta devuelve «permission denied», y eso no se rodea:
       responde que el perfil no lo incluye.
 
@@ -707,6 +707,12 @@ objetos:
       Traerla es una feature propia, F-105, con su coste de ventana y su
       conversacion sobre datos personales. Tampoco hay fecha de cierre ni clase
       del parte: en Sigrid valen 0 en los 6.886.
+
+      **SIN EMPRESA NI OBRA: mezcla las 38 empresas** (F-147,
+      `R-EMPRESA-POR-DEFECTO`): no se puede filtrar por Construcciones Ruesma;
+      la respuesta dice que la cifra es de todas las empresas y no dice «he
+      supuesto Construcciones Ruesma». Es la cabecera del parte: la obra que
+      imputa es la de `personal.partes_lineas`.
     grano: >-
       Una fila por cabecera de parte de trabajo, identificada por `parte_id`.
       Estan todas, de alta y de baja, con lineas o sin ellas.
@@ -841,7 +847,7 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
-      **No disponible para el perfil restringido** (F-141, `R-PERFIL-RESTRINGIDO`):
+      **No disponible para el perfil restringido** (F-141, `R-PERFILES`):
       con su login la consulta devuelve «permission denied», y eso no se rodea:
       responde que el perfil no lo incluye.
 
@@ -1022,7 +1028,7 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
-      **No disponible para el perfil restringido** (F-141, `R-PERFIL-RESTRINGIDO`):
+      **No disponible para el perfil restringido** (F-141, `R-PERFILES`):
       con su login la consulta devuelve «permission denied», y eso no se rodea:
       responde que el perfil no lo incluye.
 

@@ -312,7 +312,7 @@ def _plano(texto: str) -> str:
 
 def _regla() -> dict:
     (regla,) = [r for r in _yaml("00_global.yaml")["reglas"]
-                if r["codigo"] == "R-PERFIL-RESTRINGIDO"]
+                if r["codigo"] == "R-PERFILES"]
     return regla
 
 
@@ -333,7 +333,7 @@ def test_f146_r5_cada_ficha_de_contabilidad_empieza_por_el_aviso(objeto: str) ->
     descripcion = _yaml("contabilidad.yaml")["objetos"][objeto]["descripcion"]
     primera = _plano(descripcion.split("\n", 1)[0])
     assert primera.startswith(f"**{AVISO}**"), primera
-    assert "permission denied" in primera and "`R-PERFIL-RESTRINGIDO`" in primera
+    assert "permission denied" in primera and "`R-PERFILES`" in primera
     assert "F-146" in primera and "el perfil no lo incluye" in primera
 
 
@@ -343,7 +343,7 @@ def test_f146_r5_la_regla_dice_que_no_ve_nada_de_contabilidad() -> None:
     for termino in ("el esquema `contabilidad` entero", "`retenciones`",
                     "`retenciones.apuntes_contables`", "el perfil no lo incluye"):
         assert termino in texto, f"la regla no dice «{termino}»"
-    si_lee = texto.split("SI lee", 1)[1].split("OJO AL NOMBRE", 1)[0]
+    si_lee = texto.split("SI lee", 1)[1].split("«restringida»", 1)[0]
     assert "contabilidad" not in si_lee, f"la regla aún le da algo de contabilidad: {si_lee}"
     assert CONTABILIDAD in regla["ambito"]
     motivo = _plano(regla["motivo"])

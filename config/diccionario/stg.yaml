@@ -66,6 +66,10 @@ objetos:
       `mart.fact_seguimiento_mensual`. Es la regla dura `R-VERSION-MASTER`, de
       severidad bloqueante, y consultar aqui sin filtrar version da cifras
       infladas, no aproximadas.
+
+      **CARA DE CONSULTAR** (F-147, antes en la regla del coste de consulta):
+      un `count(*)` tardaba 25 s el 2026-08-25. Una sola consulta, filtrada y
+      agregada en SQL, y nunca a ciegas sobre la tabla entera.
     grano: >-
       Una fila por (`obra_id`, `partida_id`, `ambito_id`, `version`,
       `anio_mes`), que es su clave de negocio y son CINCO columnas. Omitir

@@ -362,9 +362,11 @@ objetos:
     consumo_recomendado: true
     descripcion: >-
       Las reglas duras del datamart: las trampas del modelo escritas como orden
-      y con su motivo. Se sirven ENTERAS al agente en su primera llamada, antes
-      de que escriba ninguna consulta, porque una regla que se lee despues del
-      error no ha servido de nada.
+      y con su motivo. Llegan al agente en su primera llamada, antes de que
+      escriba ninguna consulta, porque una regla que se lee despues del error no
+      ha servido de nada. Desde F-147 cada una trae un `resumen` que basta solo
+      y una `entrega` que dice si se sirve el resumen o la regla entera; las
+      reglas que no son para la IA (`fuera_mcp`, guia del ETL) no se publican.
     grano: Una fila por regla, identificada por su `codigo`, que es la clave primaria.
     clave_negocio: [codigo]
     paso_etl: publicar_diccionario
@@ -401,6 +403,20 @@ objetos:
         agregacion: no_sumable
       orden:
         significado: En que orden se presentan las reglas al agente.
+        agregacion: no_sumable
+      resumen:
+        significado: >-
+          F-147. La regla como ORDEN corta (1 a 250 caracteres, lo garantiza un
+          CHECK) que basta por si sola. Es lo que se sirve en cada conversacion;
+          `regla` y `motivo` son el detalle, para quien consulte un objeto del
+          `ambito`.
+        agregacion: no_sumable
+      entrega:
+        significado: >-
+          F-147. Que se sirve de la regla: `resumen` (el resumen; el detalle bajo
+          demanda) o `entera` (siempre entera, porque trata de lo que el perfil
+          no ve y nunca le llegaria con un objeto). Lo garantiza un CHECK.
+        valores: [resumen, entera]
         agregacion: no_sumable
 
   diccionario_publicacion:
@@ -456,7 +472,9 @@ objetos:
         significado: Objetos documentados, en total.
         agregacion: no_sumable
       n_reglas:
-        significado: Reglas duras publicadas.
+        significado: >-
+          Reglas duras publicadas en `_meta.diccionario_reglas`: desde F-147, sin
+          las `fuera_mcp` del YAML.
         agregacion: no_sumable
       n_columnas:
         significado: >-

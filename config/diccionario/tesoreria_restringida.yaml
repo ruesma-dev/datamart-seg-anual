@@ -10,14 +10,14 @@
 # comprueba cada noche. La ficha EMPIEZA por el aviso de acceso restringido
 # porque el MCP no filtra el diccionario por perfil. Decision del humano del
 # 2026-10-13: «los pagos de nominas deben quedar restringidos». Regla dura
-# `R-TESORERIA-RESTRINGIDA`.
+# `R-PERFILES`.
 #
 # Lo construye `build_tesoreria` (01) y de aqui sale la general (02, 03).
 # Solo recuentos y agregados, ni nombres ni importes de nadie.
 #
 # F-141 (2026-10-17): «restringida» = reservada al perfil total. El perfil
 # restringido del MCP (administrativos, grupo `sigrid_dm_perfil_restringido_ro`)
-# ve MENOS que el estandar y NO la lee (`R-PERFIL-RESTRINGIDO`).
+# ve MENOS que el estandar y NO la lee (`R-PERFILES`).
 
 version: 1
 esquema: tesoreria_restringida
@@ -31,7 +31,7 @@ objetos:
     descripcion: >-
       **ACCESO RESTRINGIDO: solo el perfil total del MCP.** Si no lo tienes, la
       consulta devuelve «permission denied»: usa `tesoreria.efectos`
-      (`R-TESORERIA-RESTRINGIDA`), sin reintentar ni buscar otro camino.
+      (`R-PERFILES`), sin reintentar ni buscar otro camino.
 
       **LA CARTERA COMPLETA DE COBROS Y PAGOS** (F-037): una fila por efecto de
       `raw.pag` (PAGO) y `raw.cob` (COBRO), 256.952 + 21.914 el 2026-10-13, sin

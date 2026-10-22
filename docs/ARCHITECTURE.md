@@ -65,7 +65,7 @@ delataría lo restringido en las cuentas mixtas), `incompleto` en los saldos y
 generales siguen materializadas y con los índices de siempre; un `DO` al final
 de `05_mayor_general.sql` hace fallar el paso si se cuela un apunte de cuenta
 restringida o si general más restringidos no suman el completo. Regla dura
-`R-CONTABILIDAD-RESTRINGIDA`: el mayor completo se lee solo de
+`R-PERFILES`: el mayor completo se lee solo de
 `contabilidad_restringida` y los dos esquemas nunca se suman.
 
 **`tesoreria` (F-037, fase 1, 2026-10-13) es la cartera de cobros y pagos**:
@@ -88,7 +88,7 @@ columnas), y un `DROP ... CASCADE` se la llevaría cada noche. `build_tesoreria`
 solo depende de `ingest_raw`, va delante de `build_compras` en la lista y nadie
 lo declara en su `depends_on`: si falla, su `TRUNCATE` se deshace y compras lee
 la cartera de ayer. Es cartera, no devengo: la proyección de obra (fase 2) no
-existe. Reglas duras `R-TESORERIA-ESTADO` y `R-TESORERIA-RESTRINGIDA`.
+existe. Reglas duras `R-TESORERIA-ESTADO` y `R-PERFILES`.
 
 **`descompuestos` (F-097, 2026-09-28) es de qué se compone cada partida**, por
 ORIGEN, y es el primer esquema del datamart que NO se reconstruye de cero:
@@ -792,7 +792,7 @@ fallo con cualquier tolerancia.
   `compras.documento_procesos`, `documento_alarmas.creada_por` y
   `documento_adjuntos.subido_por`: el humano lo aceptó («deja visible compras»).
   La guarda solo ve vistas y nombres: una TABLA nueva con datos del mayor o de
-  la cartera en un esquema del perfil la vería; la regla `R-PERFIL-RESTRINGIDO`
+  la cartera en un esquema del perfil la vería; la regla `R-PERFILES`
   del diccionario y este aviso son la mitigación.
 - **El mayor analítico y F-127.** Hoy no está publicado (es `raw.apa`, 709.403
   filas). Si F-127 lo publica en `contabilidad`, el perfil restringido no lo ve
