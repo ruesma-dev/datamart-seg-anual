@@ -659,7 +659,25 @@
 # propio con un enlace solo para quien lo pidio. La pareja (`emp`, `cod`), el
 # respaldo con la empresa 1 y `ORIGEN_AMBIGUO` no cambian.
 
-version: 58
+# version 59 (F-147, 2026-10-22): PRESUPUESTO DEL CONTEXTO DEL MCP.
+# `contexto_bbdd` servia ~86.000 caracteres en cada conversacion (78.057 con la
+# formula de la puerta). Revision de las 27 reglas una a una, decidida por el
+# humano (`specs/F-147-presupuesto-contexto-mcp/revision_reglas.md`): cada
+# regla lleva `resumen` (la orden corta que basta sola) y `entrega` (`resumen`,
+# `entera` o `fuera_mcp`); las cuatro de perfiles se funden en `R-PERFILES`
+# (entera), las tres de `compras.fact_compras_linea` en `R-COMPRAS-LINEA`, la
+# del coste de consulta se retira repartida a sus fichas y `R-SIGRID-CON` deja
+# de publicarse (guia del ETL: el MCP no lee `raw`). `R-OBRA-ACTIVA` define la
+# obra VIVA de F-025, `R-COMPRAS-SIN-IVA` deja de negar el IVA de las
+# cabeceras de F-128 y `R-ALBARAN-ABSURDO` queda minima y sin cifras. El
+# inventario de empresa de `R-EMPRESA-POR-DEFECTO` pasa a cada ficha
+# («mezcla las 38 empresas»). `esquemas.*.para_que_sirve` <= 350 y las 2
+# primeras `ejemplos_preguntas` son las que enrutan. 21 reglas en el YAML y
+# 20 publicadas; `_meta.diccionario_reglas` gana `resumen` y `entrega` AL
+# FINAL (contrato aditivo pactado con `mcp-bbdd`). Medida tras la feature:
+# 29.513 (tope de `tests/test_f147_presupuesto_contexto.py`).
+
+version: 59
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
