@@ -141,6 +141,18 @@ ENTREGAS = ("resumen", "entera", "fuera_mcp")
 RESUMEN_MIN = 40
 RESUMEN_MAX = 250
 
+#: F-147 (D8). Preguntas por objeto que `contexto_bbdd` sirve para ENRUTAR: las
+#: 2 PRIMERAS de `ejemplos_preguntas`. El recorte lo hace `mcp-bbdd` en su
+#: F-029; aquí se ordenan (R15) y se miden con este número. Todas siguen
+#: saliendo en `describir_tabla`. Es contrato: está en
+#: `azure-apps/datamart_seg_anual.md`.
+MAX_PREGUNTAS_ENRUTADO = 2
+
+#: F-147 (R19). Cuánto puede quedar la medida por debajo del tope sin que la
+#: puerta pida bajarlo. 1.000 ≈ cuatro resúmenes: bastante para no saltar por
+#: una coma, poco para que se acumule holgura que alguien gaste en silencio.
+HOLGURA_TRINQUETE = 1_000
+
 #: Qué claves del bloque global VIAJAN a `_meta` y cuáles no, con su motivo.
 #:
 #: Existe porque es la **tercera vez** que información importante se queda sin
@@ -1242,6 +1254,88 @@ def derivar_avisos(dicc: Diccionario) -> Diccionario:
         for ficha in dicc.fichas
     )
     return replace(dicc, fichas=fichas)
+
+
+# ---------------------------------------------------------------------------
+# F-147 · El presupuesto de lo que `contexto_bbdd` sirve entero
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class PresupuestoContexto:
+    """Caracteres que `contexto_bbdd` de `mcp-bbdd` sirve ENTEROS, por parte.
+
+    No incluye los rótulos y epígrafes de `mcp-bbdd`: son suyos y constantes, y
+    copiarlos aquí sería una segunda copia de su código. El tope de la puerta se
+    fija sobre esta misma medida, así que compara igual con igual.
+    """
+
+    reglas: int
+    enrutado: int
+    bloques: int
+
+    @property
+    def total(self) -> int:
+        return self.reglas + self.enrutado + self.bloques
+
+
+def presupuesto_contexto(
+    dicc: Diccionario, bloques: Sequence[str]
+) -> PresupuestoContexto:
+    """Lo que `contexto_bbdd` servirá ENTERO, medido desde el diccionario (R17).
+
+    * Reglas publicables: `codigo + titulo + resumen`, más `regla + motivo` de
+      las `entera`. Las `fuera_mcp` no se publican y no cuentan.
+    * Enrutado: por ficha recomendada, `esquema.objeto` y sus
+      `MAX_PREGUNTAS_ENRUTADO` primeras preguntas.
+    * Bloques: el `texto` de cada fila de `_meta.diccionario_contexto`. Llegan
+      ya hechos porque el dominio no importa infraestructura; quien llama pasa
+      los de `filas_contexto`, la misma función que publica (R20: un bloque
+      nuevo cuenta sin tocar esta función).
+    """
+    reglas = sum(
+        len(r.codigo) + len(r.titulo) + len(r.resumen.strip())
+        + (len(r.regla) + len(r.motivo) if r.entrega == "entera" else 0)
+        for r in dicc.reglas
+        if r.publicable
+    )
+    enrutado = sum(
+        len(f.nombre)
+        + sum(len(p) for p in f.ejemplos_preguntas[:MAX_PREGUNTAS_ENRUTADO])
+        for f in dicc.fichas
+        if f.consumo_recomendado and f.ejemplos_preguntas
+    )
+    return PresupuestoContexto(
+        reglas=reglas, enrutado=enrutado, bloques=sum(len(t) for t in bloques)
+    )
+
+
+def veredicto_presupuesto(medida: PresupuestoContexto, tope: int) -> str | None:
+    """`None` si la medida cabe en el tope sin holgura de más; si no, el porqué.
+
+    Falla en los dos sentidos (R18, R19): por encima del tope, diciendo cuánto
+    sobra y de qué parte; y con más de `HOLGURA_TRINQUETE` por debajo, pidiendo
+    bajarlo a la medida, para que el sitio que se libera no lo gaste nadie en
+    silencio.
+    """
+    desglose = (
+        f"reglas {medida.reglas}, enrutado {medida.enrutado}, "
+        f"bloques {medida.bloques}"
+    )
+    if medida.total > tope:
+        return (
+            f"`contexto_bbdd` serviría {medida.total} caracteres y el tope es "
+            f"{tope}: sobran {medida.total - tope} ({desglose}). Acorta lo que "
+            f"creció o, si el crecimiento está decidido, sube el tope con su "
+            f"motivo al lado"
+        )
+    if tope - medida.total > HOLGURA_TRINQUETE:
+        return (
+            f"`contexto_bbdd` sirve {medida.total} caracteres y el tope es "
+            f"{tope}: baja el tope a {medida.total} ({desglose}). Trinquete: el "
+            f"sitio que se libera no se deja para que lo gaste otro"
+        )
+    return None
 
 
 # ---------------------------------------------------------------------------
