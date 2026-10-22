@@ -336,7 +336,15 @@ def test_f147_r11_obra_activa_se_ata_a_business_rules() -> None:
     assert f"NOT IN ({estados})" in texto
     assert ventana["patron_codigo_administrativo"] in texto
     assert f"<= {ventana['meses_sin_actividad']}" in texto
-    assert str(ventana["meses_sin_actividad"]) in normalizado(_regla("R-OBRA-ACTIVA").resumen)
+    # Review F-147 (cambio 3): con la F-029 de `mcp-bbdd` el RESUMEN es lo único
+    # que se sirve en cada conversación, así que se ata a la ventana entero, no
+    # solo por los meses: estados, patrón administrativo y meses.
+    resumen = normalizado(_regla("R-OBRA-ACTIVA").resumen)
+    assert f"({estados})" in resumen, "los estados que congelan, en el resumen"
+    digitos = re.fullmatch(r"\^\[0-9\]\{(\d+)\}\$", ventana["patron_codigo_administrativo"])
+    assert digitos, "el patrón administrativo ya no es «N dígitos»: reescribe esta guarda"
+    assert f"{digitos.group(1)} dígitos" in resumen, "el patrón administrativo, en el resumen"
+    assert str(ventana["meses_sin_actividad"]) in resumen
 
 
 # ---------------------------------------------------------------------------
