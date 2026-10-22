@@ -22,6 +22,13 @@
   El punto 6 (filtrar reglas por perfil) lo decide su humano en F-029: no cambia nada aquí.
 - Implementación en curso: tarea en curso y decisiones, en las viñetas siguientes y en
   `progress/impl_F-147.md`.
+- **ROJO AJENO a F-147 (init.sh inicial, 2026-10-22)**: `test_f141_r30_mcp_bbdd_solo_enlaza_al_contrato`
+  falla porque el commit `c40adfb` de `azure-apps` (sesión de `mcp-bbdd`, F-030) dejó en
+  `mcp_bbdd.md` ~l.998-999 una cita de `mcp_sigrid_dm_restringido`/F-141 sin enlace a
+  `datamart_seg_anual.md`. El documento es de `mcp-bbdd`: no se toca desde aquí. Avisado el líder.
+- **Desviación justificada (R2)**: `RESUMEN_MAX = 250`, no 300: es el `CHECK` que pidió `mcp-bbdd`
+  (petición A) y el validador tiene que rechazar antes que la base. Los resúmenes de la tabla que
+  pasaban de 250 (`R-VENTA-COEFICIENTES` ~265, `R-PERFILES` ~255) se acortan sin perder contenido.
 
 ## 2026-10-22 · F-147 · `spec_ready` (spec-author) · rama `feature/F-147-presupuesto-contexto-mcp`
 

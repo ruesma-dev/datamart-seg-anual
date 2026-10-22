@@ -117,6 +117,30 @@ CARDINALIDADES = ("1:1", "1:N", "N:1", "N:N")
 #: Severidad de una regla dura del diccionario.
 SEVERIDADES = ("bloqueante", "aviso")
 
+#: F-147 (D2). QUÉ se sirve de una regla, que no es lo mismo que CUÁNTO importa
+#: (`severidad`: las 27 de la v58 eran `bloqueante`, y por eso no discriminaba):
+#:
+#: * `resumen` (por defecto): `contexto_bbdd` sirve el `resumen`, que es una
+#:   ORDEN que basta sola; `regla` + `motivo` son el detalle, que `mcp-bbdd`
+#:   lleva a `describir_tabla` de cada objeto del `ambito` (su F-029).
+#: * `entera`: se sirve entera siempre (`R-PERFILES`: trata justo de lo que el
+#:   perfil NO ve, así que nunca le llegaría por `describir_tabla`).
+#: * `fuera_mcp`: NO se publica en `_meta.diccionario_reglas` (D4). Sigue en el
+#:   YAML y se valida igual: es guía del ETL, no de la IA (`R-SIGRID-CON`).
+ENTREGAS = ("resumen", "entera", "fuera_mcp")
+
+#: Límites del `resumen`, en caracteres, medidos sin los blancos de los extremos.
+#:
+#: El mínimo (40) es el mismo que se exige a `regla` desde F-006: menos no es
+#: una orden, es un titular. El máximo es **250 y no los 300 de la spec (R2)**:
+#: `mcp-bbdd` pidió al pactar el contrato (T1, petición A) que la BASE lo
+#: garantice con `CHECK (char_length(btrim(resumen)) BETWEEN 1 AND 250)` en
+#: `01_diccionario.sql`. Con 300 aquí, un resumen de 280 pasaría `init.sh` y
+#: reventaría la publicación en Azure; el validador tiene que ser el primero en
+#: decir que no, y con el mismo número (lo ata un test al DDL).
+RESUMEN_MIN = 40
+RESUMEN_MAX = 250
+
 #: Qué claves del bloque global VIAJAN a `_meta` y cuáles no, con su motivo.
 #:
 #: Existe porque es la **tercera vez** que información importante se queda sin
@@ -338,6 +362,17 @@ class Regla:
     regla: str
     motivo: str
     orden: int = 0
+    #: F-147. Al FINAL, y con valor por defecto, a propósito: quien construya
+    #: una `Regla` por posición no ve sus argumentos corridos (mismo criterio que
+    #: las columnas de `_meta.diccionario_reglas`). `resumen` es la orden que
+    #: basta sola; `entrega`, una de `ENTREGAS`.
+    resumen: str = ""
+    entrega: str = "resumen"
+
+    @property
+    def publicable(self) -> bool:
+        """¿Llega a `_meta.diccionario_reglas`? Todas menos las `fuera_mcp` (D4)."""
+        return self.entrega != "fuera_mcp"
 
 
 @dataclass(frozen=True, slots=True)
@@ -1112,6 +1147,15 @@ def _validar_reglas(
         for campo in ("titulo", "regla", "motivo"):
             if not (getattr(regla, campo) or "").strip():
                 error("R9", f"la regla `{regla.codigo}` no declara `{campo}`")
+        errores_resumen = _error_resumen(regla)
+        if errores_resumen:
+            error("R2", errores_resumen)
+        if regla.entrega not in ENTREGAS:
+            error(
+                "R3",
+                f"la regla `{regla.codigo}` declara `entrega` = '{regla.entrega}', "
+                f"fuera del vocabulario: {_lista(ENTREGAS)}",
+            )
         if not regla.ambito:
             error(
                 "R9",
@@ -1137,6 +1181,28 @@ def _validar_reglas(
                     f"{_lista(ESQUEMAS_DEL_DATAMART)}",
                 )
     return errores
+
+
+def _error_resumen(regla: Regla) -> str | None:
+    """F-147 R2: el `resumen` existe y cabe entre `RESUMEN_MIN` y `RESUMEN_MAX`.
+
+    Vale también para las `fuera_mcp`: no publicarla no la exime de poder
+    resumirse, y el día que vuelva al MCP no tiene que llegar sin él. Se mide
+    sin los blancos de los extremos, como el `CHECK` de la base.
+    """
+    texto = (regla.resumen or "").strip()
+    if not texto:
+        return (
+            f"la regla `{regla.codigo}` no declara `resumen`: la orden corta que "
+            f"`contexto_bbdd` sirve en lugar de `regla` + `motivo`"
+        )
+    if not RESUMEN_MIN <= len(texto) <= RESUMEN_MAX:
+        return (
+            f"el `resumen` de `{regla.codigo}` tiene {len(texto)} caracteres y "
+            f"tiene que estar entre {RESUMEN_MIN} y {RESUMEN_MAX}: una orden que "
+            f"baste sola, no un titular ni la regla entera"
+        )
+    return None
 
 
 # ---------------------------------------------------------------------------

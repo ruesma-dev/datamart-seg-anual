@@ -89,7 +89,7 @@ def test_f147_r1_cargador_lee_resumen_y_entrega(tmp_path) -> None:
     global_yaml = GLOBAL_MINIMO.replace(
         "    motivo: Bug de la Tanda 1.4; multiplicaba por nueve.\n",
         "    motivo: Bug de la Tanda 1.4; multiplicaba por nueve.\n"
-        f"    resumen: {RESUMEN_VALIDO}\n"
+        f"    resumen: '{RESUMEN_VALIDO}'\n"
         "    entrega: entera\n",
     )
     dicc, _ = cargar_diccionario(_directorio(tmp_path, **{"00_global.yaml": global_yaml}))
@@ -231,15 +231,16 @@ def test_f147_r4_las_filas_traen_resumen_y_entrega_detras_de_lo_de_siempre() -> 
 
 
 def test_f147_r4_el_create_table_conserva_las_siete_columnas_del_contrato() -> None:
-    """Lo que `mcp-bbdd` lee hoy no cambia de nombre, tipo ni posición: las
-    columnas nuevas no se cuelan en el `CREATE TABLE`, se añaden después."""
+    """Lo que `mcp-bbdd` lee hoy no cambia de nombre ni posición: las columnas
+    nuevas no se cuelan en el `CREATE TABLE`, se añaden después y al final (el
+    parser cuenta también las que llegan por `ALTER TABLE`, en su orden real)."""
     from tests.test_f006_fichas import columnas_del_create_table
 
     reales = columnas_del_create_table(
         DDL.read_text(encoding="utf-8"), "_meta.diccionario_reglas"
     )
 
-    assert reales == COLUMNAS_LEIDAS_HOY
+    assert reales == COLUMNAS_LEIDAS_HOY + ["resumen", "entrega"]
 
 
 # ---------------------------------------------------------------------------
@@ -332,8 +333,11 @@ def test_f147_a_el_check_se_valida_solo_cuando_ninguna_fila_lo_incumple(
 
 
 def test_f147_a_el_ddl_no_hace_drop_ni_truncate() -> None:
-    """Ni para quitar el DEFAULT: un `DROP` en este fichero es un cambio de API."""
-    texto = _ddl_sin_comentarios().upper()
+    """Ni para quitar el DEFAULT: un `DROP` en este fichero es un cambio de API.
+
+    Se quitan los literales: el `COMMENT ON VIEW` nombra `DROP VIEW` a propósito,
+    para advertir de lo que cuesta."""
+    texto = re.sub(r"'(?:[^']|'')*'", "''", _ddl_sin_comentarios()).upper()
 
     assert "DROP " not in texto
     assert "TRUNCATE" not in texto

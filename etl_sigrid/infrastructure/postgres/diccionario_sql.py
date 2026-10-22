@@ -57,10 +57,13 @@ INSERT INTO _meta.diccionario (
 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 """
 
+#: F-147: `resumen` y `entrega` van AL FINAL, igual que en la tabla. Las siete
+#: primeras son las que `mcp-bbdd` lee hoy y no se mueven (contrato pactado en
+#: T1 de F-147).
 SQL_INSERT_REGLA = """
 INSERT INTO _meta.diccionario_reglas (
-    codigo, titulo, severidad, ambito, regla, motivo, orden
-) VALUES (%s, %s, %s, %s, %s, %s, %s)
+    codigo, titulo, severidad, ambito, regla, motivo, orden, resumen, entrega
+) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
 """
 
 SQL_INSERT_CONTEXTO = """
@@ -175,7 +178,11 @@ def filas_diccionario(dicc: Diccionario) -> list[tuple]:
 
 
 def filas_reglas(dicc: Diccionario) -> list[tuple]:
-    """Una tupla por regla dura, en el orden en que se sirven al agente."""
+    """Una tupla por regla dura PUBLICABLE, en el orden en que se sirven.
+
+    Las `fuera_mcp` no llegan a la tabla (F-147, D4): son guía del ETL, y el
+    `CHECK` de la base solo admite `resumen` y `entera` en `entrega`.
+    """
     return [
         (
             regla.codigo,
@@ -185,8 +192,11 @@ def filas_reglas(dicc: Diccionario) -> list[tuple]:
             regla.regla,
             regla.motivo,
             regla.orden,
+            regla.resumen.strip(),
+            regla.entrega,
         )
         for regla in sorted(dicc.reglas, key=lambda r: (r.orden, r.codigo))
+        if regla.publicable
     ]
 
 
@@ -230,7 +240,8 @@ def fila_publicacion(
         ahora,
         batch_id,
         len(dicc.fichas),
-        len(dicc.reglas),
+        # F-147 (R6, petición C de `mcp-bbdd`): las que hay en la tabla.
+        sum(1 for r in dicc.reglas if r.publicable),
         sum(len(f.columnas) for f in dicc.fichas),
         cobertura_columnas(dicc),
     )
