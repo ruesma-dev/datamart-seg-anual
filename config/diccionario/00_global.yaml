@@ -678,10 +678,23 @@ titulo: Datamart de seguimiento anual de obra
 
 reglas:
 
+  # F-147 (v59): toda regla lleva `resumen` -la ORDEN corta que basta sola y
+  # que `contexto_bbdd` sirve en lugar de `regla` + `motivo`, que son el
+  # detalle para `describir_tabla`- y una `entrega`: `resumen` (por defecto),
+  # `entera` (se sirve entera siempre) o `fuera_mcp` (no se publica). Revision
+  # una a una, decidida por el humano el 2026-10-22:
+  # `specs/F-147-presupuesto-contexto-mcp/revision_reglas.md`. Lo que salio de
+  # las reglas al acortarlas o fundirlas esta en la ficha de su objeto.
+
   - codigo: R-FRESCURA
     titulo: Ocho esquemas pueden quedarse atras sin tumbar la noche
     severidad: bloqueante
     ambito: [cierre, compras, compras_restringida, maestro, retenciones, personal, contabilidad, contabilidad_restringida, tesoreria, tesoreria_restringida, descompuestos]
+    resumen: >-
+      Cita la fecha del dato en toda respuesta de cierre, compras, maestro,
+      retenciones, personal, contabilidad, tesorería o descompuestos: cada uno
+      se construye aparte y puede ir una noche atrasado. Fecha: «ESTADO POR
+      ESQUEMA» o `_meta.v_frescura`.
     regla: >-
       Estos ocho esquemas (once con `contabilidad_restringida`,
       `tesoreria_restringida` y `compras_restringida`, que construyen el mismo
@@ -733,6 +746,11 @@ reglas:
       - cierre.v_pbi_cierre_resumen
       - cierre.v_pbi_cierre_indirectos_detalle
       - cierre.v_pbi_cierre_generales_detalle
+    resumen: >-
+      Los importes van en pareja mes/acumulado (`importe_mes`/`importe_origen`;
+      en `cierre`, `ejecutado_mes`/`ejecutado_origen`). Para series suma el del
+      mes; el acumulado NUNCA se suma entre meses: de un periodo se toma su
+      último mes.
     regla: >-
       Todo importe del datamart viene en pareja: uno del MES y otro ACUMULADO A
       ORIGEN. Para una serie temporal se suma el del mes; el acumulado ya lleva
@@ -756,6 +774,11 @@ reglas:
       - cierre.fact_cierre_mensual
       - cierre.v_pbi_cierre_resumen
       - cierre.v_pbi_cierre_cabecera
+    resumen: >-
+      Cierres, beneficio y análisis usan la venta SIN coeficientes (`importe`,
+      `final_importe`). La CON coeficientes (`importe_oficial`,
+      `*_con_coeficientes`) es lo facturado: nunca se suma ni compara con
+      ejecutado, coste ni venta sin ellos.
     regla: >-
       Hay DOS ventas. La SIN coeficientes (`stg.presupuesto.importe`,
       `cierre.*.final_importe`, `presupuesto_inicial_venta`,
@@ -775,10 +798,8 @@ reglas:
       +1.695.571,87 EUR de beneficio final donde son -790.718,46, y 42 obras
       tenian la venta final inflada (511 filas-mes, 2021-2026). Decision del
       humano del 2026-09-29: sin coeficientes para cierres y analisis, y la otra
-      aparte. El coeficiente es del CONTRATO con el cliente (varios por obra:
-      1,07 y 1,24 en la 0676-B; 1,26 y 1,00 en la 0702) y no vive en ninguna
-      tabla de Sigrid: solo aplicado, en `impcoe`, y solo en los master de venta
-      y certificacion. El desglose por contrato es F-099.
+      aparte. El coeficiente por contrato, en la ficha de
+      `stg.presupuesto.importe_oficial`.
 
   - codigo: R-UNIVERSO-OBRA
     titulo: Hay dos universos de obra y no cuentan lo mismo
@@ -787,6 +808,10 @@ reglas:
       - stg.obras
       - maestro.obras
       - mart.v_pbi_dim_obra
+    resumen: >-
+      Dos universos: `stg.obras` (seguimiento, sin códigos administrativos) y
+      `maestro.obras` (todas las fichas, una por empresa y código). Al contar
+      obras di cuál usas; `compras` y `retenciones` no filtran por `stg.obras`.
     regla: >-
       `stg.obras` es el universo del SEGUIMIENTO: excluye codigos
       administrativos (0001-0005, CM, CP, GG, VAR, POSTV*, BD*, GGD, GINT, OT),
@@ -795,18 +820,12 @@ reglas:
       es superconjunto, con una fila por FICHA (una por empresa y codigo, F-102).
       Toda respuesta que cuente obras debe decir cual usa. `compras` y
       `retenciones` tampoco filtran por `stg.obras` y pueden traer obras
-      administrativas que el seguimiento excluye. **`stg.obras` sigue eligiendo
-      su ficha como hasta hoy y NO usa `maestro.obras.es_ficha_principal`** (la
-      ficha de Ruesma): las dos difieren en 0581, 0606, 0671 y 0720, donde
-      `stg.obras` --y con ella `mart` y `cierre`-- se queda con la ficha de una
-      UTE o de Porsan. Lo resuelve F-106.
+      administrativas que el seguimiento excluye. Que ficha elige `stg.obras`
+      cuando un codigo tiene varias lo dice su ficha.
     motivo: >-
       Los filtros estan en `sql/stg/03_obras.sql`; `sql/maestro/01_obras.sql` no
       tiene ninguno. Contar en una o en otra da cifras distintas a proposito, y
-      dar la del maestro como "obras de la empresa" infla el numero. F-102
-      (2026-09-23) midio que la eleccion de `stg.obras` no es la ficha de Ruesma
-      en 0581, 0606, 0671 y 0720, y decidio no tocarla: aplicarla sacaria la 0581
-      del seguimiento. F-106 pasa el seguimiento a la ficha de Ruesma.
+      dar la del maestro como "obras de la empresa" infla el numero.
 
   - codigo: R-CODIGO-POR-EMPRESA
     titulo: El codigo de una obra o de un recurso solo es unico dentro de su empresa
@@ -831,6 +850,11 @@ reglas:
       - maestro.cuentas_analiticas
       - contabilidad.plan_cuentas
       - contabilidad.mayor
+    resumen: >-
+      Un código de obra, recurso o cuenta solo es único dentro de su empresa:
+      cruza, filtra y agrega con `empresa_id` o por
+      `clave_obra`/`clave_recurso`/`clave_cuenta` (`1-0581`). Los hechos llevan
+      el `obra_id` de la ficha de SU empresa.
     regla: >-
       En Sigrid las obras y los recursos son POR EMPRESA: el mismo codigo existe
       una vez por empresa --Ruesma (1), Porsan (28), cada UTE-- y es la misma
@@ -845,112 +869,44 @@ reglas:
       sirve para agregar hechos de otras empresas, porque sumaria lo de la UTE
       en la obra de Ruesma. Los hechos (`compras`, `retenciones`, `personal`)
       llevan el `obra_id` de la ficha de SU empresa y no se traducen. Contar
-      obras por codigo es contar `es_ficha_principal`, y hay que decirlo. Y si
-      la pregunta no indica empresa, es Construcciones Ruesma (`empresa_id =
-      1`), dicho en la respuesta: lo fija `R-EMPRESA-POR-DEFECTO`, que es
-      criterio general y no solo de codigos.
+      obras por codigo es contar `es_ficha_principal`, y hay que decirlo. Lo
+      mismo vale para las cuentas analiticas (`maestro.cuentas_analiticas`) y el
+      plan de cuentas financiero (`contabilidad.plan_cuentas`,
+      `contabilidad.mayor`: (`empresa_id`, `codigo_cuenta`) o `clave_cuenta`).
+      Y si la pregunta no indica empresa, es Construcciones Ruesma
+      (`R-EMPRESA-POR-DEFECTO`).
     motivo: >-
-      Medido en solo lectura el 2026-09-23 (F-102): 922 fichas de obra para 846
-      codigos, 58 codigos repetidos y ninguno repetido dentro de una empresa;
-      922 `clave_obra` para 922 fichas. Recursos: 2.618 para 2.504 codigos, 61
-      repetidos y ninguno dentro de una empresa; 2.618 `clave_recurso` para
-      2.618 recursos (`MO/0009` tiene ficha en las empresas 1, 18, 27 y 28). En
-      `compras.fact_compras_linea`, 91.431 lineas son de una ficha de otra
-      empresa y 84.233 de ellas (31.770.036,29 EUR) tienen un codigo que tambien
-      tiene ficha de Ruesma: son las que se mezclarian agregando por codigo. En
-      `personal.partes_lineas`, 14.079 lineas (1.677.332,46 EUR) imputan a la
-      copia de Porsan de una obra del seguimiento: en la 0704 los trabajadores
-      de Porsan imputan a su propia ficha. Lo destapo Administracion el
-      2026-09-22 al medir la direccion de las obras sobre la copia equivocada.
-      Las cuentas analiticas (F-107, 2026-09-24) tambien: 184.234 cuentas, 14.063
-      codigos repetidos entre empresas y ninguno dentro de una; en
-      `maestro.cuentas_analiticas` se cruza por codigo junto con `empresa_id`.
-      Y el plan de cuentas financiero (F-056, 2026-09-26): 38 empresas, cada una
-      con su plan, y ningun codigo repetido dentro de una; en
-      `contabilidad.plan_cuentas` y `contabilidad.mayor` la cuenta se pide por
-      (`empresa_id`, `codigo_cuenta`) o por `clave_cuenta` ('1-4308000197').
+      Medido en solo lectura (F-102, F-107 y F-056, 2026-09-23 a 26): ningun
+      codigo de obra, recurso, cuenta analitica ni cuenta contable se repite
+      dentro de una empresa y muchos se repiten entre empresas; agregando por
+      codigo, 84.233 lineas de compras de otras empresas se mezclaban con obras
+      de Ruesma.
 
   - codigo: R-EMPRESA-POR-DEFECTO
     titulo: Sin empresa en la pregunta, es Construcciones Ruesma (empresa_id = 1), y se dice
     severidad: bloqueante
     ambito: [maestro, compras, compras_restringida, retenciones, personal, contabilidad, contabilidad_restringida, tesoreria, tesoreria_restringida]
+    resumen: >-
+      Sin empresa en la pregunta, filtra `empresa_id = 1` (Construcciones
+      Ruesma) y dilo. Sin columna de empresa, llega por `obra_id` →
+      `maestro.obras`; si tampoco hay obra, avisa de que la cifra mezcla todas.
+      Nunca sumes empresas sin decirlo.
     regla: >-
-      Es un CRITERIO GENERAL, no solo para los codigos de obra o de recurso: si
-      la pregunta no indica empresa, se entiende Construcciones Ruesma,
-      `empresa_id = 1`, y se filtra por ella en TODO objeto que tenga empresa.
-      La IA DICE en la respuesta que ha supuesto Construcciones Ruesma («he
+      Es un CRITERIO GENERAL: si la pregunta no indica empresa, se entiende
+      Construcciones Ruesma, `empresa_id = 1`, y la respuesta lo dice («he
       supuesto Construcciones Ruesma, `empresa_id = 1`, porque la pregunta no
-      indica empresa»), para que el usuario lo vea y lo corrija. NO se aplica
-      si la pregunta pide otra empresa (Porsan es la 28), varias, el grupo o
-      una UTE: entonces se filtra por las que pide y, si son varias, se dice
-      cuales entran y si van por separado o sumadas. Nunca se suman empresas
-      sin decirlo.
-      DONDE SE PUEDE FILTRAR es objeto a objeto, no esquema a esquema: en
-      `compras` y en `retenciones` la mayoria de los objetos no tiene empresa.
-      La columna de empresa la tienen exactamente estos objetos:
-      `maestro.obras`, `maestro.v_obra_fichas`, `maestro.centros_coste`,
-      `maestro.cuentas_analiticas`, `compras.comparativos`,
-      `compras.v_control_forma_pago`, `compras.v_pbi_albaranes_sin_facturar`,
-      `compras.v_pbi_contrato_consumo`, `compras.v_pbi_partida_coste`,
-      `compras.v_pbi_proveedor_obra`, `retenciones.apuntes_contables`,
-      `retenciones.fin_obra`, `retenciones.saldo_contable`,
-      `retenciones.v_retencion_contable_obra`, `retenciones.retencion_factura`,
-      `retenciones.v_cuadre_factura_obra` (`retencion_factura`, la empresa de
-      la obra de CABECERA de la factura; `v_cuadre_factura_obra`, la de la obra
-      del par: la de cabecera de sus facturas o, en los pares que solo estan en
-      contabilidad, la de la cascada contable de `retenciones.saldo_contable`),
-      `personal.recursos`,
-      `contabilidad.plan_cuentas`, `contabilidad.mayor`,
-      `contabilidad.saldos_cuenta_mes`, `contabilidad.apuntes_restringidos_mes`,
-      `contabilidad_restringida.plan_cuentas`, `contabilidad_restringida.mayor`,
-      `contabilidad_restringida.saldos_cuenta_mes`, `tesoreria.efectos`,
-      `tesoreria.efectos_restringidos_mes` y `tesoreria_restringida.efectos`.
-      Se llama `empresa_id` en todos menos en `maestro.centros_coste`, donde es
-      `empresa` (`maestro.centros_coste.empresa`).
-      Solo llevan `obra_id`, sin empresa, estos hechos:
-      `compras.fact_compras_linea`, `compras.factura_lineas`,
-      `compras.albaran_lineas`, `compras.contratos`, `compras.necesidades`,
-      `compras.contrato_liquidacion`, `compras.facturas_tras_liquidacion`,
-      `maestro.proveedores_obra`, `personal.partes_lineas`,
-      `personal.v_pbi_horas_obra_mes`, `retenciones.movimientos` y
-      `retenciones.v_pbi_retencion_obra`. Su `obra_id` es la ficha de SU
-      empresa (`R-CODIGO-POR-EMPRESA`): se filtran cruzando `obra_id` con
-      `maestro.obras` y su `empresa_id = 1` (o su `clave_obra` que empieza por
-      `1-`). Las filas con `obra_id` nulo no son de ninguna empresa que se pueda
-      ver: quedan fuera del filtro y la respuesta dice cuantas son.
-      Los demas objetos de estos esquemas NO tienen empresa ni `obra_id`, y
-      mezclan las 38 empresas: entre ellos `compras.facturas`,
-      `compras.albaranes`, `compras.vencimientos`, `compras.v_facturas_pago`,
-      `compras.documento_alarmas`, `compras_restringida.documento_alarmas`,
-      `compras.documento_liquidatoria`, `compras.v_estado_documentos`,
-      `compras.contrato_lineas`, `compras.factura_recargos`,
-      `compras.albaran_recargos`, `compras_restringida.documento_cuenta_bancaria`,
-      `personal.partes` (su cabecera; la obra que
-      imputa es la de `personal.partes_lineas`),
-      `retenciones.v_pbi_retencion_entidad`,
-      `retenciones.v_pbi_retencion_resumen`,
-      `retenciones.v_pbi_retenciones_vivas`,
-      `retenciones.v_pbi_retenciones_vencidas` (estas dos traen `codigo_obra`,
-      que a solas no identifica la obra) y `retenciones.v_cuadre_proveedor`.
-      En ellos NO se puede aplicar el criterio: la cifra mezcla todas las
-      empresas, y la respuesta lo dice asi («la cifra es de todas las
-      empresas: este objeto no distingue empresa») y NO dice «he supuesto
-      Construcciones Ruesma». Solo hay dos caminos comprobados para filtrarlos:
-      `compras.vencimientos` es una vista de `tesoreria.efectos` y su
-      `vencimiento_id` es el `efecto_id` de alli (clave primaria), que lleva
-      `empresa_id` y nunca vacia, asi que se cruza por ahi o se consulta
-      `tesoreria.efectos` con `sentido = 'PAGO' AND es_factura_compra`; y una
-      pregunta de retenciones por empresa se contesta desde
-      `retenciones.movimientos`, que lleva `obra_id`, y no desde las `v_pbi_*`
-      agregadas. Los importes de compras por empresa salen de
-      `compras.fact_compras_linea`; contar facturas o albaranes de una empresa
-      no tiene camino comprobado. Desde F-128 `compras.facturas` y
-      `compras.albaranes` llevan la obra de CABECERA (`obra_cabecera_id`, que NO
-      es `obra_id`): su empresa en `maestro.obras` es la de esa obra, no la del
-      documento, y un 4 % de las facturas no la tiene; si el usuario la acepta como aproximacion, se filtra por ella
-      y se dice. `stg`, `mart`, `cierre` y `descompuestos` no
-      tienen empresa: son el universo del seguimiento, donde esta regla no
-      anade filtro y manda `R-UNIVERSO-OBRA`.
+      indica empresa»). NO se aplica si la pregunta pide otra empresa (Porsan es
+      la 28), varias, el grupo o una UTE: entonces se filtra por las que pide y,
+      si son varias, se dice si van por separado o sumadas. Nunca se suman
+      empresas sin decirlo. Donde filtrar se decide OBJETO A OBJETO, y cada
+      ficha dice su caso: con columna de empresa (`empresa_id`; en
+      `maestro.centros_coste` se llama `empresa`), por ella; con solo `obra_id`,
+      cruzando con `maestro.obras` (su `empresa_id`, o `clave_obra` que empieza
+      por `1-`), y las filas sin obra quedan fuera y se cuentan; sin empresa ni
+      obra, el objeto mezcla las 38 empresas: la respuesta lo dice y NO dice
+      «he supuesto Construcciones Ruesma» (si la ficha da un camino comprobado
+      para filtrarlo, se usa ese). `stg`, `mart`, `cierre` y `descompuestos` no
+      tienen empresa: manda `R-UNIVERSO-OBRA`.
     motivo: >-
       Orden del humano del 2026-10-18, pedida primero en la sesion de
       `mcp-bbdd` («si no se dice nada es construcciones ruesma») y confirmada
@@ -959,11 +915,8 @@ reglas:
       las 38 empresas de Sigrid --Ruesma, Porsan y cada UTE, que repiten la
       misma obra SIN CONSOLIDAR (`R-CODIGO-POR-EMPRESA`)-- o la IA elegiria una
       sin decirlo. Que la IA lo diga es sugerencia de `mcp-bbdd`: el usuario ve
-      el supuesto y lo corrige. Comprobado en Azure en solo lectura el
-      2026-10-18: `empresa_id = 1` es 'CONSTRUCCIONES RUESMA' en
-      `maestro.obras.nombre_empresa` (la 28 es 'PORSAN E HIJOS CONSTRUCCIONES
-      SL'), y ningun objeto de `stg`, `mart`, `cierre` ni `descompuestos`
-      tiene columna de empresa.
+      el supuesto y lo corrige. El inventario de que objeto tiene empresa, obra
+      o ninguna de las dos vive en cada ficha desde F-147.
 
   - codigo: R-SALDO-CONTABLE
     titulo: El saldo contable no se suma con los cierres ni las aperturas
@@ -975,6 +928,10 @@ reglas:
       - contabilidad_restringida.plan_cuentas
       - contabilidad_restringida.mayor
       - contabilidad_restringida.saldos_cuenta_mes
+    resumen: >-
+      Saldo = suma de `importe_saldo`, o `saldo_acumulado` del último apunte o
+      mes. Nunca `SUM(importe)` sin filtrar `clase_asiento`: CIERRE y APERTURA
+      duplican. El resultado del ejercicio, sin REGULARIZACION.
     regla: >-
       El saldo de una cuenta es la suma de `importe_saldo` (en el mayor o en
       `contabilidad.saldos_cuenta_mes`) y el saldo a una fecha es
@@ -997,66 +954,56 @@ reglas:
       en `clase_asiento`. Con la regla, la subcuenta 434 de la empresa 1 en 2026
       da 5.345.557,80, lo mismo que la pantalla de Sigrid.
 
-  - codigo: R-CONTABILIDAD-RESTRINGIDA
-    titulo: Usa contabilidad; contabilidad_restringida es solo para el perfil total del MCP
+  - codigo: R-PERFILES
+    titulo: El perfil restringido ve menos que el estandar; *_restringida es solo del total
     severidad: bloqueante
-    ambito: [contabilidad, contabilidad_restringida]
+    entrega: entera
+    ambito:
+      - contabilidad
+      - contabilidad_restringida
+      - tesoreria
+      - tesoreria_restringida
+      - personal
+      - compras_restringida
+      - compras.documento_alarmas
+      - compras.vencimientos
+      - compras.v_facturas_pago
+      - compras.v_control_forma_pago
+      - compras.documento_procesos
+      - compras.documento_adjuntos
+      - retenciones.apuntes_contables
+    resumen: >-
+      Usa siempre el esquema general; `*_restringida` es solo del perfil total
+      y solo si piden personal (nóminas, embargos, cuentas, alarmas de
+      partes). General y restringida nunca se suman. «permission denied» no
+      se rodea: di que el perfil no lo incluye.
     regla: >-
-      Por defecto usa SIEMPRE `contabilidad`. `contabilidad_restringida` solo la
-      lee el perfil total del MCP (y el grupo `sigrid_dm_autorizado_ro`); para
-      cualquier otro usuario devuelve «permission denied». Eso no es un fallo
-      ni algo que haya que rodear: no reintentes con otra sintaxis ni busques la
-      misma informacion por otro camino (`raw` tampoco se lee). Ante ese error,
-      responde con `contabilidad` y di que la cifra no incluye los apuntes de
-      personal -mira `incompleto` y `num_apuntes_restringidos` en
-      `contabilidad.saldos_cuenta_mes` y `contabilidad.apuntes_restringidos_mes`
-      para cuantos faltan- y que el detalle requiere acceso restringido. Si el
-      usuario no pide expresamente informacion de personal (nominas, cuentas de
-      trabajadores, embargos), no vayas a `contabilidad_restringida` aunque sea
-      «la completa».
-
-      Por que: `contabilidad` es la contabilidad GENERAL y le faltan los apuntes
-      de PERSONAL -los asientos de nomina enteros (todos sus apuntes NORMAL y
-      alguno en una cuenta de personal o con «nomina» en el concepto: la caja,
-      el banco y el IVA de ese asiento tambien) y todos los de las cuentas de
-      personal (prefijos 640, 641, 642, 643, 644, 645, 649, 465, 466, 476, 460,
-      461, 544 y 4753)-; por si acaso, tambien el de una cuenta que no
-      resuelve en el plan (motivo CUENTA_SIN_RESOLVER, que se cuenta aparte en
-      `num_apuntes_sin_resolver`). Esas cuentas van en `contabilidad.plan_cuentas` con
-      `restringida = true` y el nombre '(cuenta restringida)', y no tienen
-      fila en los saldos. Antes de dar un saldo o un total como completo:
-      (1) en `contabilidad.saldos_cuenta_mes`, si `incompleto` es true a la
-      fila le faltan `num_apuntes_restringidos` apuntes y su saldo esta
-      recortado; (2) `contabilidad.apuntes_restringidos_mes` dice cuantos
-      apuntes y asientos faltan por empresa y mes (solo recuentos, nunca
-      importes). Quien SI tiene el perfil total lee el mayor completo SOLO de
-      `contabilidad_restringida.mayor`: los dos esquemas NUNCA se suman ni se
-      unen, porque el completo ya contiene al general y sumarlos duplica lo
-      visible. Excepcion: `retenciones` no se recorta (8 apuntes de retencion
-      de proveedor en asientos mixtos, sin dato de trabajador), asi que sus
-      saldos pueden incluir apuntes que no estan en `contabilidad.mayor`.
-
-      «restringida» = reservada al perfil total; el perfil RESTRINGIDO
-      (administrativos) ve MENOS que el estandar y no lee este esquema, y
-      tampoco la general (`contabilidad`) desde F-146 (`R-PERFIL-RESTRINGIDO`).
+      Tres perfiles: TOTAL ⊃ ESTANDAR ⊃ RESTRINGIDO. El TOTAL (y el grupo
+      `sigrid_dm_autorizado_ro`) lee ademas los `*_restringida`; el ESTANDAR,
+      el consumo salvo `raw` y `*_restringida`; el RESTRINGIDO
+      (administrativos), lo del estandar MENOS `contabilidad` entero
+      (`contabilidad.mayor`, `contabilidad.saldos_cuenta_mes`; tampoco el mayor
+      analitico), `tesoreria` y `personal`, y SI `retenciones` y `compras`.
+      «restringida» = reservada al perfil total: los `*_restringida` son del
+      perfil TOTAL y NO del perfil restringido. «permission denied» no se
+      rodea: ni el mayor desde `retenciones.apuntes_contables`, ni personas
+      desde los logins de `compras`, ni la cartera desde
+      `compras.vencimientos`; responde que el perfil no lo incluye.
     motivo: >-
-      Correo de Juan Romero (Dir. Administracion y Control de Costes) del
-      2026-10-09: cualquier usuario con acceso al mayor podia consultar
-      nominas, cuentas de trabajadores y embargos; «hay que limitarla a todos
-      los usuarios salvo a los que tenemos ese rol», con el criterio de
-      restringir de mas ante la duda. Medido ese dia: 55.504 apuntes (2,55 % del
-      mayor), 8.791 asientos, 25 empresas; restringir el asiento entero oculta
-      tambien unos 7.270 apuntes que no son de personal (remesas que pagan a la
-      vez nominas y proveedores) y deja 6.063 filas de saldos incompletas. Lo
-      afinara Juan. Aprobado por el humano el 2026-10-11 (F-135). Reescrita el
-      2026-10-13 (F-136, diccionario v50): el MCP no filtra el catalogo ni el
-      diccionario por perfil y el agente veia los dos esquemas; el titulo y la
-      primera frase dicen ahora cual usar.
+      Decisiones del humano (F-135, F-037, F-138, F-141, F-146). El MCP no
+      filtra el diccionario por perfil y esta regla trata de lo que el perfil
+      no ve: por eso se sirve entera. Lo que falta en cada general, en su
+      ficha.
 
   - codigo: R-TESORERIA-ESTADO
     titulo: En la cartera de cobros y pagos BAJA no se suma, y fecha real vacia no es pendiente
     severidad: bloqueante
     ambito: [tesoreria, tesoreria_restringida, compras.vencimientos]
+    resumen: >-
+      Filtra siempre `estado_tesoreria`: BAJA nunca se suma; REALIZADO es
+      pagado o cobrado y PREVISTO pendiente. `fecha_real` vacía NO es
+      pendiente. Caja = PREVISTO y NOT `previsto_antiguo`. En
+      `compras.vencimientos`: `estado_pago` y `efecto_anulado`.
     regla: >-
       Filtra SIEMPRE por `estado_tesoreria`. BAJA (efecto dividido, agrupado o
       anulado) NO se suma nunca: su dinero ya esta en los efectos hijos.
@@ -1082,133 +1029,6 @@ reglas:
       no sostiene (223 cuentas cuadran al centimo solo sin el). Mismo patron
       que F-094 en las retenciones: efectos antiguos no punteados.
 
-  - codigo: R-TESORERIA-RESTRINGIDA
-    titulo: Usa tesoreria; tesoreria_restringida es solo para el perfil total del MCP
-    severidad: bloqueante
-    ambito: [tesoreria, tesoreria_restringida]
-    regla: >-
-      Por defecto usa SIEMPRE `tesoreria`. `tesoreria_restringida` solo la lee
-      el perfil total del MCP (y el grupo `sigrid_dm_autorizado_ro`); para
-      cualquier otro usuario devuelve «permission denied», y eso no se rodea:
-      no reintentes ni busques los pagos por otro camino (`raw` tampoco se
-      lee). Responde con `tesoreria` y di que la cartera no incluye los pagos
-      de personal; cuantos faltan por empresa y mes lo dice
-      `tesoreria.efectos_restringidos_mes` (solo recuentos, nunca importes). Si
-      el usuario no pide expresamente pagos de nomina, embargo o cuota, no vayas
-      a `tesoreria_restringida` aunque sea «la completa». Los dos esquemas NUNCA
-      se suman ni se unen: la completa ya contiene a la general y sumarlas
-      duplica lo visible.
-
-      «restringida» = reservada al perfil total; el perfil RESTRINGIDO
-      (administrativos) ve MENOS que el estandar y no lee este esquema, y
-      tampoco la general (`tesoreria`) (`R-PERFIL-RESTRINGIDO`).
-    motivo: >-
-      Decision del humano del 2026-10-13 (F-037): «los pagos de nominas deben
-      quedar restringidos», con el mismo espiritu que F-135 en la contabilidad.
-      Medido ese dia: 37.053 pagos de personal (nomina, embargo y cuota), y los
-      cuatro criterios -naturaleza, cuenta de personal, tercero empleado y
-      documento de nomina- coinciden exactamente; 0 cobros. El MCP no filtra el
-      catalogo ni el diccionario por perfil, asi que el titulo dice cual usar.
-
-  - codigo: R-COMPRAS-RESTRINGIDA
-    titulo: Usa compras.documento_alarmas; compras_restringida es solo para el perfil total del MCP
-    severidad: bloqueante
-    ambito:
-      - compras.documento_alarmas
-      - compras_restringida
-    regla: >-
-      Por defecto usa SIEMPRE `compras.documento_alarmas`.
-      `compras_restringida.documento_alarmas` solo la lee el perfil total del
-      MCP (y el grupo `sigrid_dm_autorizado_ro`); para cualquier otro usuario
-      devuelve «permission denied», y eso no se rodea: no reintentes ni busques
-      esas alarmas por otro camino (`raw` tampoco se lee). Responde con
-      `compras.documento_alarmas` y di que no incluye las alarmas de recursos ni
-      de partes de trabajo. Si el usuario no pide expresamente alarmas de
-      recursos o de partes, no vayas a `compras_restringida` aunque sea «la
-      completa». Las dos tablas NUNCA se suman ni se unen: la completa ya
-      contiene a la general y sumarlas duplica lo visible.
-
-      «restringida» = reservada al perfil total; el perfil RESTRINGIDO
-      (administrativos) ve MENOS que el estandar y no lee este esquema
-      (`R-PERFIL-RESTRINGIDO`).
-
-      Desde F-128 el esquema guarda tambien
-      `compras_restringida.documento_cuenta_bancaria`: la cuenta bancaria del
-      proveedor que lleva cada factura o albaran (decision del humano del
-      2026-10-17). Las cuentas de proveedor no tienen version general: sin el
-      perfil total, dilo y no las busques por otro camino (ni en `raw` ni
-      reconstruyendolas del banco y la sucursal de
-      `compras.v_facturas_pago`, que no son la cuenta).
-    motivo: >-
-      Decision del humano del 2026-10-14 (F-138, D9): las alarmas de recursos
-      (familia 33) y de partes de trabajo (35) nombran a trabajadores y sus
-      bajas, «mete esas alarmas en lectura solo para el perfil admin y no el
-      estandar». Son 27 de ~45.750 alarmas medidas ese dia. Mismo patron que
-      `R-TESORERIA-RESTRINGIDA`: el MCP no filtra el catalogo ni el diccionario
-      por perfil, asi que el titulo dice cual usar.
-
-  - codigo: R-PERFIL-RESTRINGIDO
-    titulo: El perfil restringido ve menos que el estandar; lo que no ve no se rodea
-    severidad: bloqueante
-    ambito:
-      - contabilidad
-      - tesoreria
-      - personal
-      - retenciones.apuntes_contables
-      - compras.vencimientos
-      - compras.v_facturas_pago
-      - compras.v_control_forma_pago
-      - compras.documento_procesos
-      - compras.documento_alarmas
-      - compras.documento_adjuntos
-    regla: >-
-      Hay TRES perfiles de lectura, de mas a menos: TOTAL ⊃ ESTANDAR ⊃
-      RESTRINGIDO. El TOTAL lee lo del estandar y ademas los esquemas
-      `*_restringida`; el ESTANDAR lee todo el consumo salvo `raw` y los
-      `*_restringida`; el RESTRINGIDO (administrativos) lee lo del estandar
-      MENOS el esquema `contabilidad` entero (el plan de cuentas
-      `contabilidad.plan_cuentas`, el mayor `contabilidad.mayor`, sus saldos
-      `contabilidad.saldos_cuenta_mes` y los recuentos de
-      `contabilidad.apuntes_restringidos_mes`; tampoco el mayor analitico cuando
-      se publique), el esquema `tesoreria` entero (la cartera de cobros y pagos)
-      y el esquema `personal` entero. SI lee `retenciones`, `compras` entero
-      (tambien `compras.vencimientos`, `compras.v_facturas_pago` y
-      `compras.v_control_forma_pago`, por las que ve el estado de pago de las
-      facturas) y el resto del consumo. OJO AL
-      NOMBRE: los esquemas `*_restringida` son del perfil TOTAL y NO del perfil
-      restringido, que no lee ninguno: «restringida» quiere decir reservada al
-      total, y el perfil restringido ve MENOS que el estandar.
-
-      Con el perfil restringido, lo que no ve devuelve «permission denied», y
-      eso no se rodea: no reintentes con otra sintaxis ni reconstruyas el dato
-      por otro camino -ni el mayor, sus saldos o el plan de cuentas desde
-      `retenciones.apuntes_contables` (solo trae las cuentas de retencion), ni
-      a las personas desde los logins de `compras` (`documento_procesos`,
-      `documento_alarmas.creada_por`, `documento_adjuntos.subido_por`), ni la
-      cartera desde `compras.vencimientos` (solo los pagos de las facturas de
-      compra)-: responde que el perfil no lo incluye. El perfil de quien
-      pregunta lo dira el propio MCP (`estado_servidor`, contrato con
-      `mcp-bbdd`): no lo adivines por un error.
-    motivo: >-
-      Decisiones del humano del 2026-10-16 y 2026-10-17 (F-141): el perfil es
-      «para administrativos y gente asi», y «ven como el estandar, menos el
-      mayor, menos el mayor analitico, menos la cartera de cobros (pero si a
-      retenciones)», «personal tambien quitalo, y saldos cuenta tambien» y
-      «compras debe poder verse». Medido en Azure el 2026-10-16 y 17: de las
-      vistas de sus diez esquemas solo `compras.vencimientos`,
-      `compras.v_facturas_pago` y `compras.v_control_forma_pago` alcanzan algo
-      que el perfil no ve (`tesoreria.efectos`), y se quedan visibles como
-      excepcion nominal; ninguna lee `personal`, `contabilidad.mayor` ni
-      `contabilidad.saldos_cuenta_mes`. `apply_grants` vigila cada noche que no
-      aparezca otra (la revoca y falla) ni un objeto con «mayor» en el nombre
-      sin excluir. El MCP no filtra el catalogo ni el diccionario por perfil:
-      por eso la ficha de cada objeto que no ve empieza por el aviso. F-146,
-      decision del humano del 2026-10-21: nada de contabilidad, el esquema
-      entero fuera, porque los recuentos sin el mayor no le sirven y dan idea del
-      volumen de nominas, y porque con el esquema dentro toda tabla nueva de
-      `contabilidad` le llegaria sola. `retenciones` se queda: lo necesita para
-      el cuadre de retenciones.
-
   - codigo: R-DESCOMPUESTO-ORIGEN
     titulo: Los descompuestos no se mezclan entre origenes ni entre versiones
     severidad: bloqueante
@@ -1218,6 +1038,11 @@ reglas:
       - descompuestos.elementos
       - descompuestos.v_pbi_master_planif_jo
       - descompuestos.v_pbi_master_estudio
+    resumen: >-
+      Filtra o agrupa siempre por `origen`: ESTUDIO, MASTER_ESTUDIO, PLANIF_JO
+      y los MASTER_* no se suman. En el master filtra una versión (`fase_num`)
+      o `es_vigente`, o cada línea cuenta una vez por versión. Orígenes, lado a
+      lado por partida.
     regla: >-
       Toda consulta sobre `descompuestos.lineas` o `descompuestos.cuadre_partida`
       filtra o agrupa por `origen`: ESTUDIO y MASTER_ESTUDIO (Estudios),
@@ -1226,13 +1051,9 @@ reglas:
       sumarlos da un descompuesto que no existe. LA FASE VIVA: coste fase 0
       (ambito 3, `fase_num` 0) es el presupuesto de coste que el jefe de obra
       evoluciona dia a dia, sin historia; su descompuesto es la planificacion de
-      compras (PLANIF_JO), y su «Descomposicion» ya no es Estudios. ESTUDIOS ES
-      EL MASTER 0 (F-123): en las obras con version 0 del master con
-      descompuesto, Estudios es MASTER_ESTUDIO (esa version, con la medicion de
-      Estudios) y no se publica ESTUDIO; solo en las obras sin master 0 se
-      publica ESTUDIO, la «Descomposicion» de la fase viva, con precios de
-      Estudios y medicion actual. Cada obra esta en uno solo de los dos:
-      Estudios entero son `v_pbi_master_estudio` y `v_pbi_estudio` juntas. Si
+      compras (PLANIF_JO), y su «Descomposicion» ya no es Estudios. Que origen
+      es Estudios en cada obra lo dicen las fichas de
+      `descompuestos.v_pbi_master_estudio` y `descompuestos.v_pbi_estudio`. Si
       una partida no tiene descompuesto de Estudios, el cuadre de su origen de
       Estudios dice SIN_DESCOMPUESTO. En el master, ademas, hay una copia POR
       VERSION: se filtra por `fase_num` (una version concreta) o por
@@ -1261,171 +1082,44 @@ reglas:
       - compras.v_pbi_proveedor_obra
       - maestro.proveedores
       - maestro.proveedores_obra
+    resumen: >-
+      En un ranking de proveedores el nº 1 es la propia Ruesma (CIF A81873903)
+      y detrás hay UTE del grupo. No hay marca de intragrupo: dalo tal cual
+      diciendo cuáles son, o exclúyelos por CIF y dilo.
     regla: >-
       **Todo ranking de "a quien le hemos comprado mas" tiene que decir que
       hace con las operaciones intragrupo, porque el numero 1 es la propia
-      empresa.** Medido el 2026-08-25 sobre `compras.fact_compras_linea` con
-      `tipo_doc IN ('FACTURA','ABONO')`: `CONSTRUCCIONES RUESMA, S.A.` (CIF
-      `A81873903`) encabeza la lista con **23,8 M€**, mas del doble que el
-      segundo. Y detras hay varias **UTE** —`UTE VALDEBEBAS VI` 9,7 M€,
-      `UTE JARAS BOADILLA` 8,1 M€— que son coinversiones, no proveedores
-      externos. Un ranking que las mezcle sin avisar dice que nuestro mayor
-      proveedor somos nosotros, que es cierto y no es lo que preguntaban.
-      Como no hay ninguna marca de grupo en el datamart, la unica salida hoy es
-      **declararlo en la respuesta**: dar la lista tal cual y decir cuales son
-      intragrupo, o excluirlos por CIF diciendo que se han excluido.
+      empresa**: `CONSTRUCCIONES RUESMA, S.A.` (CIF `A81873903`), con mas del
+      doble que el segundo. Y detras hay varias **UTE** del grupo (`UTE
+      VALDEBEBAS VI`, `UTE JARAS BOADILLA`...) que son coinversiones, no
+      proveedores externos. Un ranking que las mezcle sin avisar dice que
+      nuestro mayor proveedor somos nosotros, que es cierto y no es lo que
+      preguntaban. Como no hay ninguna marca de grupo en el datamart, la unica
+      salida hoy es **declararlo en la respuesta**: dar la lista tal cual y
+      decir cuales son intragrupo, o excluirlos por CIF diciendo que se han
+      excluido.
     motivo: >-
       Es uno de los seis casos de uso del humano y salio mal en la primera
-      pregunta de la bateria del 2026-08-22. **Resolverlo bien exige modelar el
-      intragrupo** —marcar que sociedades son del grupo y decidir que se hace
-      con las UTE—, y eso no es de esta feature: aqui solo se declara la trampa
-      para que ninguna respuesta la ignore.
-
-  - codigo: R-ALBARAN-ABSURDO
-    titulo: Dos lineas de un albaran de 2021 inflan las compras a 68,7 billones
-    severidad: bloqueante
-    ambito:
-      - compras.v_pbi_albaranes_sin_facturar
-      - compras.albaran_lineas
-      - compras.fact_compras_linea
-    regla: >-
-      **Antes de dar una cifra de "entregado y no facturado", descartar las
-      lineas absurdas.** Dos lineas del albaran `AC21/03345` (2021-02-28, obra
-      0609, lineas 588705 y 588733, "SUMINISTRO PLATO DUCHA ACRILICO") traen
-      `cantidad = 184.493.959.731` e `importe_pendiente_facturar =
-      34.361.999.999.898,80 €` **cada una**. Inflan
-      `compras.v_pbi_albaranes_sin_facturar` de **260,6 M€** —cifra plausible—
-      a **68.724.260,6 millones de euros**, o sea 68,7 billones. Con su espejo
-      negativo en `compras.albaran_lineas`. Cualquier suma sobre esas dos
-      tablas tiene que llevar `WHERE abs(importe_pendiente_facturar) < 1e8`, o
-      excluir ese albaran, **y decir en la respuesta que se ha excluido**.
-      Si un total de compras sale por encima de mil millones de euros, no es un
-      hallazgo: es esta anomalia.
-    motivo: >-
-      Es un problema de calidad del dato de ORIGEN, no del datamart, y por eso
-      no se corrige aguas abajo. Pero el diccionario se atribuye la mision de
-      que una cifra absurda **se note**, y en la bateria del 2026-08-22 no la
-      cumplio: los ordenes de magnitud solo cubrian `retenciones`, asi que el
-      agente dio 68,7 billones de euros con total aplomo. La barrera existia y
-      no cubria el sitio donde fallo.
-
-  - codigo: R-COSTE-CONSULTA
-    titulo: Dos vistas no se pueden consultar, y una base compartida que cuidar
-    severidad: bloqueante
-    ambito:
-      - mart.v_fact_periodificado
-      - cierre.v_pbi_cierre_indirectos_detalle
-      - stg.plan_mensual
-    regla: >-
-      **Antes de lanzar una consulta hay que saber lo que cuesta**, porque esto
-      corre contra `psql-albaranes-rs9k2`, **compartido con `albaranes` y
-      `partes` EN PRODUCCION**, y la ventana util son 30 s. Medido el
-      2026-08-25, con `SELECT * ... LIMIT 5`:
-      **(1) NO SE PUEDEN CONSULTAR, ni siquiera filtradas por obra**:
-      `mart.v_fact_periodificado` y `cierre.v_pbi_cierre_indirectos_detalle`
-      agotan **mas de 60 s**. Con cualquiera de las dos, la respuesta correcta
-      es "no puedo consultarla" y el motivo, no una consulta que se va a cortar.
-      **(2) YA NO SON CARAS, y esta regla lo decia hasta la version 21**: los
-      tres objetos de CP por tipologia —`mart.v_pbi_cp_tipologia` (mas de 60 s),
-      `mart.v_master_vigente_anual` (40 s sin filtro, **20 s** filtrada por
-      obra) y `mart.v_master_versiones_tipadas` (**16 s**)— **son TABLAS desde
-      F-078** (2026-09-15) y se consultan con normalidad, sin filtro y sin
-      aviso. Apartar a un agente de una vista que ya funciona es tan danino
-      como mandarle a una que no.
-      **(3) CARAS PERO VIABLES, una sola vez y agregando**: un `count(*)` de
-      `stg.plan_mensual` **25 s**, uno de `compras.fact_compras_linea` **10 s**.
-      **(4) BARATAS**: `maestro.obras`, `cierre.v_pbi_cierre_resumen`,
-      `compras.v_pbi_proveedor_obra` y `compras.v_pbi_partida_coste`, todas por
-      debajo de 5 s. Empezar siempre por estas.
-    motivo: >-
-      El diccionario no tenia ninguna nocion de coste: ni un `[LENTO]`, ni un
-      "filtra siempre por obra". La bateria de aceptacion del 2026-08-22 se
-      choco **cinco veces** con el timeout de 30 s, y
-      `mart.v_master_vigente_anual` —marcada como recomendada y anunciada como
-      la que responde que version de plan rige en una obra— no respondia nada.
-      Un agente que no sabe que es caro lanza consultas que se cortan o, peor,
-      consultas que terminan y molestan a dos aplicaciones en produccion. La
-      otra mitad de la leccion la dejo F-078: una regla de coste **caduca**, y
-      dejarla puesta cuando el objeto ya se arreglo aparta al agente de la
-      respuesta buena con la misma seguridad con que antes lo salvaba.
-
-  - codigo: R-OBRA-ACTIVA
-    titulo: El datamart NO sabe si una obra esta activa. Las dos columnas mienten
-    severidad: bloqueante
-    ambito:
-      - stg.obras
-      - maestro.obras
-      - cierre.v_pbi_cierre_cabecera
-    regla: >-
-      **"Cuantas obras activas tenemos" NO se puede responder con el datamart, y
-      hay que decirlo en vez de dar un numero.** Las DOS columnas que lo
-      aparentan valen TRUE para todas las filas: `stg.obras.activa` es un
-      literal `TRUE AS activa` (583 de 583) y `maestro.obras.es_activa` se
-      deriva de `con.fecbaj`, que **no se informa nunca** (919 de 919 activas,
-      0 con fecha de baja, medido el 2026-08-25). Un recuento con cualquiera de
-      las dos devuelve el total de obras disfrazado de obras activas. Lo que si
-      discrimina, con sus limites: `maestro.obras.estado_id` reparte las 919 en
-      once valores (465 en el 25, 226 en el 1, 175 en el 15 = EN CURSO), pero su
-      catalogo de Sigrid **no esta ingerido**, asi que hay codigos sin nombre; y
-      `cierre.v_pbi_cierre_cabecera` da **107 obras con inicio real y sin fin
-      real**, que es la mejor aproximacion a "en curso" que hay hoy, pero solo
-      cubre 583 de las 919. Cualquier respuesta tiene que decir cual de los tres
-      criterios usa y a cuantas obras alcanza.
-    motivo: >-
-      `sql/stg/03_obras.sql` escribe `activa` como constante. Una columna que se
-      llama `activa` y siempre dice TRUE es una trampa perfecta: nadie la
-      comprueba. **Y esta regla llevaba diecisiete pasadas apartando de esa
-      trampa para empujar a la gemela, que miente igual**: la bateria de
-      aceptacion del 2026-08-22 midio `es_activa` TRUE en las 919 filas. Una
-      regla que desvia de una trampa hacia otra identica es peor que no tener
-      regla, porque da confianza injustificada.
-
-  - codigo: R-VERSION-MASTER
-    titulo: En stg.plan_mensual conviven TODAS las versiones master
-    severidad: bloqueante
-    ambito:
-      - stg.plan_mensual
-      - mart.master_versiones_tipadas
-      - mart.master_vigente_anual
-      - mart.v_master_versiones_tipadas
-      - mart.v_master_vigente_anual
-    regla: >-
-      Consultar `stg.plan_mensual` filtrando solo por obra y ambito multiplica
-      los importes por el numero de versiones master de esa obra. La version
-      vigente solo esta resuelta AGUAS ABAJO: para planificado se va a
-      `mart.fact_seguimiento_mensual`, nunca a `stg`. Ademas, solo son master
-      vigente las de tipo 'Planif Inicial', 'ABC' y 'Cuatrimestral'; las de
-      'Cierre mensual' NO reemplazan al plan.
-    motivo: >-
-      Los ambitos master (8 y 11) guardan una fila por version y mes. `mart`
-      elige la vigente por mes con la regla de `sql/mart/02_build_fact.sql`; el
-      que va a `stg` directamente se salta esa eleccion y suma todas.
-
-  - codigo: R-FAS-AMBIGUO
-    titulo: fas significa dos cosas y cambia de nombre en cada capa
-    severidad: bloqueante
-    ambito:
-      - stg.presupuesto
-      - stg.plan_mensual
-      - stg.fases
-      - raw.obrfas
-      - raw.obrfasamb
-    regla: >-
-      En los ambitos REALES (3 = coste, 7 = venta) `fas` es el MES, y `fas = 0`
-      es el "Previsto" vivo. En los ambitos MASTER (8 = coste, 11 = venta) `fas`
-      es el NUMERO DE VERSION. Ademas cambia de nombre segun donde mires: se
-      llama `fase_num` en `stg.presupuesto`, `version` en `stg.plan_mensual` y
-      `fasnum` en `raw.obrfas`. Nunca cruces las dos lecturas.
-    motivo: >-
-      Es la ambiguedad estructural del modelo de Sigrid, verificada en los DDL
-      de `sql/stg/01_ddl.sql`. Tratar una version como si fuera un mes produce
-      series temporales inventadas.
+      pregunta de la bateria del 2026-08-22. Medido sobre
+      `compras.fact_compras_linea` (FACTURA y ABONO): 23,8 M€ de Ruesma el
+      2026-08-25 y 29,5 M€ el 2026-10-22, por delante de `UTE VALDEBEBAS VI`
+      (9,7 M€). Resolverlo bien exige modelar el intragrupo y no es de esta
+      regla: aqui solo se declara la trampa.
 
   - codigo: R-SIGRID-CON
     titulo: La regla de oro de Sigrid, sin la cual `raw` es ilegible
     severidad: bloqueante
+    # F-147: guia del que escribe el SQL del ETL, no de la IA. `raw` no esta en
+    # la lista blanca de `mcp-bbdd` y ningun login del MCP tiene USAGE sobre el
+    # (comprobado en Azure el 2026-10-22): no se publica en `_meta`.
+    entrega: fuera_mcp
     ambito:
       - raw
+    resumen: >-
+      Antes de escribir SQL contra `raw`: `ide` es la clave, diez tablas son
+      propiedades 1:1 de `con`, ciertos campos se leen de su tabla y no de
+      `con`, las fechas son enteros YYYYMMDD con 0 = NULL y las referencias
+      polimórficas se filtran por tipo.
     regla: >-
       Antes de escribir cualquier consulta contra `raw`, seis cosas.
 
@@ -1488,7 +1182,118 @@ reglas:
       `con.nom` falla con "columna inexistente", consultar `obr` sin unir a `con`
       devuelve una obra sin codigo, y un `MIN(fecha)` que no excluya el cero
       devuelve cero, que parece un dato y no lo es.
-    orden: 13
+
+  - codigo: R-ALBARAN-ABSURDO
+    titulo: Dos lineas absurdas de un albaran de 2021 inflan cualquier suma de compras
+    severidad: bloqueante
+    # F-147 (D5): se mantiene DE MOMENTO, minima y sin cifras que envejezcan.
+    # Se retira cuando Administracion corrija las dos lineas en Sigrid.
+    ambito:
+      - compras.v_pbi_albaranes_sin_facturar
+      - compras.albaran_lineas
+      - compras.fact_compras_linea
+    resumen: >-
+      Excluye las 2 líneas absurdas del albarán AC21/03345 (obra 0609): toda
+      suma de compras lleva `abs(importe…) < 1e8` y lo dice. Un total de
+      compras por encima de mil millones de euros es esta anomalía, no un
+      hallazgo.
+    regla: >-
+      Las lineas 588705 y 588733 del albaran `AC21/03345` (obra 0609) traen un
+      importe absurdo, con su espejo en `compras.albaran_lineas`. Toda suma
+      lleva `abs(<importe>) < 1e8` y la respuesta dice que se excluyen.
+    motivo: >-
+      Error del dato de ORIGEN, que Administracion corregira en Sigrid. En la
+      bateria del 2026-08-22 el agente dio la cifra inflada con aplomo.
+
+  - codigo: R-OBRA-ACTIVA
+    titulo: Obra activa es la obra VIVA de la nocturna; activa y es_activa mienten
+    severidad: bloqueante
+    ambito:
+      - stg.obras
+      - maestro.obras
+      - stg.fases
+      - _meta.v_frescura_obra
+    resumen: >-
+      «Obra activa» = obra VIVA de la nocturna (F-025): `estado_id` fuera de
+      (1, 11, 25), código que no sea de 6 dígitos y alguna fase en `stg.fases`
+      en los últimos 12 meses. `stg.obras.activa` y `maestro.obras.es_activa`
+      valen TRUE siempre: no sirven.
+    regla: >-
+      El criterio es el de la ventana de la nocturna (F-025), sin inventar
+      otro: `config/business_rules.yaml` -> `ventana`, que aplica
+      `etl_sigrid/domain/ventana.py`. Una obra esta VIVA si su estado no es 1
+      (EN ESTUDIO), 11 (NO PRESENTADA) ni 25 (CERRADA), su codigo no es
+      administrativo de seis digitos y tiene alguna fase en `stg.fases` en los
+      ultimos 12 meses, contados en meses enteros (justo 12 cuenta). Consulta
+      equivalente sobre `maestro.obras`, mas `R-EMPRESA-POR-DEFECTO`:
+      `SELECT o.empresa_id, o.codigo_obra FROM maestro.obras o JOIN (SELECT
+      obra_id, MAX(make_date(anio, GREATEST(mes, 1), 1)) AS ultima FROM
+      stg.fases WHERE anio BETWEEN 1990 AND 2100 GROUP BY obra_id) f ON
+      f.obra_id = o.obra_id WHERE o.estado_id NOT IN (1, 11, 25) AND
+      o.codigo_obra !~ '^[0-9]{6}$' AND (date_part('year', current_date) -
+      date_part('year', f.ultima)) * 12 + date_part('month', current_date) -
+      date_part('month', f.ultima) <= 12`. `_meta.v_frescura_obra` con `motivo
+      = 'ventana' AND NOT congelada` no es equivalente: una obra viva sin filas
+      va como `sin_filas` y los domingos todas van como `completa`.
+      `stg.obras.activa` es un literal TRUE y `maestro.obras.es_activa` sale de
+      una fecha de baja que Sigrid no informa: contar con cualquiera de las dos
+      da el total disfrazado.
+    motivo: >-
+      Hasta la v58 esta regla decia que la pregunta no se podia responder,
+      cuando el repositorio ya definia la obra viva para la nocturna (F-025).
+      Medido en Azure el 2026-10-22 con la consulta de arriba: 41 obras, todas
+      de la empresa 1; con `_meta.v_frescura_obra`, 40.
+
+  - codigo: R-VERSION-MASTER
+    titulo: En stg.plan_mensual conviven TODAS las versiones master
+    severidad: bloqueante
+    ambito:
+      - stg.plan_mensual
+      - mart.master_versiones_tipadas
+      - mart.master_vigente_anual
+      - mart.v_master_versiones_tipadas
+      - mart.v_master_vigente_anual
+    resumen: >-
+      En `stg.plan_mensual` conviven todas las versiones master: filtrar solo
+      por obra y ámbito multiplica. El planificado vigente está en
+      `mart.fact_seguimiento_mensual`; 'Cierre mensual' nunca es master
+      vigente.
+    regla: >-
+      Consultar `stg.plan_mensual` filtrando solo por obra y ambito multiplica
+      los importes por el numero de versiones master de esa obra. La version
+      vigente solo esta resuelta AGUAS ABAJO: para planificado se va a
+      `mart.fact_seguimiento_mensual`, nunca a `stg`. Ademas, solo son master
+      vigente las de tipo 'Planif Inicial', 'ABC' y 'Cuatrimestral'; las de
+      'Cierre mensual' NO reemplazan al plan.
+    motivo: >-
+      Los ambitos master (8 y 11) guardan una fila por version y mes. `mart`
+      elige la vigente por mes con la regla de `sql/mart/02_build_fact.sql`; el
+      que va a `stg` directamente se salta esa eleccion y suma todas.
+
+  - codigo: R-FAS-AMBIGUO
+    titulo: fas significa dos cosas y cambia de nombre en cada capa
+    severidad: bloqueante
+    ambito:
+      - stg.presupuesto
+      - stg.plan_mensual
+      - stg.fases
+      - raw.obrfas
+      - raw.obrfasamb
+    resumen: >-
+      `fas` es el MES en los ámbitos reales (3 coste, 7 venta; 0 = previsto
+      vivo) y la VERSIÓN en los master (8, 11). Se llama `fase_num` en
+      `stg.presupuesto` y `version` en `stg.plan_mensual`. No cruces las dos
+      lecturas.
+    regla: >-
+      En los ambitos REALES (3 = coste, 7 = venta) `fas` es el MES, y `fas = 0`
+      es el "Previsto" vivo. En los ambitos MASTER (8 = coste, 11 = venta) `fas`
+      es el NUMERO DE VERSION. Ademas cambia de nombre segun donde mires: se
+      llama `fase_num` en `stg.presupuesto` y `version` en `stg.plan_mensual`.
+      Nunca cruces las dos lecturas.
+    motivo: >-
+      Es la ambiguedad estructural del modelo de Sigrid, verificada en los DDL
+      de `sql/stg/01_ddl.sql`. Tratar una version como si fuera un mes produce
+      series temporales inventadas.
 
   - codigo: R-CLAVE-SUSTITUTA
     titulo: Las claves BIGSERIAL cambian en cada build
@@ -1500,6 +1305,10 @@ reglas:
       - mart.v_pbi_fact_categoria
       - stg.plan_mensual
       - cierre.fact_cierre_mensual
+    resumen: >-
+      `fact_id`, `fact_cat_id`, `plan_id` y `cierre_id` se renumeran en cada
+      build: no los enseñes ni los guardes como identificador; usa la clave de
+      negocio.
     regla: >-
       `fact_id`, `fact_cat_id`, `plan_id` y `cierre_id` son BIGSERIAL sobre
       tablas que se reconstruyen enteras en cada build: se reasignan. No sirven
@@ -1514,40 +1323,6 @@ reglas:
       `stg.plan_mensual` desde el propio paso). Un `fact_id` citado en un
       informe de ayer apunta hoy a otra fila.
 
-  - codigo: R-ABONO-NEGATIVO
-    titulo: En compras los abonos ya entran con signo negativo
-    severidad: bloqueante
-    ambito:
-      - compras.fact_compras_linea
-      - compras.facturas
-      - compras.factura_lineas
-      - compras.v_pbi_proveedor_obra
-      - compras.v_pbi_contrato_consumo
-      - compras.v_pbi_partida_coste
-    regla: >-
-      Los documentos de tipo ABONO llegan con su signo natural, es decir en
-      negativo. Un `SUM(importe)` sobre FACTURA y ABONO ya da el facturado neto:
-      restarlos otra vez, o filtrarlos fuera y restarlos aparte, produce un
-      resultado equivocado en el doble de la cifra abonada.
-    motivo: >-
-      Esta escrito en el propio SQL: `sql/compras/03_views.sql` dice "los ABONOS
-      restan (signo natural)" y las vistas los agregan junto a las facturas.
-
-  - codigo: R-LINEA-ID-NO-UNICA
-    titulo: linea_id NO es unico en compras.fact_compras_linea
-    severidad: bloqueante
-    ambito:
-      - compras.fact_compras_linea
-    regla: >-
-      La tabla no tiene clave primaria declarada y `linea_id` NO identifica una
-      fila: viene de tres tablas distintas de Sigrid (`ctrpro`, `dcapro` y
-      `dcfpro`) cuyos identificadores colisionan. La clave real es el par
-      `(tipo_doc, linea_id)`. Un COUNT DISTINCT sobre `linea_id` pierde filas y
-      un JOIN por `linea_id` a secas las duplica.
-    motivo: >-
-      La tabla se crea con `CREATE TABLE ... AS` uniendo los tres origenes
-      (`sql/compras/02_fact_linea.sql`), sin PK y sin renumerar.
-
   - codigo: R-PARTIDA-CODIGO-NO-UNICO
     titulo: El codigo de partida NO es unico ni dentro de su obra; se une por partida_id
     severidad: bloqueante
@@ -1559,6 +1334,11 @@ reglas:
       - mart.v_fact_periodificado
       - compras.v_pbi_partida_coste
       - cierre.v_pbi_dim_subcategoria_ci
+    resumen: >-
+      Une y cuenta partidas por `partida_id`, nunca por obra + código: el mismo
+      código se repite en la obra (bloques, fases, contratos) y multiplica
+      importes. Agrupar por código vale si lo dices; al usuario, la ruta de
+      capítulos.
     regla: >-
       No cruces tablas por obra + código de partida: usa `partida_id`. Agrupar
       por código es válido si se quiere sumar todas las copias del concepto
@@ -1594,6 +1374,10 @@ reglas:
       - retenciones.v_src_lineas_compra
       - retenciones.v_src_lineas_venta
       - compras.factura_lineas
+    resumen: >-
+      `retenciones.movimientos` lleva un registro por efecto con el total
+      retenido: nunca lo unas a líneas de factura (multiplica por nº de
+      líneas). Agrega antes por documento y une por documento.
     regla: >-
       `retenciones.movimientos` tiene UN registro por efecto, con el importe
       total retenido. Unirlo a las lineas del documento origen multiplica ese
@@ -1606,35 +1390,65 @@ reglas:
       `mcp-bbdd`, y de ahi sale esta regla.
 
   - codigo: R-COMPRAS-SIN-IVA
-    titulo: Los importes de compras son sin IVA; importe_contratado lleva IVA
+    titulo: Las lineas de compras son sin IVA; los totales de cabecera e importe_contratado lo llevan
     severidad: bloqueante
     ambito:
       - compras
       - maestro.proveedores_obra
+    resumen: >-
+      Los importes de línea de `compras` son SIN IVA; llevan IVA los totales de
+      cabecera (`total_factura`, `total_documento`, `total_a_pagar`) y
+      `maestro.proveedores_obra.importe_contratado`. No los compares: la
+      diferencia es el impuesto.
     regla: >-
-      Todos los importes del esquema `compras` son SIN IVA (base imponible de
-      linea). En cambio `maestro.proveedores_obra.importe_contratado` es
-      `SUM(ctr.totdoc)`, el TOTAL DEL DOCUMENTO CON IVA. No son comparables: la
-      diferencia entre ambas cifras no es sobrecoste ni ahorro, es el impuesto.
+      Los importes de LINEA de `compras` (`compras.fact_compras_linea`,
+      `compras.factura_lineas`, `compras.albaran_lineas` y las vistas que los
+      agregan) son SIN IVA: base imponible de linea. Llevan IVA los totales de
+      CABECERA que se publican desde F-128 -`total_factura` y `total_a_pagar`
+      de `compras.facturas` (con `cuota_iva` aparte), y `total_documento` y
+      `total_a_pagar` de `compras.albaranes`- y
+      `maestro.proveedores_obra.importe_contratado`, que es `SUM(ctr.totdoc)`,
+      el total del contrato. Un importe de linea no se compara con un total con
+      IVA: la diferencia no es sobrecoste ni ahorro, es el impuesto (y, en
+      `total_a_pagar`, tambien las retenciones).
     motivo: >-
-      `sql/compras/02_fact_linea.sql` dice "todos los importes SIN IVA" y
-      `sql/maestro/03_proveedores_obra.sql` suma `t.totdoc` de `raw.ctr`.
-      Compararlos da desviaciones falsas del orden del 21 %.
+      `sql/compras/02_fact_linea.sql` construye las lineas sin IVA y
+      `sql/maestro/03_proveedores_obra.sql` suma `t.totdoc` de `raw.ctr`:
+      compararlos da desviaciones falsas del orden del 21 %. Hasta la v58 esta
+      regla negaba el IVA de las cabeceras que publica F-128.
 
-  - codigo: R-COMPRAS-TIPO-DOC
-    titulo: Seis tipos de documento conviven en la misma tabla
+  - codigo: R-COMPRAS-LINEA
+    titulo: compras.fact_compras_linea mezcla tipos de documento y su clave es (tipo_doc, linea_id)
     severidad: bloqueante
     ambito:
       - compras.fact_compras_linea
+      - compras.facturas
+      - compras.factura_lineas
+      - compras.v_pbi_proveedor_obra
+      - compras.v_pbi_contrato_consumo
+      - compras.v_pbi_partida_coste
+    resumen: >-
+      `compras.fact_compras_linea` mezcla CONTRATO, ALBARAN, PROFORMA, NOTA,
+      FACTURA, ABONO y OTRO: filtra siempre `tipo_doc` (son el mismo coste en
+      tres momentos). Su clave es (`tipo_doc`, `linea_id`). Los ABONO ya
+      restan: no los restes otra vez.
     regla: >-
       `compras.fact_compras_linea` mezcla CONTRATO, ALBARAN, PROFORMA, NOTA,
-      FACTURA y ABONO (mas OTRO) en la misma tabla. Sumar `importe` sin filtrar
-      `tipo_doc` suma el mismo gasto hasta tres veces: contratado, albaranado y
-      facturado son tres momentos del MISMO coste, no tres costes. Se filtra
-      siempre por el `tipo_doc` que responde la pregunta.
+      FACTURA y ABONO (mas OTRO): sumar `importe` sin filtrar `tipo_doc` suma
+      el mismo gasto hasta tres veces, porque contratado, albaranado y
+      facturado son tres momentos del MISMO coste. `linea_id` NO identifica una
+      fila: viene de tres tablas de Sigrid (`ctrpro`, `dcapro`, `dcfpro`) cuyos
+      identificadores colisionan, y la clave es `(tipo_doc, linea_id)`; un
+      COUNT DISTINCT de `linea_id` pierde filas y un JOIN por `linea_id` a secas
+      las duplica. Los ABONO llegan con su signo natural (negativo): un
+      `SUM(importe)` sobre FACTURA y ABONO ya es el facturado neto, y
+      restarlos otra vez da un error del doble de lo abonado.
     motivo: >-
-      Los tipos los asigna `compras.fn_tipo_documento` sobre `(con.tip, serie)`.
-      Es la nota global del prototipo `mcp-bbdd`: "no filtrar tipo_doc triplica".
+      Los tipos los asigna `compras.fn_tipo_documento` sobre `(con.tip, serie)`
+      y la tabla une los tres origenes sin clave primaria
+      (`sql/compras/02_fact_linea.sql`); `sql/compras/03_views.sql` agrega los
+      abonos junto a las facturas con su signo. Es la nota global del prototipo
+      `mcp-bbdd`: «no filtrar tipo_doc triplica».
 
 # ===========================================================================
 # ORDENES DE MAGNITUD (R10)

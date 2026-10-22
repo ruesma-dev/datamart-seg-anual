@@ -217,23 +217,26 @@ CONTEXTO_NO_PUBLICADO = {
 }
 
 
-#: Las TRECE reglas duras que `00_global.yaml` tiene que declarar sí o sí (R9).
+#: Las DOCE reglas duras que `00_global.yaml` tiene que declarar sí o sí (R9).
 #:
 #: No es una lista de buenas prácticas: cada una nace de una trampa concreta del
 #: modelo y varias de un número falso real. Se escriben aquí, en el dominio, para
 #: que quitar una del YAML deje `bash harness/init.sh` en rojo en vez de dejar al
 #: agente sin esa defensa en silencio.
+#:
+#: Eran trece hasta F-147 (2026-10-22): las tres de `compras.fact_compras_linea`
+#: (tipos de documento, clave y abonos) se fundieron en `R-COMPRAS-LINEA`, y
+#: entra `R-PERFILES`, la que funde las cuatro de perfiles y se sirve entera.
 CODIGOS_REGLAS_OBLIGATORIAS = (
-    "R-ABONO-NEGATIVO",
     "R-SIGRID-CON",
     "R-CLAVE-SUSTITUTA",
     "R-COMPRAS-SIN-IVA",
-    "R-COMPRAS-TIPO-DOC",
+    "R-COMPRAS-LINEA",
     "R-FAS-AMBIGUO",
     "R-FRESCURA",
     "R-IMPORTE-MES",
-    "R-LINEA-ID-NO-UNICA",
     "R-OBRA-ACTIVA",
+    "R-PERFILES",
     "R-RETENCION-NO-JOIN-LINEAS",
     "R-UNIVERSO-OBRA",
     "R-VERSION-MASTER",

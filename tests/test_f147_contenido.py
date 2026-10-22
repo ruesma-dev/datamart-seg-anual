@@ -62,12 +62,17 @@ CODIGOS_RETIRADOS = tuple(
 
 
 @cache
-def _real():
-    from etl_sigrid.domain.diccionario import derivar_avisos
+def _cargado():
     from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
 
-    dicc, _ = cargar_diccionario(DIR_DICCIONARIO)
-    return derivar_avisos(dicc)
+    return cargar_diccionario(DIR_DICCIONARIO)[0]
+
+
+@cache
+def _real():
+    from etl_sigrid.domain.diccionario import derivar_avisos
+
+    return derivar_avisos(_cargado())
 
 
 def _regla(codigo: str):
@@ -107,7 +112,7 @@ def test_f147_r7_solo_r_perfiles_va_entera_y_solo_r_sigrid_con_fuera() -> None:
 def test_f147_r7_el_diccionario_real_valida_entero() -> None:
     from tests.test_f006_frescura import pasos_del_pipeline_nocturno
 
-    assert validar(_real(), pasos_del_pipeline_nocturno()) == []
+    assert validar(_cargado(), pasos_del_pipeline_nocturno()) == []
 
 
 def test_f147_r7_version_59() -> None:
