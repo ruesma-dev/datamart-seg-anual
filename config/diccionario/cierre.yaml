@@ -1020,8 +1020,8 @@ objetos:
         porque: Es el universo del que sale la vista.
     ejemplos_preguntas:
       - De que va la obra X, quien es el cliente y en que fechas se hace
-      - Que obras estan acabadas y cuales siguen vivas
       - Cuanto han crecido las obras por modificados
+      - Que obras estan acabadas y cuales siguen vivas
 
   v_pbi_planif_vs_real:
     tipo: vista

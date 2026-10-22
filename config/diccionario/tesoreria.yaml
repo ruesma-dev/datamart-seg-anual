@@ -308,8 +308,8 @@ objetos:
         porque: El centro de coste del efecto, del que sale la obra.
     ejemplos_preguntas:
       - Que pagos a proveedores vencen el mes que viene y por cuanto
-      - Cuanto nos deben los clientes y cuando vence
       - Flujo de caja comprometido por mes de los proximos seis meses
+      - Cuanto nos deben los clientes y cuando vence
       - Que efectos previstos de la obra X estan vencidos
 
   efectos_restringidos_mes:

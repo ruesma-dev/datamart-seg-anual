@@ -325,10 +325,10 @@ objetos:
           no se refresca de noche y el seguimiento si.
 
     ejemplos_preguntas:
-      - Cual es la planificacion mensual de la obra 0704 en 2025
       - Dame la evolucion mensual del coste directo de la obra X en el ano A
-      - Que obras estan mal configuradas, sin planificado en algun mes
       - Cuanto llevamos produciendo este ano frente a lo planificado
+      - Cual es la planificacion mensual de la obra 0704 en 2025
+      - Que obras estan mal configuradas, sin planificado en algun mes
 
   fact_seguimiento_categoria:
     tipo: tabla

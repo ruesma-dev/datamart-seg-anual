@@ -202,8 +202,8 @@ objetos:
     refresco: estatico
     ejemplos_preguntas:
       - De cuando es el dato que me estas dando
-      - Cuando se construyo el mart por ultima vez
       - Que pasos fallaron anoche
+      - Cuando se construyo el mart por ultima vez
       - Cuantas horas lleva sin actualizarse el cierre
     columnas:
       paso:
@@ -373,8 +373,8 @@ objetos:
     refresco: nocturno
     ejemplos_preguntas:
       - Que reglas tengo que respetar antes de consultar el datamart
-      - Por que no puedo sumar el importe acumulado
       - Que trampas tiene este modelo
+      - Por que no puedo sumar el importe acumulado
     columnas:
       codigo:
         significado: Identificador corto y estable de la regla, para poder citarla.
@@ -517,9 +517,9 @@ objetos:
     refresco: nocturno
     ejemplos_preguntas:
       - En que moneda estan los importes y llevan IVA
+      - Para que sirve cada esquema del datamart
       - Esta cifra es razonable para esta empresa
       - Que valores exactos puede tomar escenario
-      - Para que sirve cada esquema del datamart
     columnas:
       bloque:
         significado: >-
@@ -828,8 +828,8 @@ objetos:
     paso_etl: build_stg
     ejemplos_preguntas:
       - "de cuando es el dato de la obra 0599?"
-      - "que obras llevan mas de una semana sin actualizarse?"
       - "esta congelada la obra 0710, y por que?"
+      - "que obras llevan mas de una semana sin actualizarse?"
       - "hay alguna obra congelada que haya cambiado en Sigrid?"
     columnas:
       obra_id:

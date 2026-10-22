@@ -427,6 +427,7 @@ objetos:
           (F-138), filtrando antes `familia = 'CONTRATO'`.
     ejemplos_preguntas:
       - Que contratos tiene abiertos la obra X y con quien
+      - Que forma de pago y que retencion de garantia tiene el contrato C
       - Con que proveedores tiene contrato la obra X
       - Que contratos estan enviados y sin firmar
       - Cuantos contratos hay en cada estado, y cuantos sin firmar todavia
@@ -434,7 +435,6 @@ objetos:
         Que contratos llevan mas de tres semanas enviados sin firmar y desde
         cuando (con `compras.v_estado_documentos`: la fecha del envio sale de
         `rac`)
-      - Que forma de pago y que retencion de garantia tiene el contrato C
 
   contrato_lineas:
     tipo: tabla
@@ -1434,10 +1434,10 @@ objetos:
           (F-138), filtrando antes `familia = 'FACTURA'`.
     ejemplos_preguntas:
       - Que facturas nos ha pasado el proveedor P este ano
+      - Cuanto es la factura X con IVA, cuanto se le retiene y cuanto se le paga
       - En que estado esta la factura X, esta aprobada o solo contabilizada
       - Cuantas facturas hay contabilizadas sin aprobar, retenidas o rechazadas
       - De que fecha es la factura X, la suya o la de alta en Sigrid
-      - Cuanto es la factura X con IVA, cuanto se le retiene y cuanto se le paga
 
   factura_lineas:
     tipo: tabla
@@ -3356,12 +3356,12 @@ objetos:
           ofertas, une por `compras.documento_adjuntos.comparativo_id`
           (F-090).
     ejemplos_preguntas:
+      - Cuanto se ahorro en los concursos de la obra X
+      - Cuanto se adjudico en comparativos este ano, con y sin atipicos
       - Que proveedores ganan comparativos de mas de una actividad
       - Cuantos comparativos hay por actividad
-      - Cuanto se ahorro en los concursos de la obra X
       - Quien aprobo el comparativo X y cuando
       - Acabo en contrato el comparativo X
-      - Cuanto se adjudico en comparativos este ano, con y sin atipicos
       - Que comparativos estan pendientes de firma
 
   comparativo_ofertas:

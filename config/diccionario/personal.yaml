@@ -548,8 +548,8 @@ objetos:
           partida es siempre de la misma obra de la linea.
 
     ejemplos_preguntas:
-      - Cuanto coste de personal lleva la obra X, contando meses y horas
       - Quien ha trabajado en la obra X y cuanto ha imputado cada uno
+      - Cuanto coste de personal lleva la obra X, contando meses y horas
       - Que partidas de la obra X llevan mano de obra imputada
       - Que lineas del parte PT26/00336 llevan comentario y que dicen
 
