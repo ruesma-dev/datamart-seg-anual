@@ -9,23 +9,21 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-22 · F-147 · spec en BORRADOR (spec-author) · rama `feature/F-147-presupuesto-contexto-mcp`
+## 2026-10-22 · F-147 · `spec_ready` (spec-author) · rama `feature/F-147-presupuesto-contexto-mcp`
 
-- Escritos `specs/F-147-presupuesto-contexto-mcp/revision_reglas.md` (las 27 reglas una a
-  una, con evidencia de Azure en solo lectura y del código), `requirements.md`, `design.md` y
-  `tasks.md` en borrador. Estado en `features.json` SIN cambiar (`pending`).
-- **Decisiones abiertas para el humano** (detalle en `requirements.md`): D1 regla a regla
-  (fundir las 4 de perfiles y las 3 de `fact_compras_linea`; quitar `R-COSTE-CONSULTA`; sacar
-  `R-SIGRID-CON` del MCP; texto de cada resumen); D2 eje `entrega` frente a `severidad`; D3
-  códigos de las fusionadas; D4 no publicar las `fuera_mcp`; D5 albarán absurdo; D6 qué es
-  «obra activa»; D7 `R-COMPRAS-SIN-IVA`; D8 enrutado (campo propio o N primeras, N = 1 o 2);
-  D9 bloque `esquemas`; D10 tope inicial y margen del trinquete.
-- **Hallazgos que no esperan a F-147**: `R-COMPRAS-SIN-IVA` (y `convenciones.importes_iva` y
-  la cabecera de `compras.yaml`) es FALSA desde F-128: `compras.facturas`/`albaranes` publican
-  totales CON IVA. `R-OBRA-ACTIVA` dice que el catálogo de estados no está ingerido y
-  `maestro.obras.estado` ya trae el nombre (178 EN CURSO). Propuesta: arreglo aparte, ya (D7).
-- Contrato con `mcp-bbdd` pendiente de pactar (T1): columna `resumen` al final de
-  `_meta.diccionario_reglas`; su F-029 sirve el índice y lleva el detalle a `describir_tabla`.
+- Spec cerrada con las decisiones del humano del 2026-10-22 (D1-D10, en `requirements.md`):
+  tabla de `revision_reglas.md` aceptada; campo `entrega` (resumen | entera | fuera_mcp);
+  `R-PERFILES` y `R-COMPRAS-LINEA`; `fuera_mcp` no se publica; `R-ALBARAN-ABSURDO` se queda DE
+  MOMENTO, mínima y sin cifras (Administración corregirá las dos líneas en Sigrid);
+  `R-OBRA-ACTIVA` = obra VIVA de F-025 (`business_rules.yaml` → `ventana`; hoy 41 con
+  `maestro.obras` + `stg.fases`; `_meta.v_frescura_obra` no es equivalente: 40, la 0726 va como
+  `sin_filas`); `R-COMPRAS-SIN-IVA` (falsa desde F-128) se corrige dentro; enrutado = 2 primeras
+  `ejemplos_preguntas` (opción b: no obliga a `mcp-bbdd` a nada fuera de su F-029); `esquemas`
+  ≤ 350 por entrada; tope = medida tras la feature, trinquete de 1.000.
+- Pendiente ANTES de implementar (T1): pactar el contrato con `mcp-bbdd` (columnas `resumen` y
+  `entrega` al final de `_meta.diccionario_reglas`, códigos retirados, N = 2).
+- Estimación con la fórmula de la puerta: ~78.000 hoy → ~29.000; con el MCP actual baja
+  ~15.000-20.000 y el resto llega con la F-029 de `mcp-bbdd`.
 
 ## 2026-10-21 · F-146 · CERRADA (`done`, APROBADO `6205285`) · merge `4511a33` · cierra también F-142
 
