@@ -1595,29 +1595,26 @@ ordenes_de_magnitud:
 convenciones:
   moneda: EUR
   importes_iva: >-
-    Los importes del esquema `compras` son SIN IVA (base imponible de linea).
-    El unico importe CON IVA del datamart es
-    `maestro.proveedores_obra.importe_contratado`, que es SUM(ctr.totdoc), el
-    total del documento. No son comparables entre si.
+    Lineas de `compras` SIN IVA; totales de cabecera (`total_factura`,
+    `total_documento`, `total_a_pagar`) y
+    `maestro.proveedores_obra.importe_contratado` CON IVA. No se comparan:
+    regla `R-COMPRAS-SIN-IVA`.
   fechas: >-
-    En `raw` las fechas son enteros con formato YYYYMMDD y el valor 0 significa
-    NULL, no el ano 0. A partir de `stg` ya vienen tipadas como DATE. Hay cuatro
-    funciones de conversion, una por esquema (`stg.fn_sigrid_date_to_date`,
-    `compras.fn_sigrid_date`, `retenciones.fn_sigrid_date`, `maestro.fn_fecha`).
+    Las fechas del datamart vienen tipadas como DATE; las de Sigrid se
+    convierten en el ETL (el 0 de Sigrid es NULL, no el ano 0).
   timestamps: >-
     Los timestamps de `_meta` son UTC SIN zona horaria (TIMESTAMP, escritos con
     datetime.utcnow()). Compararlos contra un now() local da el desfase de
     Espana como antiguedad, que en verano son dos horas.
+  # Remite a la regla y no repite su contenido A PROPOSITO: cuando lo repetia
+  # se quedo atras (la regla amplio la lista de tablas y esta convencion siguio
+  # publicando la version anterior: dos versiones que se contradecian). F-147:
+  # la regla ya no se publica (`fuera_mcp`); esta linea dice por que.
   identidad_sigrid: >-
-    En Sigrid `ide` es la clave universal, y hay tablas que son "propiedades de
-    `con` 1:1". **Lo que hay que saber antes de consultar `raw` esta en la regla
-    `R-SIGRID-CON`, que es la unica version**: cuales son esas tablas, de que
-    lado sale cada campo y que tablas no cuelgan de `con` en absoluto.
-
-    Esta entrada no lo repite a proposito. Cuando lo repetia, se quedo atras: la
-    regla corrigio donde vive cada campo y amplio la lista de tablas, y esta
-    convencion siguio publicando la version anterior, con dos tablas menos.
-    Eran dos versiones publicadas que se contradecian.
+    `raw` (la copia de Sigrid) no se consulta desde el MCP. Como se lee
+    Sigrid -la clave `ide`, las tablas que son propiedades de `con` y de que
+    lado sale cada campo- es guia del ETL, en la regla `R-SIGRID-CON`, que es
+    la unica version.
 
 # ===========================================================================
 # EJES DEL MODELO (R4)
@@ -1680,23 +1677,11 @@ esquemas:
   compras:
     titulo: Mundo documental de la compra a proveedores
     para_que_sirve: >-
-      Contratos, albaranes, proformas, notas, facturas y abonos de proveedor, a
-      nivel de linea y sin IVA. Responde a quien se ha comprado, cuanto se ha
-      contratado, que hay albaranado sin facturar y que coste lleva cada
-      partida. Incluye ademas el catalogo de formas de pago
-      (`compras.formas_pago`), que es la DIMENSION: dice que formas de pago
-      existen, no con cual se pago un documento concreto. Y desde F-038 el
-      comparativo de ofertas (`compras.comparativos`) con todas sus ofertas
-      (`compras.comparativo_ofertas`), las ficticias marcadas; sus lineas de
-      los dos lados (`compras.comparativo_lineas`,
-      `compras.comparativo_oferta_lineas`), el coste objetivo contra su base
-      del descompuesto (`compras.comparativo_objetivo`) y las firmas escalon
-      a escalon (`compras.comparativo_firmas`). Desde F-085, el historial de
-      procesos de cada documento (`compras.documento_procesos`, de `rac`), y
-      desde F-132 el estado actual de contratos, facturas y comparativos y
-      desde cuando estan en el (`compras.v_estado_documentos`, sacado de
-      `rac`; la foto diaria de estados de F-067 que la precedio se retiro). Y
-      el documento de planificacion de compras (`compras.necesidades`).
+      Contratos, albaranes, proformas, notas, facturas y abonos de proveedor:
+      lineas SIN IVA y cabeceras CON IVA (`R-COMPRAS-SIN-IVA`). A quien se
+      compra, cuanto se contrata, que hay albaranado sin facturar y el coste
+      por partida; tambien formas de pago, comparativos, alarmas y el estado
+      de cada documento (`compras.v_estado_documentos`, de `rac`, F-132).
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_compras]
@@ -1704,13 +1689,11 @@ esquemas:
   retenciones:
     titulo: Retenciones de garantia practicadas y sufridas
     para_que_sirve: >-
-      Un registro por efecto de retencion, en los dos sentidos: lo retenido a
-      proveedores y lo que los clientes nos retienen. Con saldo vivo, fechas
-      prevista y real de liquidacion, y marca de vencida sin liquidar. Desde
-      F-095, la retencion de PROVEEDOR desde la contabilidad: el saldo vivo que
-      MANDA es `retenciones.saldo_contable` (por proveedor y obra), cuadrado con
-      los efectos en `retenciones.v_cuadre_proveedor`, y su vencimiento desde el
-      fin de obra en `retenciones.v_retencion_contable_obra`.
+      Un registro por efecto de retencion, a proveedores y de clientes, con
+      saldo vivo, fechas de liquidacion y marca de vencida. La de PROVEEDOR la
+      manda la contabilidad: `retenciones.saldo_contable` (por proveedor y
+      obra), cuadrada con los efectos en `retenciones.v_cuadre_proveedor` y
+      con su vencimiento en `retenciones.v_retencion_contable_obra`.
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_retenciones]
@@ -1718,22 +1701,12 @@ esquemas:
   personal:
     titulo: Quien ha trabajado en cada obra y cuantas horas
     para_que_sirve: >-
-      El maestro de recursos --personas, medios y consumos imputables-- y las
-      330.638 lineas de parte de trabajo que atan persona, horas y obra, con 20
-      anos de historia. Responde "cuantas horas se han imputado a esta obra",
-      "quien ha trabajado en ella" y "cuanto cuesta su mano de obra". DOS
-      TRAMPAS antes de consultarlo: la cantidad de una linea NO son horas --
-      mezcla HORA, DIA, MES y UD, y por eso existe la vista
-      `personal.v_pbi_horas_obra_mes`, que lleva el corte cableado-- y el 71,7 %
-      del euro esta en las lineas de MES, que es el coste de estructura de obra,
-      no las horas. CONTIENE DATOS PERSONALES (nombre, NIF y DNI), publicados
-      por decision expresa del responsable del dato el 2026-09-18. Desde F-101
-      tambien la CABECERA del parte (`personal.partes`: codigo, descripcion,
-      estado; el codigo NO es unico y su obra AUDITA, no imputa) y los precios
-      de la ficha de cada recurso (`personal.recursos_tipos_hora`), que son los
-      de HOY: Sigrid no guarda historico. Desde F-107 `personal.recursos` trae
-      la CONTRAPARTIDA del recurso (centro de coste y cuenta analitica del
-      abono), que es del recurso y no por tipo de hora.
+      Recursos (personas, medios y consumos) y las lineas de parte que atan
+      persona, horas y obra: horas imputadas, quien trabajo y su coste.
+      TRAMPA: la cantidad de una linea NO son horas (mezcla HORA, DIA, MES y
+      UD): usa `personal.v_pbi_horas_obra_mes`. CONTIENE DATOS PERSONALES
+      (nombre, NIF y DNI), autorizados por el responsable del dato el
+      2026-09-18.
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_personal]
@@ -1741,17 +1714,12 @@ esquemas:
   contabilidad:
     titulo: La contabilidad financiera, el mayor y el plan de cuentas
     para_que_sirve: >-
-      Lo que de verdad se contabilizo, desde 2008 y en las 38 empresas: el plan
-      de cuentas FINANCIERO como arbol (`contabilidad.plan_cuentas`, por
-      prefijo y dentro de la empresa), el mayor con una fila por apunte
-      (`contabilidad.mayor`: fecha, cuenta, debe, haber, clase del asiento,
-      saldo, obra por el centro de coste y tercero) y los saldos por cuenta y
-      mes (`contabilidad.saldos_cuenta_mes`). Responde "el mayor de la cuenta
-      X", "el saldo de la subcuenta Y a fin de mes" y "que se contabilizo en la
-      obra Z". TRAMPA antes de consultarlo (`R-SALDO-CONTABLE`): el saldo es
-      `importe_saldo`, porque los asientos de CIERRE y APERTURA duplican. No es
-      el plan analitico de `maestro.cuentas_analiticas`, y la contabilidad no
-      cuadra con el seguimiento de `mart` y `cierre` por construccion.
+      La contabilidad financiera de las 38 empresas desde 2008, sin los
+      apuntes de personal: el plan de cuentas (`contabilidad.plan_cuentas`),
+      el mayor (`contabilidad.mayor`) y los saldos por cuenta y mes
+      (`contabilidad.saldos_cuenta_mes`). TRAMPA: el saldo es `importe_saldo`
+      (`R-SALDO-CONTABLE`). No es el plan analitico de
+      `maestro.cuentas_analiticas`.
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_contabilidad]
@@ -1759,19 +1727,11 @@ esquemas:
   contabilidad_restringida:
     titulo: La contabilidad COMPLETA, con la informacion de personal (solo perfil total del MCP y rol autorizado)
     para_que_sirve: >-
-      La misma contabilidad que `contabilidad` -plan de cuentas, mayor y
-      saldos por cuenta y mes, desde 2008 y en las 38 empresas- pero COMPLETA:
-      con los asientos de nomina, las cuentas de trabajadores, sus prestamos,
-      anticipos y embargos (F-135). Es lo que `contabilidad` publicaba hasta el
-      2026-10-11, con las mismas filas, columnas y cifras, mas la marca
-      `restringido` en el mayor. SOLO LO LEEN el perfil total del MCP (el
-      login `mcp_sigrid_dm_total`, F-136) y el grupo autorizado
-      `sigrid_dm_autorizado_ro` (sin login; sus miembros los decide Negocio):
-      para el perfil estandar del MCP y para Power BI esta vetado, y una
-      consulta devuelve «permission denied». Por defecto se usa `contabilidad`
-      (`R-PERFILES`). No se suma con
-      `contabilidad` (`R-PERFILES`), y vale la misma trampa del
-      saldo (`R-SALDO-CONTABLE`).
+      La misma contabilidad que `contabilidad`, pero COMPLETA: con nominas,
+      cuentas de trabajadores, prestamos, anticipos y embargos (F-135). Solo
+      la leen el perfil total del MCP (`mcp_sigrid_dm_total`) y el grupo
+      `sigrid_dm_autorizado_ro`; para los demas, «permission denied». No se
+      suma con `contabilidad` (`R-PERFILES`).
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_contabilidad]
@@ -1779,17 +1739,11 @@ esquemas:
   tesoreria:
     titulo: La cartera de cobros y pagos (sin los pagos de personal)
     para_que_sirve: >-
-      Cada efecto de cobro y de pago de Sigrid, tal cual: pagos a proveedores y
-      acreedores y cobros de clientes, con tercero, vencimiento, fecha real,
-      importe, medio de pago, estado PREVISTO/REALIZADO/BAJA y la obra de su
-      centro de coste (`tesoreria.efectos`). Responde «que vence este mes»,
-      «que nos deben los clientes» y es el ingrediente de un flujo de caja.
-      TRAMPAS antes de consultarlo (`R-TESORERIA-ESTADO`): BAJA no se suma,
-      `fecha_real` vacia no es pendiente y el previsto antiguo no es caja. Le
-      faltan los pagos de personal (`R-PERFILES`): cuantos, en
-      `tesoreria.efectos_restringidos_mes`. Es cartera, no devengo: la
-      proyeccion de obra (fase 2) no existe, y los cobros van sin documento de
-      venta hasta F-040.
+      Cada efecto de cobro y de pago de Sigrid (`tesoreria.efectos`): tercero,
+      vencimiento, fecha real, importe, medio, estado y obra. Que vence, que
+      nos deben y el ingrediente de un flujo de caja. TRAMPA
+      (`R-TESORERIA-ESTADO`): BAJA no se suma y `fecha_real` vacia no es
+      pendiente. Sin los pagos de personal. Es cartera, no devengo.
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_tesoreria]
@@ -1797,14 +1751,11 @@ esquemas:
   tesoreria_restringida:
     titulo: La cartera COMPLETA, con los pagos de personal (solo perfil total del MCP y rol autorizado)
     para_que_sirve: >-
-      La misma cartera que `tesoreria` pero COMPLETA: con los pagos de nomina,
-      embargo y cuota (F-037), marcados con `restringido` y
-      `motivo_restriccion`. SOLO LA LEEN el perfil total del MCP (el login
-      `mcp_sigrid_dm_total`, F-136) y el grupo autorizado
-      `sigrid_dm_autorizado_ro`; para el perfil estandar del MCP y para Power
-      BI esta vetada, y una consulta devuelve «permission denied». Por defecto
-      se usa `tesoreria` (`R-PERFILES`); no se suma con ella, y
-      valen las mismas trampas del estado (`R-TESORERIA-ESTADO`).
+      La misma cartera que `tesoreria`, pero COMPLETA: con los pagos de
+      nomina, embargo y cuota (F-037). Solo la leen el perfil total del MCP
+      (`mcp_sigrid_dm_total`) y el grupo `sigrid_dm_autorizado_ro`; para los
+      demas, «permission denied». No se suma con `tesoreria` (`R-PERFILES`) y
+      vale `R-TESORERIA-ESTADO`.
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_tesoreria]
@@ -1812,15 +1763,11 @@ esquemas:
   compras_restringida:
     titulo: Las alarmas COMPLETAS de los documentos, con recursos y partes (solo perfil total del MCP y rol autorizado)
     para_que_sirve: >-
-      La misma tabla de alarmas que `compras.documento_alarmas` pero COMPLETA:
-      con las alarmas de recursos y de partes de trabajo (F-138, D9), que
-      nombran trabajadores y bajas, marcadas con `restringido` y
-      `motivo_restriccion`. SOLO LA LEEN el perfil total del MCP (el login
-      `mcp_sigrid_dm_total`, F-136) y el grupo autorizado
-      `sigrid_dm_autorizado_ro`; para el perfil estandar del MCP y para Power
-      BI esta vetada, y una consulta devuelve «permission denied». Por defecto
-      se usa `compras.documento_alarmas` (`R-PERFILES`); no se suma
-      con ella.
+      Lo de compras que nombra a trabajadores o es del proveedor: las alarmas
+      COMPLETAS, con las de recursos y partes (F-138), y la cuenta bancaria de
+      cada documento (F-128). Solo lo leen el perfil total del MCP
+      (`mcp_sigrid_dm_total`) y el grupo `sigrid_dm_autorizado_ro`. No se suma
+      con `compras.documento_alarmas` (`R-PERFILES`).
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_compras]
@@ -1828,21 +1775,11 @@ esquemas:
   descompuestos:
     titulo: De que se compone cada partida, por origen
     para_que_sirve: >-
-      Los descompuestos de las partidas --los elementos o precios simples que
-      las componen: hormigon, acero, mano de obra, medios auxiliares-- con su
-      ORIGEN separado: Estudios (MASTER_ESTUDIO, la version 0 del master, en
-      las obras con master 0; ESTUDIO, la «Descomposicion» de coste fase 0,
-      solo en las obras sin master 0: juntas, `v_pbi_master_estudio` y
-      `v_pbi_estudio`), la planificacion de compras del jefe de obra (PLANIF_JO,
-      con proveedor y contrato: el descompuesto de la fase viva) y las demas
-      versiones del master (MASTER_PRE_ABC y MASTER_PLANIF_JO, desde la primera
-      ABC). Responde "de que se compone la partida X",
-      "compara Estudios con la planificacion del jefe de obra" y "que partidas
-      no cuadran con su descompuesto" (`descompuestos.cuadre_partida`). TRAMPA
-      antes de consultarlo (`R-DESCOMPUESTO-ORIGEN`): los origenes no se suman
-      ni se mezclan, y el master tiene una copia por version que se filtra por
-      `fase_num` o `es_vigente`. La primera carga del master se hizo el
-      2026-09-29, con las 3.025 versiones; que version esta cargada lo dice
+      Composicion de cada partida, por ORIGEN: Estudios (MASTER_ESTUDIO, el
+      master 0, o ESTUDIO donde no lo hay; juntas, `v_pbi_master_estudio` y
+      `v_pbi_estudio`), la planificacion del jefe de obra (PLANIF_JO) y las
+      demas versiones del master. Los origenes no se suman
+      (`R-DESCOMPUESTO-ORIGEN`). Desde el 2026-09-29:
       `descompuestos._versiones_cargadas`.
     consumo_recomendado: true
     refresco: nocturno
@@ -1851,13 +1788,11 @@ esquemas:
   maestro:
     titulo: Maestros y dimensiones de consulta directa
     para_que_sirve: >-
-      Obras, proveedores y la relacion proveedor-obra derivada de los contratos,
-      mas el puente centro de coste -> obra y los catalogos de estados de
-      documento y de cuentas analiticas (`maestro.cuentas_analiticas`, F-107),
-      pensados para consultarse tal cual. `maestro.obras` es el
-      universo SIN filtrar, superconjunto de `stg.obras`, y trae la direccion
-      del emplazamiento -informada en un tercio de las obras- y las marcas de
-      que datos tiene cada obra dentro del datamart.
+      Obras, proveedores y la relacion proveedor-obra de los contratos, el
+      puente centro de coste -> obra y los catalogos de estados de documento y
+      de cuentas analiticas, para consultarse tal cual. `maestro.obras` es el
+      universo SIN filtrar (superconjunto de `stg.obras`), con direccion y las
+      marcas de que datos tiene cada obra.
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_maestros]
@@ -1886,15 +1821,12 @@ esquemas:
   stg:
     titulo: Capa intermedia de preparacion, y tambien superficie de consulta
     para_que_sirve: >-
-      Normaliza Sigrid y explota la planificacion a nivel mensual. SI se
-      consulta: aqui estan el presupuesto por partida y ambito -incluidos los
-      ambitos que `mart` no construye, la certificacion entre ellos-, el arbol
-      de partidas con su jerarquia y las fases una a una. Lo que ya esta
-      resuelto aguas abajo suele ser mas comodo en `mart` y en `cierre`, y cada
-      ficha lo dice, pero eso es navegacion y no una prohibicion. LA TRAMPA que
-      hay que respetar: en `stg.plan_mensual` conviven todas las versiones
-      master y consultarla sin filtrar version multiplica los importes (regla
-      `R-VERSION-MASTER`).
+      Normaliza Sigrid y explota la planificacion por mes. SI se consulta:
+      presupuesto por partida y ambito (tambien los que `mart` no construye,
+      como la certificacion), el arbol de partidas y las fases. Lo resuelto
+      aguas abajo es mas comodo en `mart` y `cierre`. TRAMPA: en
+      `stg.plan_mensual` conviven todas las versiones master
+      (`R-VERSION-MASTER`).
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_stg]

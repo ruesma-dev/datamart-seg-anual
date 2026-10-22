@@ -21,7 +21,9 @@
   (DH3 de su F-027), texto corto. **C)** `n_reglas` cuenta solo las publicadas (R6), con test.
   El punto 6 (filtrar reglas por perfil) lo decide su humano en F-029: no cambia nada aquí.
 - Implementación en curso: tarea en curso y decisiones, en las viñetas siguientes y en
-  `progress/impl_F-147.md`.
+  `progress/impl_F-147.md`. Diccionario v59 en el árbol: 234 objetos, 2002 columnas
+  (las dos nuevas de la ficha de `_meta.diccionario_reglas`), 114 de consumo; 21 reglas en
+  el YAML y 20 publicadas.
 - **ROJO AJENO a F-147 (init.sh inicial, 2026-10-22)**: `test_f141_r30_mcp_bbdd_solo_enlaza_al_contrato`
   falla porque el commit `c40adfb` de `azure-apps` (sesión de `mcp-bbdd`, F-030) dejó en
   `mcp_bbdd.md` ~l.998-999 una cita de `mcp_sigrid_dm_restringido`/F-141 sin enlace a

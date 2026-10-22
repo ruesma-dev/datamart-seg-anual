@@ -4,10 +4,13 @@
 #
 # CINCO COSAS QUE HAY QUE SABER ANTES DE CONSULTAR NADA DE AQUI:
 #
-# 1. **Todos los importes son SIN IVA.** El unico importe con IVA del datamart
-#    es `maestro.proveedores_obra.importe_contratado`, que es la suma del total
-#    del documento. No son comparables: la diferencia no es sobrecoste, es el
-#    impuesto.
+# 1. **Las LINEAS van SIN IVA y las CABECERAS CON IVA** (F-128; corregido en
+#    F-147, que esta nota negaba lo segundo). Los importes de linea son base
+#    imponible; `total_factura`, `total_documento` y `total_a_pagar` de
+#    `compras.facturas` y `compras.albaranes`, y
+#    `maestro.proveedores_obra.importe_contratado`, llevan IVA. No son
+#    comparables: la diferencia no es sobrecoste, es el impuesto
+#    (`R-COMPRAS-SIN-IVA`).
 # 2. **Los ABONOS ya entran en negativo.** Un SUM sobre FACTURA y ABONO da el
 #    facturado neto; restarlos otra vez se equivoca en el doble de lo abonado.
 # 3. **`compras` NO filtra por `stg.obras`.** Puede traer obras administrativas

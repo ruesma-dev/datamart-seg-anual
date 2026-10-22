@@ -1281,9 +1281,9 @@ def test_f006_r2_el_diccionario_declara_el_coste_de_consultar() -> None:
         assert not ficha.consumo_recomendado, objeto
         assert "60 s" in " ".join((ficha.motivo_no_consumo or "").split()), objeto
     for objeto, medido in (("stg.plan_mensual", "25 s"), ("compras.fact_compras_linea", "10 s")):
-        descripcion = " ".join(dicc.por_nombre[objeto].descripcion.split())
-        assert medido in descripcion, f"falta la cifra medida {medido}"
-        assert "Una sola consulta" in descripcion, objeto
+        descripcion = dicc.por_nombre[objeto].descripcion
+        assert contiene(descripcion, medido), f"falta la cifra medida {medido}"
+        assert contiene(descripcion, "Una sola consulta"), objeto
 
 
 #: F-078 (2026-09-15) materializó los tres objetos de CP por tipología. Un aviso
@@ -1360,7 +1360,7 @@ def test_f006_r2_ninguna_ficha_recomienda_es_activa_para_saber_si_una_obra_vive(
     regla = next(r for r in dicc.reglas if r.codigo == "R-OBRA-ACTIVA")
     assert "stg.obras.activa" in regla.regla and "maestro.obras.es_activa" in regla.regla
     assert contiene(regla.regla, "da el total disfrazado")
-    assert "no sirven" in regla.resumen
+    assert contiene(regla.resumen, "no sirven")
 
     # Y ninguna ficha anuncia como ejemplo una pregunta que no puede contestar.
     for ficha in dicc.fichas:

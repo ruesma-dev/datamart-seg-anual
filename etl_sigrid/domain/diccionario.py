@@ -245,6 +245,12 @@ CODIGOS_REGLAS_OBLIGATORIAS = (
 #: Claves obligatorias de cada entrada de `esquemas` en `00_global.yaml` (R4).
 CLAVES_ESQUEMA = ("titulo", "para_que_sirve", "consumo_recomendado", "refresco")
 
+#: F-147 (R16, D9). Tope del `para_que_sirve` de un esquema, en caracteres. El
+#: bloque `esquemas` se sirve ENTERO en cada conversación (10.549 caracteres en
+#: la v58, tres de cada cuatro del contexto global): es para ENRUTAR una
+#: pregunta al esquema, y el detalle de cada objeto está en su ficha.
+PARA_QUE_SIRVE_MAX = 350
+
 #: Longitud mínima de cada texto de una ficha, en caracteres.
 #:
 #: No es burocracia: sin esto, `descripcion: x` y `motivo_no_consumo: x` pasan
@@ -521,6 +527,22 @@ def _validar_entrada_esquema(
                     detalle=f"el esquema `{esquema}` no declara `{clave}`",
                 )
             )
+
+    para_que_sirve = entrada.get("para_que_sirve")
+    if isinstance(para_que_sirve, str) and len(para_que_sirve.strip()) > PARA_QUE_SIRVE_MAX:
+        errores.append(
+            ErrorValidacion(
+                fichero=fichero,
+                objeto=None,
+                regla="R4",
+                detalle=(
+                    f"el `para_que_sirve` del esquema `{esquema}` tiene "
+                    f"{len(para_que_sirve.strip())} caracteres y el tope es "
+                    f"{PARA_QUE_SIRVE_MAX} (F-147): se sirve entero en cada "
+                    f"conversación; lo que no sirva para enrutar va a las fichas"
+                ),
+            )
+        )
 
     refresco = entrada.get("refresco")
     if isinstance(refresco, str) and refresco and refresco not in REFRESCOS:

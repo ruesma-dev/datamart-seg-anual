@@ -629,7 +629,7 @@ def test_f006_r10_la_cifra_absurda_de_compras_llega_avisada() -> None:
     # F-147 (D5): la regla queda minima y SIN cifras que envejezcan (la de
     # 260,6 M€ ya eran 277,0 el 2026-10-22); lo que no cambia es el filtro. La
     # cifra inflada sigue en la ficha, que no se sirve entera en cada charla.
-    assert "< 1e8" in regla.regla, "el filtro que la excluye"
+    assert contiene(regla.regla, "< 1e8"), "el filtro que la excluye"
 
     ficha = dicc.por_nombre["compras.v_pbi_albaranes_sin_facturar"]
     assert contiene(ficha.descripcion, "68,7 BILLONES")
