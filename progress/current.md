@@ -24,7 +24,9 @@
   `progress/impl_F-147.md`. Diccionario v59 en el árbol: 234 objetos, 2002 columnas
   (las dos nuevas de la ficha de `_meta.diccionario_reglas`), 114 de consumo; 21 reglas en
   el YAML y 20 publicadas.
-- **T2-T13 hechas** (commits `357c20a`..`b00d69f`); `azure-apps` `db0b5c5` (commit local, solo
+- **T1-T15 hechas**; `bash harness/init.sh` en verde (8.619 passed, cobertura 100 %), mutación
+  20 muestreados: 19 muertos y el superviviente cazado con un test reforzado. Pendiente: review.
+- Commits `357c20a`..`b00d69f` (T2-T13) y los de T14-T15; `azure-apps` `db0b5c5` (commit local, solo
   `datamart_seg_anual.md`). Medida (fórmula de la puerta): 78.057 → **29.504** (reglas 7.107,
   enrutado 13.901, bloques 8.496); con el MCP de hoy, sin su F-029, lo servido ya baja a ~51.287.
   Informe: `progress/impl_F-147.md`.

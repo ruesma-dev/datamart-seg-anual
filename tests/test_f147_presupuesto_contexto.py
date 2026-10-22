@@ -121,7 +121,9 @@ def test_f147_r18_por_encima_del_tope_dice_cuanto_sobra_y_el_desglose() -> None:
     mensaje = veredicto_presupuesto(medida, tope=28_500)
 
     assert mensaje is not None
-    assert "500" in mensaje, "cuánto sobra"
+    # Exacto: un «"500" in mensaje» lo daba por bueno también con 57.500 (el
+    # superviviente 18 de la campaña de mutación, `total + tope`).
+    assert "sobran 500 (" in mensaje, "cuánto sobra"
     for parte, cifra in (("reglas", "6000"), ("enrutado", "14000"), ("bloques", "9000")):
         assert parte in mensaje and cifra in mensaje.replace(".", ""), mensaje
 
