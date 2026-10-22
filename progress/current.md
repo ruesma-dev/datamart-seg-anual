@@ -26,8 +26,8 @@
   el YAML y 20 publicadas.
 - **T1-T15 hechas**; `bash harness/init.sh` en verde (8.619 passed, cobertura 100 %), mutación
   20 muestreados: 19 muertos y el superviviente cazado con un test reforzado. Pendiente: review.
-- Commits `357c20a`..`b00d69f` (T2-T13) y los de T14-T15; `azure-apps` `db0b5c5` (commit local, solo
-  `datamart_seg_anual.md`). Medida (fórmula de la puerta): 78.057 → **29.504** (reglas 7.107,
+- Commits `357c20a`..`b00d69f` (T2-T13) y los de T14-T15; `azure-apps` `db0b5c5` y `7cc95c2` (commits
+  locales, solo `datamart_seg_anual.md`; el segundo corrige la medida a 29.504). Medida (fórmula de la puerta): 78.057 → **29.504** (reglas 7.107,
   enrutado 13.901, bloques 8.496); con el MCP de hoy, sin su F-029, lo servido ya baja a ~51.287.
   Informe: `progress/impl_F-147.md`.
 - **MANUAL tras APROBADO y merge, EN ESTE ORDEN** (T14; nada lo hace el implementer):
@@ -42,8 +42,17 @@
      columnas de `_meta.diccionario_reglas` = las 7 de antes + `resumen, entrega`; 20 filas, ninguna
      `R-SIGRID-CON`; `pg_constraint` con `diccionario_reglas_entrega_check` y `..._resumen_check`
      (el de `resumen` queda `NOT VALID` hasta la publicación siguiente, la nocturna, que lo valida).
-  6. Avisar a `mcp-bbdd` (su F-029 ya puede leer `resumen`/`entrega`) y medir `contexto_bbdd()` en
+  6. Reiniciar el MCP (cachea el diccionario hasta reiniciarse). Leer ANTES la revisión activa:
+     `az containerapp show -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --query properties.latestReadyRevisionName -o tsv`
+     y reiniciar ESA: `az containerapp revision restart -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --revision <revisión> -o none`.
+     Después, comprobar que `contexto_bbdd()` abre con la cabecera de la «Versión 59» y «20 reglas».
+  7. Avisar a `mcp-bbdd` (su F-029 ya puede leer `resumen`/`entrega`) y medir `contexto_bbdd()` en
      Azure antes y después de su F-029; anotar las dos cifras en `progress/`.
+  - **Vuelta atrás**: con los `CHECK` puestos, un job en una imagen anterior a F-147 falla en
+    `publicar_diccionario` cada noche. Antes de volver a una imagen anterior:
+    `ALTER TABLE _meta.diccionario_reglas DROP CONSTRAINT diccionario_reglas_resumen_check`
+    (escritura en Azure: la autoriza y la lanza el humano). Las columnas nuevas pueden quedarse:
+    la imagen vieja no las lee y el `DEFAULT` de `entrega` ('resumen') cumple su `CHECK`.
 - **ROJO AJENO a F-147 (init.sh inicial, 2026-10-22)**: `test_f141_r30_mcp_bbdd_solo_enlaza_al_contrato`
   falla porque el commit `c40adfb` de `azure-apps` (sesión de `mcp-bbdd`, F-030) dejó en
   `mcp_bbdd.md` ~l.998-999 una cita de `mcp_sigrid_dm_restringido`/F-141 sin enlace a
