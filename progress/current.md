@@ -24,10 +24,29 @@
   `progress/impl_F-147.md`. Diccionario v59 en el árbol: 234 objetos, 2002 columnas
   (las dos nuevas de la ficha de `_meta.diccionario_reglas`), 114 de consumo; 21 reglas en
   el YAML y 20 publicadas.
+- **T2-T13 hechas** (commits `357c20a`..`b00d69f`); `azure-apps` `db0b5c5` (commit local, solo
+  `datamart_seg_anual.md`). Medida (fórmula de la puerta): 78.057 → **29.513** (reglas 7.107,
+  enrutado 13.901, bloques 8.505); con el MCP de hoy, sin su F-029, lo servido ya baja a ~51.168.
+  Informe: `progress/impl_F-147.md`.
+- **MANUAL tras APROBADO y merge, EN ESTE ORDEN** (T14; nada lo hace el implementer):
+  1. Imagen: `powershell -NoProfile -File infra/70_build_image.ps1` (anota el tag que imprime).
+  2. Job a esa imagen ANTES de publicar: `powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag>`.
+     **Obligatorio antes del paso 3**: el DDL nuevo pone `CHECK` en `_meta.diccionario_reglas`, y
+     una imagen anterior a F-147 ya no puede publicar (su INSERT no trae `resumen`): la nocturna
+     con la imagen vieja fallaría en `publicar_diccionario`.
+  3. `.venv/Scripts/python.exe main.py publicar-diccionario` (v59; esperado `n_reglas` = 20).
+  4. `.venv/Scripts/python.exe main.py check-diccionario`.
+  5. Comprobación en solo lectura (`pg._bootstrap_done = True; pg.filas_solo_lectura`):
+     columnas de `_meta.diccionario_reglas` = las 7 de antes + `resumen, entrega`; 20 filas, ninguna
+     `R-SIGRID-CON`; `pg_constraint` con `diccionario_reglas_entrega_check` y `..._resumen_check`
+     (el de `resumen` queda `NOT VALID` hasta la publicación siguiente, la nocturna, que lo valida).
+  6. Avisar a `mcp-bbdd` (su F-029 ya puede leer `resumen`/`entrega`) y medir `contexto_bbdd()` en
+     Azure antes y después de su F-029; anotar las dos cifras en `progress/`.
 - **ROJO AJENO a F-147 (init.sh inicial, 2026-10-22)**: `test_f141_r30_mcp_bbdd_solo_enlaza_al_contrato`
   falla porque el commit `c40adfb` de `azure-apps` (sesión de `mcp-bbdd`, F-030) dejó en
   `mcp_bbdd.md` ~l.998-999 una cita de `mcp_sigrid_dm_restringido`/F-141 sin enlace a
-  `datamart_seg_anual.md`. El documento es de `mcp-bbdd`: no se toca desde aquí. Avisado el líder.
+  `datamart_seg_anual.md`. El documento es de `mcp-bbdd`: no se toca desde aquí. Avisado el líder;
+  RESUELTO por `mcp-bbdd` en `azure-apps` `8545002` (verificado por el líder: r30 en verde).
 - **Desviación justificada (R2)**: `RESUMEN_MAX = 250`, no 300: es el `CHECK` que pidió `mcp-bbdd`
   (petición A) y el validador tiene que rechazar antes que la base. Los resúmenes de la tabla que
   pasaban de 250 (`R-VENTA-COEFICIENTES` ~265, `R-PERFILES` ~255) se acortan sin perder contenido.
