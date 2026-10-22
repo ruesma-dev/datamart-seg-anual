@@ -9,6 +9,20 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-22 · F-147 · `in_progress` (implementer) · rama `feature/F-147-presupuesto-contexto-mcp`
+
+- **T1 CERRADA (respuesta de `mcp-bbdd`, vía líder, 2026-10-22)**: ACEPTA los puntos 1-5 del
+  contrato de `design.md` (lee `diccionario_reglas` con columnas explícitas; ningún código suyo
+  depende de los códigos retirados). Añade tres peticiones que el líder acepta y entran en F-147:
+  **A)** `CHECK (entrega IN ('resumen','entera'))` y `CHECK (char_length(btrim(resumen)) BETWEEN 1
+  AND 250)` en `_meta.diccionario_reglas`, con DDL seguro sobre la tabla con filas (el DEFAULT ''
+  violaría el CHECK); ellos sirven un `entrega` desconocido como `entera`. **B)** `R-PERFILES` con
+  `entrega: entera` y un `ambito` que no la oculte al restringido si su F-029 filtra por ámbito
+  (DH3 de su F-027), texto corto. **C)** `n_reglas` cuenta solo las publicadas (R6), con test.
+  El punto 6 (filtrar reglas por perfil) lo decide su humano en F-029: no cambia nada aquí.
+- Implementación en curso: tarea en curso y decisiones, en las viñetas siguientes y en
+  `progress/impl_F-147.md`.
+
 ## 2026-10-22 · F-147 · `spec_ready` (spec-author) · rama `feature/F-147-presupuesto-contexto-mcp`
 
 - Spec cerrada con las decisiones del humano del 2026-10-22 (D1-D10, en `requirements.md`):
