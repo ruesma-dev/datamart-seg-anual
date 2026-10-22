@@ -9,6 +9,24 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-22 · F-147 · spec en BORRADOR (spec-author) · rama `feature/F-147-presupuesto-contexto-mcp`
+
+- Escritos `specs/F-147-presupuesto-contexto-mcp/revision_reglas.md` (las 27 reglas una a
+  una, con evidencia de Azure en solo lectura y del código), `requirements.md`, `design.md` y
+  `tasks.md` en borrador. Estado en `features.json` SIN cambiar (`pending`).
+- **Decisiones abiertas para el humano** (detalle en `requirements.md`): D1 regla a regla
+  (fundir las 4 de perfiles y las 3 de `fact_compras_linea`; quitar `R-COSTE-CONSULTA`; sacar
+  `R-SIGRID-CON` del MCP; texto de cada resumen); D2 eje `entrega` frente a `severidad`; D3
+  códigos de las fusionadas; D4 no publicar las `fuera_mcp`; D5 albarán absurdo; D6 qué es
+  «obra activa»; D7 `R-COMPRAS-SIN-IVA`; D8 enrutado (campo propio o N primeras, N = 1 o 2);
+  D9 bloque `esquemas`; D10 tope inicial y margen del trinquete.
+- **Hallazgos que no esperan a F-147**: `R-COMPRAS-SIN-IVA` (y `convenciones.importes_iva` y
+  la cabecera de `compras.yaml`) es FALSA desde F-128: `compras.facturas`/`albaranes` publican
+  totales CON IVA. `R-OBRA-ACTIVA` dice que el catálogo de estados no está ingerido y
+  `maestro.obras.estado` ya trae el nombre (178 EN CURSO). Propuesta: arreglo aparte, ya (D7).
+- Contrato con `mcp-bbdd` pendiente de pactar (T1): columna `resumen` al final de
+  `_meta.diccionario_reglas`; su F-029 sirve el índice y lleva el detalle a `describir_tabla`.
+
 ## 2026-10-21 · F-146 · CERRADA (`done`, APROBADO `6205285`) · merge `4511a33` · cierra también F-142
 
 - Merge por orden del humano (21:38 UTC); F-142 `done` (su trabajo es la F-028 de `mcp-bbdd` + la ficha de esta v58).
