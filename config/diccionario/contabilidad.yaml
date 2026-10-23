@@ -34,12 +34,12 @@
 # (55.504 apuntes, el 2,55 %, medidos el 2026-10-09) viven solo en
 # `contabilidad_restringida`, que el rol general no lee. Cuanto falta, en
 # `contabilidad.apuntes_restringidos_mes` y en `incompleto` de los saldos.
-# Regla dura `R-CONTABILIDAD-RESTRINGIDA`.
+# Regla dura `R-PERFILES`.
 #
 # F-146 (2026-10-21, decision del humano): EL PERFIL RESTRINGIDO DEL MCP
 # (administrativos) NO LEE NADA DE ESTE ESQUEMA, ni el plan de cuentas ni los
 # recuentos (F-141 le quitaba solo el mayor y los saldos). Por eso cada ficha de
-# tabla empieza por «No disponible para el perfil restringido» (`R-PERFIL-RESTRINGIDO`).
+# tabla empieza por «No disponible para el perfil restringido» (`R-PERFILES`).
 
 version: 1
 esquema: contabilidad
@@ -51,7 +51,7 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
-      **No disponible para el perfil restringido** (F-146, `R-PERFIL-RESTRINGIDO`):
+      **No disponible para el perfil restringido** (F-146, `R-PERFILES`):
       ese perfil no lee nada del esquema `contabilidad`; con su login la consulta
       devuelve «permission denied», y eso no se rodea: responde que el perfil no
       lo incluye.
@@ -65,7 +65,7 @@ objetos:
       con su codigo y su rama, pero con `restringida = true` y el nombre
       '(cuenta restringida)': que exista una cuenta de prestamo o de embargo a
       nombre de alguien ya es el dato. Sus apuntes no estan en
-      `contabilidad.mayor` (`R-CONTABILIDAD-RESTRINGIDA`). 78.974 nodos el
+      `contabilidad.mayor` (`R-PERFILES`). 78.974 nodos el
       2026-09-26: **44.778 grupos** (`con.tip = 16`, codigos de 1 a 4 digitos:
       321 grupos, 2.673 subgrupos, 15.017 cuentas y 26.767 subcuentas) y
       **34.196 cuentas auxiliares** (`raw.cua`, `con.tip = 17`, todas de 10
@@ -227,7 +227,7 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
-      **No disponible para el perfil restringido** (F-141 y F-146, `R-PERFIL-RESTRINGIDO`):
+      **No disponible para el perfil restringido** (F-141 y F-146, `R-PERFILES`):
       ese perfil no lee nada del esquema `contabilidad`; con su login la consulta
       devuelve «permission denied», y eso no se rodea: responde que el perfil no
       lo incluye.
@@ -236,7 +236,7 @@ objetos:
       `raw.apu` SALVO LOS DE PERSONAL. El 2026-09-26 eran 2.166.701 apuntes de
       38 empresas desde 2008 (la empresa 1, Ruesma, 1.948.503: el 89,9 %).
 
-      **LE FALTAN LOS APUNTES DE PERSONAL** (F-135, `R-CONTABILIDAD-RESTRINGIDA`):
+      **LE FALTAN LOS APUNTES DE PERSONAL** (F-135, `R-PERFILES`):
       los asientos de nomina enteros y las cuentas de trabajadores, 55.504
       apuntes (el 2,55 %) de 8.791 asientos y 25 empresas medidos el
       2026-10-09. Viven solo en `contabilidad_restringida.mayor`, que lee el
@@ -439,7 +439,7 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
-      **No disponible para el perfil restringido** (F-141 y F-146, `R-PERFIL-RESTRINGIDO`):
+      **No disponible para el perfil restringido** (F-141 y F-146, `R-PERFILES`):
       ese perfil no lee nada del esquema `contabilidad`; con su login la consulta
       devuelve «permission denied», y eso no se rodea: responde que el perfil no
       lo incluye.
@@ -449,7 +449,7 @@ objetos:
       visible (400.342 con todo el 2026-09-26). Las cuentas de personal no
       tienen fila; las mixtas llevan `num_apuntes_restringidos` e
       `incompleto` (6.063 filas parciales medidas el 2026-10-09):
-      `R-CONTABILIDAD-RESTRINGIDA`. El importe va partido por clase
+      `R-PERFILES`. El importe va partido por clase
       --apertura (APERTURA + SALDO_INICIAL), movimiento (NORMAL),
       regularizacion y cierre-- para que la trampa del CIERRE y la APERTURA no
       se pueda cometer sin verla: `importe_saldo` ya los excluye y
@@ -459,6 +459,10 @@ objetos:
       de resultados, agregar por los ancestros de `contabilidad.plan_cuentas`;
       en los grupos 6 y 7 la REGULARIZACION deja el ejercicio a cero, asi que
       el resultado del ejercicio se lee sin ella (`importe_movimiento`).
+
+      Cuantos apuntes y asientos faltan por empresa y mes, sin importes, lo
+      dice `contabilidad.apuntes_restringidos_mes`. Antes de dar un saldo como
+      completo, mirar `incompleto`.
     grano: >-
       Una fila por (`cuenta_id`, `empresa_id`, `ejercicio`, `mes`) con algun
       apunte visible. Los meses sin apuntes no tienen fila: el saldo de un mes sin
@@ -542,7 +546,7 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
-      **No disponible para el perfil restringido** (F-146, `R-PERFIL-RESTRINGIDO`):
+      **No disponible para el perfil restringido** (F-146, `R-PERFILES`):
       ese perfil no lee nada del esquema `contabilidad`; con su login la consulta
       devuelve «permission denied», y eso no se rodea: responde que el perfil no
       lo incluye.
@@ -555,7 +559,7 @@ objetos:
       por empresa y mes seria la masa salarial mensual, que es lo que se
       protege. Sirve para decir «este saldo no incluye N apuntes de personal»
       en vez de presentar un total recortado como completo
-      (`R-CONTABILIDAD-RESTRINGIDA`).
+      (`R-PERFILES`).
     grano: >-
       Una fila por (`empresa_id`, `ejercicio`, `mes`) con algun apunte
       restringido. Sin fila, no falta nada ese mes.

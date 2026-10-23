@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **136 features**, 72 abiertas (0 en curso, 1 con la spec lista, 0 bloqueadas y 71 en backlog) y 64 terminadas.
+Resumen: **136 features**, 71 abiertas (0 en curso, 1 con la spec lista, 0 bloqueadas y 70 en backlog) y 65 terminadas.
 
 ## En curso
 
@@ -23,7 +23,6 @@ _Ninguna feature bloqueada._
 
 | # | Feature | Prioridad | Rigor | Rama |
 |---|---|---|---|---|
-| F-147 | Presupuesto del contexto del MCP: reglas con resumen corto y detalle bajo demanda, y una puerta que impida que `contexto_bbdd` crezca en silencio | 1 | estandar | `feature/F-147-presupuesto-contexto-mcp` |
 | F-148 | Robustez de la nocturna: la causa del «connection timeout expired» de las 00:0x en `ingest_raw.obrparpre`, reanudar en vez de repetir desde la ingesta, y permisos que no dependan del final | 1 | estandar | `feature/F-148-robustez-nocturna` |
 | F-054 | Glosario de negocio para la IA (`_meta.glosario`): qué significan en Ruesma la valorada, el incurrido, el ABC o la liquidatoria, y dónde están en el datamart | 4 | documental | `feature/F-054-conocimiento-de-negocio` |
 | F-140 | La fase 2 de la cartera (F-037): los ingredientes de la proyección de caja por obra (devengo pendiente, plazos de pago pactados y retenciones), sin convertir devengo en caja | 5 | estandar | `feature/F-140-proyeccion-caja-ingredientes` |
@@ -121,6 +120,7 @@ _Ninguna feature bloqueada._
 | F-144 | Regla del diccionario: si no se indica empresa, es Construcciones Ruesma (`empresa_id = 1`), y la IA lo dice | 1 | estandar |
 | F-145 | La ficha de los adjuntos dice cómo los abre hoy `mcp-bbdd` (F-025): por la pareja {empresa, código} con respaldo en la empresa 1, sin `ADJUNTO_AMBIGUO` | 1 | estandar |
 | F-146 | El perfil restringido del MCP (el «General» de la plantilla) no ve NADA de contabilidad: fuera el esquema `contabilidad` entero, no tabla a tabla | 1 | estandar |
+| F-147 | Presupuesto del contexto del MCP: reglas con resumen corto y detalle bajo demanda, y una puerta que impida que `contexto_bbdd` crezca en silencio | 1 | estandar |
 | F-009 | Inventario del entorno Azure existente | 2 | documental |
 | F-042 | La clave de mart.fact_seguimiento_mensual esta rota: 8.778 combinaciones duplicadas | 2 | critico |
 | F-056 | El mayor y el plan de cuentas como arbol: stg y mart sobre la contabilidad (raw por F-066) | 2 | critico |
@@ -165,12 +165,6 @@ _Ninguna feature bloqueada._
 | F-142 | Que cualquier IA pueda leer los adjuntos: `abrir_adjunto` devuelve el contenido CONVERTIDO (texto por página, o imagen si es un escaneo) de PDF y ofimática, también Word 97 y Excel antiguos, y el original a petición | 74 | estandar |
 
 ## Detalle
-
-### F-147 · Presupuesto del contexto del MCP: reglas con resumen corto y detalle bajo demanda, y una puerta que impida que `contexto_bbdd` crezca en silencio
-
-estado **pendiente** · prioridad 1 · rigor `estandar` · SDD sí · rama `feature/F-147-presupuesto-contexto-mcp`
-
-Pedida por el humano el 2026-10-22, preocupado por el consumo de tokens. MEDIDO en Azure con la v58: `contexto_bbdd()` de `mcp-bbdd` sirve unos 86.000 caracteres (22-25k tokens) en cada conversación, antes de la primera pregunta, y se quedan en el historial de todos los mensajes siguientes. Reparto: 27 reglas enteras ~50.000 (regla 29.401 + motivo 14.653), enrutado ~20.000 (283 `ejemplos_preguntas` de 114 objetos; compras sola 100), bloques de `diccionario_contexto` ~14.000. Las fichas de `describir_tabla` miden 2.328 de media y hasta 16.726 (`maestro.obras`). REPARTO DE RESPONSABILIDAD: CÓMO se sirve es de `mcp-bbdd` (su F-029, pendiente: índice de reglas en `contexto_bbdd` y texto entero con `describir_tabla` de su `ambito`); CUÁNTO se publica es de aquí, y su ficha dice que un resumen corto por regla es contrato de `_meta` y feature nuestra. ENFOQUE A DECIDIR CON EL HUMANO tras revisar las reglas una a una (divulgación progresiva): cada regla publica un `resumen` corto e imperativo que basta por sí solo para no cometer el error, y el detalle (`regla`, `motivo`) solo cuando hace falta. Hallazgos de la revisión inicial: las 27 son `bloqueante`, así que la severidad no discrimina; todas tienen `ambito`; cuatro son de perfiles (R-CONTABILIDAD/TESORERIA/COMPRAS-RESTRINGIDA y R-PERFIL-RESTRINGIDO, ~9.600) y podrían fundirse; R-SIGRID-CON (~4.300) habla de `raw`, que el MCP no expone a nadie; R-EMPRESA-POR-DEFECTO tiene 4.886 de regla. Relacionada: F-054 (glosario) no debe entrar en lo que se sirve entero.
 
 ### F-148 · Robustez de la nocturna: la causa del «connection timeout expired» de las 00:0x en `ingest_raw.obrparpre`, reanudar en vez de repetir desde la ingesta, y permisos que no dependan del final
 
@@ -729,6 +723,12 @@ Nace el 2026-10-20 por orden del humano («lánzalo ya»), tras el aviso formal 
 estado **terminada** · prioridad 1 · rigor `estandar` · SDD no · rama `feature/F-146-restringido-sin-contabilidad`
 
 Decisión del humano del 2026-10-21. Hoy el restringido (F-141) tiene `contabilidad` en su lista de esquemas y excluye solo `contabilidad.mayor` y `contabilidad.saldos_cuenta_mes`: le quedan `contabilidad.plan_cuentas` y `contabilidad.apuntes_restringidos_mes` (recuentos de apuntes de personal). El humano quiere quitarle el plan de cuentas; se decide quitar el ESQUEMA ENTERO porque (1) el resumen de recuentos sin el mayor no sirve y da idea del volumen de nóminas y (2) con el esquema en la lista, toda tabla nueva de `contabilidad` le llegaría sola (p. ej. el mayor analítico de F-127), riesgo ya anotado en `config/settings.py`. QUÉ SE TOCA: `DEFAULT_PERFIL_RESTRINGIDO_SCHEMAS` sin `contabilidad` (y `.env.example`); la lista de excluidas deja de necesitar las dos de contabilidad (decidir si se vacía o se mantiene como red); `apply_grants` pasa `contabilidad` a los esquemas VETADOS del restringido, como `tesoreria` y `personal`; fichas de `contabilidad.*` y la regla `R-PERFIL-RESTRINGIDO` (y la de contabilidad restringida si aplica) dicen que el perfil restringido no ve la contabilidad; tests de F-141 al día; `azure-apps/datamart_seg_anual.md` (l.~133, contrato del restringido) al día; diccionario v58. FUERA: `retenciones.apuntes_contables` y el resto de `retenciones` (el restringido los sigue viendo: los necesita para el cuadre de retenciones; decisión del humano del 2026-10-21); los perfiles estándar y total no cambian; mcp-bbdd no cambia código (se le avisa: su documento dice «sin el mayor contable»). DESPLIEGUE (tras APROBADO y merge, en este orden): imagen y job; `publicar-diccionario` (v58) y `check-diccionario`; `apply-grants` (lo lanza el humano: el clasificador se lo bloquea al líder); verificar con has_table_privilege que `mcp_sigrid_dm_restringido` no lee ningún objeto de `contabilidad` y que estándar y total siguen igual; reiniciar el MCP y avisar a mcp-bbdd. ================ AMPLIADA el 2026-10-21 por orden del humano («arregla ya el diccionario»), en la MISMA v58: aviso formal de `mcp-bbdd`, su F-028 (nuestra F-142) está desplegada y verificada (revisión `ca-mcp-bbdd-dev--0000023`, imagen `r20261021-1510`); `abrir_adjunto` ya no entrega el original sin convertir: TEXTO por página (PDF, ofimática que Microsoft Graph convierte a PDF, texto extraído en el servidor de lo que Graph no convierte), escaneos e imágenes como IMAGEN, parámetro `paginas` (10 primeras por defecto) y el documento 24 h en un SharePoint propio con enlace solo para quien lo pidió. Se ponen al día la ficha de `compras.documento_adjuntos`, el comentario de la v58, `docs/ARCHITECTURE.md` y `azure-apps/datamart_seg_anual.md` (H6, H8, H11, H13); la pareja (`emp`, `cod`), el respaldo con la empresa 1 y `ORIGEN_AMBIGUO` no cambian.
+
+### F-147 · Presupuesto del contexto del MCP: reglas con resumen corto y detalle bajo demanda, y una puerta que impida que `contexto_bbdd` crezca en silencio
+
+estado **terminada** · prioridad 1 · rigor `estandar` · SDD sí · rama `feature/F-147-presupuesto-contexto-mcp`
+
+Pedida por el humano el 2026-10-22, preocupado por el consumo de tokens. MEDIDO en Azure con la v58: `contexto_bbdd()` de `mcp-bbdd` sirve unos 86.000 caracteres (22-25k tokens) en cada conversación, antes de la primera pregunta, y se quedan en el historial de todos los mensajes siguientes. Reparto: 27 reglas enteras ~50.000 (regla 29.401 + motivo 14.653), enrutado ~20.000 (283 `ejemplos_preguntas` de 114 objetos; compras sola 100), bloques de `diccionario_contexto` ~14.000. Las fichas de `describir_tabla` miden 2.328 de media y hasta 16.726 (`maestro.obras`). REPARTO DE RESPONSABILIDAD: CÓMO se sirve es de `mcp-bbdd` (su F-029, pendiente: índice de reglas en `contexto_bbdd` y texto entero con `describir_tabla` de su `ambito`); CUÁNTO se publica es de aquí, y su ficha dice que un resumen corto por regla es contrato de `_meta` y feature nuestra. ENFOQUE A DECIDIR CON EL HUMANO tras revisar las reglas una a una (divulgación progresiva): cada regla publica un `resumen` corto e imperativo que basta por sí solo para no cometer el error, y el detalle (`regla`, `motivo`) solo cuando hace falta. Hallazgos de la revisión inicial: las 27 son `bloqueante`, así que la severidad no discrimina; todas tienen `ambito`; cuatro son de perfiles (R-CONTABILIDAD/TESORERIA/COMPRAS-RESTRINGIDA y R-PERFIL-RESTRINGIDO, ~9.600) y podrían fundirse; R-SIGRID-CON (~4.300) habla de `raw`, que el MCP no expone a nadie; R-EMPRESA-POR-DEFECTO tiene 4.886 de regla. Relacionada: F-054 (glosario) no debe entrar en lo que se sirve entero.
 
 ### F-009 · Inventario del entorno Azure existente
 

@@ -65,7 +65,7 @@ delataría lo restringido en las cuentas mixtas), `incompleto` en los saldos y
 generales siguen materializadas y con los índices de siempre; un `DO` al final
 de `05_mayor_general.sql` hace fallar el paso si se cuela un apunte de cuenta
 restringida o si general más restringidos no suman el completo. Regla dura
-`R-CONTABILIDAD-RESTRINGIDA`: el mayor completo se lee solo de
+`R-PERFILES`: el mayor completo se lee solo de
 `contabilidad_restringida` y los dos esquemas nunca se suman.
 
 **`tesoreria` (F-037, fase 1, 2026-10-13) es la cartera de cobros y pagos**:
@@ -88,7 +88,7 @@ columnas), y un `DROP ... CASCADE` se la llevaría cada noche. `build_tesoreria`
 solo depende de `ingest_raw`, va delante de `build_compras` en la lista y nadie
 lo declara en su `depends_on`: si falla, su `TRUNCATE` se deshace y compras lee
 la cartera de ayer. Es cartera, no devengo: la proyección de obra (fase 2) no
-existe. Reglas duras `R-TESORERIA-ESTADO` y `R-TESORERIA-RESTRINGIDA`.
+existe. Reglas duras `R-TESORERIA-ESTADO` y `R-PERFILES`.
 
 **`descompuestos` (F-097, 2026-09-28) es de qué se compone cada partida**, por
 ORIGEN, y es el primer esquema del datamart que NO se reconstruye de cero:
@@ -792,7 +792,7 @@ fallo con cualquier tolerancia.
   `compras.documento_procesos`, `documento_alarmas.creada_por` y
   `documento_adjuntos.subido_por`: el humano lo aceptó («deja visible compras»).
   La guarda solo ve vistas y nombres: una TABLA nueva con datos del mayor o de
-  la cartera en un esquema del perfil la vería; la regla `R-PERFIL-RESTRINGIDO`
+  la cartera en un esquema del perfil la vería; la regla `R-PERFILES`
   del diccionario y este aviso son la mitigación.
 - **El mayor analítico y F-127.** Hoy no está publicado (es `raw.apa`, 709.403
   filas). Si F-127 lo publica en `contabilidad`, el perfil restringido no lo ve
@@ -1065,6 +1065,22 @@ poder preguntarle a nadie si algo no encaja.
   diccionario vive aquí y el servidor MCP no. Y el diccionario describe lo que
   el dato **es**, no cómo se decide con él: un procedimiento de negocio es otro
   repositorio.
+- **Presupuesto del contexto (F-147).** `contexto_bbdd()` de `mcp-bbdd` se
+  sirve ENTERO en cada conversación, y crecía en silencio (~86.000 caracteres
+  con la v58). Desde la v59 **toda regla dura lleva `resumen`** —la orden corta,
+  de 40 a 250 caracteres, que basta sola— y una **`entrega`**: `resumen` (se
+  sirve el resumen; `regla` y `motivo` son el detalle para `describir_tabla`),
+  `entera` (se sirve entera siempre: `R-PERFILES`, que trata de lo que el perfil
+  NO ve) o `fuera_mcp` (no se publica: `R-SIGRID-CON`, guía del ETL). Las dos
+  columnas van AL FINAL de `_meta.diccionario_reglas`, con `CHECK` en la base y
+  un `DO` que solo hace `ALTER` si faltan (no en cada publicación). El enrutado sirve las 2
+  primeras `ejemplos_preguntas` de cada ficha (`MAX_PREGUNTAS_ENRUTADO`) y cada
+  `para_que_sirve` de esquema cabe en 350. **La puerta**:
+  `tests/test_f147_presupuesto_contexto.py` mide desde los YAML lo que se
+  servirá entero (reglas, enrutado y bloques de `_meta.diccionario_contexto`) y
+  falla por encima de `PRESUPUESTO_MAX` o con más de 1.000 de holgura
+  (trinquete). Cómo se compone lo servido es de `mcp-bbdd` (su F-029); cuánto se
+  publica, de aquí.
 - **La frescura no se declara, se une.** El `paso_etl` de cada ficha casa con
   `_meta.v_frescura.paso` (F-024), así que el consumidor sabe de cuándo es lo
   que está mirando sin tener que creerse un texto escrito a mano.

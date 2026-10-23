@@ -395,10 +395,10 @@ objetos:
           Para el presupuesto, los modificados y las fechas de ejecucion de la
           obra, que aqui no estan.
     ejemplos_preguntas:
-      - Cuantas obras hay dadas de alta en Sigrid
       - Quien es el cliente de la obra X
-      - Que codigo tiene la obra que se llama X
       - En que municipio o provincia esta la obra X
+      - Cuantas obras hay dadas de alta en Sigrid
+      - Que codigo tiene la obra que se llama X
       - Cuantas obras tenemos en cada provincia
       - De que obras tiene el datamart presupuesto y de cuales tiene seguimiento
       - De que empresa es la ficha de la obra X

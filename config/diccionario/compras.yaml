@@ -4,10 +4,13 @@
 #
 # CINCO COSAS QUE HAY QUE SABER ANTES DE CONSULTAR NADA DE AQUI:
 #
-# 1. **Todos los importes son SIN IVA.** El unico importe con IVA del datamart
-#    es `maestro.proveedores_obra.importe_contratado`, que es la suma del total
-#    del documento. No son comparables: la diferencia no es sobrecoste, es el
-#    impuesto.
+# 1. **Las LINEAS van SIN IVA y las CABECERAS CON IVA** (F-128; corregido en
+#    F-147, que esta nota negaba lo segundo). Los importes de linea son base
+#    imponible; `total_factura`, `total_documento` y `total_a_pagar` de
+#    `compras.facturas` y `compras.albaranes`, y
+#    `maestro.proveedores_obra.importe_contratado`, llevan IVA. No son
+#    comparables: la diferencia no es sobrecoste, es el impuesto
+#    (`R-COMPRAS-SIN-IVA`).
 # 2. **Los ABONOS ya entran en negativo.** Un SUM sobre FACTURA y ABONO da el
 #    facturado neto; restarlos otra vez se equivoca en el doble de lo abonado.
 # 3. **`compras` NO filtra por `stg.obras`.** Puede traer obras administrativas
@@ -43,6 +46,10 @@ objetos:
       lineas de todos los documentos de compra —contratos, albaranes, proformas,
       notas, facturas y abonos— unificadas con las mismas columnas, con la obra
       y la partida ya resueltas y los importes sin IVA.
+
+      **CARA DE CONSULTAR** (F-147, antes en la regla del coste de consulta):
+      un `count(*)` tardaba 10 s el 2026-08-25. Una sola consulta, filtrada y
+      agregada en SQL, y nunca a ciegas sobre la tabla entera.
     grano: >-
       Una fila por linea de documento. La clave real es el par
       `(tipo_doc, linea_id)` y NO `linea_id` a secas: los identificadores vienen
@@ -420,6 +427,7 @@ objetos:
           (F-138), filtrando antes `familia = 'CONTRATO'`.
     ejemplos_preguntas:
       - Que contratos tiene abiertos la obra X y con quien
+      - Que forma de pago y que retencion de garantia tiene el contrato C
       - Con que proveedores tiene contrato la obra X
       - Que contratos estan enviados y sin firmar
       - Cuantos contratos hay en cada estado, y cuantos sin firmar todavia
@@ -427,7 +435,6 @@ objetos:
         Que contratos llevan mas de tres semanas enviados sin firmar y desde
         cuando (con `compras.v_estado_documentos`: la fecha del envio sale de
         `rac`)
-      - Que forma de pago y que retencion de garantia tiene el contrato C
 
   contrato_lineas:
     tipo: tabla
@@ -436,6 +443,11 @@ objetos:
     descripcion: >-
       El detalle de lo comprometido en cada contrato: que partida, que producto,
       cuanta cantidad y a que precio. Incluye cuanta cantidad se ha servido ya.
+
+      **SIN EMPRESA NI OBRA: mezcla las 38 empresas** (F-147,
+      `R-EMPRESA-POR-DEFECTO`): no se puede filtrar por Construcciones Ruesma;
+      la respuesta dice que la cifra es de todas las empresas y no dice «he
+      supuesto Construcciones Ruesma».
     grano: Una fila por linea de contrato. `linea_id` es clave primaria aqui.
     clave_negocio: [linea_id]
     paso_etl: build_compras
@@ -592,7 +604,16 @@ objetos:
       del proveedor que lleva el documento** (`ban`, `bancue`, `bandig`,
       `banban`, `bansuc`) NO esta aqui: solo en
       `compras_restringida.documento_cuenta_bancaria`, para el perfil total
-      del MCP (`R-COMPRAS-RESTRINGIDA`).
+      del MCP (`R-PERFILES`).
+
+      **SIN EMPRESA NI OBRA: mezcla las 38 empresas** (F-147,
+      `R-EMPRESA-POR-DEFECTO`): no se puede filtrar por Construcciones Ruesma;
+      la respuesta dice que la cifra es de todas las empresas y no dice «he
+      supuesto Construcciones Ruesma». Lleva la obra de CABECERA
+      (`obra_cabecera_id`, que NO es `obra_id`): su empresa en `maestro.obras`
+      es la de esa obra, no la del documento, y un 4 % de los documentos no la
+      tiene; si el usuario acepta esa aproximacion, se filtra por ella y se
+      dice. Los importes por empresa salen de `compras.fact_compras_linea`.
     grano: Una fila por documento de entrega. `albaran_id` es clave primaria.
     clave_negocio: [albaran_id]
     paso_etl: build_compras
@@ -641,7 +662,7 @@ objetos:
         significado: >-
           Importe bruto de la cabecera (`dca.impbru`), antes de los descuentos
           de linea. Informado en el 98,94 %; 0 cuando el documento no lo trae.
-          Los abonos y las notas de cargo van en negativo (`R-ABONO-NEGATIVO`).
+          Los abonos y las notas de cargo van en negativo (`R-COMPRAS-LINEA`).
         unidad: EUR
         agregacion: suma
       importe_neto:
@@ -1082,7 +1103,16 @@ objetos:
       estan en `compras.v_facturas_pago`. **La cuenta bancaria del proveedor
       que lleva la factura** (`ban`, `bancue`, `bandig`) NO esta aqui: solo en
       `compras_restringida.documento_cuenta_bancaria`, para el perfil total
-      del MCP (`R-COMPRAS-RESTRINGIDA`).
+      del MCP (`R-PERFILES`).
+
+      **SIN EMPRESA NI OBRA: mezcla las 38 empresas** (F-147,
+      `R-EMPRESA-POR-DEFECTO`): no se puede filtrar por Construcciones Ruesma;
+      la respuesta dice que la cifra es de todas las empresas y no dice «he
+      supuesto Construcciones Ruesma». Lleva la obra de CABECERA
+      (`obra_cabecera_id`, que NO es `obra_id`): su empresa en `maestro.obras`
+      es la de esa obra, no la del documento, y un 4 % de los documentos no la
+      tiene; si el usuario acepta esa aproximacion, se filtra por ella y se
+      dice. Los importes por empresa salen de `compras.fact_compras_linea`.
     grano: Una fila por factura o abono recibido. `factura_id` es clave primaria.
     clave_negocio: [factura_id]
     paso_etl: build_compras
@@ -1194,7 +1224,7 @@ objetos:
           Importe bruto de la cabecera (`dcf.impbru`), antes de los descuentos
           de LINEA: difiere de `importe_neto` en 11.334 facturas sin descuento
           de cabecera (6,99 M EUR). Informado en el 99,98 %; 0 si no. Los
-          abonos van en negativo (`R-ABONO-NEGATIVO`).
+          abonos van en negativo (`R-COMPRAS-LINEA`).
         unidad: EUR
         agregacion: suma
       importe_neto:
@@ -1404,10 +1434,10 @@ objetos:
           (F-138), filtrando antes `familia = 'FACTURA'`.
     ejemplos_preguntas:
       - Que facturas nos ha pasado el proveedor P este ano
+      - Cuanto es la factura X con IVA, cuanto se le retiene y cuanto se le paga
       - En que estado esta la factura X, esta aprobada o solo contabilizada
       - Cuantas facturas hay contabilizadas sin aprobar, retenidas o rechazadas
       - De que fecha es la factura X, la suya o la de alta en Sigrid
-      - Cuanto es la factura X con IVA, cuanto se le retiene y cuanto se le paga
 
   factura_lineas:
     tipo: tabla
@@ -2255,7 +2285,7 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
-      **El perfil restringido SI la lee** (F-141, D4, `R-PERFIL-RESTRINGIDO`):
+      **El perfil restringido SI la lee** (F-141, D4, `R-PERFILES`):
       aunque no lea la cartera (`tesoreria`), por esta vista ve el estado de
       pago de las facturas de compra (si y cuando se pago, por que forma de
       pago). No la uses para reconstruir la cartera de cobros y pagos.
@@ -2303,6 +2333,14 @@ objetos:
       (`raw.cob`) no entran aqui: estan en `tesoreria.efectos`. **La deuda
       declarada con F-037 (R35) esta saldada**: F-037 absorbio la tabla y la
       dejo como vista suya, sin una segunda tabla de efectos en paralelo.
+
+      **SIN EMPRESA NI OBRA: mezcla las 38 empresas** (F-147,
+      `R-EMPRESA-POR-DEFECTO`): no se puede filtrar por Construcciones Ruesma;
+      la respuesta dice que la cifra es de todas las empresas y no dice «he
+      supuesto Construcciones Ruesma». Camino comprobado para filtrarla: es
+      una vista de `tesoreria.efectos` y su `vencimiento_id` es el `efecto_id`
+      de alli, que lleva `empresa_id` y nunca vacia (o `tesoreria.efectos` con
+      `sentido = 'PAGO' AND es_factura_compra`).
     grano: >-
       Una fila por efecto de pago (`raw.pag.ide`) cuyo documento sea una factura
       de compra. `vencimiento_id` es el `efecto_id` de `tesoreria.efectos`, que
@@ -2535,7 +2573,7 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
-      **El perfil restringido SI la lee** (F-141, D4, `R-PERFIL-RESTRINGIDO`):
+      **El perfil restringido SI la lee** (F-141, D4, `R-PERFILES`):
       aunque no lea la cartera (`tesoreria`), por esta vista ve el estado de
       pago de las facturas de compra (si y cuando se pago, por que forma de
       pago). No la uses para reconstruir la cartera de cobros y pagos.
@@ -2557,6 +2595,11 @@ objetos:
       `num_efectos` los cuenta TODOS y `num_efectos_anulados` dice cuantos son,
       para que la resta se pueda hacer. Son dos criterios distintos en la misma
       fila, a proposito.
+
+      **SIN EMPRESA NI OBRA: mezcla las 38 empresas** (F-147,
+      `R-EMPRESA-POR-DEFECTO`): no se puede filtrar por Construcciones Ruesma;
+      la respuesta dice que la cifra es de todas las empresas y no dice «he
+      supuesto Construcciones Ruesma».
     grano: >-
       Una fila por factura de compra (`compras.facturas`), incluidas las que no
       tienen ningun efecto: el resumen entra por un LEFT JOIN a un CTE ya
@@ -2709,7 +2752,7 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
-      **El perfil restringido SI la lee** (F-141, D4, `R-PERFIL-RESTRINGIDO`):
+      **El perfil restringido SI la lee** (F-141, D4, `R-PERFILES`):
       aunque no lea la cartera (`tesoreria`), por esta vista ve el estado de
       pago de las facturas de compra (si y cuando se pago, por que forma de
       pago). No la uses para reconstruir la cartera de cobros y pagos.
@@ -3313,12 +3356,12 @@ objetos:
           ofertas, une por `compras.documento_adjuntos.comparativo_id`
           (F-090).
     ejemplos_preguntas:
+      - Cuanto se ahorro en los concursos de la obra X
+      - Cuanto se adjudico en comparativos este ano, con y sin atipicos
       - Que proveedores ganan comparativos de mas de una actividad
       - Cuantos comparativos hay por actividad
-      - Cuanto se ahorro en los concursos de la obra X
       - Quien aprobo el comparativo X y cuando
       - Acabo en contrato el comparativo X
-      - Cuanto se adjudico en comparativos este ano, con y sin atipicos
       - Que comparativos estan pendientes de firma
 
   comparativo_ofertas:
@@ -3965,6 +4008,11 @@ objetos:
       `compras.contratos.fecha_ultima_modificacion` (`con.tiemod`) para esto**:
       es la ultima modificacion del documento y NO es la fecha del cambio de
       estado (la firma no la mueve).
+
+      **SIN EMPRESA NI OBRA: mezcla las 38 empresas** (F-147,
+      `R-EMPRESA-POR-DEFECTO`): no se puede filtrar por Construcciones Ruesma;
+      la respuesta dice que la cifra es de todas las empresas y no dice «he
+      supuesto Construcciones Ruesma».
     grano: >-
       Una fila por documento de `compras.contratos`, `compras.facturas` y
       `compras.comparativos`. Clave `documento_id`.
@@ -4658,7 +4706,7 @@ objetos:
       **LE FALTAN las alarmas de recursos (familia 33) y de partes de trabajo
       (35)**, que nombran trabajadores y bajas: 27 el 2026-10-14. Estan en
       `compras_restringida.documento_alarmas`, solo para el perfil total
-      (`R-COMPRAS-RESTRINGIDA`). Las de empleados (43) no estan en el datamart.
+      (`R-PERFILES`). Las de empleados (43) no estan en el datamart.
 
       **LA MARCA «LIQUIDATORIA» ES TEXTO LIBRE DE UNA ALARMA, no un campo de
       Sigrid.** `clase_liquidacion` la clasifica con una regla heuristica
@@ -4680,6 +4728,11 @@ objetos:
       **DATO PERSONAL**: `creada_por` es el LOGIN de Sigrid de quien creo la
       alarma (D6 de F-138). El nombre de la persona, si hace falta, esta en
       `raw.usu` por el login.
+
+      **SIN EMPRESA NI OBRA: mezcla las 38 empresas** (F-147,
+      `R-EMPRESA-POR-DEFECTO`): no se puede filtrar por Construcciones Ruesma;
+      la respuesta dice que la cifra es de todas las empresas y no dice «he
+      supuesto Construcciones Ruesma».
     grano: >-
       Una fila por alarma, identificada por `alarma_id` (`conala.ide`), clave
       primaria declarada. Un documento puede tener varias alarmas (453 facturas
@@ -4823,6 +4876,11 @@ objetos:
       une con LEFT JOIN y los booleanos se leen con COALESCE a FALSE. Las
       marcas de facturas de venta, contratos y comparativos no estan aqui: se
       leen en `compras.documento_alarmas`.
+
+      **SIN EMPRESA NI OBRA: mezcla las 38 empresas** (F-147,
+      `R-EMPRESA-POR-DEFECTO`): no se puede filtrar por Construcciones Ruesma;
+      la respuesta dice que la cifra es de todas las empresas y no dice «he
+      supuesto Construcciones Ruesma».
     grano: >-
       Una fila por documento de las familias 14 (albaran, proforma, nota) y 15
       (factura, abono) con alguna alarma de clase no nula o un memo con clase
@@ -5137,6 +5195,11 @@ objetos:
 
       Una factura y el albaran del que viene llevan la MISMA retencion en sus
       dos tablas de recargos (`compras.albaran_recargos`): **no se suman**.
+
+      **SIN EMPRESA NI OBRA: mezcla las 38 empresas** (F-147,
+      `R-EMPRESA-POR-DEFECTO`): no se puede filtrar por Construcciones Ruesma;
+      la respuesta dice que la cifra es de todas las empresas y no dice «he
+      supuesto Construcciones Ruesma».
     grano: >-
       Una fila por recargo, identificada por `recargo_id` (`dcfrec.ide`), clave
       primaria declarada. Una factura puede tener varios (10 repiten concepto en
@@ -5233,6 +5296,11 @@ objetos:
       factura son la misma vista dos veces. Para lo retenido a un proveedor,
       `compras.factura_recargos`. El `RETESP` sale DESCUENTO, como en las
       facturas.
+
+      **SIN EMPRESA NI OBRA: mezcla las 38 empresas** (F-147,
+      `R-EMPRESA-POR-DEFECTO`): no se puede filtrar por Construcciones Ruesma;
+      la respuesta dice que la cifra es de todas las empresas y no dice «he
+      supuesto Construcciones Ruesma».
     grano: >-
       Una fila por recargo, identificada por `recargo_id` (`dcarec.ide`), clave
       primaria declarada.

@@ -75,6 +75,111 @@ CREATE TABLE IF NOT EXISTS _meta.diccionario_reglas (
 );
 
 -- ---------------------------------------------------------------------------
+-- F-147: `resumen` y `entrega`, AL FINAL (contrato aditivo pactado con
+-- `mcp-bbdd` el 2026-10-22). Las siete de arriba no cambian.
+-- ---------------------------------------------------------------------------
+-- `resumen` es la ORDEN corta que basta sola y que `contexto_bbdd` sirve en
+-- lugar de `regla` + `motivo` (el detalle, para `describir_tabla`).
+-- `entrega` dice que se sirve: 'resumen' o 'entera'. Las reglas `fuera_mcp`
+-- del YAML no llegan a esta tabla.
+--
+-- POR QUE UN BLOQUE DO Y NO `ADD COLUMN IF NOT EXISTS`: este fichero corre en
+-- CADA publicacion, con el MCP leyendo, y `ALTER TABLE` toma `ACCESS
+-- EXCLUSIVE` AUNQUE la columna ya exista: bloquearia a los lectores cada noche,
+-- justo lo que el vaciado con DELETE de `diccionario_sql.py` evita. Mirando
+-- antes el catalogo, cada ALTER corre UNA vez en la vida de la tabla. Con un
+-- valor por defecto constante, anadir la columna es un cambio de catalogo
+-- (PostgreSQL >= 11): no reescribe la tabla.
+--
+-- LOS CHECK (peticion A de `mcp-bbdd`: la base garantiza lo que el MCP da por
+-- hecho). Se anaden `NOT VALID` porque la tabla ya tiene filas cuando llega
+-- este DDL, y con `resumen` a '' (el DEFAULT que exige anadir una columna NOT
+-- NULL a una tabla con filas) un CHECK validado fallaria. `NOT VALID` obliga
+-- igual a toda fila NUEVA desde ese momento, asi que la primera publicacion ya
+-- escribe bajo la restriccion; el `VALIDATE` corre en la publicacion siguiente
+-- (la nocturna), cuando ninguna fila la incumple, y solo una vez. `VALIDATE
+-- CONSTRAINT` toma `SHARE UPDATE EXCLUSIVE`, que no bloquea a los lectores.
+-- El tope de 250 es `RESUMEN_MAX` de `etl_sigrid/domain/diccionario.py`; un
+-- test los ata.
+--
+-- OJO AL DESPLIEGUE: con el CHECK puesto, una imagen ANTERIOR a F-147 ya no
+-- puede publicar (su INSERT no trae `resumen` y el DEFAULT '' lo incumple). El
+-- job tiene que estar en la imagen nueva ANTES de la primera publicacion.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = '_meta' AND table_name = 'diccionario_reglas'
+          AND column_name = 'resumen'
+    ) THEN
+        ALTER TABLE _meta.diccionario_reglas
+            ADD COLUMN resumen TEXT NOT NULL DEFAULT '';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = '_meta' AND table_name = 'diccionario_reglas'
+          AND column_name = 'entrega'
+    ) THEN
+        ALTER TABLE _meta.diccionario_reglas
+            ADD COLUMN entrega TEXT NOT NULL DEFAULT 'resumen';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = '_meta.diccionario_reglas'::regclass
+          AND conname = 'diccionario_reglas_entrega_check'
+    ) THEN
+        ALTER TABLE _meta.diccionario_reglas
+            ADD CONSTRAINT diccionario_reglas_entrega_check
+            CHECK (entrega IN ('resumen', 'entera')) NOT VALID;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = '_meta.diccionario_reglas'::regclass
+          AND conname = 'diccionario_reglas_resumen_check'
+    ) THEN
+        ALTER TABLE _meta.diccionario_reglas
+            ADD CONSTRAINT diccionario_reglas_resumen_check
+            CHECK (char_length(btrim(resumen)) BETWEEN 1 AND 250) NOT VALID;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = '_meta.diccionario_reglas'::regclass
+          AND conname = 'diccionario_reglas_entrega_check' AND NOT convalidated
+    ) AND NOT EXISTS (
+        SELECT 1 FROM _meta.diccionario_reglas
+        WHERE NOT (entrega IN ('resumen', 'entera'))
+    ) THEN
+        ALTER TABLE _meta.diccionario_reglas
+            VALIDATE CONSTRAINT diccionario_reglas_entrega_check;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = '_meta.diccionario_reglas'::regclass
+          AND conname = 'diccionario_reglas_resumen_check' AND NOT convalidated
+    ) AND NOT EXISTS (
+        SELECT 1 FROM _meta.diccionario_reglas
+        WHERE NOT (char_length(btrim(resumen)) BETWEEN 1 AND 250)
+    ) THEN
+        ALTER TABLE _meta.diccionario_reglas
+            VALIDATE CONSTRAINT diccionario_reglas_resumen_check;
+    END IF;
+END
+$$;
+
+COMMENT ON COLUMN _meta.diccionario_reglas.resumen IS
+'F-147. La orden corta (1-250 caracteres) que basta sola. contexto_bbdd la '
+'sirve en lugar de regla + motivo, que son el detalle.';
+
+COMMENT ON COLUMN _meta.diccionario_reglas.entrega IS
+'F-147. Que se sirve de la regla: resumen (el resumen; el detalle con '
+'describir_tabla) o entera (siempre entera). Las fuera_mcp no se publican.';
+
+-- ---------------------------------------------------------------------------
 -- El CONTEXTO global: convenciones, ordenes de magnitud, ejes y esquemas.
 -- ---------------------------------------------------------------------------
 -- ENMIENDA DEL CONTRATO, 2026-08-22. Nace porque al implementar el proveedor de

@@ -11,7 +11,7 @@
 # (`mcp_sigrid_dm_ro`) tiene el esquema VETADO: `apply_grants` se lo revoca y
 # lo comprueba cada noche. Desde la v50 (F-136) cada ficha EMPIEZA por el aviso
 # de acceso restringido: el MCP no filtra el diccionario por perfil. Origen: correo de Juan Romero (Dir. Administracion y
-# Control de Costes) del 2026-10-09. Regla dura `R-CONTABILIDAD-RESTRINGIDA`.
+# Control de Costes) del 2026-10-09. Regla dura `R-PERFILES`.
 #
 # Lo construye `build_contabilidad` (01-03) y de aqui sale la contabilidad
 # general (04-07). Las cifras de las fichas son las de F-056 (2026-09-26) y las
@@ -20,7 +20,7 @@
 #
 # F-141 (2026-10-17): «restringida» = reservada al perfil total. El perfil
 # restringido del MCP (administrativos, grupo `sigrid_dm_perfil_restringido_ro`)
-# ve MENOS que el estandar y NO la lee (`R-PERFIL-RESTRINGIDO`).
+# ve MENOS que el estandar y NO la lee (`R-PERFILES`).
 
 version: 1
 esquema: contabilidad_restringida
@@ -34,13 +34,13 @@ objetos:
     descripcion: >-
       **ACCESO RESTRINGIDO: solo el perfil total del MCP.** Si no lo tienes, la
       consulta devuelve «permission denied»: usa `contabilidad.plan_cuentas`
-      (`R-CONTABILIDAD-RESTRINGIDA`), sin reintentar ni buscar otro camino.
+      (`R-PERFILES`), sin reintentar ni buscar otro camino.
 
       **SOLO PARA EL ROL AUTORIZADO** (`sigrid_dm_autorizado_ro`, F-135, del
       que es miembro el perfil total del MCP): es el plan COMPLETO, con el nombre de todas las cuentas, tambien las de
       personal (prestamos, anticipos y embargos a nombre de trabajadores). El
       rol general lee `contabilidad.plan_cuentas`, con esas 521 cuentas
-      enmascaradas (`R-CONTABILIDAD-RESTRINGIDA`).
+      enmascaradas (`R-PERFILES`).
 
       **EL PLAN DE CUENTAS FINANCIERO COMO ARBOL** (F-056): una fila por nodo
       del plan de las 38 empresas, sin filtrar altas ni bajas. 78.974 nodos el
@@ -197,7 +197,7 @@ objetos:
     descripcion: >-
       **ACCESO RESTRINGIDO: solo el perfil total del MCP.** Si no lo tienes, la
       consulta devuelve «permission denied»: usa `contabilidad.mayor`
-      (`R-CONTABILIDAD-RESTRINGIDA`), sin reintentar ni buscar otro camino.
+      (`R-PERFILES`), sin reintentar ni buscar otro camino.
 
       **SOLO PARA EL ROL AUTORIZADO** (`sigrid_dm_autorizado_ro`, F-135, del
       que es miembro el perfil total del MCP): es el mayor COMPLETO, el que hasta el 2026-10-11 publicaba
@@ -206,7 +206,7 @@ objetos:
       nomina enteros y las cuentas de trabajadores (55.504 apuntes, el 2,55 %,
       medidos el 2026-10-09). El rol general lee `contabilidad.mayor`, que es
       esta tabla con `restringido = false`. **No se suman los dos esquemas**:
-      el completo ya contiene al general (`R-CONTABILIDAD-RESTRINGIDA`).
+      el completo ya contiene al general (`R-PERFILES`).
 
       **EL MAYOR CONTABLE** (F-056): una fila por apunte de `raw.apu`, SIN
       FILTRAR NINGUNO: 2.166.701 apuntes de 38 empresas desde 2008 (la empresa
@@ -434,13 +434,13 @@ objetos:
     descripcion: >-
       **ACCESO RESTRINGIDO: solo el perfil total del MCP.** Si no lo tienes, la
       consulta devuelve «permission denied»: usa `contabilidad.saldos_cuenta_mes`
-      (`R-CONTABILIDAD-RESTRINGIDA`), sin reintentar ni buscar otro camino.
+      (`R-PERFILES`), sin reintentar ni buscar otro camino.
 
       **SOLO PARA EL ROL AUTORIZADO** (`sigrid_dm_autorizado_ro`, F-135, del
       que es miembro el perfil total del MCP): son los saldos COMPLETOS, los que hasta el 2026-10-11 publicaba
       `contabilidad.saldos_cuenta_mes`, con las mismas filas, columnas y
       cifras. Los generales solo suman lo visible y marcan con `incompleto` el
-      mes al que le falta algo (`R-CONTABILIDAD-RESTRINGIDA`).
+      mes al que le falta algo (`R-PERFILES`).
 
       **LOS SALDOS POR CUENTA Y MES** (F-056), construidos desde
       `contabilidad_restringida.mayor`: una fila por cuenta, empresa, ejercicio y mes con

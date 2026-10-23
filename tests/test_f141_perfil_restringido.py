@@ -1547,7 +1547,7 @@ def _plano_yaml(texto: str) -> str:
 
 
 def test_f141_r26_la_regla_nueva_es_bloqueante_y_corta_de_titulo() -> None:
-    regla = _reglas()["R-PERFIL-RESTRINGIDO"]
+    regla = _reglas()["R-PERFILES"]
     assert regla["severidad"] == "bloqueante"
     assert len(regla["titulo"]) <= 87, "no más largo que el título más largo ya publicado"
     assert "restringido" in regla["titulo"].lower() and "menos" in regla["titulo"].lower()
@@ -1555,7 +1555,7 @@ def test_f141_r26_la_regla_nueva_es_bloqueante_y_corta_de_titulo() -> None:
 
 
 def test_f141_r26_la_regla_dice_lo_que_pidio_el_humano() -> None:
-    texto = _plano_yaml(_reglas()["R-PERFIL-RESTRINGIDO"]["regla"])
+    texto = _plano_yaml(_reglas()["R-PERFILES"]["regla"])
     assert texto.index("TOTAL") < texto.index("ESTANDAR") < texto.index("RESTRINGIDO"), (
         "los tres perfiles, de más a menos"
     )
@@ -1572,40 +1572,32 @@ def test_f141_r26_la_regla_dice_lo_que_pidio_el_humano() -> None:
 
 
 def test_f141_r26_el_ambito_alcanza_lo_que_no_ve_y_los_atajos() -> None:
-    ambito = set(_reglas()["R-PERFIL-RESTRINGIDO"]["ambito"])
+    ambito = set(_reglas()["R-PERFILES"]["ambito"])
     assert ambito >= {
         "contabilidad", "tesoreria", "personal",
         "retenciones.apuntes_contables", *EXCEPCIONES,
     }
 
 
-@pytest.mark.parametrize(
-    ("codigo", "titulo"),
-    [
-        ("R-CONTABILIDAD-RESTRINGIDA",
-         "Usa contabilidad; contabilidad_restringida es solo para el perfil total del MCP"),
-        ("R-TESORERIA-RESTRINGIDA",
-         "Usa tesoreria; tesoreria_restringida es solo para el perfil total del MCP"),
-        ("R-COMPRAS-RESTRINGIDA",
-         "Usa compras.documento_alarmas; compras_restringida es solo para el perfil total del MCP"),
-    ],
-)
-def test_f141_r27_cada_restringida_dice_que_no_es_del_perfil_restringido(
-    codigo: str, titulo: str,
-) -> None:
-    regla = _reglas()[codigo]
-    assert regla["titulo"] == titulo, "títulos sin cambio (D7)"
+def test_f141_r27_la_regla_dice_que_restringida_no_es_del_perfil_restringido() -> None:
+    """Las tres reglas de esquema restringido (contabilidad, tesoreria y alarmas)
+    se fundieron en F-147 en `R-PERFILES`, que se sirve ENTERA: la aclaración del
+    nombre vive ahí una sola vez, en vez de repetida en tres reglas."""
+    regla = _reglas()["R-PERFILES"]
     texto = _plano_yaml(regla["regla"])
     assert f"`{AUTORIZADO}`" in texto and RETIRADO not in texto
-    assert (
-        "«restringida» = reservada al perfil total; el perfil RESTRINGIDO (administrativos) "
-        "ve MENOS que el estandar y no lee este esquema"
-    ) in texto
+    assert "«restringida» = reservada al perfil total" in texto
+    assert "son del perfil TOTAL y NO del perfil restringido" in texto
+    assert regla["entrega"] == "entera"
+    assert {"contabilidad_restringida", "tesoreria_restringida", "compras_restringida"} <= set(
+        regla["ambito"]
+    )
 
 
 def test_f141_r27_en_tesoreria_tampoco_la_general() -> None:
-    texto = _plano_yaml(_reglas()["R-TESORERIA-RESTRINGIDA"]["regla"])
-    assert "tampoco la general (`tesoreria`)" in texto
+    texto = _plano_yaml(_reglas()["R-PERFILES"]["regla"])
+    menos = texto.split("MENOS", 1)[1].split("SI lee", 1)[0]
+    assert "`tesoreria`" in menos and "`personal`" in menos
 
 
 @pytest.mark.parametrize(
@@ -1616,7 +1608,7 @@ def test_f141_r28_la_ficha_empieza_por_el_aviso(fichero: str, objeto: str) -> No
     descripcion = _yaml_dicc(fichero)["objetos"][objeto]["descripcion"]
     primera = _plano_yaml(descripcion.split("\n", 1)[0])
     assert primera.startswith(f"**{AVISO}**"), primera
-    assert "permission denied" in primera and "`R-PERFIL-RESTRINGIDO`" in primera
+    assert "permission denied" in primera and "`R-PERFILES`" in primera
 
 
 def test_f141_r28_ninguna_otra_ficha_lleva_el_aviso() -> None:
@@ -1636,7 +1628,7 @@ def test_f141_r28_las_tres_excepciones_dicen_que_el_restringido_las_lee(vista: s
     descripcion = _yaml_dicc("compras.yaml")["objetos"][vista]["descripcion"]
     primera = _plano_yaml(descripcion.split("\n", 1)[0])
     assert primera.startswith("**El perfil restringido SI la lee**"), primera
-    for termino in ("estado de pago", "aunque no lea la cartera", "`R-PERFIL-RESTRINGIDO`"):
+    for termino in ("estado de pago", "aunque no lea la cartera", "`R-PERFILES`"):
         assert termino in primera, termino
 
 
@@ -1669,7 +1661,7 @@ def test_f141_r29_la_historia_de_versiones_cuenta_f141() -> None:
 
 
 def test_f141_r26_r28_sin_nombres_oid_ni_upn_en_el_diccionario() -> None:
-    textos = [str(_reglas()["R-PERFIL-RESTRINGIDO"])] + [
+    textos = [str(_reglas()["R-PERFILES"])] + [
         str(_yaml_dicc(f)["objetos"][o]) for f, objetos in NO_DISPONIBLES.items() for o in objetos
     ]
     for texto in textos:

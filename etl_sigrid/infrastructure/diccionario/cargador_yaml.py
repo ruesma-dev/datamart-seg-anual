@@ -103,7 +103,11 @@ CLAVES_COLUMNA = frozenset(
 )
 CLAVES_RELACION = frozenset({"de", "a", "cardinalidad", "porque"})
 CLAVES_REGLA = frozenset(
-    {"codigo", "titulo", "severidad", "ambito", "regla", "motivo", "orden"}
+    {
+        "codigo", "titulo", "severidad", "ambito", "regla", "motivo", "orden",
+        # F-147: la orden corta y qué se sirve de la regla (`ENTREGAS`).
+        "resumen", "entrega",
+    }
 )
 
 
@@ -318,6 +322,10 @@ def _cargar_reglas(
                 regla=_texto(cruda.get("regla")),
                 motivo=_texto(cruda.get("motivo")),
                 orden=int(cruda.get("orden") or posicion),
+                resumen=_texto(cruda.get("resumen")),
+                # Sin la clave, `resumen` (D2). Un valor inventado se construye
+                # igual y lo rechaza `validar` (R3): el cargador mira la forma.
+                entrega=_texto(cruda.get("entrega")) or "resumen",
             )
         )
     return reglas

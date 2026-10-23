@@ -9,6 +9,95 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-23 · F-147 · CERRADA (`done`, APROBADO en pasada 2, `ae59f75`) · merge `09886ce` · DESPLEGADA
+
+- Orden del humano (23-10): merge, despliegue, diccionario y reinicio del MCP. `init.sh` sobre
+  `main` tras el merge: pytest en verde (8.618 passed; único KO, el de «estás en main»).
+- Despliegue tras la nocturna del 23 (Succeeded, 04:36): imagen `r20261023-1016` y job a esa
+  imagen ANTES de publicar; `publicar-diccionario` v59 (234 objetos, 2.002 columnas, 20 reglas,
+  hash `4f3fe53a05a4`) y `check-diccionario` OK (biyección exacta, lo publicado es el árbol).
+- Comprobado en solo lectura: `_meta.diccionario_reglas` con `resumen, entrega` al final, 20
+  filas, ninguna `R-SIGRID-CON`; `diccionario_reglas_entrega_check` validado y
+  `..._resumen_check` NOT VALID (lo valida la nocturna del 24).
+- MCP reiniciado (`ca-mcp-bbdd-dev--0000023`, réplica nueva 09:22:49). `contexto_bbdd()` abre
+  con «Versión 59 · … 20 reglas». **Medido**: v58 88.666 → v59 **61.345** caracteres (−31 %):
+  reglas 28.782, enrutado 20.721, esquemas 6.253, magnitudes 2.236, convenciones 946, estado
+  1.636. La estimación de 51.287 se quedó corta: el MCP de hoy sirve todas las
+  `ejemplos_preguntas` (el corte a 2 por objeto es de su F-029). El tope 29.504 llega con ella.
+- Resto: el bloque de convenciones sigue citando `R-SIGRID-CON` («guía del ETL»), que ya no se
+  publica: referencia colgante menor, para la próxima versión del diccionario.
+- Pendiente: avisar a `mcp-bbdd` (su F-029 ya puede leer `resumen`/`entrega`) y medir otra vez
+  tras su F-029. Primera nocturna con la imagen nueva: la del 24.
+
+## 2026-10-22 · F-147 · `in_progress` (implementer) · rama `feature/F-147-presupuesto-contexto-mcp`
+
+- **T1 CERRADA (respuesta de `mcp-bbdd`, vía líder, 2026-10-22)**: ACEPTA los puntos 1-5 del
+  contrato de `design.md` (lee `diccionario_reglas` con columnas explícitas; ningún código suyo
+  depende de los códigos retirados). Añade tres peticiones que el líder acepta y entran en F-147:
+  **A)** `CHECK (entrega IN ('resumen','entera'))` y `CHECK (char_length(btrim(resumen)) BETWEEN 1
+  AND 250)` en `_meta.diccionario_reglas`, con DDL seguro sobre la tabla con filas (el DEFAULT ''
+  violaría el CHECK); ellos sirven un `entrega` desconocido como `entera`. **B)** `R-PERFILES` con
+  `entrega: entera` y un `ambito` que no la oculte al restringido si su F-029 filtra por ámbito
+  (DH3 de su F-027), texto corto. **C)** `n_reglas` cuenta solo las publicadas (R6), con test.
+  El punto 6 (filtrar reglas por perfil) lo decide su humano en F-029: no cambia nada aquí.
+- Implementación en curso: tarea en curso y decisiones, en las viñetas siguientes y en
+  `progress/impl_F-147.md`. Diccionario v59 en el árbol: 234 objetos, 2002 columnas
+  (las dos nuevas de la ficha de `_meta.diccionario_reglas`), 114 de consumo; 21 reglas en
+  el YAML y 20 publicadas.
+- **T1-T15 hechas**; `bash harness/init.sh` en verde (8.619 passed, cobertura 100 %), mutación
+  20 muestreados: 19 muertos y el superviviente cazado con un test reforzado. Pendiente: review.
+- Commits `357c20a`..`b00d69f` (T2-T13) y los de T14-T15; `azure-apps` `db0b5c5` y `7cc95c2` (commits
+  locales, solo `datamart_seg_anual.md`; el segundo corrige la medida a 29.504). Medida (fórmula de la puerta): 78.057 → **29.504** (reglas 7.107,
+  enrutado 13.901, bloques 8.496); con el MCP de hoy, sin su F-029, lo servido ya baja a ~51.287.
+  Informe: `progress/impl_F-147.md`.
+- **MANUAL tras APROBADO y merge, EN ESTE ORDEN** (T14; nada lo hace el implementer):
+  1. Imagen: `powershell -NoProfile -File infra/70_build_image.ps1` (anota el tag que imprime).
+  2. Job a esa imagen ANTES de publicar: `powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag>`.
+     **Obligatorio antes del paso 3**: el DDL nuevo pone `CHECK` en `_meta.diccionario_reglas`, y
+     una imagen anterior a F-147 ya no puede publicar (su INSERT no trae `resumen`): la nocturna
+     con la imagen vieja fallaría en `publicar_diccionario`.
+  3. `.venv/Scripts/python.exe main.py publicar-diccionario` (v59; esperado `n_reglas` = 20).
+  4. `.venv/Scripts/python.exe main.py check-diccionario`.
+  5. Comprobación en solo lectura (`pg._bootstrap_done = True; pg.filas_solo_lectura`):
+     columnas de `_meta.diccionario_reglas` = las 7 de antes + `resumen, entrega`; 20 filas, ninguna
+     `R-SIGRID-CON`; `pg_constraint` con `diccionario_reglas_entrega_check` y `..._resumen_check`
+     (el de `resumen` queda `NOT VALID` hasta la publicación siguiente, la nocturna, que lo valida).
+  6. Reiniciar el MCP (cachea el diccionario hasta reiniciarse). Leer ANTES la revisión activa:
+     `az containerapp show -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --query properties.latestReadyRevisionName -o tsv`
+     y reiniciar ESA: `az containerapp revision restart -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --revision <revisión> -o none`.
+     Después, comprobar que `contexto_bbdd()` abre con la cabecera de la «Versión 59» y «20 reglas».
+  7. Avisar a `mcp-bbdd` (su F-029 ya puede leer `resumen`/`entrega`) y medir `contexto_bbdd()` en
+     Azure antes y después de su F-029; anotar las dos cifras en `progress/`.
+  - **Vuelta atrás**: con los `CHECK` puestos, un job en una imagen anterior a F-147 falla en
+    `publicar_diccionario` cada noche. Antes de volver a una imagen anterior:
+    `ALTER TABLE _meta.diccionario_reglas DROP CONSTRAINT diccionario_reglas_resumen_check`
+    (escritura en Azure: la autoriza y la lanza el humano). Las columnas nuevas pueden quedarse:
+    la imagen vieja no las lee y el `DEFAULT` de `entrega` ('resumen') cumple su `CHECK`.
+- **ROJO AJENO a F-147 (init.sh inicial, 2026-10-22)**: `test_f141_r30_mcp_bbdd_solo_enlaza_al_contrato`
+  falla porque el commit `c40adfb` de `azure-apps` (sesión de `mcp-bbdd`, F-030) dejó en
+  `mcp_bbdd.md` ~l.998-999 una cita de `mcp_sigrid_dm_restringido`/F-141 sin enlace a
+  `datamart_seg_anual.md`. El documento es de `mcp-bbdd`: no se toca desde aquí. Avisado el líder;
+  RESUELTO por `mcp-bbdd` en `azure-apps` `8545002` (verificado por el líder: r30 en verde).
+- **Desviación justificada (R2)**: `RESUMEN_MAX = 250`, no 300: es el `CHECK` que pidió `mcp-bbdd`
+  (petición A) y el validador tiene que rechazar antes que la base. Los resúmenes de la tabla que
+  pasaban de 250 (`R-VENTA-COEFICIENTES` ~265, `R-PERFILES` ~255) se acortan sin perder contenido.
+
+## 2026-10-22 · F-147 · `spec_ready` (spec-author) · rama `feature/F-147-presupuesto-contexto-mcp`
+
+- Spec cerrada con las decisiones del humano del 2026-10-22 (D1-D10, en `requirements.md`):
+  tabla de `revision_reglas.md` aceptada; campo `entrega` (resumen | entera | fuera_mcp);
+  `R-PERFILES` y `R-COMPRAS-LINEA`; `fuera_mcp` no se publica; `R-ALBARAN-ABSURDO` se queda DE
+  MOMENTO, mínima y sin cifras (Administración corregirá las dos líneas en Sigrid);
+  `R-OBRA-ACTIVA` = obra VIVA de F-025 (`business_rules.yaml` → `ventana`; hoy 41 con
+  `maestro.obras` + `stg.fases`; `_meta.v_frescura_obra` no es equivalente: 40, la 0726 va como
+  `sin_filas`); `R-COMPRAS-SIN-IVA` (falsa desde F-128) se corrige dentro; enrutado = 2 primeras
+  `ejemplos_preguntas` (opción b: no obliga a `mcp-bbdd` a nada fuera de su F-029); `esquemas`
+  ≤ 350 por entrada; tope = medida tras la feature, trinquete de 1.000.
+- Pendiente ANTES de implementar (T1): pactar el contrato con `mcp-bbdd` (columnas `resumen` y
+  `entrega` al final de `_meta.diccionario_reglas`, códigos retirados, N = 2).
+- Estimación con la fórmula de la puerta: ~78.000 hoy → ~29.000; con el MCP actual baja
+  ~15.000-20.000 y el resto llega con la F-029 de `mcp-bbdd`.
+
 ## 2026-10-21 · F-146 · CERRADA (`done`, APROBADO `6205285`) · merge `4511a33` · cierra también F-142
 
 - Merge por orden del humano (21:38 UTC); F-142 `done` (su trabajo es la F-028 de `mcp-bbdd` + la ficha de esta v58).

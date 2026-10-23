@@ -325,10 +325,10 @@ objetos:
           no se refresca de noche y el seguimiento si.
 
     ejemplos_preguntas:
-      - Cual es la planificacion mensual de la obra 0704 en 2025
       - Dame la evolucion mensual del coste directo de la obra X en el ano A
-      - Que obras estan mal configuradas, sin planificado en algun mes
       - Cuanto llevamos produciendo este ano frente a lo planificado
+      - Cual es la planificacion mensual de la obra 0704 en 2025
+      - Que obras estan mal configuradas, sin planificado en algun mes
 
   fact_seguimiento_categoria:
     tipo: tabla
@@ -1437,6 +1437,10 @@ objetos:
       `mart.fact_seguimiento_mensual` mas dos columnas de trazabilidad, y todas
       sus filas salen marcadas 'NO_PERIODIFICADO'. Usar la tabla de hecho es mas
       barato y menos confuso. Cuando se carguen reglas, esta ficha cambia.
+
+      Y aunque periodificara, NO SE PUEDE CONSULTAR HOY: con `SELECT * ...
+      LIMIT 5` agota mas de 60 s (medido el 2026-08-25), porque materializa su
+      CTE entero antes de la primera fila.
     descripcion: >-
       El hecho del seguimiento con las reglas de periodificacion aplicadas: coge
       un coste imputado de golpe —un seguro, un aval— y lo reparte a lo largo de

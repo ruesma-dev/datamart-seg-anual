@@ -105,7 +105,7 @@ def test_f138_r24_las_fechas_que_no_se_publican() -> None:
 def test_f138_r24_la_general_dice_lo_que_le_falta() -> None:
     alarmas = _texto(_ficha("compras", "documento_alarmas"))
     for dato in ("recursos", "partes de trabajo", "27", "compras_restringida",
-                 "R-COMPRAS-RESTRINGIDA"):
+                 "R-PERFILES"):
         assert dato in alarmas, f"la ficha de la general no dice «{dato}» (D9)"
 
 
@@ -167,15 +167,18 @@ def test_f138_r26_el_esquema_restringido_en_el_global() -> None:
 
 def test_f138_r26_la_regla_dura() -> None:
     reglas = {r["codigo"]: r for r in _yaml("00_global.yaml")["reglas"]}
-    regla = reglas["R-COMPRAS-RESTRINGIDA"]
-    assert regla["severidad"] == "bloqueante"
-    assert set(regla["ambito"]) == {"compras.documento_alarmas", "compras_restringida"}
-    assert "compras_restringida" in regla["titulo"] and "perfil total" in regla["titulo"]
+    # F-147: la regla de las alarmas restringidas se fundió en `R-PERFILES`,
+    # que se sirve entera; el detalle (familias 33 y 35, D9) vive en las fichas.
+    regla = reglas["R-PERFILES"]
+    assert regla["severidad"] == "bloqueante" and regla["entrega"] == "entera"
+    assert {"compras.documento_alarmas", "compras_restringida"} <= set(regla["ambito"])
+    assert "solo del perfil total" in re.sub(r"\s+", " ", regla["resumen"])
     texto = re.sub(r"\s+", " ", regla["regla"])
-    assert "permission denied" in texto and "NUNCA se suman" in texto
-    assert "D9" in regla["motivo"]
-    hermana = reglas["R-TESORERIA-RESTRINGIDA"]
-    assert hermana["severidad"] == regla["severidad"]
+    assert "permission denied" in texto and "nunca se suman" in regla["resumen"]
+    assert "F-138" in regla["motivo"]
+    restringida = _texto(_ficha("compras_restringida", "documento_alarmas"))
+    assert "NUNCA se suman" in restringida
+    assert "D9" in (DIR_DICCIONARIO / "compras_restringida.yaml").read_text(encoding="utf-8")
 
 
 def test_f138_r26_version_recuento_y_pendientes() -> None:

@@ -143,7 +143,9 @@ def test_f006_r22_ddl_la_publicacion_es_un_singleton() -> None:
         ),
         (
             "_meta.diccionario_reglas",
-            ["codigo", "titulo", "severidad", "ambito", "regla", "motivo", "orden"],
+            # F-147: `resumen` y `entrega` AL FINAL (contrato aditivo con mcp-bbdd).
+            ["codigo", "titulo", "severidad", "ambito", "regla", "motivo", "orden",
+             "resumen", "entrega"],
         ),
         (
             "_meta.diccionario_publicacion",
@@ -219,6 +221,12 @@ from etl_sigrid.domain.inventario import evaluar_cobertura  # noqa: E402
 from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario  # noqa: E402
 
 DIR_DICCIONARIO = RAIZ / "config" / "diccionario"
+
+
+def _n_publicables(dicc) -> int:
+    """F-147 (R6): las reglas que llegan a `_meta.diccionario_reglas`. Las
+    `fuera_mcp` siguen en el YAML pero no se publican ni cuentan en `n_reglas`."""
+    return sum(1 for r in dicc.reglas if r.publicable)
 
 
 def _diccionario_real():
@@ -347,7 +355,7 @@ def test_f006_r9_filas_de_reglas_van_las_doce_en_su_orden() -> None:
 
     filas = filas_reglas(dicc)
 
-    assert len(filas) == len(dicc.reglas)
+    assert len(filas) == _n_publicables(dicc)
     assert [f[6] for f in filas] == sorted(f[6] for f in filas), "ordenadas por `orden`"
     codigos = [f[0] for f in filas]
     assert "R-IMPORTE-MES" in codigos
@@ -378,7 +386,7 @@ def test_f006_r22_fila_de_publicacion_lleva_los_recuentos_reales() -> None:
     assert batch == "20260820T021500Z-abcdef"
     assert (n_objetos, n_reglas, n_columnas) == (
         len(dicc.fichas),
-        len(dicc.reglas),
+        _n_publicables(dicc),
         sum(len(f.columnas) for f in dicc.fichas),
     )
     assert n_objetos >= 49 and n_columnas >= 593
@@ -525,7 +533,7 @@ def test_f006_r17_publicar_escribe_las_cuatro_tablas() -> None:
 
     dicc, _ = _diccionario_real()
     esperadas = (
-        len(dicc.fichas) + len(dicc.reglas) + len(filas_contexto(dicc)) + 1
+        len(dicc.fichas) + _n_publicables(dicc) + len(filas_contexto(dicc)) + 1
     )
     assert filas == esperadas
 
@@ -578,9 +586,10 @@ def test_f006_r17_publicar_manda_las_filas_reales_no_un_ejemplo() -> None:
 
     dicc, _ = _diccionario_real()
     assert len(fichas) == len(dicc.fichas) >= 49
-    assert len(reglas) == len(dicc.reglas)
+    # F-147: las `fuera_mcp` no viajan, y cada regla lleva `resumen` y `entrega`.
+    assert len(reglas) == sum(1 for r in dicc.reglas if r.publicable)
     assert all(len(f) == 14 for f in fichas)
-    assert all(len(r) == 7 for r in reglas)
+    assert all(len(r) == 9 for r in reglas)
 
 
 def test_f006_r22_publicar_registra_la_version_y_el_hash() -> None:
@@ -597,7 +606,7 @@ def test_f006_r22_publicar_registra_la_version_y_el_hash() -> None:
     dicc, _ = _diccionario_real()
     assert publicacion[5:] == (
         len(dicc.fichas),
-        len(dicc.reglas),
+        _n_publicables(dicc),
         sum(len(f.columnas) for f in dicc.fichas),
         100.0,
     )
@@ -717,7 +726,7 @@ class _ClienteEspia:
         from tests.test_f006_publicacion import _diccionario_real as _d
 
         dicc, _ = _d()
-        return len(dicc.fichas) + len(dicc.reglas) + 1
+        return len(dicc.fichas) + _n_publicables(dicc) + 1
 
     def connection(self):  # pragma: no cover - no debería llamarse
         raise AssertionError("el paso no debe abrir conexión por su cuenta")
@@ -746,13 +755,13 @@ def test_f006_r17_paso_publica_el_diccionario_real_y_lo_cuenta() -> None:
 
     assert resultado.status is StepStatus.SUCCESS
     dicc, _ = _diccionario_real()
-    assert resultado.rows_processed == len(dicc.fichas) + len(dicc.reglas) + 1
+    assert resultado.rows_processed == len(dicc.fichas) + _n_publicables(dicc) + 1
     assert espia.llamadas == [
         "execute_sql_file:01_diccionario.sql",
         "publicar_diccionario",
     ], "el DDL idempotente va ANTES de escribir"
     assert resultado.metadata["n_objetos"] == len(dicc.fichas)
-    assert resultado.metadata["n_reglas"] == len(dicc.reglas)
+    assert resultado.metadata["n_reglas"] == _n_publicables(dicc)
     assert resultado.metadata["n_columnas"] == sum(len(f.columnas) for f in dicc.fichas)
     assert resultado.metadata["cobertura_cols"] == 100.0
     assert len(resultado.metadata["hash_fuente"]) == 64
@@ -879,7 +888,7 @@ class _PgDeCli:
         from tests.test_f006_publicacion import _diccionario_real as _d
 
         dicc, _ = _d()
-        return len(dicc.fichas) + len(dicc.reglas) + 1
+        return len(dicc.fichas) + _n_publicables(dicc) + 1
 
 
 def _cli_runner(monkeypatch, pg):

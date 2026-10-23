@@ -387,6 +387,13 @@ objetos:
       `retenciones.v_cuadre_proveedor`. Y `fecha_prevista_devolucion` es el
       vencimiento de Sigrid (factura + 15 meses), no el de fin de obra, que
       esta en `retenciones.v_retencion_contable_obra`.
+
+      **SIN EMPRESA NI OBRA: mezcla las 38 empresas** (F-147,
+      `R-EMPRESA-POR-DEFECTO`): no se puede filtrar por Construcciones Ruesma;
+      la respuesta dice que la cifra es de todas las empresas y no dice «he
+      supuesto Construcciones Ruesma». Una pregunta de retenciones por empresa
+      se contesta desde `retenciones.movimientos`, que lleva `obra_id`, y no
+      desde esta vista agregada.
     grano: >-
       Una fila por (`sentido`, `entidad_id`), que es su clave de negocio. Los
       efectos sin entidad informada quedan FUERA de esta vista, asi que su total
@@ -640,6 +647,14 @@ objetos:
       `retenciones.v_cuadre_proveedor`. Y `fecha_prevista_devolucion` es el
       vencimiento de Sigrid (factura + 15 meses), no el de fin de obra, que
       esta en `retenciones.v_retencion_contable_obra`.
+
+      **SIN EMPRESA NI OBRA: mezcla las 38 empresas** (F-147,
+      `R-EMPRESA-POR-DEFECTO`): no se puede filtrar por Construcciones Ruesma;
+      la respuesta dice que la cifra es de todas las empresas y no dice «he
+      supuesto Construcciones Ruesma». Trae `codigo_obra`, que a solas no
+      identifica la obra. Una pregunta de retenciones por empresa se contesta
+      desde `retenciones.movimientos`, que lleva `obra_id`, y no desde esta
+      vista agregada.
     grano: >-
       Una fila por efecto vivo, en los dos sentidos; su clave es el par
       (`sentido`, `movimiento_id`), porque el identificador solo es unico dentro
@@ -737,6 +752,14 @@ objetos:
       `retenciones.v_cuadre_proveedor`. Y `fecha_prevista_devolucion` es el
       vencimiento de Sigrid (factura + 15 meses), no el de fin de obra, que
       esta en `retenciones.v_retencion_contable_obra`.
+
+      **SIN EMPRESA NI OBRA: mezcla las 38 empresas** (F-147,
+      `R-EMPRESA-POR-DEFECTO`): no se puede filtrar por Construcciones Ruesma;
+      la respuesta dice que la cifra es de todas las empresas y no dice «he
+      supuesto Construcciones Ruesma». Trae `codigo_obra`, que a solas no
+      identifica la obra. Una pregunta de retenciones por empresa se contesta
+      desde `retenciones.movimientos`, que lleva `obra_id`, y no desde esta
+      vista agregada.
     grano: >-
       Una fila por efecto vencido y sin liquidar; su clave es el par
       (`sentido`, `movimiento_id`), porque el identificador solo es unico dentro
@@ -835,6 +858,13 @@ objetos:
       `retenciones.v_cuadre_proveedor`. Y `fecha_prevista_devolucion` es el
       vencimiento de Sigrid (factura + 15 meses), no el de fin de obra, que
       esta en `retenciones.v_retencion_contable_obra`.
+
+      **SIN EMPRESA NI OBRA: mezcla las 38 empresas** (F-147,
+      `R-EMPRESA-POR-DEFECTO`): no se puede filtrar por Construcciones Ruesma;
+      la respuesta dice que la cifra es de todas las empresas y no dice «he
+      supuesto Construcciones Ruesma». Una pregunta de retenciones por empresa
+      se contesta desde `retenciones.movimientos`, que lleva `obra_id`, y no
+      desde esta vista agregada.
     grano: Dos filas, una por sentido. Cubre TODOS los efectos, con y sin obra.
     clave_negocio: [sentido]
     paso_etl: build_retenciones
@@ -1004,7 +1034,7 @@ objetos:
       cuenta de personal y ningun concepto de nomina: asientos mixtos que
       pagan a la vez nominas y proveedores. Quitarlos descuadraria el saldo
       de esos proveedores. Por eso aqui hay 8 apuntes que no estan en
-      `contabilidad.mayor` (`R-CONTABILIDAD-RESTRINGIDA`).
+      `contabilidad.mayor` (`R-PERFILES`).
 
       Los apuntes contables de las cuentas de retencion de proveedor (F-095):
       una fila por apunte de `raw.apu` sobre las cuentas de
@@ -1504,6 +1534,13 @@ objetos:
       efectos AGR (agrupadores): no tienen factura, 2.454 efectos y 0,82 M EUR
       vivos.** Un proveedor cuyo descuadre esta en sus AGR no tiene ninguna
       factura que lo explique: dilo asi.
+
+      **SIN EMPRESA NI OBRA: mezcla las 38 empresas** (F-147,
+      `R-EMPRESA-POR-DEFECTO`): no se puede filtrar por Construcciones Ruesma;
+      la respuesta dice que la cifra es de todas las empresas y no dice «he
+      supuesto Construcciones Ruesma». Una pregunta de retenciones por empresa
+      se contesta desde `retenciones.movimientos`, que lleva `obra_id`, y no
+      desde esta vista agregada.
     grano: Una fila por proveedor (`proveedor_id`), de cualquiera de los dos lados.
     clave_negocio: [proveedor_id]
     paso_etl: build_retenciones
