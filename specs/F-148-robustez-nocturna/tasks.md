@@ -4,7 +4,7 @@ Orden por dependencia. Cada tarea = un commit `F-148 Tn: ...`. Tests en fase RED
 antes del código (rigor de la feature). Ningún test toca red ni BBDD: psycopg,
 `sigrid-api` y el reloj se doblan.
 
-- [ ] T1: Settings y cadena: `PostgresSettings` (+6 campos, `design.md` §3) y `build_conninfo` con `connect_timeout`, keepalives y `tcp_user_timeout`  |  Verificación: `pytest tests/test_f148_conexion.py -k "r1 or r2"` y `tests/test_f005*` / tests de conninfo existentes en verde
+- [x] T1: Settings y cadena: `PostgresSettings` (+6 campos, `design.md` §3) y `build_conninfo` con `connect_timeout`, keepalives y `tcp_user_timeout`  |  Verificación: `pytest tests/test_f148_conexion.py -k "r1 or r2"` y `tests/test_f005*` / tests de conninfo existentes en verde
 - [ ] T2: `reintento_conexion.py`: `es_error_transitorio` (tabla de casos R3/R4 con excepciones construidas), `abrir_con_reintento` con `dormir` inyectado, `psycopg_en_debug`; comprobar en el psycopg instalado (`.venv`) que registra los intentos de conexión en DEBUG y anotarlo en el informe  |  Verificación: `pytest tests/test_f148_conexion.py -k "r3 or r4 or r5 or r6 or r15"`
 - [ ] T3: `PostgresClient._connect` con reintento, `SET ROLE` sin reintento, `pg_conexion_lenta`, contador `conexiones_abiertas`; `client_factory` pasa `connect_intentos`  |  Verificación: `pytest tests/test_f148_conexion.py` y `tests/test_f005*`, `tests/test_f024*` en verde
 - [ ] T4: `sesion_carga.py` (`SesionDeCarga`, `MedidaPagina`) y `PostgresClient.sesion_de_carga`; formateo COPY compartido; `SQL_FILAS_EN_RANGO`  |  Verificación: `pytest tests/test_f148_sesion_carga.py -k "r8 or r9 or r10 or r11 or r12 or r13"`

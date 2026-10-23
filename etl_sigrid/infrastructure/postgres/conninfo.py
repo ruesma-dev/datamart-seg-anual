@@ -58,6 +58,10 @@ def build_conninfo(pg: PostgresSettings, password: str, *, dbname: str | None = 
     `password` se recibe ya resuelta (contraseña o token de Entra) en vez de
     leerse de la configuración: así este módulo no decide el modo de
     autenticación y se puede probar sin credenciales.
+
+    F-148: lleva `connect_timeout` (sin él psycopg 3 espera 130 s) y los
+    keepalives con `tcp_user_timeout` en TODA conexión, la de la base admin
+    incluida. En Windows libpq ignora lo que el sistema no soporta.
     """
     return make_conninfo(
         host=pg.host,
@@ -66,6 +70,12 @@ def build_conninfo(pg: PostgresSettings, password: str, *, dbname: str | None = 
         user=pg.user,
         password=password,
         sslmode=pg.effective_sslmode,
+        connect_timeout=pg.connect_timeout_s,
+        keepalives=1,
+        keepalives_idle=pg.keepalives_idle_s,
+        keepalives_interval=pg.keepalives_interval_s,
+        keepalives_count=pg.keepalives_count,
+        tcp_user_timeout=pg.tcp_user_timeout_ms,
     )
 
 

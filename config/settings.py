@@ -296,6 +296,26 @@ class PostgresSettings(BaseSettings):
                     "que todos los objetos tengan el mismo propietario conecte quien "
                     "conecte. Contra Azure: 'sigrid_dm_etl'.",
     )
+    # --- Apertura de conexión (F-148) ---------------------------------------
+    # La noche del 2026-10-23 una conexión NUEVA se colgó 130 s —el
+    # `connect_timeout` por defecto de psycopg 3— y mató la ingesta. Con estos
+    # valores una apertura colgada cae a los 15 s y se reintenta (2, 4, 8 s);
+    # los keepalives y `tcp_user_timeout` acotan un flujo que la red deje caer
+    # en silencio mientras la sesión de carga espera a sigrid-api (design §4).
+    connect_timeout_s: int = Field(
+        15, ge=2, le=120,
+        description="Segundos de libpq para abrir una conexión (connect_timeout).",
+    )
+    keepalives_idle_s: int = Field(30, description="TCP keepalive: inactividad antes de sondear.")
+    keepalives_interval_s: int = Field(10, description="TCP keepalive: segundos entre sondeos.")
+    keepalives_count: int = Field(3, description="TCP keepalive: sondeos sin respuesta = caída.")
+    tcp_user_timeout_ms: int = Field(
+        60000, description="Milisegundos con datos enviados sin acuse antes de dar la conexión por rota.",
+    )
+    connect_intentos: int = Field(
+        4, ge=1, le=10,
+        description="Intentos en total al abrir una conexión ante un error transitorio.",
+    )
     readonly_role: str = Field(
         "",
         description="Rol de solo lectura al que se le reaplican los GRANT tras cada "
