@@ -9,6 +9,27 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-23 · F-148 · `blocked` (implementer, ANTES de escribir código) · init.sh en rojo
+
+- `bash harness/init.sh` (precondición 1 del implementer) sale en ROJO con 3 KO, ninguno de
+  código (1 failed, 6.774 passed, 253 skipped en 28 min 52 s; `-x` paró en el primero):
+  1. **La rama nació de `dev`, no de `main`.** `git merge-base HEAD main` = `9ff322f`, y entre
+     él y `HEAD` está `eb5e480` («Espejo de main en dev», el merge de `dev`) con los demás
+     espejos de `dev` detrás. Lo detectan `test_f112_r2_en_este_repositorio_la_base_no_esta_rezagada`
+     y la PUERTA COBERTURA («la base main se ha quedado por detrás: 2 de los 4 ya están en dev»).
+     `docs/CONVENTIONS.md` § Git: «Ninguna feature nace de `dev`».
+  2. **PUERTA TAMAÑO**: `specs/F-148-robustez-nocturna/design.md` 252 líneas > tope 250.
+- **Arreglo propuesto (líder; reescribe la historia LOCAL de la rama, sin push):**
+  `git rebase --onto main eb5e480 feature/F-148-robustez-nocturna` (mueve solo `21fea8c`,
+  `92eaa63` y este commit de bloqueo; tocan specs/, progress/, features.json y BACKLOG.md, sin
+  conflicto esperado con `main`) y recortar 2 líneas de `design.md` (p. ej. fundir las dos
+  líneas de cabecera de §12). Después, `status` de vuelta a `spec_ready` y relanzar al implementer.
+- Trabajo ya hecho y FUERA del árbol (para no romper la suite): borradores de los cinco ficheros
+  de test `tests/test_f148_*.py` en el scratchpad de la sesión
+  (`C:\Users\pgris\AppData\Local\Temp\claude\C--Users-pgris-PycharmProjects-datamart-seg-anual\0e5805e4-8d75-4cb3-9e59-22aca541756e\scratchpad\borradores_tests\`)
+  y la fase RED de T1 medida (8 failed: `KeyError: 'connect_timeout'`, sin `connect_timeout_s`
+  en `PostgresSettings`, rango no validado). Nada de producción tocado.
+
 ## 2026-10-23 · F-148 · `spec_ready` (spec-author) · rama `feature/F-148-robustez-nocturna`
 
 - Spec escrita: `specs/F-148-robustez-nocturna/` (requirements 145, design 250, tasks 15

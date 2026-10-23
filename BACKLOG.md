@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **136 features**, 71 abiertas (0 en curso, 2 con la spec lista, 0 bloqueadas y 69 en backlog) y 65 terminadas.
+Resumen: **136 features**, 71 abiertas (0 en curso, 1 con la spec lista, 1 bloqueadas y 69 en backlog) y 65 terminadas.
 
 ## En curso
 
@@ -13,12 +13,13 @@ _Ninguna feature en curso._
 
 | # | Feature | Prioridad | Rigor | Rama |
 |---|---|---|---|---|
-| F-148 | Robustez de la nocturna: la causa del «connection timeout expired» de las 00:0x en `ingest_raw.obrparpre`, reanudar en vez de repetir desde la ingesta, y permisos que no dependan del final | 1 | critico | `feature/F-148-robustez-nocturna` |
 | F-111 | Los nombres de partida se resuelven por codigo en los niveles del arbol y en la dimension de costes indirectos: 10.593 filas con un escalon con el nombre de otra partida | 15 | estandar | `feature/F-111-nombres-partida-por-ancestro` |
 
 ## Bloqueadas
 
-_Ninguna feature bloqueada._
+| # | Feature | Prioridad | Rigor | Rama |
+|---|---|---|---|---|
+| F-148 | Robustez de la nocturna: la causa del «connection timeout expired» de las 00:0x en `ingest_raw.obrparpre`, reanudar en vez de repetir desde la ingesta, y permisos que no dependan del final | 1 | critico | `feature/F-148-robustez-nocturna` |
 
 ## Backlog
 
@@ -168,7 +169,7 @@ _Ninguna feature bloqueada._
 
 ### F-148 · Robustez de la nocturna: la causa del «connection timeout expired» de las 00:0x en `ingest_raw.obrparpre`, reanudar en vez de repetir desde la ingesta, y permisos que no dependan del final
 
-estado **spec lista** · prioridad 1 · rigor `critico` · SDD sí · rama `feature/F-148-robustez-nocturna`
+estado **bloqueada** · prioridad 1 · rigor `critico` · SDD sí · rama `feature/F-148-robustez-nocturna`
 
 Pedida por el humano el 2026-10-23 con PRIORIDAD MÁXIMA: «hay que ver la razón del corte». MEDIDO en `_meta.etl_runs` (Azure, solo lectura, 2026-10-23 00:15 UTC): el PRIMER intento de la nocturna muere en `ingest_raw.obrparpre` con «connection timeout expired» el 17, 18, 19, 22 y 23 de octubre (empieza hacia las 00:03 y cae entre 4 y 12 minutos después; el resto de `ingest_raw` y los builds quedan SKIPPED) y lo salva el reintento del job (`replicaRetryLimit` 1), que vuelve a empezar por la ingesta: el 22 terminó a las 04:31. El 15, 16, 20 y 21 el primer intento pasó. Sin margen: si falla también el reintento, ese día no hay datos, y como los permisos se aplican al final (`apply_grants`), una muerte a medias deja tablas sin GRANT (incidencia del 2026-10-20). TRES PARTES: (1) DIAGNÓSTICO, lo primero y lo que pide el humano: por qué caduca la conexión a esa hora —«connection timeout expired» es el `connect_timeout` de libpq al abrir conexión NUEVA contra `psql-albaranes-rs9k2` (Postgres COMPARTIDO), así que hay que mirar quién más carga el servidor a las 00:00 (jobs y backups de otros proyectos, ventana de mantenimiento, créditos de CPU del SKU, conexiones máximas), cuántas conexiones abre la ingesta de `obrparpre` y con qué `connect_timeout`, y los logs del servidor y del job; (2) el arreglo de la causa (o mover la hora, o reintentar la conexión dentro del paso), según lo que salga; (3) que un reintento REANUDE donde se quedó en vez de repetir la ingesta entera y que los permisos de cada esquema no dependan de que la noche llegue al final. Ver memoria del proyecto sobre los créditos de CPU del SKU y F-065 (¿cabe la nocturna en la hucha?).
 
