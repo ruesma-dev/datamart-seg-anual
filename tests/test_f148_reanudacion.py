@@ -22,6 +22,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import main
 from etl_sigrid.application.orchestrator import Orchestrator
 from etl_sigrid.application.steps import ingest_raw_step
 from etl_sigrid.application.steps.ingest_raw_step import IngestRawStep
@@ -40,6 +41,7 @@ from etl_sigrid.infrastructure.postgres.postgres_client import (
     SQL_TERMINADOS_EN_LOTE,
     PostgresClient,
 )
+from tests.test_f024_cli import STEPS_POR_COMANDO, PgFalso, paso_falso, settings_falsos
 
 RAIZ = Path(__file__).resolve().parents[1]
 NOMBRE_JOB = "caj-etl-sigrid-dev-r7k2p9q"
@@ -158,7 +160,9 @@ def test_f148_dominio_ejecucion_desde_batch() -> None:
     ejecucion = ejecucion_desde_batch("20261023T000312Z-a1b2c3")
 
     assert ejecucion == Ejecucion(
-        batch_id="20261023T000312Z-a1b2c3", iniciada_en=datetime(2026, 10, 23, 0, 3, 12)
+        batch_id="20261023T000312Z-a1b2c3",
+        iniciada_en=datetime(2026, 10, 23, 0, 3, 12),
+        reanudada=True,
     )
 
 
@@ -505,3 +509,224 @@ def test_f148_r24_control_sin_adoptar_el_lote_la_puerta_rechaza() -> None:
     ]
 
     assert evaluar_coherencia_raw(_v_raw_state(filas), ["con", "obrparpre"]).ok is False
+
+
+# ===========================================================================
+# main: identidad del lote y composición (T10, R18-R20)
+# ===========================================================================
+
+
+class PgReanuda(PgFalso):
+    def __init__(
+        self,
+        lote: str | None = None,
+        terminados: frozenset[str] = frozenset(),
+        error_buscar: Exception | None = None,
+        error_terminados: Exception | None = None,
+    ) -> None:
+        super().__init__()
+        self._lote = lote
+        self._terminados = terminados
+        self._error_buscar = error_buscar
+        self._error_terminados = error_terminados
+        self.busquedas: list[tuple[str, datetime]] = []
+        self.lotes_leidos: list[str] = []
+
+    def buscar_lote_reanudable(self, sufijo: str, desde: datetime) -> str | None:
+        self.busquedas.append((sufijo, desde))
+        if self._error_buscar is not None:
+            raise self._error_buscar
+        return self._lote
+
+    def fetch_terminados_en_lote(self, batch_id: str) -> frozenset[str]:
+        self.lotes_leidos.append(batch_id)
+        if self._error_terminados is not None:
+            raise self._error_terminados
+        return self._terminados
+
+
+def _preparar(
+    monkeypatch: pytest.MonkeyPatch,
+    pg: PgFalso,
+    construcciones: list[dict],
+    nombre: str | None = NOMBRE_JOB,
+) -> LoggerFalso:
+    from click.testing import CliRunner  # noqa: F401  (lo usa quien llama)
+
+    registro = LoggerFalso()
+    monkeypatch.setattr(main, "get_settings", lambda: settings_falsos())
+    monkeypatch.setattr(main, "configure_logging", lambda **_k: None)
+    monkeypatch.setattr(main, "_get_pg", lambda: pg)
+    monkeypatch.setattr(main, "get_logger", lambda _n: registro)
+    for atributo, paso, etapa in STEPS_POR_COMANDO.values():
+        monkeypatch.setattr(main, atributo, paso_falso(paso, etapa, construcciones=construcciones))
+    if nombre is None:
+        monkeypatch.delenv(VARIABLE, raising=False)
+    else:
+        monkeypatch.setenv(VARIABLE, nombre)
+    return registro
+
+
+def _invocar(*argumentos: str):
+    from click.testing import CliRunner
+
+    return CliRunner().invoke(main.cli, list(argumentos))
+
+
+def _batch_de(construcciones: list[dict]) -> str:
+    (batch,) = {c["batch_id"] for c in construcciones if "batch_id" in c}
+    return batch
+
+
+def test_f148_r18_sin_lote_previo_el_batch_lleva_el_sufijo_del_job(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pg = PgReanuda()
+    construcciones: list[dict] = []
+    _preparar(monkeypatch, pg, construcciones)
+    antes = datetime.utcnow()
+
+    resultado = _invocar("run-all")
+    despues = datetime.utcnow()
+
+    assert resultado.exit_code == 0, resultado.output
+    batch = _batch_de(construcciones)
+    assert batch.endswith("-" + SUFIJO)
+    assert batch[:16] >= antes.strftime("%Y%m%dT%H%M%SZ")
+    ((sufijo, desde),) = pg.busquedas
+    assert sufijo == SUFIJO
+    assert antes - timedelta(hours=8) <= desde <= despues - timedelta(hours=8)
+    assert pg.batches_de_la_marca == [batch]
+
+
+def test_f148_r18_con_lote_previo_lo_adopta_y_lee_lo_terminado(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    lote = "20261023T000312Z-" + SUFIJO
+    pg = PgReanuda(lote=lote, terminados=frozenset({"load_excel_aux", "ingest_raw.con"}))
+    construcciones: list[dict] = []
+    registro = _preparar(monkeypatch, pg, construcciones)
+
+    resultado = _invocar("run-all")
+
+    assert resultado.exit_code == 0, resultado.output
+    assert _batch_de(construcciones) == lote
+    assert pg.batches_de_la_marca == [lote]
+    assert pg.lotes_leidos == [lote]
+    (aviso,) = registro.de("ejecucion_reanudada")
+    assert aviso["batch_id"] == lote
+    # la ingesta recibe las tablas ya cargadas; el orquestador omite el paso
+    (ingesta,) = [c for c in construcciones if "tablas_terminadas" in c]
+    assert ingesta["tablas_terminadas"] == frozenset({"con"})
+    pasos = [p for p, _e, _b in pg.pasos_registrados]
+    assert "load_excel_aux" not in pasos
+    assert "ingest_raw" in pasos
+    assert {b for _p, _e, b in pg.pasos_registrados} == {lote}
+
+
+def test_f148_r18_el_arranque_dice_la_ejecucion_del_job(monkeypatch: pytest.MonkeyPatch) -> None:
+    pg = PgReanuda()
+    registro = _preparar(monkeypatch, pg, [])
+
+    _invocar("run-all")
+
+    (aviso,) = registro.de("ejecucion_job")
+    assert aviso == {"ejecucion_job": NOMBRE_JOB, "sufijo": SUFIJO}
+
+
+def test_f148_r19_sin_la_variable_todo_como_hoy(monkeypatch: pytest.MonkeyPatch) -> None:
+    pg = PgReanuda(lote="20261023T000312Z-" + SUFIJO)
+    construcciones: list[dict] = []
+    _preparar(monkeypatch, pg, construcciones, nombre=None)
+
+    resultado = _invocar("run-all")
+
+    assert resultado.exit_code == 0, resultado.output
+    assert pg.busquedas == []
+    assert pg.lotes_leidos == []
+    assert not _batch_de(construcciones).endswith("-" + SUFIJO)
+    (ingesta,) = [c for c in construcciones if "tablas_terminadas" in c]
+    assert ingesta["tablas_terminadas"] == frozenset()
+
+
+def test_f148_r19_variable_vacia_es_como_sin_variable(monkeypatch: pytest.MonkeyPatch) -> None:
+    pg = PgReanuda()
+    _preparar(monkeypatch, pg, [], nombre="")
+
+    resultado = _invocar("run-all")
+
+    assert resultado.exit_code == 0, resultado.output
+    assert pg.busquedas == []
+
+
+@pytest.mark.parametrize("comando", ["ingest", "stage", "build-mart", "apply-grants"])
+def test_f148_r19_los_comandos_sueltos_nunca_reanudan(
+    monkeypatch: pytest.MonkeyPatch, comando: str
+) -> None:
+    pg = PgReanuda(lote="20261023T000312Z-" + SUFIJO)
+    _preparar(monkeypatch, pg, [])
+
+    resultado = _invocar(comando)
+
+    assert resultado.exit_code == 0, resultado.output
+    assert pg.busquedas == []
+    assert not pg.batches_de_la_marca[0].endswith("-" + SUFIJO)
+
+
+def test_f148_r19_sin_lote_previo_no_se_omite_nada(monkeypatch: pytest.MonkeyPatch) -> None:
+    pg = PgReanuda(lote=None, terminados=frozenset({"load_excel_aux"}))
+    construcciones: list[dict] = []
+    _preparar(monkeypatch, pg, construcciones)
+
+    _invocar("run-all")
+
+    assert "load_excel_aux" in [p for p, _e, _b in pg.pasos_registrados]
+
+
+def test_f148_r20_si_la_busqueda_falla_avisa_y_arranca_lote_nuevo(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pg = PgReanuda(error_buscar=RuntimeError("_meta no responde"))
+    construcciones: list[dict] = []
+    registro = _preparar(monkeypatch, pg, construcciones)
+
+    resultado = _invocar("run-all")
+
+    assert resultado.exit_code == 0, resultado.output
+    (aviso,) = registro.de("reanudacion_no_disponible")
+    assert "_meta no responde" in aviso["error"]
+    assert _batch_de(construcciones).endswith("-" + SUFIJO)
+    assert pg.lotes_leidos == []
+
+
+def test_f148_r20_un_lote_con_formato_raro_no_se_adopta(monkeypatch: pytest.MonkeyPatch) -> None:
+    pg = PgReanuda(lote="basura-" + SUFIJO)
+    construcciones: list[dict] = []
+    registro = _preparar(monkeypatch, pg, construcciones)
+
+    resultado = _invocar("run-all")
+
+    assert resultado.exit_code == 0, resultado.output
+    assert registro.de("reanudacion_no_disponible")
+    assert _batch_de(construcciones) != "basura-" + SUFIJO
+
+
+def test_f148_r20_si_falla_leer_lo_terminado_no_se_omite_nada(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    lote = "20261023T000312Z-" + SUFIJO
+    pg = PgReanuda(lote=lote, error_terminados=RuntimeError("se cae"))
+    construcciones: list[dict] = []
+    registro = _preparar(monkeypatch, pg, construcciones)
+
+    resultado = _invocar("run-all")
+
+    assert resultado.exit_code == 0, resultado.output
+    (aviso,) = registro.de("reanudacion_no_disponible")
+    assert "se cae" in aviso["error"]
+    assert _batch_de(construcciones) == lote
+    assert "load_excel_aux" in [p for p, _e, _b in pg.pasos_registrados]
+
+
+def test_f148_dominio_una_ejecucion_nueva_no_es_reanudada() -> None:
+    assert nueva_ejecucion().reanudada is False

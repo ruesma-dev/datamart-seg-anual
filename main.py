@@ -88,8 +88,10 @@ escribe en _meta; el «medir antes de optimizar» de esa feature vive aquí:
 
 from __future__ import annotations
 
+import os
 import platform
 import sys
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
@@ -127,7 +129,7 @@ from etl_sigrid.domain.coherencia import (
     evaluar_coherencia_stg,
     formatear_veredicto_stg,
 )
-from etl_sigrid.domain.ejecucion import Ejecucion, nueva_ejecucion
+from etl_sigrid.domain.ejecucion import Ejecucion, ejecucion_desde_batch, nueva_ejecucion
 from etl_sigrid.domain.entities import StepResult, StepStatus
 from etl_sigrid.domain.extraccion import (
     comparar_cap,
@@ -137,6 +139,11 @@ from etl_sigrid.domain.extraccion import (
 from etl_sigrid.domain.perfil_carga import (
     format_perfil,
     perfil_de_carga,
+)
+from etl_sigrid.domain.reanudacion import (
+    VENTANA_REANUDACION,
+    sufijo_de_ejecucion_job,
+    tablas_a_omitir,
 )
 from etl_sigrid.domain.recuentos import (
     TOLERANCIA_DERIVA_PCT,
@@ -189,6 +196,27 @@ from etl_sigrid.infrastructure.sigrid.sigrid_api_client import (
 #: son 20.000 (DA-6, dato del humano el 2026-08-18): la divergencia se avisa,
 #: pero **este proyecto no edita aquel documento**, que es de `sigrid-api`.
 CAP_DOCUMENTADO_SIGRID_API = 1_000
+
+#: F-148, R18. La variable con la que Container Apps nombra cada ejecución del
+#: job. Las dos réplicas de una ejecución (`replicaRetryLimit` 1) la comparten:
+#: de ella sale el sufijo del `batch_id` que les permite reanudar.
+VARIABLE_EJECUCION_JOB = "CONTAINER_APP_JOB_EXECUTION_NAME"
+
+#: F-148, R25. Los diez build que recrean vistas con DROP + CREATE: tras cada
+#: uno, `run-all` devuelve los permisos completos sin esperar al `apply_grants`
+#: final, que sigue siendo el que decide.
+PASOS_CON_PERMISOS = (
+    "build_stg",
+    "build_mart",
+    "build_maestros",
+    "build_tesoreria",
+    "build_compras",
+    "build_retenciones",
+    "build_personal",
+    "build_contabilidad",
+    "build_descompuestos",
+    "build_cierre",
+)
 
 
 @click.group()
@@ -249,7 +277,83 @@ def _get_api() -> SigridApiClient:
 # ---------------------------------------------------------------------------
 
 
-def _arrancar_ejecucion(pg: PostgresClient) -> Ejecucion:
+def _identidad_de_la_ejecucion(
+    pg: PostgresClient, ejecucion_job: str | None, logger
+) -> Ejecucion:
+    """Lote nuevo, o el de la réplica anterior de esta ejecución del job (F-148).
+
+    Sin `ejecucion_job` (el puesto, los comandos sueltos), un lote nuevo como
+    siempre (R19). Con él, el sufijo sale de su SHA-256 y se adopta el lote
+    más reciente con ese sufijo dentro de `VENTANA_REANUDACION` (R18). Si la
+    búsqueda falla o el lote no se entiende, aviso y lote nuevo: reanudar es
+    un ahorro, no puede tumbar la noche (R20).
+    """
+    if not ejecucion_job:
+        return nueva_ejecucion()
+    sufijo = sufijo_de_ejecucion_job(ejecucion_job)
+    logger.info("ejecucion_job", ejecucion_job=ejecucion_job, sufijo=sufijo)
+    ahora = datetime.utcnow()
+    try:
+        lote = pg.buscar_lote_reanudable(sufijo, ahora - VENTANA_REANUDACION)
+        if lote is not None:
+            ejecucion = ejecucion_desde_batch(lote)
+            logger.info("ejecucion_reanudada", batch_id=lote)
+            return ejecucion
+    except Exception as e:  # reanudar es un ahorro: nunca para la carga
+        logger.warning("reanudacion_no_disponible", error=str(e))
+    return nueva_ejecucion(ahora, sufijo=sufijo)
+
+
+def _terminados_del_lote(pg: PostgresClient, ejecucion: Ejecucion) -> frozenset[str]:
+    """Lo que el lote adoptado ya dejó en SUCCESS; vacío si no se reanuda (F-148).
+
+    Un fallo leyendo avisa y no omite nada (R20): repetir es lo de antes.
+    """
+    if not ejecucion.reanudada:
+        return frozenset()
+    try:
+        return pg.fetch_terminados_en_lote(ejecucion.batch_id)
+    except Exception as e:  # reanudar es un ahorro: nunca para la carga
+        get_logger("ejecucion").warning("reanudacion_no_disponible", error=str(e))
+        return frozenset()
+
+
+def _permisos_tras_paso(settings, pg: PostgresClient, recorder):
+    """Gancho `tras_paso` de `run-all`: permisos completos tras cada build (F-148).
+
+    Tras un paso EJECUTADO de `PASOS_CON_PERMISOS` (en SUCCESS o FAILED: un
+    build que falla deja su esquema a medias) corre la lógica íntegra de
+    `ApplyGrantsStep` sobre el mismo cliente y graba la fila
+    `apply_grants.tras_<paso>` (R25). Si los permisos fallan o lanzan, aviso y
+    la noche sigue: el resultado del paso no cambia (R26).
+    """
+
+    def _tras(step, _resultado: StepResult) -> None:
+        if step.name not in PASOS_CON_PERMISOS:
+            return
+        permisos = ApplyGrantsStep(settings, client=pg)
+        nombre = f"apply_grants.tras_{step.name}"
+        try:
+            fila = replace(permisos.run(), step_name=nombre)
+        except Exception as e:  # los permisos de un build nunca paran la noche
+            ahora = datetime.utcnow()
+            fila = StepResult(
+                step_name=nombre,
+                status=StepStatus.FAILED,
+                started_at=ahora,
+                finished_at=ahora,
+                error_message=str(e),
+            )
+        if fila.status != StepStatus.SUCCESS:
+            get_logger("permisos").warning(
+                "permisos_tras_paso_fallidos", paso=step.name, error=fila.error_message
+            )
+        recorder.record(permisos.stage, fila)
+
+    return _tras
+
+
+def _arrancar_ejecucion(pg: PostgresClient, *, ejecucion_job: str | None = None) -> Ejecucion:
     """Abre una ejecución y cierra las filas que dejó abiertas un proceso muerto.
 
     Se llama UNA vez por proceso, antes de construir ningún step. Toda fila
@@ -259,9 +363,13 @@ def _arrancar_ejecucion(pg: PostgresClient) -> Ejecucion:
     Un fallo marcando NO tumba la carga (R7): esto es contabilidad, y el paso
     que venga detrás fallará por sí mismo si la BBDD no está. Abortar aquí
     convertiría un problema de permisos sobre `_meta` en una noche sin datos.
+
+    F-148: solo `run-all` pasa `ejecucion_job`, y entonces la ejecución puede
+    adoptar el lote de la réplica anterior del job; las filas `RUNNING` que
+    dejó esa réplica al morir son huérfanas como cualquier otra.
     """
-    ejecucion = nueva_ejecucion()
     logger = get_logger("ejecucion")
+    ejecucion = _identidad_de_la_ejecucion(pg, ejecucion_job, logger)
 
     try:
         huerfanas = pg.abortar_runs_huerfanos(ejecucion.batch_id)
@@ -499,6 +607,7 @@ def build_pipeline_steps(
     batch_id: str | None = None,
     pg: PostgresClient | None = None,
     reconstruir_todo: bool = False,
+    tablas_terminadas: frozenset[str] = frozenset(),
 ) -> list:
     """
     Composición del pipeline de `run-all`.
@@ -521,9 +630,17 @@ def build_pipeline_steps(
     (`build_tesoreria`): ocho build de negocio, quince pasos. El
     orden dentro de la lista es legible, pero lo que lo GARANTIZA es el
     `depends_on` de cada paso, que es lo que obedece el orden topológico.
+
+    `tablas_terminadas` (F-148) son las tablas de `raw` que la réplica anterior
+    del job ya cargó en este lote: la ingesta no las repite.
     """
     pasos = [
-        IngestRawStep(settings, full_refresh=full_refresh, batch_id=batch_id),
+        IngestRawStep(
+            settings,
+            full_refresh=full_refresh,
+            batch_id=batch_id,
+            tablas_terminadas=tablas_terminadas,
+        ),
         LoadExcelAuxStep(settings),
         BuildStgStep(
             settings, batch_id=batch_id, reconstruir_todo=reconstruir_todo
@@ -629,19 +746,29 @@ def run_all(full_refresh: bool, reconstruir_todo: bool) -> None:
     """
     settings = get_settings()
     pg = _get_pg()
-    ejecucion = _arrancar_ejecucion(pg)
+    # F-148: la variable vacía cuenta como ausente (R19).
+    ejecucion = _arrancar_ejecucion(
+        pg, ejecucion_job=os.environ.get(VARIABLE_EJECUCION_JOB) or None
+    )
+    terminados = _terminados_del_lote(pg, ejecucion)
+    declaradas = [t["source_table"] for t in settings.tables_sigrid.get("tables", [])]
     steps = build_pipeline_steps(
         settings,
         full_refresh,
         batch_id=ejecucion.batch_id,
         pg=pg,
         reconstruir_todo=reconstruir_todo,
+        tablas_terminadas=tablas_a_omitir(declaradas, terminados),
     )
     # El grabador deja una fila por paso en _meta.etl_runs: es lo que después
     # leen `python main.py timings` y la vista _meta.v_frescura. Si falla, el
     # orquestador solo lo loguea.
+    grabador = PostgresStepRunRecorder(pg, ejecucion.batch_id)
     orchestrator = Orchestrator(
-        steps, recorder=PostgresStepRunRecorder(pg, ejecucion.batch_id)
+        steps,
+        recorder=grabador,
+        terminados_en_lote=terminados,
+        tras_paso=_permisos_tras_paso(settings, pg, grabador),
     )
     results = orchestrator.run_all()
 

@@ -55,6 +55,9 @@ class Ejecucion:
 
     batch_id: str
     iniciada_en: datetime
+    #: F-148: True si esta ejecución ADOPTA el lote de una réplica anterior
+    #: del mismo job (R18). Solo entonces se lee lo que ese lote ya terminó.
+    reanudada: bool = False
 
 
 def nueva_ejecucion(
@@ -87,4 +90,5 @@ def ejecucion_desde_batch(batch_id: str) -> Ejecucion:
     return Ejecucion(
         batch_id=batch_id,
         iniciada_en=datetime.strptime(instante, FORMATO_INSTANTE),
+        reanudada=True,
     )
