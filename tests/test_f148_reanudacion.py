@@ -29,6 +29,11 @@ from etl_sigrid.domain.reanudacion import (
     sufijo_de_ejecucion_job,
     tablas_a_omitir,
 )
+from etl_sigrid.infrastructure.postgres.postgres_client import (
+    SQL_LOTE_REANUDABLE,
+    SQL_TERMINADOS_EN_LOTE,
+    PostgresClient,
+)
 
 RAIZ = Path(__file__).resolve().parents[1]
 NOMBRE_JOB = "caj-etl-sigrid-dev-r7k2p9q"
@@ -158,3 +163,91 @@ def test_f148_dominio_ejecucion_desde_batch() -> None:
 def test_f148_dominio_ejecucion_desde_batch_rechaza_lo_que_no_casa(basura: str) -> None:
     with pytest.raises(ValueError):
         ejecucion_desde_batch(basura)
+
+
+# ===========================================================================
+# SQL (T7)
+# ===========================================================================
+
+
+def test_f148_sql_lote_reanudable_es_el_del_diseno() -> None:
+    texto = " ".join(SQL_LOTE_REANUDABLE.split())
+    assert texto == (
+        "SELECT batch_id FROM _meta.etl_runs WHERE right(batch_id, 7) = %(cola)s "
+        "AND started_at >= %(desde)s ORDER BY batch_id DESC LIMIT 1"
+    )
+    assert "LIKE" not in SQL_LOTE_REANUDABLE.upper()
+
+
+def test_f148_sql_terminados_en_lote_es_el_del_diseno() -> None:
+    texto = " ".join(SQL_TERMINADOS_EN_LOTE.split())
+    assert texto == (
+        "SELECT DISTINCT step FROM _meta.etl_runs WHERE batch_id = %(batch)s AND status = 'SUCCESS'"
+    )
+
+
+class Cursor:
+    def __init__(self, filas: list[tuple]) -> None:
+        self._filas = filas
+        self.enviado: list[tuple[str, object]] = []
+
+    def __enter__(self) -> Cursor:
+        return self
+
+    def __exit__(self, *_: object) -> bool:
+        return False
+
+    def execute(self, sentencia: str, parametros: object = None) -> None:
+        self.enviado.append((sentencia, parametros))
+
+    def fetchone(self) -> tuple | None:
+        return self._filas[0] if self._filas else None
+
+    def fetchall(self) -> list[tuple]:
+        return list(self._filas)
+
+
+class Conexion:
+    def __init__(self, cursor: Cursor) -> None:
+        self._cursor = cursor
+
+    def __enter__(self) -> Conexion:
+        return self
+
+    def __exit__(self, *_: object) -> bool:
+        return False
+
+    def cursor(self) -> Cursor:
+        return self._cursor
+
+
+def _cliente(filas: list[tuple]) -> tuple[PostgresClient, Cursor]:
+    cursor = Cursor(filas)
+    cliente = PostgresClient("dbname=x", "dbname=admin", "sigrid_dm")
+    cliente.connection = lambda: Conexion(cursor)  # type: ignore[method-assign]
+    return cliente, cursor
+
+
+def test_f148_sql_buscar_lote_reanudable_envia_la_cola_y_el_desde() -> None:
+    cliente, cursor = _cliente([("20261023T000312Z-" + SUFIJO,)])
+    desde = datetime(2026, 10, 22, 16, 0, 0)
+
+    lote = cliente.buscar_lote_reanudable(SUFIJO, desde)
+
+    assert lote == "20261023T000312Z-" + SUFIJO
+    assert cursor.enviado == [(SQL_LOTE_REANUDABLE, {"cola": "-" + SUFIJO, "desde": desde})]
+
+
+def test_f148_sql_buscar_lote_reanudable_sin_lote_es_none() -> None:
+    cliente, _cursor = _cliente([])
+
+    assert cliente.buscar_lote_reanudable(SUFIJO, datetime(2026, 1, 1)) is None
+
+
+def test_f148_sql_fetch_terminados_en_lote() -> None:
+    cliente, cursor = _cliente([("ingest_raw.con",), ("build_stg",)])
+
+    terminados = cliente.fetch_terminados_en_lote("b1")
+
+    assert terminados == frozenset({"ingest_raw.con", "build_stg"})
+    assert cursor.enviado == [(SQL_TERMINADOS_EN_LOTE, {"batch": "b1"})]

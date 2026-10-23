@@ -693,6 +693,22 @@ VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
 RETURNING id
 """
 
+#: F-148, R18. El lote más reciente de esta ejecución del job dentro de la
+#: ventana. `cola` = '-' + sufijo (7 caracteres). Sin LIKE a propósito: no
+#: mezcla el comodín `%` con los parámetros de psycopg.
+SQL_LOTE_REANUDABLE = """
+SELECT batch_id FROM _meta.etl_runs
+WHERE right(batch_id, 7) = %(cola)s AND started_at >= %(desde)s
+ORDER BY batch_id DESC LIMIT 1
+"""
+
+#: F-148, R21 y R23. Lo que el lote ya dejó en SUCCESS, pasos y tramos
+#: (`ingest_raw.<tabla>`) juntos: el dominio separa unos de otros.
+SQL_TERMINADOS_EN_LOTE = """
+SELECT DISTINCT step FROM _meta.etl_runs
+WHERE batch_id = %(batch)s AND status = 'SUCCESS'
+"""
+
 
 def _float_o_none(valor: Any) -> float | None:
     """Convierte a `float` respetando el nulo de SQL.
@@ -2236,6 +2252,24 @@ class PostgresClient:
             return [
                 (int(fila[0]), str(fila[1]), fila[2]) for fila in cur.fetchall()
             ]
+
+    def buscar_lote_reanudable(self, sufijo: str, desde: datetime) -> str | None:
+        """El `batch_id` que esta réplica debe adoptar, o `None` (F-148, R18).
+
+        Es el lote más reciente con el sufijo de la ejecución del job iniciado
+        desde `desde`. Propaga las excepciones: quien llama avisa y arranca un
+        lote nuevo (R20).
+        """
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_LOTE_REANUDABLE, {"cola": "-" + sufijo, "desde": desde})
+            fila = cur.fetchone()
+        return None if fila is None else fila[0]
+
+    def fetch_terminados_en_lote(self, batch_id: str) -> frozenset[str]:
+        """Los `step` que el lote dejó en SUCCESS, con y sin punto (F-148)."""
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_TERMINADOS_EN_LOTE, {"batch": batch_id})
+            return frozenset(fila[0] for fila in cur.fetchall())
 
     def fetch_estado_raw(self) -> list[EstadoTablaRaw]:
         """Última ingesta conocida de cada tabla de `raw`, desde la vista."""
