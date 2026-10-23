@@ -1888,3 +1888,19 @@ base sobre otra suite), pasada 2 APROBADO. Desplegada el 19-10: imagen `r2026101
 `apply-grants` (el humano: el clasificador lo bloqueó al líder), recuentos = `raw`, 0 facturas
 descuadradas, 35.467 cuentas bancarias que el estándar y el restringido no leen, v56 y MCP
 reiniciado. Queda R36 (dos preguntas por el conector, humano).
+
+## F-147 · Presupuesto del contexto del MCP · 2026-10-23
+
+Pedida por el humano el 22-10 por el consumo de tokens: `contexto_bbdd()` servía ~86.000
+caracteres en cada conversación. Revisión regla a regla (`specs/F-147-.../revision_reglas.md`):
+de 27 a 21 reglas en el YAML y 20 publicadas (cuatro de perfiles fundidas en `R-PERFILES`, tres
+en `R-COMPRAS-LINEA`, `R-COSTE-CONSULTA` retirada, `R-SIGRID-CON` fuera del MCP;
+`R-OBRA-ACTIVA` con la obra viva de la ventana de F-025). `_meta.diccionario_reglas` publica
+`resumen` (≤ 250, CHECK) y `entrega` (`resumen`/`entera`, CHECK), contrato pactado con
+`mcp-bbdd`; detalle de las reglas a las fichas; puerta `presupuesto_contexto` con trinquete
+(`PRESUPUESTO_MAX` = 29.504, medida de lo que servirá el MCP con su F-029). Diccionario v59.
+
+Verificado: `init.sh` 8.619 passed, cobertura 100 %; mutación 19/20 con el superviviente cazado.
+Review: pasada 1 rechazada (MANUAL sin reinicio del MCP ni vuelta atrás, R11), pasada 2 APROBADO.
+Desplegada el 23-10: imagen `r20261023-1016`, v59 y MCP reiniciado; servido 88.666 → 61.345
+caracteres (−31 %); el resto, con la F-029 de `mcp-bbdd`.

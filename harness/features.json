@@ -2330,12 +2330,12 @@
         "Lo publicado mide menos que hoy, con la medida antes y después en `progress/`, y versión nueva del diccionario con su test",
         "`bash harness/init.sh` en verde y APROBADO del reviewer; despliegue MANUAL en `progress/current.md` con sus comandos"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "rigor": "estandar",
       "priority": 1,
       "branch": "feature/F-147-presupuesto-contexto-mcp",
-      "notes": "2026-10-22: alta por petición del humano. Coordinar con F-029 de mcp-bbdd."
+      "notes": "2026-10-22: alta por petición del humano. Coordinar con F-029 de mcp-bbdd. 2026-10-23: CERRADA. Review APROBADO en pasada 2 (ae59f75; init.sh 8619 passed, cobertura 100 %). Merge 09886ce por orden del humano. Desplegada: imagen r20261023-1016, diccionario v59 (20 reglas) y MCP reiniciado (ca-mcp-bbdd-dev--0000023). contexto_bbdd servido: 88.666 -> 61.345 caracteres; el resto (tope 29.504) llega con la F-029 de mcp-bbdd."
     },
     {
       "id": "F-148",

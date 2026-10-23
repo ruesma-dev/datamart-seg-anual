@@ -9,6 +9,26 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-23 · F-147 · CERRADA (`done`, APROBADO en pasada 2, `ae59f75`) · merge `09886ce` · DESPLEGADA
+
+- Orden del humano (23-10): merge, despliegue, diccionario y reinicio del MCP. `init.sh` sobre
+  `main` tras el merge: pytest en verde (8.618 passed; único KO, el de «estás en main»).
+- Despliegue tras la nocturna del 23 (Succeeded, 04:36): imagen `r20261023-1016` y job a esa
+  imagen ANTES de publicar; `publicar-diccionario` v59 (234 objetos, 2.002 columnas, 20 reglas,
+  hash `4f3fe53a05a4`) y `check-diccionario` OK (biyección exacta, lo publicado es el árbol).
+- Comprobado en solo lectura: `_meta.diccionario_reglas` con `resumen, entrega` al final, 20
+  filas, ninguna `R-SIGRID-CON`; `diccionario_reglas_entrega_check` validado y
+  `..._resumen_check` NOT VALID (lo valida la nocturna del 24).
+- MCP reiniciado (`ca-mcp-bbdd-dev--0000023`, réplica nueva 09:22:49). `contexto_bbdd()` abre
+  con «Versión 59 · … 20 reglas». **Medido**: v58 88.666 → v59 **61.345** caracteres (−31 %):
+  reglas 28.782, enrutado 20.721, esquemas 6.253, magnitudes 2.236, convenciones 946, estado
+  1.636. La estimación de 51.287 se quedó corta: el MCP de hoy sirve todas las
+  `ejemplos_preguntas` (el corte a 2 por objeto es de su F-029). El tope 29.504 llega con ella.
+- Resto: el bloque de convenciones sigue citando `R-SIGRID-CON` («guía del ETL»), que ya no se
+  publica: referencia colgante menor, para la próxima versión del diccionario.
+- Pendiente: avisar a `mcp-bbdd` (su F-029 ya puede leer `resumen`/`entrega`) y medir otra vez
+  tras su F-029. Primera nocturna con la imagen nueva: la del 24.
+
 ## 2026-10-22 · F-147 · `in_progress` (implementer) · rama `feature/F-147-presupuesto-contexto-mcp`
 
 - **T1 CERRADA (respuesta de `mcp-bbdd`, vía líder, 2026-10-22)**: ACEPTA los puntos 1-5 del
