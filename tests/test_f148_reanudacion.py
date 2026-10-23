@@ -18,10 +18,14 @@ import hashlib
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from etl_sigrid.application.orchestrator import Orchestrator
+from etl_sigrid.application.steps import ingest_raw_step
+from etl_sigrid.application.steps.ingest_raw_step import IngestRawStep
+from etl_sigrid.domain.coherencia import EstadoTablaRaw, evaluar_coherencia_raw
 from etl_sigrid.domain.ejecucion import Ejecucion, ejecucion_desde_batch, nueva_ejecucion
 from etl_sigrid.domain.entities import StepResult, StepStatus
 from etl_sigrid.domain.reanudacion import (
@@ -370,3 +374,134 @@ def test_f148_r22_sin_terminados_todo_como_hoy() -> None:
 
     assert ejecutados == ["a", "b", "c"]
     assert len(grabador.filas) == 3
+
+
+# ===========================================================================
+# IngestRawStep reanudado (T9, R23-R24)
+# ===========================================================================
+
+
+class PgIngesta:
+    def __init__(self) -> None:
+        self.conexiones_abiertas = 0
+        self.truncadas: list[str] = []
+
+    def record_run_start(self, *a: object, **k: object) -> int:
+        return 1
+
+    def record_run_end(self, *a: object, **k: object) -> None:
+        return None
+
+    def fetch_firma_origen(self) -> dict:
+        return {}
+
+    def registrar_firmas_actuales(self, firmas: dict) -> int:
+        return 0
+
+
+class Api:
+    def __init__(self, *_a: object, **_k: object) -> None:
+        pass
+
+    def __enter__(self) -> Api:
+        return self
+
+    def __exit__(self, *_: object) -> bool:
+        return False
+
+
+def _settings_ingesta(tablas: tuple[str, ...]) -> SimpleNamespace:
+    return SimpleNamespace(
+        sigrid_api=SimpleNamespace(
+            page_size=10,
+            base_url="http://x",
+            database="ruesma",
+            timeout_s=1.0,
+            max_retries=1,
+            function_key=SimpleNamespace(get_secret_value=lambda: "k"),
+        ),
+        tables_sigrid={"tables": [{"source_table": t, "target_table": t} for t in tablas]},
+    )
+
+
+def test_f148_r23_la_ingesta_omite_las_tablas_terminadas(monkeypatch: pytest.MonkeyPatch) -> None:
+    registro = LoggerFalso()
+    monkeypatch.setattr(ingest_raw_step, "logger", registro)
+    monkeypatch.setattr(ingest_raw_step, "build_postgres_client", lambda _s: PgIngesta())
+    monkeypatch.setattr(ingest_raw_step, "SigridApiClient", Api)
+    cargadas: list[str] = []
+    monkeypatch.setattr(
+        IngestRawStep,
+        "_ingest_one_table",
+        lambda self, spec, api, pg: cargadas.append(spec.source_table) or 4,
+    )
+    paso = IngestRawStep(
+        _settings_ingesta(("con", "obrparpre", "apu")),  # type: ignore[arg-type]
+        batch_id="b",
+        tablas_terminadas=frozenset({"con", "apu"}),
+    )
+
+    resultado = paso.run()
+
+    assert cargadas == ["obrparpre"]
+    assert resultado.status is StepStatus.SUCCESS
+    assert resultado.rows_processed == 4
+    assert resultado.metadata["tablas_reanudadas"] == ["apu", "con"]
+    assert [c["table"] for c in registro.de("ingest_raw_tabla_reanudada")] == ["con", "apu"]
+
+
+def test_f148_r23_sin_reanudar_carga_todas(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(ingest_raw_step, "build_postgres_client", lambda _s: PgIngesta())
+    monkeypatch.setattr(ingest_raw_step, "SigridApiClient", Api)
+    cargadas: list[str] = []
+    monkeypatch.setattr(
+        IngestRawStep,
+        "_ingest_one_table",
+        lambda self, spec, api, pg: cargadas.append(spec.source_table) or 1,
+    )
+
+    resultado = IngestRawStep(_settings_ingesta(("con", "apu")), batch_id="b").run()  # type: ignore[arg-type]
+
+    assert cargadas == ["con", "apu"]
+    assert resultado.metadata["tablas_reanudadas"] == []
+
+
+def _v_raw_state(filas: list[tuple[int, str, str, str, datetime]]) -> list[EstadoTablaRaw]:
+    """Lo que hace `_meta.v_raw_state`: la última fila de cada tabla, por
+    `started_at DESC, id DESC`. Filas: (id, tabla, status, batch, started_at)."""
+    ultima: dict[str, tuple] = {}
+    for fila in sorted(filas, key=lambda f: (f[4], f[0])):
+        ultima[fila[1]] = fila
+    return [
+        EstadoTablaRaw(tabla=t, status=s, batch_id=b, started_at=ini, finished_at=ini, filas=1)
+        for (_i, t, s, b, ini) in ultima.values()
+    ]
+
+
+def test_f148_r24_la_puerta_de_stg_acepta_una_ingesta_reanudada() -> None:
+    """Primer intento: `con` en SUCCESS y `obrparpre` FAILED. El reintento adopta
+    el lote, omite `con` y recarga `obrparpre`: un solo lote, puerta OK."""
+    lote = "20261023T000312Z-" + SUFIJO
+    t0 = datetime(2026, 10, 23, 0, 3)
+    filas = [
+        (1, "con", "SUCCESS", lote, t0),
+        (2, "obrparpre", "FAILED", lote, t0 + timedelta(minutes=1)),
+        # el reintento: `con` omitida (sin fila), `obrparpre` otra vez
+        (3, "obrparpre", "SUCCESS", lote, t0 + timedelta(hours=1)),
+    ]
+
+    veredicto = evaluar_coherencia_raw(_v_raw_state(filas), ["con", "obrparpre"])
+
+    assert veredicto.ok is True
+    assert veredicto.batch_id == lote
+
+
+def test_f148_r24_control_sin_adoptar_el_lote_la_puerta_rechaza() -> None:
+    """Por qué hace falta adoptar: omitir tablas con un lote NUEVO mezclaría dos."""
+    t0 = datetime(2026, 10, 23, 0, 3)
+    filas = [
+        (1, "con", "SUCCESS", "20261023T000312Z-aaaaaa", t0),
+        (3, "obrparpre", "SUCCESS", "20261023T010000Z-bbbbbb", t0 + timedelta(hours=1)),
+    ]
+
+    assert evaluar_coherencia_raw(_v_raw_state(filas), ["con", "obrparpre"]).ok is False
