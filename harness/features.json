@@ -2330,7 +2330,7 @@
         "Lo publicado mide menos que hoy, con la medida antes y después en `progress/`, y versión nueva del diccionario con su test",
         "`bash harness/init.sh` en verde y APROBADO del reviewer; despliegue MANUAL en `progress/current.md` con sus comandos"
       ],
-      "status": "pending",
+      "status": "in_progress",
       "sdd": true,
       "rigor": "estandar",
       "priority": 1,

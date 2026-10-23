@@ -160,17 +160,17 @@ def test_f037_r25bis_la_columna_documentada() -> None:
 # ===========================================================================
 
 def test_f037_r26_regla_hermana_de_la_contable() -> None:
-    regla = _regla("R-TESORERIA-RESTRINGIDA")
-    assert regla["severidad"] == "bloqueante"
-    assert regla["titulo"].startswith("Usa tesoreria;")
-    assert "tesoreria_restringida" in regla["titulo"]
-    assert contiene(regla["titulo"], "perfil total")
+    """F-147: la regla de la tesorería restringida se fundió en `R-PERFILES`
+    (entera, una sola vez para los tres esquemas `*_restringida`); los recuentos
+    de lo que falta viven en la ficha de la general."""
+    regla = _regla("R-PERFILES")
+    assert regla["severidad"] == "bloqueante" and regla["entrega"] == "entera"
     assert len(regla["titulo"]) <= 87, "como el título más largo ya publicado"
-    assert set(regla["ambito"]) == {"tesoreria", "tesoreria_restringida"}
-    texto = regla["regla"]
-    assert "NUNCA" in texto and contiene(texto, "se suman"), "los dos esquemas no se suman"
-    assert "efectos_restringidos_mes" in texto
-    assert contiene(texto, "permission denied")
+    assert {"tesoreria", "tesoreria_restringida"} <= set(regla["ambito"])
+    assert contiene(regla["resumen"], "nunca se suman"), "los dos esquemas no se suman"
+    assert contiene(regla["regla"], "permission denied")
+    assert "efectos_restringidos_mes" in _texto(_ficha("tesoreria.efectos"))
+    assert "NUNCA se suman" in _texto(_ficha("tesoreria_restringida.efectos"))
 
 
 # ===========================================================================

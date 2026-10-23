@@ -588,8 +588,7 @@ objetos:
       los **60 s filtrada a una sola obra** (medido el 2026-08-25). Estaba
       marcada como recomendada mientras no devolvia ni una fila dentro de la
       ventana util. Para los indirectos por obra y mes que si responden, ir a
-      `cierre.fact_cierre_mensual` con `concepto = 'INDIRECTOS'`. Ver
-      R-COSTE-CONSULTA.
+      `cierre.fact_cierre_mensual` con `concepto = 'INDIRECTOS'`.
     descripcion: >-
       Detalle de los costes INDIRECTOS de cada obra abierto por grupo y
       subcategoria, con CUATRO variantes de periodificacion calculadas en
@@ -1021,8 +1020,8 @@ objetos:
         porque: Es el universo del que sale la vista.
     ejemplos_preguntas:
       - De que va la obra X, quien es el cliente y en que fechas se hace
-      - Que obras estan acabadas y cuales siguen vivas
       - Cuanto han crecido las obras por modificados
+      - Que obras estan acabadas y cuales siguen vivas
 
   v_pbi_planif_vs_real:
     tipo: vista

@@ -252,10 +252,13 @@ def test_f128_r30_cobertura_formato_y_que_es_la_del_documento():
 
 
 def test_f128_r30_la_regla_la_nombra_sin_cambiar_su_ambito():
-    regla = _reglas()["R-COMPRAS-RESTRINGIDA"]
-    assert "`compras_restringida.documento_cuenta_bancaria`" in _plano(regla["regla"])
-    assert "no tienen version general" in _plano(regla["regla"])
-    assert regla["ambito"] == ["compras.documento_alarmas", "compras_restringida"]
+    """F-147: la regla de las alarmas restringidas se fundió en `R-PERFILES`, que
+    alcanza el esquema entero; lo propio de la cuenta bancaria va a su ficha."""
+    regla = _reglas()["R-PERFILES"]
+    assert "compras_restringida" in regla["ambito"]
+    ficha = _plano(_ficha("compras_restringida", "documento_cuenta_bancaria")["descripcion"])
+    assert "no tienen version general" in ficha
+    assert "`compras.v_facturas_pago`" in ficha
 
 
 def test_f128_r30_ningun_numero_de_cuenta_en_las_fichas():

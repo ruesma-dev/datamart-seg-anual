@@ -373,7 +373,12 @@ def test_f123_r19_diccionario_la_regla_explica_la_fase_viva() -> None:
     reglas = {r["codigo"]: r for r in _yaml("00_global.yaml")["reglas"]}
     assert "R-FASE-VIVA" not in reglas, "D1: dentro de R-DESCOMPUESTO-ORIGEN, sin regla nueva"
     regla = reglas["R-DESCOMPUESTO-ORIGEN"]
-    texto = regla["regla"] + " " + regla["motivo"]
+    # F-147: «Estudios es el master 0» salió de la regla a las fichas de las dos
+    # vistas de Estudios (revision_reglas.md, fila 13); la regla remite a ellas.
+    texto = " ".join(
+        [regla["regla"], regla["motivo"]]
+        + [_ficha(v)["descripcion"] for v in ("v_pbi_master_estudio", "v_pbi_estudio")]
+    )
     for termino in ("FASE VIVA", "jefe de obra", "planificacion de compras", "PLANIF_JO",
                     "MASTER_ESTUDIO", "ESTUDIO", "master 0", "sin master 0"):
         assert termino in texto, f"R-DESCOMPUESTO-ORIGEN no dice «{termino}»"

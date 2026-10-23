@@ -1193,7 +1193,8 @@ def _yaml_dicc(nombre: str) -> dict:
 
 def _regla_restringida() -> dict:
     reglas = {r["codigo"]: r for r in _yaml_dicc("00_global.yaml")["reglas"]}
-    return reglas["R-CONTABILIDAD-RESTRINGIDA"]
+    # F-147: la regla de la contabilidad restringida se fundió en `R-PERFILES`.
+    return reglas["R-PERFILES"]
 
 
 def test_f136_r32_version_50() -> None:
@@ -1203,29 +1204,38 @@ def test_f136_r32_version_50() -> None:
 
 def test_f136_r32_el_titulo_se_explica_solo() -> None:
     """Solo los títulos van en las instrucciones de arranque del MCP."""
-    titulo = _regla_restringida()["titulo"]
-    assert titulo.startswith("Usa contabilidad;"), titulo
-    assert "contabilidad_restringida" in titulo and "perfil total" in titulo
-    assert len(titulo) <= 87, "no más largo que el título más largo ya publicado"
+    # F-147: el título es el de `R-PERFILES` y la orden va en su `resumen`, que es
+    # lo que se sirve en cada conversación (y la regla, entera).
+    regla = _regla_restringida()
+    assert "*_restringida" in regla["titulo"] and "total" in regla["titulo"], regla["titulo"]
+    assert len(regla["titulo"]) <= 87, "no más largo que el título más largo ya publicado"
+    assert "esquema general" in regla["resumen"] and "perfil total" in regla["resumen"]
 
 
 def test_f136_r32_la_regla_manda_lo_que_pidio_el_humano() -> None:
+    """F-147: la orden vive en `R-PERFILES` (resumen + regla, servida entera) y lo
+    que le falta a la general, en la ficha de `contabilidad.saldos_cuenta_mes`."""
     import re
 
-    texto = re.sub(r"\s+", " ", _regla_restringida()["regla"])
+    regla = _regla_restringida()
+    texto = re.sub(r"\s+", " ", f"{regla['resumen']} {regla['regla']}")
     for termino in (
-        "Por defecto usa SIEMPRE `contabilidad`",
-        "perfil total del MCP",
+        "Usa siempre el esquema general",
+        "solo del perfil total",
         "sigrid_dm_autorizado_ro",
         "«permission denied»",
-        "no es un fallo ni algo que haya que rodear",
-        "no reintentes con otra sintaxis ni busques la misma informacion por otro camino",
-        "responde con `contabilidad`",
-        "`incompleto`", "`num_apuntes_restringidos`", "`contabilidad.apuntes_restringidos_mes`",
-        "el detalle requiere acceso restringido",
-        "no pide expresamente informacion de personal",
+        "no se rodea",
+        "el perfil no lo incluye",
+        "solo si piden personal",
     ):
         assert termino in texto, f"la regla no dice «{termino}»"
+    ficha = re.sub(
+        r"\s+", " ",
+        _yaml_dicc("contabilidad.yaml")["objetos"]["saldos_cuenta_mes"]["descripcion"],
+    )
+    for termino in ("`incompleto`", "`num_apuntes_restringidos`",
+                    "`contabilidad.apuntes_restringidos_mes`"):
+        assert termino in ficha, f"la ficha de los saldos no dice «{termino}»"
 
 
 @pytest.mark.parametrize("objeto", sorted(OBJETOS_RESTR))

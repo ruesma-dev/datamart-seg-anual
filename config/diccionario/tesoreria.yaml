@@ -23,7 +23,7 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
-      **No disponible para el perfil restringido** (F-141, `R-PERFIL-RESTRINGIDO`):
+      **No disponible para el perfil restringido** (F-141, `R-PERFILES`):
       con su login la consulta devuelve «permission denied», y eso no se rodea:
       responde que el perfil no lo incluye.
 
@@ -35,7 +35,7 @@ objetos:
       vencen este mes», «que nos deben los clientes» y es el ingrediente de un
       flujo de caja. 219.899 pagos y 21.914 cobros el 2026-10-13 (241.813).
 
-      **NO ESTAN LOS PAGOS DE PERSONAL** (`R-TESORERIA-RESTRINGIDA`): 37.053
+      **NO ESTAN LOS PAGOS DE PERSONAL** (`R-PERFILES`): 37.053
       pagos de nomina, embargo y cuota (naturaleza informada, cuenta de
       personal, tercero empleado o documento de nomina) viven solo en
       `tesoreria_restringida.efectos`. Cuantos faltan, por empresa y mes, lo
@@ -308,8 +308,8 @@ objetos:
         porque: El centro de coste del efecto, del que sale la obra.
     ejemplos_preguntas:
       - Que pagos a proveedores vencen el mes que viene y por cuanto
-      - Cuanto nos deben los clientes y cuando vence
       - Flujo de caja comprometido por mes de los proximos seis meses
+      - Cuanto nos deben los clientes y cuando vence
       - Que efectos previstos de la obra X estan vencidos
 
   efectos_restringidos_mes:
@@ -317,7 +317,7 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
-      **No disponible para el perfil restringido** (F-141, `R-PERFIL-RESTRINGIDO`):
+      **No disponible para el perfil restringido** (F-141, `R-PERFILES`):
       con su login la consulta devuelve «permission denied», y eso no se rodea:
       responde que el perfil no lo incluye.
 
@@ -327,7 +327,7 @@ objetos:
       cobros el 2026-10-13). SOLO RECUENTOS, nunca importes: el importe por
       empresa y mes seria la nomina neta mensual, que es lo que se protege.
       Sirve para decir «esta cartera no incluye N pagos de personal» en vez de
-      presentar un total recortado como completo (`R-TESORERIA-RESTRINGIDA`).
+      presentar un total recortado como completo (`R-PERFILES`).
     grano: >-
       Una fila por (`empresa_id`, `sentido`, `anio`, `mes`, `estado_tesoreria`)
       con algun efecto restringido. `anio` y `mes` valen 0 si el efecto no tiene

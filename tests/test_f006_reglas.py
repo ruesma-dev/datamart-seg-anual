@@ -42,14 +42,16 @@ def _codigos(errores) -> set[str]:
 # ---------------------------------------------------------------------------
 
 
-def test_f006_r9_son_trece_reglas_y_estas() -> None:
+def test_f006_r9_son_doce_reglas_y_estas() -> None:
     """La lista es cerrada y explícita: si mañana se añade una, se ve en el diff.
 
     Empezó siendo doce. La decimotercera, `R-SIGRID-CON`, entró con las fichas
     de `raw`: es la regla de oro de Sigrid, y estaba contada en un comentario
-    del YAML, que no se publica y por tanto el MCP no ve.
+    del YAML, que no se publica y por tanto el MCP no ve. F-147 (2026-10-22)
+    fundió las tres de `compras.fact_compras_linea` en `R-COMPRAS-LINEA` y
+    añadió `R-PERFILES`: vuelven a ser doce, sin perder ninguna defensa.
     """
-    assert len(CODIGOS_REGLAS_OBLIGATORIAS) == 13
+    assert len(CODIGOS_REGLAS_OBLIGATORIAS) == 12
     assert set(CODIGOS_REGLAS_OBLIGATORIAS) == {
         "R-SIGRID-CON",
         "R-FRESCURA",
@@ -59,11 +61,10 @@ def test_f006_r9_son_trece_reglas_y_estas() -> None:
         "R-VERSION-MASTER",
         "R-FAS-AMBIGUO",
         "R-CLAVE-SUSTITUTA",
-        "R-ABONO-NEGATIVO",
-        "R-LINEA-ID-NO-UNICA",
+        "R-COMPRAS-LINEA",
+        "R-PERFILES",
         "R-RETENCION-NO-JOIN-LINEAS",
         "R-COMPRAS-SIN-IVA",
-        "R-COMPRAS-TIPO-DOC",
     }
 
 
@@ -625,7 +626,10 @@ def test_f006_r10_la_cifra_absurda_de_compras_llega_avisada() -> None:
     assert regla is not None, "la anomalia de 68,7 billones no esta declarada"
     assert regla.severidad == "bloqueante"
     assert "AC21/03345" in regla.regla, "sin el albaran concreto no es accionable"
-    assert "260,6" in regla.regla, "la cifra buena, para saber a que aspirar"
+    # F-147 (D5): la regla queda minima y SIN cifras que envejezcan (la de
+    # 260,6 M€ ya eran 277,0 el 2026-10-22); lo que no cambia es el filtro. La
+    # cifra inflada sigue en la ficha, que no se sirve entera en cada charla.
+    assert contiene(regla.regla, "< 1e8"), "el filtro que la excluye"
 
     ficha = dicc.por_nombre["compras.v_pbi_albaranes_sin_facturar"]
     assert contiene(ficha.descripcion, "68,7 BILLONES")

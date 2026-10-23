@@ -10,14 +10,14 @@
 # comprueba cada noche. La ficha EMPIEZA por el aviso de acceso restringido
 # porque el MCP no filtra el diccionario por perfil. Decision del humano del
 # 2026-10-14 (D9): «mete esas alarmas en lectura solo para el perfil admin y no
-# el estandar». Regla dura `R-COMPRAS-RESTRINGIDA`.
+# el estandar». Regla dura `R-PERFILES`.
 #
 # Lo construye `build_compras` (`15_alarmas_liquidatoria.sql`) y de aqui sale
 # la general, `compras.documento_alarmas`. Solo recuentos, ni nombres de nadie.
 #
 # F-141 (2026-10-17): «restringida» = reservada al perfil total. El perfil
 # restringido del MCP (administrativos, grupo `sigrid_dm_perfil_restringido_ro`)
-# ve MENOS que el estandar y NO la lee (`R-PERFIL-RESTRINGIDO`).
+# ve MENOS que el estandar y NO la lee (`R-PERFILES`).
 #
 # F-128 (2026-10-18): el esquema guarda YA DOS COSAS. Ademas de las alarmas
 # completas, `documento_cuenta_bancaria`: la cuenta bancaria del proveedor que
@@ -38,7 +38,7 @@ objetos:
     descripcion: >-
       **ACCESO RESTRINGIDO: solo el perfil total del MCP.** Si no lo tienes, la
       consulta devuelve «permission denied»: usa `compras.documento_alarmas`
-      (`R-COMPRAS-RESTRINGIDA`), sin reintentar ni buscar otro camino.
+      (`R-PERFILES`), sin reintentar ni buscar otro camino.
 
       **TODAS LAS ALARMAS DE LOS DOCUMENTOS DE SIGRID** (F-138): una fila por
       alarma de texto libre pegada a un documento (`raw.conala`), ~45.750 el
@@ -53,6 +53,11 @@ objetos:
       general (`clase_liquidacion`, ver `compras.documento_alarmas`): la marca
       «liquidatoria» es texto libre de una alarma y la regla es heuristica.
       `creada_por` es el LOGIN de quien creo la alarma (dato personal).
+
+      **SIN EMPRESA NI OBRA: mezcla las 38 empresas** (F-147,
+      `R-EMPRESA-POR-DEFECTO`): no se puede filtrar por Construcciones Ruesma;
+      la respuesta dice que la cifra es de todas las empresas y no dice «he
+      supuesto Construcciones Ruesma».
     grano: >-
       Una fila por alarma, identificada por `alarma_id` (`conala.ide`), clave
       primaria declarada. Un documento puede tener varias alarmas.
@@ -136,7 +141,7 @@ objetos:
     descripcion: >-
       **ACCESO RESTRINGIDO: solo el perfil total del MCP.** Si no lo tienes, la
       consulta devuelve «permission denied»: dilo asi y no busques la cuenta
-      por otro camino (`R-COMPRAS-RESTRINGIDA`). Las cuentas de proveedor no
+      por otro camino (`R-PERFILES`). Las cuentas de proveedor no
       tienen version general.
 
       **LA CUENTA BANCARIA DEL PROVEEDOR EN CADA DOCUMENTO** (F-128, decision
@@ -156,6 +161,15 @@ objetos:
       `compras.v_facturas_pago` para todos los perfiles. Aqui no estan el tipo
       de cuenta (`bantipide`, su catalogo no se ingiere) ni la cuenta PROPIA del
       albaran (`dca.banide`).
+
+      **SIN EMPRESA NI OBRA: mezcla las 38 empresas** (F-147,
+      `R-EMPRESA-POR-DEFECTO`): no se puede filtrar por Construcciones Ruesma;
+      la respuesta dice que la cifra es de todas las empresas y no dice «he
+      supuesto Construcciones Ruesma».
+
+      Sin el perfil total no hay otro camino (`R-PERFILES`): ni `raw` ni
+      reconstruirla con el banco y la sucursal de `compras.v_facturas_pago`,
+      que no son la cuenta.
     grano: >-
       Una fila por documento con cuenta, identificada por `documento_id` (el
       `ide` de la factura o del albaran), clave primaria declarada: no hay

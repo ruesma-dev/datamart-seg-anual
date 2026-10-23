@@ -117,6 +117,42 @@ CARDINALIDADES = ("1:1", "1:N", "N:1", "N:N")
 #: Severidad de una regla dura del diccionario.
 SEVERIDADES = ("bloqueante", "aviso")
 
+#: F-147 (D2). QUÉ se sirve de una regla, que no es lo mismo que CUÁNTO importa
+#: (`severidad`: las 27 de la v58 eran `bloqueante`, y por eso no discriminaba):
+#:
+#: * `resumen` (por defecto): `contexto_bbdd` sirve el `resumen`, que es una
+#:   ORDEN que basta sola; `regla` + `motivo` son el detalle, que `mcp-bbdd`
+#:   lleva a `describir_tabla` de cada objeto del `ambito` (su F-029).
+#: * `entera`: se sirve entera siempre (`R-PERFILES`: trata justo de lo que el
+#:   perfil NO ve, así que nunca le llegaría por `describir_tabla`).
+#: * `fuera_mcp`: NO se publica en `_meta.diccionario_reglas` (D4). Sigue en el
+#:   YAML y se valida igual: es guía del ETL, no de la IA (`R-SIGRID-CON`).
+ENTREGAS = ("resumen", "entera", "fuera_mcp")
+
+#: Límites del `resumen`, en caracteres, medidos sin los blancos de los extremos.
+#:
+#: El mínimo (40) es el mismo que se exige a `regla` desde F-006: menos no es
+#: una orden, es un titular. El máximo es **250 y no los 300 de la spec (R2)**:
+#: `mcp-bbdd` pidió al pactar el contrato (T1, petición A) que la BASE lo
+#: garantice con `CHECK (char_length(btrim(resumen)) BETWEEN 1 AND 250)` en
+#: `01_diccionario.sql`. Con 300 aquí, un resumen de 280 pasaría `init.sh` y
+#: reventaría la publicación en Azure; el validador tiene que ser el primero en
+#: decir que no, y con el mismo número (lo ata un test al DDL).
+RESUMEN_MIN = 40
+RESUMEN_MAX = 250
+
+#: F-147 (D8). Preguntas por objeto que `contexto_bbdd` sirve para ENRUTAR: las
+#: 2 PRIMERAS de `ejemplos_preguntas`. El recorte lo hace `mcp-bbdd` en su
+#: F-029; aquí se ordenan (R15) y se miden con este número. Todas siguen
+#: saliendo en `describir_tabla`. Es contrato: está en
+#: `azure-apps/datamart_seg_anual.md`.
+MAX_PREGUNTAS_ENRUTADO = 2
+
+#: F-147 (R19). Cuánto puede quedar la medida por debajo del tope sin que la
+#: puerta pida bajarlo. 1.000 ≈ cuatro resúmenes: bastante para no saltar por
+#: una coma, poco para que se acumule holgura que alguien gaste en silencio.
+HOLGURA_TRINQUETE = 1_000
+
 #: Qué claves del bloque global VIAJAN a `_meta` y cuáles no, con su motivo.
 #:
 #: Existe porque es la **tercera vez** que información importante se queda sin
@@ -181,23 +217,26 @@ CONTEXTO_NO_PUBLICADO = {
 }
 
 
-#: Las TRECE reglas duras que `00_global.yaml` tiene que declarar sí o sí (R9).
+#: Las DOCE reglas duras que `00_global.yaml` tiene que declarar sí o sí (R9).
 #:
 #: No es una lista de buenas prácticas: cada una nace de una trampa concreta del
 #: modelo y varias de un número falso real. Se escriben aquí, en el dominio, para
 #: que quitar una del YAML deje `bash harness/init.sh` en rojo en vez de dejar al
 #: agente sin esa defensa en silencio.
+#:
+#: Eran trece hasta F-147 (2026-10-22): las tres de `compras.fact_compras_linea`
+#: (tipos de documento, clave y abonos) se fundieron en `R-COMPRAS-LINEA`, y
+#: entra `R-PERFILES`, la que funde las cuatro de perfiles y se sirve entera.
 CODIGOS_REGLAS_OBLIGATORIAS = (
-    "R-ABONO-NEGATIVO",
     "R-SIGRID-CON",
     "R-CLAVE-SUSTITUTA",
     "R-COMPRAS-SIN-IVA",
-    "R-COMPRAS-TIPO-DOC",
+    "R-COMPRAS-LINEA",
     "R-FAS-AMBIGUO",
     "R-FRESCURA",
     "R-IMPORTE-MES",
-    "R-LINEA-ID-NO-UNICA",
     "R-OBRA-ACTIVA",
+    "R-PERFILES",
     "R-RETENCION-NO-JOIN-LINEAS",
     "R-UNIVERSO-OBRA",
     "R-VERSION-MASTER",
@@ -205,6 +244,12 @@ CODIGOS_REGLAS_OBLIGATORIAS = (
 
 #: Claves obligatorias de cada entrada de `esquemas` en `00_global.yaml` (R4).
 CLAVES_ESQUEMA = ("titulo", "para_que_sirve", "consumo_recomendado", "refresco")
+
+#: F-147 (R16, D9). Tope del `para_que_sirve` de un esquema, en caracteres. El
+#: bloque `esquemas` se sirve ENTERO en cada conversación (10.549 caracteres en
+#: la v58, tres de cada cuatro del contexto global): es para ENRUTAR una
+#: pregunta al esquema, y el detalle de cada objeto está en su ficha.
+PARA_QUE_SIRVE_MAX = 350
 
 #: Longitud mínima de cada texto de una ficha, en caracteres.
 #:
@@ -338,6 +383,17 @@ class Regla:
     regla: str
     motivo: str
     orden: int = 0
+    #: F-147. Al FINAL, y con valor por defecto, a propósito: quien construya
+    #: una `Regla` por posición no ve sus argumentos corridos (mismo criterio que
+    #: las columnas de `_meta.diccionario_reglas`). `resumen` es la orden que
+    #: basta sola; `entrega`, una de `ENTREGAS`.
+    resumen: str = ""
+    entrega: str = "resumen"
+
+    @property
+    def publicable(self) -> bool:
+        """¿Llega a `_meta.diccionario_reglas`? Todas menos las `fuera_mcp` (D4)."""
+        return self.entrega != "fuera_mcp"
 
 
 @dataclass(frozen=True, slots=True)
@@ -471,6 +527,22 @@ def _validar_entrada_esquema(
                     detalle=f"el esquema `{esquema}` no declara `{clave}`",
                 )
             )
+
+    para_que_sirve = entrada.get("para_que_sirve")
+    if isinstance(para_que_sirve, str) and len(para_que_sirve.strip()) > PARA_QUE_SIRVE_MAX:
+        errores.append(
+            ErrorValidacion(
+                fichero=fichero,
+                objeto=None,
+                regla="R4",
+                detalle=(
+                    f"el `para_que_sirve` del esquema `{esquema}` tiene "
+                    f"{len(para_que_sirve.strip())} caracteres y el tope es "
+                    f"{PARA_QUE_SIRVE_MAX} (F-147): se sirve entero en cada "
+                    f"conversación; lo que no sirva para enrutar va a las fichas"
+                ),
+            )
+        )
 
     refresco = entrada.get("refresco")
     if isinstance(refresco, str) and refresco and refresco not in REFRESCOS:
@@ -1112,6 +1184,15 @@ def _validar_reglas(
         for campo in ("titulo", "regla", "motivo"):
             if not (getattr(regla, campo) or "").strip():
                 error("R9", f"la regla `{regla.codigo}` no declara `{campo}`")
+        errores_resumen = _error_resumen(regla)
+        if errores_resumen:
+            error("R2", errores_resumen)
+        if regla.entrega not in ENTREGAS:
+            error(
+                "R3",
+                f"la regla `{regla.codigo}` declara `entrega` = '{regla.entrega}', "
+                f"fuera del vocabulario: {_lista(ENTREGAS)}",
+            )
         if not regla.ambito:
             error(
                 "R9",
@@ -1137,6 +1218,28 @@ def _validar_reglas(
                     f"{_lista(ESQUEMAS_DEL_DATAMART)}",
                 )
     return errores
+
+
+def _error_resumen(regla: Regla) -> str | None:
+    """F-147 R2: el `resumen` existe y cabe entre `RESUMEN_MIN` y `RESUMEN_MAX`.
+
+    Vale también para las `fuera_mcp`: no publicarla no la exime de poder
+    resumirse, y el día que vuelva al MCP no tiene que llegar sin él. Se mide
+    sin los blancos de los extremos, como el `CHECK` de la base.
+    """
+    texto = (regla.resumen or "").strip()
+    if not texto:
+        return (
+            f"la regla `{regla.codigo}` no declara `resumen`: la orden corta que "
+            f"`contexto_bbdd` sirve en lugar de `regla` + `motivo`"
+        )
+    if not RESUMEN_MIN <= len(texto) <= RESUMEN_MAX:
+        return (
+            f"el `resumen` de `{regla.codigo}` tiene {len(texto)} caracteres y "
+            f"tiene que estar entre {RESUMEN_MIN} y {RESUMEN_MAX}: una orden que "
+            f"baste sola, no un titular ni la regla entera"
+        )
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -1176,6 +1279,88 @@ def derivar_avisos(dicc: Diccionario) -> Diccionario:
         for ficha in dicc.fichas
     )
     return replace(dicc, fichas=fichas)
+
+
+# ---------------------------------------------------------------------------
+# F-147 · El presupuesto de lo que `contexto_bbdd` sirve entero
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class PresupuestoContexto:
+    """Caracteres que `contexto_bbdd` de `mcp-bbdd` sirve ENTEROS, por parte.
+
+    No incluye los rótulos y epígrafes de `mcp-bbdd`: son suyos y constantes, y
+    copiarlos aquí sería una segunda copia de su código. El tope de la puerta se
+    fija sobre esta misma medida, así que compara igual con igual.
+    """
+
+    reglas: int
+    enrutado: int
+    bloques: int
+
+    @property
+    def total(self) -> int:
+        return self.reglas + self.enrutado + self.bloques
+
+
+def presupuesto_contexto(
+    dicc: Diccionario, bloques: Sequence[str]
+) -> PresupuestoContexto:
+    """Lo que `contexto_bbdd` servirá ENTERO, medido desde el diccionario (R17).
+
+    * Reglas publicables: `codigo + titulo + resumen`, más `regla + motivo` de
+      las `entera`. Las `fuera_mcp` no se publican y no cuentan.
+    * Enrutado: por ficha recomendada, `esquema.objeto` y sus
+      `MAX_PREGUNTAS_ENRUTADO` primeras preguntas.
+    * Bloques: el `texto` de cada fila de `_meta.diccionario_contexto`. Llegan
+      ya hechos porque el dominio no importa infraestructura; quien llama pasa
+      los de `filas_contexto`, la misma función que publica (R20: un bloque
+      nuevo cuenta sin tocar esta función).
+    """
+    reglas = sum(
+        len(r.codigo) + len(r.titulo) + len(r.resumen.strip())
+        + (len(r.regla) + len(r.motivo) if r.entrega == "entera" else 0)
+        for r in dicc.reglas
+        if r.publicable
+    )
+    enrutado = sum(
+        len(f.nombre)
+        + sum(len(p) for p in f.ejemplos_preguntas[:MAX_PREGUNTAS_ENRUTADO])
+        for f in dicc.fichas
+        if f.consumo_recomendado and f.ejemplos_preguntas
+    )
+    return PresupuestoContexto(
+        reglas=reglas, enrutado=enrutado, bloques=sum(len(t) for t in bloques)
+    )
+
+
+def veredicto_presupuesto(medida: PresupuestoContexto, tope: int) -> str | None:
+    """`None` si la medida cabe en el tope sin holgura de más; si no, el porqué.
+
+    Falla en los dos sentidos (R18, R19): por encima del tope, diciendo cuánto
+    sobra y de qué parte; y con más de `HOLGURA_TRINQUETE` por debajo, pidiendo
+    bajarlo a la medida, para que el sitio que se libera no lo gaste nadie en
+    silencio.
+    """
+    desglose = (
+        f"reglas {medida.reglas}, enrutado {medida.enrutado}, "
+        f"bloques {medida.bloques}"
+    )
+    if medida.total > tope:
+        return (
+            f"`contexto_bbdd` serviría {medida.total} caracteres y el tope es "
+            f"{tope}: sobran {medida.total - tope} ({desglose}). Acorta lo que "
+            f"creció o, si el crecimiento está decidido, sube el tope con su "
+            f"motivo al lado"
+        )
+    if tope - medida.total > HOLGURA_TRINQUETE:
+        return (
+            f"`contexto_bbdd` sirve {medida.total} caracteres y el tope es "
+            f"{tope}: baja el tope a {medida.total} ({desglose}). Trinquete: el "
+            f"sitio que se libera no se deja para que lo gaste otro"
+        )
+    return None
 
 
 # ---------------------------------------------------------------------------

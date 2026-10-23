@@ -37,7 +37,7 @@
 -- DATO PERSONAL: `creada_por` es el LOGIN de quien creó la alarma (D6, como
 -- `subido_por` de F-090). Las alarmas de recursos (33) y partes (35) nombran
 -- trabajadores y bajas: solo en `compras_restringida`, que el rol estándar no
--- lee (D9, `R-COMPRAS-RESTRINGIDA`).
+-- lee (D9, `R-PERFILES`).
 -- ============================================================================
 
 -- R14 · La guarda de ingesta. Sin ninguna alarma de factura en `raw.conala` la
@@ -211,7 +211,7 @@ CREATE INDEX ix_com_documento_alarmas_documento ON compras.documento_alarmas (do
 CREATE INDEX ix_com_documento_alarmas_familia   ON compras.documento_alarmas (familia);
 
 COMMENT ON TABLE compras.documento_alarmas IS
-'Alarmas de los documentos de Sigrid (F-138): una fila por alarma (raw.conala) de facturas, albaranes, contratos, facturas de venta, comparativos y el resto de familias, con su texto libre integro, su tipo (auxala), quien y cuando la creo y su clase de liquidacion. SIN las de recursos y partes de trabajo, que viven en compras_restringida (R-COMPRAS-RESTRINGIDA). Clave alarma_id.';
+'Alarmas de los documentos de Sigrid (F-138): una fila por alarma (raw.conala) de facturas, albaranes, contratos, facturas de venta, comparativos y el resto de familias, con su texto libre integro, su tipo (auxala), quien y cuando la creo y su clase de liquidacion. SIN las de recursos y partes de trabajo, que viven en compras_restringida (R-PERFILES). Clave alarma_id.';
 
 -- R14 · la guarda de la restricción. Recalcula desde `raw.con` (no desde la
 -- columna `restringido`, que podría estar mal calculada) que la general no

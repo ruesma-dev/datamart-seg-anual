@@ -88,6 +88,8 @@ def _regla(codigo: str, **kwargs) -> Regla:
         "ambito": ("mart",),
         "regla": "Qué hacer y qué no hacer.",
         "motivo": "Por qué, con el incidente real.",
+        # F-147: toda regla lleva su orden corta (40-250 caracteres).
+        "resumen": "Haz esto y no aquello; dilo en la respuesta con la columna exacta.",
     }
     datos.update(kwargs)
     return Regla(**datos)

@@ -1268,36 +1268,28 @@ def test_f006_r2_el_diccionario_declara_el_coste_de_consultar() -> None:
     veces con el `statement_timeout` de 30 s, y `mart.v_master_vigente_anual`
     —marcada como recomendada— agotaba el tiempo **con `LIMIT 5`**.
 
-    El coste viaja por el canal que ya existe: una regla dura cuyo ámbito son
-    los objetos caros, que `derivar_avisos` cuelga de cada ficha afectada. Así
-    aparece en `describir_tabla` sin que el agente lea el bloque global.
+    Hasta F-147 el coste viajaba en una regla dura. F-147 (2026-10-22, decisión
+    del humano) la retiró y repartió lo que seguía vivo a las fichas, que es
+    donde se lee al consultar el objeto: las dos inconsultables, fuera del
+    consumo con su medida; las dos caras, con la orden de una sola consulta.
     """
     dicc = _diccionario()
-    regla = next((r for r in dicc.reglas if r.codigo == "R-COSTE-CONSULTA"), None)
 
-    assert regla is not None, "el diccionario sigue sin decir lo que cuesta consultar"
-    assert regla.severidad == "bloqueante"
-    for medido in ("60 s", "25 s", "10 s"):
-        assert medido in regla.regla, f"falta la cifra medida {medido}"
-
-    from etl_sigrid.domain.diccionario import derivar_avisos
-
-    derivado = derivar_avisos(dicc)
-    caras = (
-        "mart.v_fact_periodificado",
-        "cierre.v_pbi_cierre_indirectos_detalle",
-    )
-    for objeto in caras:
-        assert objeto in regla.ambito, f"{objeto} es cara y no esta en el ambito"
-        assert "R-COSTE-CONSULTA" in derivado.por_nombre[objeto].avisos, (
-            f"el aviso no llega a la ficha de {objeto}, que es donde se lee"
-        )
+    assert not [r for r in dicc.reglas if "COSTE" in r.codigo], "la regla se retiró en F-147"
+    for objeto in ("mart.v_fact_periodificado", "cierre.v_pbi_cierre_indirectos_detalle"):
+        ficha = dicc.por_nombre[objeto]
+        assert not ficha.consumo_recomendado, objeto
+        assert "60 s" in " ".join((ficha.motivo_no_consumo or "").split()), objeto
+    for objeto, medido in (("stg.plan_mensual", "25 s"), ("compras.fact_compras_linea", "10 s")):
+        descripcion = dicc.por_nombre[objeto].descripcion
+        assert contiene(descripcion, medido), f"falta la cifra medida {medido}"
+        assert contiene(descripcion, "Una sola consulta"), objeto
 
 
 #: F-078 (2026-09-15) materializó los tres objetos de CP por tipología. Un aviso
 #: de coste que era cierto y deja de serlo **se retira**: seguir apartando al
 #: agente de una vista que ya funciona hace el mismo daño que mandarle a una que
-#: no. Es la otra mitad de la lección de `R-COSTE-CONSULTA`.
+#: no. Es la otra mitad de la lección de la regla del coste de consulta.
 YA_NO_SON_CARAS = (
     "mart.v_pbi_cp_tipologia",
     "mart.v_master_vigente_anual",
@@ -1307,17 +1299,13 @@ YA_NO_SON_CARAS = (
 
 @pytest.mark.parametrize("nombre", YA_NO_SON_CARAS)
 def test_f006_r2_el_aviso_de_coste_no_sobrevive_al_arreglo(nombre: str) -> None:
-    """Materializado el objeto, ni la regla lo nombra en su ámbito ni la ficha
-    hereda el aviso."""
-    from etl_sigrid.domain.diccionario import derivar_avisos
+    """Materializado el objeto, su ficha no lo declara inconsultable ni caro."""
+    ficha = _diccionario().por_nombre[nombre]
+    texto = " ".join(f"{ficha.descripcion} {ficha.motivo_no_consumo or ''}".split())
 
-    dicc = _diccionario()
-    regla = next(r for r in dicc.reglas if r.codigo == "R-COSTE-CONSULTA")
-
-    assert nombre not in regla.ambito, (
-        f"{nombre} ya es una tabla y la regla lo sigue declarando caro"
-    )
-    assert "R-COSTE-CONSULTA" not in derivar_avisos(dicc).por_nombre[nombre].avisos
+    assert ficha.consumo_recomendado, f"{nombre} ya es una tabla y se puede consultar"
+    assert "NO SE PUEDE CONSULTAR" not in texto
+    assert "CARA DE CONSULTAR" not in texto
 
 
 def test_f006_r2_una_vista_que_no_se_puede_ejecutar_no_es_superficie_de_consumo() -> None:
@@ -1367,16 +1355,19 @@ def test_f006_r2_ninguna_ficha_recomienda_es_activa_para_saber_si_una_obra_vive(
         "stg.obras.activa seguia mandando a la gemela rota"
     )
 
+    # F-147 (D6): la regla ya no dice «no se puede responder»: define la obra
+    # VIVA de F-025 y sigue desmintiendo las dos columnas gemelas.
     regla = next(r for r in dicc.reglas if r.codigo == "R-OBRA-ACTIVA")
-    assert contiene(regla.regla, "NO se puede responder")
-    assert "919" in regla.regla and "583" in regla.regla
+    assert "stg.obras.activa" in regla.regla and "maestro.obras.es_activa" in regla.regla
+    assert contiene(regla.regla, "da el total disfrazado")
+    assert contiene(regla.resumen, "no sirven")
 
     # Y ninguna ficha anuncia como ejemplo una pregunta que no puede contestar.
     for ficha in dicc.fichas:
         for pregunta in ficha.ejemplos_preguntas:
             assert "obras activas" not in pregunta.lower(), (
-                f"{ficha.nombre} anuncia '{pregunta}', que R-OBRA-ACTIVA declara "
-                f"no respondible"
+                f"{ficha.nombre} anuncia '{pregunta}': se responde con el criterio "
+                f"de R-OBRA-ACTIVA, no desde la ficha de un objeto"
             )
 
 

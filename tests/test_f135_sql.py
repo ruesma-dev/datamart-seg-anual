@@ -655,7 +655,7 @@ def test_f135_diccionario_fichas_generales_con_las_columnas_del_sql(tabla: str) 
 def test_f135_diccionario_la_general_dice_que_le_falta_y_donde_esta() -> None:
     objetos = _yaml("contabilidad.yaml")["objetos"]
     mayor = _texto(objetos["mayor"])
-    for termino in ("contabilidad_restringida", "apuntes_restringidos_mes", "55.504", "R-CONTABILIDAD-RESTRINGIDA"):
+    for termino in ("contabilidad_restringida", "apuntes_restringidos_mes", "55.504", "R-PERFILES"):
         assert termino in mayor, f"la ficha del mayor general no dice «{termino}»"
     assert "SIN FILTRAR NINGUNO" not in objetos["mayor"]["descripcion"], "ya no es verdad"
     acumulado = objetos["mayor"]["columnas"]["saldo_acumulado"]["significado"]
@@ -675,16 +675,22 @@ def test_f135_r22_regla_dura_contabilidad_restringida() -> None:
     glob = _yaml("00_global.yaml")
     assert glob["version"] >= 49, "F-090 publicó la 48; F-135 sube a 49"
     reglas = {r["codigo"]: r for r in glob["reglas"]}
-    regla = reglas["R-CONTABILIDAD-RESTRINGIDA"]
-    assert regla["severidad"] == "bloqueante"
+    # F-147: la regla de la contabilidad restringida se fundió en `R-PERFILES`
+    # (entera); lo propio de la contabilidad pasó a sus fichas.
+    regla = reglas["R-PERFILES"]
+    assert regla["severidad"] == "bloqueante" and regla["entrega"] == "entera"
     assert {"contabilidad", RESTR} <= set(regla["ambito"])
-    texto = regla["regla"] + " " + regla["motivo"]
+    texto = " ".join(
+        [regla["resumen"], regla["regla"], regla["motivo"]]
+        + [_texto(f) for f in _yaml("contabilidad.yaml")["objetos"].values()]
+        + [(DIR_DICC / "contabilidad_restringida.yaml").read_text(encoding="utf-8")]
+    )
     for termino in (
         "contabilidad_restringida", "sigrid_dm_autorizado_ro", "incompleto",
-        "apuntes_restringidos_mes", "num_apuntes_restringidos", "NUNCA se suman",
-        "retenciones", "Juan Romero",
+        "apuntes_restringidos_mes", "num_apuntes_restringidos", "nunca se suman",
+        "retenciones", "Juan Romero", "F-135",
     ):
-        assert termino in texto, f"R-CONTABILIDAD-RESTRINGIDA no dice «{termino}»"
+        assert termino in texto, f"ni R-PERFILES ni las fichas dicen «{termino}»"
     assert set(reglas["R-SALDO-CONTABLE"]["ambito"]) >= {
         f"{RESTR}.mayor", f"{RESTR}.saldos_cuenta_mes"
     }, "la trampa del cierre y la apertura vale igual en la completa"
