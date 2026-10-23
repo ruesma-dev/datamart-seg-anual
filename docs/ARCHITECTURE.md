@@ -1010,15 +1010,36 @@ coherencia se garantiza por **verificación** y **visibilidad**:
   job diciendo que `build_mart` terminó en `SUCCESS`. Vigila desde **fuera**
   del ETL, así que «el job no lo hizo» dispara igual que «el job murió».
 
-**La ingesta hace commit por PÁGINA, no por tabla** (DA-8, confirmado leyendo
-`copy_rows` el 2026-08-18). `truncate_table` y cada página de 10.000 filas
-abren su propia conexión, y por tanto su propia transacción. Consecuencia para
-cualquier post mortem futuro: una muerte a mitad de tabla la deja **truncada y
-parcial**, no intacta. Donde se dijo «la ingesta es transaccional por tabla, lo
-cargado se conserva» se dijo mal. La puerta de F-024 no depende de ello: la
-marca de «tabla ingerida» solo se escribe cuando la tabla termina en `SUCCESS`,
-así que una tabla parcial queda con su última fila en `RUNNING` → `ABORTED` y
-la puerta la rechaza igual.
+**La ingesta hace commit por PÁGINA, no por tabla** (DA-8, confirmado el
+2026-08-18). Desde F-148 lo hace por **una conexión por tabla**: la
+`SesionDeCarga` (`sesion_carga.py`) abre la conexión en la primera página y
+la reutiliza para todas, con `COPY` + `COMMIT` por página; antes cada página
+abría la suya (~3.500 aperturas por noche contra el Postgres compartido, y
+una de ellas colgó la nocturna del 2026-10-22 130 s por apertura). La
+transacción sigue siendo por página, así que la consecuencia para cualquier
+post mortem no cambia: una muerte a mitad de tabla la deja **truncada y
+parcial**, no intacta. Si la conexión se rompe a mitad de una página, la
+sesión cuenta las filas del rango de ids de esa página para saber si el
+`COMMIT` llegó (0: no llegó; todas: sí; otra cifra: error, «página ambigua»),
+reconecta y reintenta hasta 3 veces; un error que no es de conexión hace
+`ROLLBACK` y propaga. Cada página deja `ingest_pagina` en el log (`http_s`,
+`pg_connect_s`, `copy_s`, `reintentos`) y el paso, `conexiones_abiertas` en
+su `metadata`. La puerta de F-024 no depende de nada de esto: la marca de
+«tabla ingerida» solo se escribe cuando la tabla termina en `SUCCESS`, así
+que una tabla parcial queda con su última fila en `RUNNING` → `ABORTED` y la
+puerta la rechaza igual.
+
+**Toda conexión lleva `connect_timeout` y keepalives** (F-148). Sin
+`connect_timeout`, psycopg 3 espera 130 s por apertura; ahora son 15
+(`PG_CONNECT_TIMEOUT_S`), con `keepalives` 30/10/3 y `tcp_user_timeout` 60 s
+para que un flujo que la red deje caer en silencio durante las esperas a
+`sigrid-api` se detecte en un minuto y no en los ~15 de la retransmisión de
+TCP. La apertura se reintenta (`reintento_conexion.py`, hasta
+`PG_CONNECT_INTENTOS` = 4, espera exponencial 2-30 s) SOLO ante errores
+transitorios —sin `sqlstate`, clase `08`, `53300`, `57P03`—; la autenticación
+fallida, el rol o la base inexistentes fallan a la primera. El `SET ROLE` no
+se reintenta. Una apertura de más de 2 s o con reintento deja
+`pg_conexion_lenta`.
 
 ### El datamart se explica solo (F-006)
 
@@ -1236,6 +1257,24 @@ ingest_raw → load_excel_aux → build_stg → build_mart
   se reaplican igual. El precio es que un esquema puede quedarse atrás sin
   tumbar la carga, y por eso la regla dura `R-FRESCURA` del diccionario manda
   citar la frescura DEL PASO, no la del pipeline.
+- **Permisos tras cada build, sin esperar al final** (F-148). Una noche que
+  moría a medias dejaba esquemas sin `GRANT` hasta la noche siguiente
+  (2026-10-20). Ahora `run-all` aplica los permisos completos —la lógica
+  íntegra de `ApplyGrantsStep`, con sus vetos— tras cada uno de los diez build
+  de `PASOS_CON_PERMISOS` que se EJECUTA, vaya bien o mal, y graba la fila
+  `apply_grants.tras_<paso>`. Si fallan, aviso `permisos_tras_paso_fallidos`
+  y la noche sigue; el `apply_grants` final sigue siendo el que decide.
+- **El reintento del job reanuda, no repite** (F-148). El job tiene
+  `replicaRetryLimit` 1 y la segunda réplica empezaba de cero (el 22-10 la
+  noche terminó a las 04:31). Ahora `run-all` lee
+  `CONTAINER_APP_JOB_EXECUTION_NAME`, que comparten las dos réplicas, y el
+  sufijo del `batch_id` sale de su SHA-256: la segunda réplica encuentra el
+  lote de la primera (de las últimas 8 h), lo **adopta** y omite lo que ya
+  quedó en `SUCCESS`: un paso, si sus dependencias también se omiten
+  (`apply_grants` nunca), y cada tabla de `raw` ya cargada. Como el lote es el
+  mismo, la puerta de `build_stg` ve un solo lote. Un paso omitido no graba
+  fila: `v_frescura` sigue diciendo cuándo se construyó de verdad. Sin la
+  variable (el puesto, los comandos sueltos) todo es como antes.
 - **Los siete registran paso** en `_meta.etl_runs` con el `batch_id` de la
   noche. `build-compras` y `build-retenciones` no lo hacían —ejecutaban SQL en
   línea, sin step—, así que su fecha de build no era consultable por SQL
