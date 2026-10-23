@@ -45,4 +45,5 @@ def build_postgres_client_from(pg: PostgresSettings) -> PostgresClient:
         target_db=pg.db,
         auto_create_db=pg.auto_create_db,
         set_role=pg.set_role,
+        connect_intentos=pg.connect_intentos,
     )

@@ -23,6 +23,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from time import sleep
 from typing import Any
 
 import psycopg
@@ -45,6 +46,10 @@ from etl_sigrid.infrastructure.postgres.grants import (
     build_restricted_grant_statements,
     build_veto_statements,
     partir_tabla_cualificada,
+)
+from etl_sigrid.infrastructure.postgres.reintento_conexion import (
+    abrir_con_reintento,
+    psycopg_en_debug,
 )
 from etl_sigrid.infrastructure.postgres.timings import Timing
 
@@ -130,6 +135,9 @@ TIMINGS_SIN_ANCLA = 100
 # autenticación Entra la "contraseña" es un token que caduca y hay que
 # resolverlo en cada conexión, no una vez al arrancar.
 ConnInfo = str | Callable[[], str]
+
+#: Una apertura sana tarda menos de un segundo; más de esto se registra (F-148).
+UMBRAL_CONEXION_LENTA_S = 2.0
 
 
 # --- Troceo y puerta de disco del build de plan_mensual (F-019) -------------
@@ -718,6 +726,12 @@ class PostgresClient:
         set_role       : rol de grupo al que hacer SET ROLE al abrir cada
                          sesión, para que todos los objetos tengan el mismo
                          propietario conecte quien conecte.
+        connect_intentos: intentos al abrir una conexión ante un error
+                         transitorio (F-148, `PG_CONNECT_INTENTOS`).
+        dormir         : la espera entre intentos; se inyecta en los tests.
+
+    `conexiones_abiertas` cuenta las conexiones que ha abierto el cliente
+    (F-148, R17): es la medida del antes y el después de la sesión de carga.
     """
 
     def __init__(
@@ -728,6 +742,8 @@ class PostgresClient:
         *,
         auto_create_db: bool = True,
         set_role: str | None = None,
+        connect_intentos: int = 4,
+        dormir: Callable[[float], None] = sleep,
     ) -> None:
         self._conninfo = conninfo
         self._admin_conninfo = admin_conninfo
@@ -735,6 +751,9 @@ class PostgresClient:
         self._auto_create_db = auto_create_db
         self._set_role = (set_role or "").strip()
         self._bootstrap_done = False
+        self._connect_intentos = connect_intentos
+        self._dormir = dormir
+        self.conexiones_abiertas = 0
 
     # ---------------------------------------------------------------------
     # Conexión (con auto-bootstrap)
@@ -751,8 +770,26 @@ class PostgresClient:
         sesión (R7). Todo el cliente pasa por aquí: si alguna ruta se saltara
         el SET ROLE, crearía objetos con otro propietario y el siguiente
         proceso no podría recrearlos.
+
+        F-148: la apertura se reintenta ante un error transitorio (R3), con el
+        logger de psycopg en DEBUG mientras dura (R15), y deja
+        `pg_conexion_lenta` si tarda más de `UMBRAL_CONEXION_LENTA_S` o
+        necesitó reintento (R16). El `SET ROLE` NO se reintenta: si falla es un
+        permiso, no la red (R7).
         """
-        conn = psycopg.connect(self._resolve(conninfo), autocommit=autocommit)
+
+        def _abrir() -> psycopg.Connection:
+            with psycopg_en_debug():
+                return psycopg.connect(self._resolve(conninfo), autocommit=autocommit)
+
+        conn, segundos, intentos = abrir_con_reintento(
+            _abrir, intentos=self._connect_intentos, dormir=self._dormir
+        )
+        self.conexiones_abiertas += 1
+        if segundos > UMBRAL_CONEXION_LENTA_S or intentos > 1:
+            logger.warning(
+                "pg_conexion_lenta", connect_s=round(segundos, 3), intentos=intentos
+            )
         if self._set_role:
             try:
                 with conn.cursor() as cur:
@@ -1671,8 +1708,8 @@ class PostgresClient:
             SQL_INSERT_PUBLICACION,
             SQL_INSERT_REGLA,
             fila_publicacion,
-            filas_diccionario,
             filas_contexto,
+            filas_diccionario,
             filas_reglas,
         )
 

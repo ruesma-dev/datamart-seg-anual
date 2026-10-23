@@ -21,7 +21,9 @@ import pytest
 from psycopg import errors as pg_errors
 
 from config.settings import PostgresSettings
-from etl_sigrid.infrastructure.postgres import conninfo, reintento_conexion
+from etl_sigrid.infrastructure.postgres import conninfo, postgres_client, reintento_conexion
+from etl_sigrid.infrastructure.postgres.client_factory import build_postgres_client_from
+from etl_sigrid.infrastructure.postgres.postgres_client import PostgresClient
 from etl_sigrid.infrastructure.postgres.reintento_conexion import (
     abrir_con_reintento,
     es_error_transitorio,
@@ -345,3 +347,189 @@ def test_f148_r15_vuelve_a_su_nivel_aunque_falle() -> None:
         registrador.setLevel(previo)
 
 
+# ---------------------------------------------------------------------------
+# R3, R7, R16, R17 · PostgresClient._connect
+# ---------------------------------------------------------------------------
+
+
+class ConexionFalsa:
+    def __init__(self, falla_set_role: bool = False) -> None:
+        self.sentencias: list[str] = []
+        self.cerrada = False
+        self._falla = falla_set_role
+
+    def cursor(self) -> ConexionFalsa:
+        return self
+
+    def __enter__(self) -> ConexionFalsa:
+        return self
+
+    def __exit__(self, *_: object) -> bool:
+        return False
+
+    def execute(self, sentencia: object, *_: object) -> None:
+        if self._falla:
+            raise pg_errors.lookup("42501")("permission denied to set role")
+        self.sentencias.append(str(sentencia))
+
+    def close(self) -> None:
+        self.cerrada = True
+
+
+class PsycopgFalso:
+    """Sustituye a `psycopg.connect`: falla con los errores dados y luego conecta."""
+
+    def __init__(self, *errores: BaseException, falla_set_role: bool = False) -> None:
+        self._errores = list(errores)
+        self.llamadas: list[tuple[str, bool, int]] = []
+        self.conexiones: list[ConexionFalsa] = []
+        self._falla_set_role = falla_set_role
+
+    def connect(self, dsn: str, autocommit: bool = False) -> ConexionFalsa:
+        self.llamadas.append((dsn, autocommit, logging.getLogger("psycopg").level))
+        if self._errores:
+            raise self._errores.pop(0)
+        conexion = ConexionFalsa(self._falla_set_role)
+        self.conexiones.append(conexion)
+        return conexion
+
+
+def _cliente(**kwargs: object) -> PostgresClient:
+    return PostgresClient("dbname=uno", "dbname=admin", "sigrid_dm", **kwargs)  # type: ignore[arg-type]
+
+
+def test_f148_r3_connect_reintenta_y_cuenta_una_conexion(monkeypatch: pytest.MonkeyPatch) -> None:
+    doble = PsycopgFalso(_timeout())
+    monkeypatch.setattr(psycopg, "connect", doble.connect)
+    esperas: list[float] = []
+    cliente = _cliente(dormir=esperas.append)
+
+    conexion = cliente._connect("dbname=uno", autocommit=True)
+
+    assert conexion is doble.conexiones[0]
+    assert [(d, a) for d, a, _n in doble.llamadas] == [("dbname=uno", True)] * 2
+    assert esperas == [2]
+    assert cliente.conexiones_abiertas == 1
+
+
+def test_f148_r3_los_intentos_vienen_del_cliente(monkeypatch: pytest.MonkeyPatch) -> None:
+    doble = PsycopgFalso(_timeout(), _timeout())
+    monkeypatch.setattr(psycopg, "connect", doble.connect)
+
+    with pytest.raises(pg_errors.ConnectionTimeout):
+        _cliente(connect_intentos=2, dormir=lambda _s: None)._connect("dbname=uno")
+
+    assert len(doble.llamadas) == 2
+
+
+def test_f148_r3_por_defecto_cuatro_intentos(monkeypatch: pytest.MonkeyPatch) -> None:
+    doble = PsycopgFalso(*[_timeout() for _ in range(4)])
+    monkeypatch.setattr(psycopg, "connect", doble.connect)
+
+    with pytest.raises(pg_errors.ConnectionTimeout):
+        _cliente(dormir=lambda _s: None)._connect("dbname=uno")
+
+    assert len(doble.llamadas) == 4
+
+
+def test_f148_r15_connect_ocurre_en_debug(monkeypatch: pytest.MonkeyPatch) -> None:
+    doble = PsycopgFalso()
+    monkeypatch.setattr(psycopg, "connect", doble.connect)
+    registrador = logging.getLogger("psycopg")
+    previo = registrador.level
+    registrador.setLevel(logging.WARNING)
+    try:
+        _cliente()._connect("dbname=uno")
+        assert doble.llamadas[0][2] == logging.DEBUG
+        assert registrador.level == logging.WARNING
+    finally:
+        registrador.setLevel(previo)
+
+
+def test_f148_r7_set_role_que_falla_cierra_y_no_reintenta(monkeypatch: pytest.MonkeyPatch) -> None:
+    doble = PsycopgFalso(falla_set_role=True)
+    monkeypatch.setattr(psycopg, "connect", doble.connect)
+
+    with pytest.raises(pg_errors.InsufficientPrivilege):
+        _cliente(set_role="sigrid_dm_etl", dormir=lambda _s: None)._connect("dbname=uno")
+
+    assert len(doble.llamadas) == 1
+    assert doble.conexiones[0].cerrada is True
+
+
+def test_f148_r16_conexion_lenta_por_tiempo(monkeypatch: pytest.MonkeyPatch) -> None:
+    registro = LoggerFalso()
+    monkeypatch.setattr(postgres_client, "logger", registro)
+    monkeypatch.setattr(psycopg, "connect", PsycopgFalso().connect)
+    monkeypatch.setattr(reintento_conexion, "perf_counter", Reloj(100.0, 102.0004))
+
+    _cliente()._connect("dbname=uno")
+
+    (aviso,) = registro.de("pg_conexion_lenta")
+    assert aviso == {"connect_s": 2.0, "intentos": 1}
+
+
+def test_f148_r16_dos_segundos_justos_no_es_lenta(monkeypatch: pytest.MonkeyPatch) -> None:
+    registro = LoggerFalso()
+    monkeypatch.setattr(postgres_client, "logger", registro)
+    monkeypatch.setattr(psycopg, "connect", PsycopgFalso().connect)
+    monkeypatch.setattr(reintento_conexion, "perf_counter", Reloj(100.0, 102.0))
+
+    _cliente()._connect("dbname=uno")
+
+    assert registro.de("pg_conexion_lenta") == []
+
+
+def test_f148_r16_conexion_lenta_por_reintento(monkeypatch: pytest.MonkeyPatch) -> None:
+    registro = LoggerFalso()
+    monkeypatch.setattr(postgres_client, "logger", registro)
+    monkeypatch.setattr(psycopg, "connect", PsycopgFalso(_timeout()).connect)
+    monkeypatch.setattr(reintento_conexion, "perf_counter", Reloj(5.0, 5.12345))
+
+    _cliente(dormir=lambda _s: None)._connect("dbname=uno")
+
+    (aviso,) = registro.de("pg_conexion_lenta")
+    assert aviso == {"connect_s": 0.123, "intentos": 2}
+
+
+def test_f148_r17_cuenta_cada_conexion_abierta(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(psycopg, "connect", PsycopgFalso().connect)
+    cliente = _cliente()
+    assert cliente.conexiones_abiertas == 0
+
+    cliente._connect("dbname=uno")
+    cliente._connect("dbname=uno")
+
+    assert cliente.conexiones_abiertas == 2
+
+
+def test_f148_r3_la_factoria_pasa_los_intentos(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Con UN intento configurado, el primer timeout se propaga sin esperar."""
+    doble = PsycopgFalso(_timeout())
+    monkeypatch.setattr(psycopg, "connect", doble.connect)
+    cliente = build_postgres_client_from(_pg(connect_intentos=1))
+
+    with pytest.raises(pg_errors.ConnectionTimeout):
+        cliente._connect(cliente._conninfo)
+
+    assert len(doble.llamadas) == 1
+    assert "connect_timeout=15" in doble.llamadas[0][0]
+
+
+def test_f148_r3_el_cliente_de_run_all_tambien_lleva_los_intentos(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`main._get_pg` construye su propio cliente: también tiene que pasarlos."""
+    from types import SimpleNamespace
+
+    import main
+
+    doble = PsycopgFalso(_timeout())
+    monkeypatch.setattr(psycopg, "connect", doble.connect)
+    monkeypatch.setattr(main, "get_settings", lambda: SimpleNamespace(postgres=_pg(connect_intentos=1)))
+    cliente = main._get_pg()
+
+    with pytest.raises(pg_errors.ConnectionTimeout):
+        cliente._connect(cliente._conninfo)
+
+    assert len(doble.llamadas) == 1
