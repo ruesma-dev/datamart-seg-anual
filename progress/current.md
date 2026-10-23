@@ -9,6 +9,29 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-23 · F-148 · `spec_ready` (spec-author) · rama `feature/F-148-robustez-nocturna`
+
+- Spec escrita: `specs/F-148-robustez-nocturna/` (requirements 145, design 250, tasks 15
+  tareas). Diagnóstico redactado y sin datos sensibles en `progress/explore_F-148_corte.md`.
+- Enfoque del humano (1+2+3+4): sesión de carga con UNA conexión por tabla y COPY+COMMIT por
+  página; `connect_timeout` 15 s + reintento (4 intentos, 2/4/8 s; nunca ante autenticación);
+  keepalives + `tcp_user_timeout` 60 s con reintento IDEMPOTENTE de página (cuenta filas en el
+  rango de ids); reanudación por `CONTAINER_APP_JOB_EXECUTION_NAME` (sufijo del `batch_id`,
+  ventana 8 h; omite pasos `SUCCESS` del lote cuyas dependencias también se omiten, y tablas de
+  `raw` ya cargadas; `apply_grants` nunca se omite); permisos completos (`ApplyGrantsStep`
+  entero) tras cada uno de los diez build, como sub-fila `apply_grants.tras_<paso>`;
+  `ingest_pagina` con `http_s`/`pg_connect_s`/`copy_s`. Sin DDL ni variables nuevas en el job.
+- **Decisiones abiertas para el humano** (`design.md` §12): **D1** `connect_timeout` 15 o 10 s;
+  **D2** keepalives 30/10/3 y `tcp_user_timeout` 60 s; **D3** identidad del lote por
+  `CONTAINER_APP_JOB_EXECUTION_NAME` (si no existiera, no reanuda y todo sigue como hoy);
+  **D4** permisos tras cada build (coste por medir; recortar si > ~30 s cada uno); **D5** subir el
+  rigor de `estandar` a `critico` (servidor compartido + permisos del perfil restringido);
+  **D6** N = 7 noches seguidas, contando también los huecos > 100 s entre páginas (un hueco de
+  `http_s` no rompe la racha y se remite a `sigrid-api`); **D7** `ingest_pagina` en todas las
+  páginas o solo en las lentas.
+- Fuera (recomendación, escrituras en Azure del humano): logs del servidor compartido, mover la
+  hora (no recomendado), VNet/NAT Gateway.
+
 ## 2026-10-23 · F-147 · CERRADA (`done`, APROBADO en pasada 2, `ae59f75`) · merge `09886ce` · DESPLEGADA
 
 - Orden del humano (23-10): merge, despliegue, diccionario y reinicio del MCP. `init.sh` sobre

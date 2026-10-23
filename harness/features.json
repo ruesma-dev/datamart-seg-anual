@@ -2348,12 +2348,12 @@
         "`azure-apps/datamart_seg_anual.md` al día si cambia la hora, el job o lo que se consume del Postgres compartido",
         "`bash harness/init.sh` en verde y APROBADO del reviewer; despliegue MANUAL en `progress/current.md`"
       ],
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "rigor": "estandar",
       "priority": 1,
       "branch": "feature/F-148-robustez-nocturna",
-      "notes": "2026-10-23: alta con prioridad máxima por orden del humano. Empieza por el diagnóstico (solo lectura)."
+      "notes": "2026-10-23: alta con prioridad máxima por orden del humano. Empieza por el diagnóstico (solo lectura). 2026-10-23: diagnóstico (progress/explore_F-148_corte.md) revisado con el humano, que elige el enfoque 1+2+3+4; spec en specs/F-148-robustez-nocturna/ con decisiones abiertas D1-D7 en design.md §12 (D5: subir el rigor a critico)."
     }
   ]
 }
