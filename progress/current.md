@@ -14,6 +14,49 @@
 - Retomada tras el desbloqueo. Primer `init.sh` sobre la rama reubicada: un KO propio (el GUID
   de la carpeta temporal que este implementer anotó abajo, cazado por `test_f003_r4`); retirado.
 - Tarea en curso, decisiones y desviaciones: en las viñetas que siguen y en `progress/impl_F-148.md`.
+- **T1-T13 hechas**, un commit por tarea (`F-148 T1` … `F-148 T13`). Queda T14 (campaña de
+  mutación ENTERA, rigor `critico`) y T15 (`init.sh` en verde).
+- **Desviaciones respecto a la spec, justificadas** (detalle en `impl_F-148.md`):
+  1. `es_error_transitorio` no lleva la rama explícita «clase `28`/`3D000` → False» de §5: esos
+     casos ya caen en False por las marcas de autenticación, la regex de rol/base inexistente y
+     porque `28…`/`3D000` no están entre los transitorios. Con la rama explícita la campaña
+     tendría mutantes equivalentes por construcción. Mismo comportamiento, probado caso a caso.
+  2. `Ejecucion` gana el campo `reanudada` (False por defecto; `ejecucion_desde_batch` lo pone a
+     True): es lo que dice a `run-all` si debe leer lo terminado del lote. Sin él, un lote NUEVO
+     con el sufijo del job leería filas ajenas.
+  3. En `main.py`, además de lo de §5: `_identidad_de_la_ejecucion` y `_terminados_del_lote`
+     (las dos ramas de R18-R20 separadas para poder probarlas) y `VARIABLE_EJECUCION_JOB`.
+  4. Los tests de versión del diccionario siguen la convención del repo: `test_f147` pasa a
+     `>= 59` y el de F-148 es `>= 60`.
+  5. `test_f024_cli` R3 cuenta aparte las diez filas `apply_grants.tras_*`; la exigencia de una
+     fila por paso se mantiene intacta.
+
+### F-148 · PENDIENTE DEL HUMANO tras APROBADO y merge (T13: `design.md` §7 y §8)
+
+Despliegue MANUAL, en este orden:
+
+1. `powershell -NoProfile -File infra/70_build_image.ps1` (anotar el tag).
+2. `powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag>`. Sin variables nuevas en el
+   job; sin DDL; el diccionario v60 lo publica la propia nocturna con la imagen nueva (NO
+   publicar desde el puesto antes: memoria «publicar el diccionario solo con su imagen»).
+3. Primera nocturna: comprobar en Log Analytics `ejecucion_job=<nombre>` en el arranque (D3),
+   `ingest_pagina` por página, `conexiones_abiertas` en la `metadata` de `ingest_raw` y filas
+   `apply_grants.tras_*` en `SUCCESS`.
+4. Medir el coste de los permisos por paso (D4): `SELECT step, finished_at - started_at FROM
+   _meta.etl_runs WHERE batch_id = '<lote>' AND step LIKE 'apply_grants%'`.
+5. Contar **7 noches SEGUIDAS** (R31) y anotar cada una aquí, una línea por noche:
+   - `_meta.etl_runs`: `SELECT batch_id, step, status, started_at FROM _meta.etl_runs WHERE
+     started_at >= '<día>' AND (step LIKE 'ingest_raw%' AND status IN ('FAILED','ABORTED'));`
+     → cero filas. Una sola réplica por ejecución (`az containerapp job execution list`).
+   - Huecos > 100 s entre páginas (KQL, workspace del entorno del job) y su atribución:
+     `ContainerAppConsoleLogs_CL | where Log_s has "ingest_pagina" | extend j = parse_json(Log_s)
+     | project ts = todatetime(j.timestamp), tabla = tostring(j.table), page = toint(j.page),
+     http_s = todouble(j.http_s), pg_connect_s = todouble(j.pg_connect_s), copy_s =
+     todouble(j.copy_s), exec = ContainerGroupName_s | where http_s > 100 or pg_connect_s > 100
+     or copy_s > 100`. Un hueco de `http_s` no rompe la racha y se remite a `sigrid-api` (D6).
+   - Control independiente: la consulta H6 del diagnóstico (`sigrid_stream_page`, `gap_s >
+     100`); cada hueco suyo debe tener su `ingest_pagina` que lo explique.
+   - Noches contadas: (ninguna todavía)
 
 ## 2026-10-23 · F-148 · `blocked` (implementer, ANTES de escribir código) · init.sh en rojo
 
