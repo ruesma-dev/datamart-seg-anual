@@ -11,6 +11,8 @@
 
 ## 2026-10-23 · F-148 · `blocked` (implementer, ANTES de escribir código) · init.sh en rojo
 
+- **RESUELTO por el líder (2026-10-23)**: rama reubicada sobre `main` (`git rebase --onto main eb5e480`, solo local; base `9ff322f`) y `design.md` a 250 líneas (§12 compactada). F-148 vuelve a `spec_ready` y se relanza el implementer.
+
 - `bash harness/init.sh` (precondición 1 del implementer) sale en ROJO con 3 KO, ninguno de
   código (1 failed, 6.774 passed, 253 skipped en 28 min 52 s; `-x` paró en el primero):
   1. **La rama nació de `dev`, no de `main`.** `git merge-base HEAD main` = `9ff322f`, y entre

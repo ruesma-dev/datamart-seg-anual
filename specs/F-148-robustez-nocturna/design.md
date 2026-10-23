@@ -232,11 +232,9 @@ Control independiente: la consulta H6 del diagnóstico (`sigrid_stream_page`,
 `sigrid_api_client.py`; `domain/coherencia.py`; `ingest_descompuestos` (gana
 el reintento vía `_connect`); el DDL de `_meta`; `abortar_runs_huerfanos`.
 
-## 12 · Decisiones del humano (CERRADAS el 2026-10-23: todas según la propuesta)
+## 12 · Decisiones del humano (CERRADAS el 2026-10-23, todas según la propuesta)
 
-D1 15 s · D2 30/10/3 y 60 s · D3 sí · D4 sí, medir y recortar si > ~30 s · D5 rigor `critico` · D6 7 noches · D7 todas las páginas.
-
-- **D1** `connect_timeout` 15 s (propuesto) o 10 s.
+- **D1** `connect_timeout` 15 s (elegido) o 10 s.
 - **D2** Valores de keepalives (30/10/3) y `tcp_user_timeout` 60 s (§4).
 - **D3** Identidad del lote por `CONTAINER_APP_JOB_EXECUTION_NAME` (variable
   documentada por Microsoft para jobs; se confirma en la primera nocturna). Si
@@ -245,7 +243,7 @@ D1 15 s · D2 30/10/3 y 60 s · D3 sí · D4 sí, medir y recortar si > ~30 s ·
   más de ~30 s cada uno, recortar la lista.
 - **D5** Rigor: la feature está en `estandar`; toca las conexiones al servidor
   compartido y el camino de los permisos del perfil restringido. Propuesta:
-  subir a `critico` (campaña de mutación entera).
+  subir a `critico` (campaña de mutación entera). Elegido.
 - **D6** N = 7 noches (propuesto). Un hueco de `http_s` > 100 s no rompe la
   racha y se remite a `sigrid-api` (hipótesis B del diagnóstico).
 - **D7** `ingest_pagina` en TODAS las páginas (~3.000 líneas más por noche) o

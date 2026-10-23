@@ -2348,7 +2348,7 @@
         "`azure-apps/datamart_seg_anual.md` al día si cambia la hora, el job o lo que se consume del Postgres compartido",
         "`bash harness/init.sh` en verde y APROBADO del reviewer; despliegue MANUAL en `progress/current.md`"
       ],
-      "status": "blocked",
+      "status": "spec_ready",
       "sdd": true,
       "rigor": "critico",
       "priority": 1,
