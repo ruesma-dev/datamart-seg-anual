@@ -643,7 +643,7 @@ ORDER BY started_at, id
 # SOLO LECTURA sobre `raw`. Responde si la marca de modificación de Sigrid
 # sirve como watermark **sin volver a leer Sigrid**: sus valores ya están
 # guardados en `_source_tiemod`, carga tras carga, desde que existe
-# `copy_rows(tiemod_column=...)`.
+# `copy_rows(tiemod_column=...)` (desde F-148, la sesión de carga).
 #
 # El COUNT(DISTINCT) no es gratis —obliga a recorrer la tabla entera— y por eso
 # esto es un comando que se lanza a mano, no un paso del pipeline.
@@ -2102,55 +2102,6 @@ class PostgresClient:
 
     # ---------------------------------------------------------------------
 
-    def copy_rows(
-        self,
-        schema: str,
-        table: str,
-        columns: list[str],
-        rows: Iterable[dict[str, Any]],
-        *,
-        tiemod_column: str | None = None,
-    ) -> int:
-        """
-        Inserta filas en `schema.table` usando COPY FROM STDIN en formato texto.
-
-        `rows` es un iterable de dicts (no se materializa entero en memoria).
-        `columns` define el orden y selección de columnas a insertar.
-        Añade automáticamente `_source_tiemod` si `tiemod_column` se proporciona
-        y existe en cada fila.
-
-        Devuelve el número de filas insertadas.
-        """
-        if not columns:
-            raise ValueError("Lista de columnas vacía")
-
-        # Cláusula de columnas para COPY. Incluye _source_tiemod si procede.
-        copy_columns = list(columns)
-        if tiemod_column:
-            copy_columns.append("_source_tiemod")
-
-        copy_sql = sql.SQL(
-            "COPY {}.{} ({}) FROM STDIN WITH (FORMAT text, NULL '\\N')"
-        ).format(
-            sql.Identifier(schema),
-            sql.Identifier(table),
-            sql.SQL(", ").join(sql.Identifier(c) for c in copy_columns),
-        )
-
-        rows_written = 0
-
-        with self.connection() as conn, conn.cursor() as cur, cur.copy(copy_sql) as copy:
-            for row in rows:
-                fields: list[str] = []
-                for c in columns:
-                    fields.append(_pg_text_format(row.get(c)))
-                if tiemod_column:
-                    fields.append(_pg_text_format(row.get(tiemod_column)))
-                copy.write("\t".join(fields) + "\n")
-                rows_written += 1
-
-        return rows_written
-
     @contextmanager
     def sesion_de_carga(
         self,
@@ -2197,8 +2148,8 @@ class PostgresClient:
         `DELETE` de las filas que casan con `filtro`, `COPY` de `filas` y, si se
         da, la fila de `control` (un `UPSERT` por su clave, o su `DELETE` si
         `control.valores` es `None`). Las tres cosas van por la MISMA conexion
-        y con un solo `commit`, que es lo que `copy_rows` no puede dar: abre una
-        conexion por llamada. Si algo falla, `connection()` hace `rollback` y
+        y con un solo `commit`, que es lo que `copy_rows` no podía dar: abría una
+        conexion por llamada (F-148 lo retiró). Si algo falla, `connection()` hace `rollback` y
         queda lo que habia: nunca dos copias ni media version.
 
         Un `filtro` vacio se rechaza ANTES de abrir la conexion: seria un

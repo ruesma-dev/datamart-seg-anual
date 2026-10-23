@@ -16,12 +16,15 @@ Características:
     - Idempotente: ejecutarlo dos veces deja el mismo estado.
     - Incremental por defecto: solo trae filas con ide > MAX(ide) ya cargado.
     - Streaming: no carga toda la tabla en memoria (psycopg COPY + iterador HTTP).
+    - Una conexión por tabla (F-148): las páginas viajan por UNA sesión de carga,
+      con COPY y COMMIT por página; antes se abría una conexión por página.
     - Resiliente: si una tabla falla, las demás continúan (configurable).
 """
 
 from __future__ import annotations
 
 from datetime import datetime
+from time import perf_counter
 
 from config.settings import Settings
 from etl_sigrid.application.steps.base import PipelineStep
@@ -160,6 +163,8 @@ class IngestRawStep(PipelineStep):
             "failed_tables": failed_tables,
             "full_refresh": self._full_refresh,
             "obras_firmadas": firmadas,
+            # F-148, R17: el antes y el después de la sesión de carga.
+            "conexiones_abiertas": pg.conexiones_abiertas,
         }
         if failed_tables:
             result.error_message = f"Fallaron: {', '.join(failed_tables)}"
@@ -274,29 +279,52 @@ class IngestRawStep(PipelineStep):
             else:
                 last_id_already = pg.get_max_id("raw", spec.target_table, spec.id_column)
 
-            # 4. Stream Sigrid → COPY Postgres
+            # 4. Stream Sigrid → COPY Postgres, por UNA sesión de carga (F-148)
             col_names = [c.name for c in kept_cols]
             tiemod_col = spec.incremental_column if spec.incremental_column in col_names else None
 
             total = 0
-            for batch in api.stream_table(
-                spec.source_table,
-                columns=col_names,
+            with pg.sesion_de_carga(
+                "raw",
+                spec.target_table,
+                col_names,
                 id_column=spec.id_column,
-                where=spec.where,
-                start_id=last_id_already,
-                page_size=spec.page_size_override,
-            ):
-                if not batch:
-                    continue
-                inserted = pg.copy_rows(
-                    schema="raw",
-                    table=spec.target_table,
-                    columns=col_names,
-                    rows=batch,
-                    tiemod_column=tiemod_col,
+                tiemod_column=tiemod_col,
+            ) as sesion:
+                paginas = iter(
+                    api.stream_table(
+                        spec.source_table,
+                        columns=col_names,
+                        id_column=spec.id_column,
+                        where=spec.where,
+                        start_id=last_id_already,
+                        page_size=spec.page_size_override,
+                    )
                 )
-                total += inserted
+                pagina = 0
+                while True:
+                    # `http_s` es la espera del iterador de sigrid-api: lo que
+                    # separa una pausa de la API de una de Postgres (R14).
+                    antes = perf_counter()
+                    batch = next(paginas, None)
+                    http_s = perf_counter() - antes
+                    if batch is None:
+                        break
+                    pagina += 1
+                    if not batch:
+                        continue
+                    medida = sesion.copiar_pagina(batch)
+                    total += medida.filas
+                    logger.info(
+                        "ingest_pagina",
+                        table=spec.source_table,
+                        page=pagina,
+                        filas=medida.filas,
+                        http_s=round(http_s, 3),
+                        pg_connect_s=medida.pg_connect_s,
+                        copy_s=medida.copy_s,
+                        reintentos=medida.reintentos,
+                    )
 
             logger.info(
                 "ingest_table_done",

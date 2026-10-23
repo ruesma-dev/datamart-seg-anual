@@ -118,7 +118,9 @@ def test_f148_r1_r2_los_valores_vienen_de_la_configuracion() -> None:
     p = _parametros(conninfo.build_conninfo(pg, "x"))
 
     assert (p["connect_timeout"], p["keepalives_idle"], p["keepalives_interval"]) == (
-        "7", "31", "11",
+        "7",
+        "31",
+        "11",
     )
     assert (p["keepalives_count"], p["tcp_user_timeout"]) == ("4", "45000")
 
@@ -195,7 +197,8 @@ DEFINITIVOS = [
     ),
     pytest.param(psycopg.OperationalError('FATAL:  role "etl" does not exist'), id="rol"),
     pytest.param(
-        psycopg.OperationalError('FATAL:  database "sigrid_dm" does not exist'), id="base",
+        psycopg.OperationalError('FATAL:  database "sigrid_dm" does not exist'),
+        id="base",
     ),
     pytest.param(pg_errors.lookup("57014")("canceling statement"), id="57014-otro-operational"),
     pytest.param(pg_errors.lookup("42501")("permission denied"), id="permiso"),
@@ -526,7 +529,9 @@ def test_f148_r3_el_cliente_de_run_all_tambien_lleva_los_intentos(
 
     doble = PsycopgFalso(_timeout())
     monkeypatch.setattr(psycopg, "connect", doble.connect)
-    monkeypatch.setattr(main, "get_settings", lambda: SimpleNamespace(postgres=_pg(connect_intentos=1)))
+    monkeypatch.setattr(
+        main, "get_settings", lambda: SimpleNamespace(postgres=_pg(connect_intentos=1))
+    )
     cliente = main._get_pg()
 
     with pytest.raises(pg_errors.ConnectionTimeout):

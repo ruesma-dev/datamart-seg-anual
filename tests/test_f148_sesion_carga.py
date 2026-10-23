@@ -14,11 +14,16 @@ rompe cuando el test se lo manda.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import psycopg
 import pytest
 from psycopg import errors as pg_errors
 
-from etl_sigrid.infrastructure.postgres import sesion_carga
+from etl_sigrid.application.steps import ingest_raw_step
+from etl_sigrid.application.steps.ingest_raw_step import IngestRawStep
+from etl_sigrid.domain.entities import ColumnSpec, StepStatus, TableSpec
+from etl_sigrid.infrastructure.postgres import postgres_client, sesion_carga
 from etl_sigrid.infrastructure.postgres.postgres_client import (
     SQL_FILAS_EN_RANGO,
     PostgresClient,
@@ -135,7 +140,9 @@ class Abridor:
 
 
 def _sesion(abrir: Abridor, *, tiemod: str | None = None) -> SesionDeCarga:
-    return SesionDeCarga(abrir, "raw", "obrparpre", ["ide", "cod"], id_column="ide", tiemod_column=tiemod)
+    return SesionDeCarga(
+        abrir, "raw", "obrparpre", ["ide", "cod"], id_column="ide", tiemod_column=tiemod
+    )
 
 
 PAGINA_1 = [{"ide": 1, "cod": "a"}, {"ide": 2, "cod": "b"}]
@@ -323,9 +330,7 @@ def test_f148_r11_cuenta_las_filas_del_rango_de_ids_de_la_pagina() -> None:
     sesion.copiar_pagina(PAGINA_2)
 
     (recuento,) = [r for r in registro if r[0] == "recuento"]
-    assert recuento[1] == SQL_FILAS_EN_RANGO.format(
-        schema='"raw"', table='"obrparpre"', id='"ide"'
-    )
+    assert recuento[1] == SQL_FILAS_EN_RANGO.format(schema='"raw"', table='"obrparpre"', id='"ide"')
     assert "count(*)" in recuento[1]
     assert recuento[2] == {"lo": 3, "hi": 7}
 
@@ -339,7 +344,9 @@ def test_f148_r11_la_pagina_ya_llego_no_se_copia_otra_vez() -> None:
     medida = sesion.copiar_pagina(PAGINA_1)
 
     assert segunda.lineas == []
-    assert medida == MedidaPagina(filas=2, copy_s=medida.copy_s, pg_connect_s=medida.pg_connect_s, reintentos=1)
+    assert medida == MedidaPagina(
+        filas=2, copy_s=medida.copy_s, pg_connect_s=medida.pg_connect_s, reintentos=1
+    )
     # Y no deja la transacción del recuento abierta mientras espera a sigrid-api.
     assert registro[-1] == ("commit",)
 
@@ -488,3 +495,260 @@ def test_f148_r10_el_reintento_deja_aviso(monkeypatch: pytest.MonkeyPatch) -> No
     assert "server closed" in aviso["error"]
 
 
+# ---------------------------------------------------------------------------
+# T5 · el paso de ingesta sobre la sesión (R8, R14, R17)
+# ---------------------------------------------------------------------------
+
+
+class SesionFalsa:
+    def __init__(self, registro: list, medidas: list[MedidaPagina] | None = None) -> None:
+        self.registro = registro
+        self._medidas = list(medidas or [])
+        self.paginas: list[list[dict]] = []
+
+    def copiar_pagina(self, filas: list[dict]) -> MedidaPagina:
+        self.paginas.append(list(filas))
+        self.registro.append(("pagina", len(filas)))
+        if self._medidas:
+            return self._medidas.pop(0)
+        return MedidaPagina(filas=len(filas), copy_s=0.0, pg_connect_s=0.0, reintentos=0)
+
+
+class PgIngesta:
+    """Doble del cliente para `_ingest_one_table` y `run`."""
+
+    def __init__(self, medidas: list[MedidaPagina] | None = None) -> None:
+        self.registro: list = []
+        self.sesiones: list[dict] = []
+        self.sesion = SesionFalsa(self.registro, medidas)
+        self.cierres: list[tuple] = []
+        self.conexiones_abiertas = 0
+
+    def record_run_start(self, stage: str, step: str, batch_id: str | None = None) -> int:
+        return 1
+
+    def record_run_end(
+        self, run_id: int, status: str, rows_processed: int = 0, error_message: str | None = None
+    ) -> None:
+        self.cierres.append((status, rows_processed, error_message))
+
+    def ensure_raw_table(self, *a: object, **k: object) -> None:
+        return None
+
+    def truncate_table(self, *a: object) -> None:
+        return None
+
+    def get_max_id(self, *a: object) -> int:
+        return 0
+
+    def fetch_firma_origen(self) -> dict:
+        return {}
+
+    def registrar_firmas_actuales(self, firmas: dict) -> int:
+        return 0
+
+    def sesion_de_carga(
+        self,
+        schema: str,
+        table: str,
+        columns: list[str],
+        *,
+        id_column: str,
+        tiemod_column: str | None = None,
+    ):
+        from contextlib import contextmanager
+
+        @contextmanager
+        def _gestor():
+            self.sesiones.append(
+                {
+                    "schema": schema,
+                    "table": table,
+                    "columns": list(columns),
+                    "id_column": id_column,
+                    "tiemod_column": tiemod_column,
+                }
+            )
+            self.registro.append(("abre",))
+            try:
+                yield self.sesion
+            finally:
+                self.registro.append(("cierra",))
+
+        return _gestor()
+
+
+def _columna(nombre: str) -> ColumnSpec:
+    return ColumnSpec(
+        name=nombre,
+        sql_server_type="int",
+        char_max_length=None,
+        numeric_precision=None,
+        numeric_scale=None,
+        is_nullable=False,
+    )
+
+
+class ApiPaginas:
+    def __init__(
+        self, paginas: list[list[dict]], columnas: tuple[str, ...] = ("ide", "cod")
+    ) -> None:
+        self._paginas = paginas
+        self._columnas = columnas
+        self.pedidas: list[dict] = []
+
+    def fetch_table_schema(self, tabla: str) -> list[ColumnSpec]:
+        return [_columna(c) for c in self._columnas]
+
+    def stream_table(self, tabla: str, **kwargs: object):
+        self.pedidas.append(kwargs)
+        yield from self._paginas
+
+
+def _settings() -> SimpleNamespace:
+    return SimpleNamespace(
+        sigrid_api=SimpleNamespace(
+            page_size=10_000,
+            base_url="http://x",
+            database="ruesma",
+            timeout_s=1.0,
+            max_retries=1,
+            function_key=SimpleNamespace(get_secret_value=lambda: "k"),
+        ),
+        tables_sigrid={"tables": [{"source_table": "con", "target_table": "con"}]},
+    )
+
+
+def test_f148_r8_el_paso_carga_la_tabla_por_una_sesion() -> None:
+    pg = PgIngesta()
+    api = ApiPaginas([PAGINA_1, PAGINA_2])
+    paso = IngestRawStep(_settings(), batch_id="b")  # type: ignore[arg-type]
+
+    filas = paso._ingest_one_table(
+        TableSpec(source_table="con", target_table="con_raw", incremental_column="cod"), api, pg
+    )
+
+    assert filas == 5
+    assert pg.sesiones == [
+        {
+            "schema": "raw",
+            "table": "con_raw",
+            "columns": ["ide", "cod"],
+            "id_column": "ide",
+            "tiemod_column": "cod",
+        }
+    ]
+    assert pg.registro == [("abre",), ("pagina", 2), ("pagina", 3), ("cierra",)]
+    assert pg.cierres == [("SUCCESS", 5, None)]
+
+
+def test_f148_r8_sin_columna_tiemod_no_pide_source_tiemod() -> None:
+    pg = PgIngesta()
+    paso = IngestRawStep(_settings(), batch_id="b")  # type: ignore[arg-type]
+
+    paso._ingest_one_table(
+        TableSpec(source_table="con", target_table="con", incremental_column="tiemod"),
+        ApiPaginas([PAGINA_1]),
+        pg,
+    )
+
+    assert pg.sesiones[0]["tiemod_column"] is None
+
+
+def test_f148_r8_una_pagina_vacia_se_salta_y_sigue() -> None:
+    pg = PgIngesta()
+    paso = IngestRawStep(_settings(), batch_id="b")  # type: ignore[arg-type]
+
+    filas = paso._ingest_one_table(
+        TableSpec(source_table="con", target_table="con"), ApiPaginas([[], PAGINA_1]), pg
+    )
+
+    assert filas == 2
+    assert pg.sesion.paginas == [PAGINA_1]
+
+
+def test_f148_r14_ingest_pagina_por_cada_pagina(monkeypatch: pytest.MonkeyPatch) -> None:
+    registro_log = LoggerFalso()
+    monkeypatch.setattr(ingest_raw_step, "logger", registro_log)
+    # Por página: antes y después de pedir a sigrid-api. La tercera vuelta es el
+    # final del iterador.
+    monkeypatch.setattr(ingest_raw_step, "perf_counter", Reloj(0.0, 1.23456, 5.0, 5.5, 9.0, 9.0001))
+    medidas = [
+        MedidaPagina(filas=2, copy_s=0.25, pg_connect_s=0.75, reintentos=0),
+        MedidaPagina(filas=3, copy_s=0.5, pg_connect_s=0.0, reintentos=2),
+    ]
+    pg = PgIngesta(medidas)
+    paso = IngestRawStep(_settings(), batch_id="b")  # type: ignore[arg-type]
+
+    paso._ingest_one_table(
+        TableSpec(source_table="con", target_table="con"), ApiPaginas([PAGINA_1, PAGINA_2]), pg
+    )
+
+    assert registro_log.de("ingest_pagina") == [
+        {
+            "table": "con",
+            "page": 1,
+            "filas": 2,
+            "http_s": 1.235,
+            "pg_connect_s": 0.75,
+            "copy_s": 0.25,
+            "reintentos": 0,
+        },
+        {
+            "table": "con",
+            "page": 2,
+            "filas": 3,
+            "http_s": 0.5,
+            "pg_connect_s": 0.0,
+            "copy_s": 0.5,
+            "reintentos": 2,
+        },
+    ]
+
+
+def test_f148_r13_el_paso_cierra_la_sesion_aunque_falle_la_pagina() -> None:
+    pg = PgIngesta()
+
+    class SesionQueFalla(SesionFalsa):
+        def copiar_pagina(self, filas: list[dict]) -> MedidaPagina:
+            raise pg_errors.ConnectionTimeout("connection timeout expired")
+
+    pg.sesion = SesionQueFalla(pg.registro)
+    paso = IngestRawStep(_settings(), batch_id="b")  # type: ignore[arg-type]
+
+    with pytest.raises(pg_errors.ConnectionTimeout):
+        paso._ingest_one_table(
+            TableSpec(source_table="con", target_table="con"), ApiPaginas([PAGINA_1]), pg
+        )
+
+    assert pg.registro[-1] == ("cierra",)
+    assert pg.cierres[0][0] == "FAILED"
+
+
+class ApiContexto(ApiPaginas):
+    def __init__(self, *_a: object, **_k: object) -> None:
+        super().__init__([PAGINA_1])
+
+    def __enter__(self) -> ApiContexto:
+        return self
+
+    def __exit__(self, *_: object) -> bool:
+        return False
+
+
+def test_f148_r17_el_paso_anota_las_conexiones_abiertas(monkeypatch: pytest.MonkeyPatch) -> None:
+    pg = PgIngesta()
+    pg.conexiones_abiertas = 7
+    monkeypatch.setattr(ingest_raw_step, "build_postgres_client", lambda _s: pg)
+    monkeypatch.setattr(ingest_raw_step, "SigridApiClient", ApiContexto)
+
+    resultado = IngestRawStep(_settings(), batch_id="b").run()  # type: ignore[arg-type]
+
+    assert resultado.status is StepStatus.SUCCESS
+    assert resultado.metadata["conexiones_abiertas"] == 7
+
+
+def test_f148_r17_copy_rows_ya_no_existe() -> None:
+    """Su único llamante pasó a la sesión: un `copy_rows` vivo volvería a abrir
+    una conexión por página en cuanto alguien lo llamara."""
+    assert not hasattr(postgres_client.PostgresClient, "copy_rows")
