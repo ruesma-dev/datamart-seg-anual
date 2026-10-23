@@ -232,7 +232,9 @@ Control independiente: la consulta H6 del diagnóstico (`sigrid_stream_page`,
 `sigrid_api_client.py`; `domain/coherencia.py`; `ingest_descompuestos` (gana
 el reintento vía `_connect`); el DDL de `_meta`; `abortar_runs_huerfanos`.
 
-## 12 · Decisiones abiertas para el humano
+## 12 · Decisiones del humano (CERRADAS el 2026-10-23: todas según la propuesta)
+
+D1 15 s · D2 30/10/3 y 60 s · D3 sí · D4 sí, medir y recortar si > ~30 s · D5 rigor `critico` · D6 7 noches · D7 todas las páginas.
 
 - **D1** `connect_timeout` 15 s (propuesto) o 10 s.
 - **D2** Valores de keepalives (30/10/3) y `tcp_user_timeout` 60 s (§4).
