@@ -9,6 +9,12 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-23 · F-148 · `in_progress` (implementer) · rama `feature/F-148-robustez-nocturna`
+
+- Retomada tras el desbloqueo. Primer `init.sh` sobre la rama reubicada: un KO propio (el GUID
+  de la carpeta temporal que este implementer anotó abajo, cazado por `test_f003_r4`); retirado.
+- Tarea en curso, decisiones y desviaciones: en las viñetas que siguen y en `progress/impl_F-148.md`.
+
 ## 2026-10-23 · F-148 · `blocked` (implementer, ANTES de escribir código) · init.sh en rojo
 
 - **RESUELTO por el líder (2026-10-23)**: rama reubicada sobre `main` (`git rebase --onto main eb5e480`, solo local; base `9ff322f`) y `design.md` a 250 líneas (§12 compactada). F-148 vuelve a `spec_ready` y se relanza el implementer.
@@ -27,9 +33,8 @@
   conflicto esperado con `main`) y recortar 2 líneas de `design.md` (p. ej. fundir las dos
   líneas de cabecera de §12). Después, `status` de vuelta a `spec_ready` y relanzar al implementer.
 - Trabajo ya hecho y FUERA del árbol (para no romper la suite): borradores de los cinco ficheros
-  de test `tests/test_f148_*.py` en el scratchpad de la sesión
-  (`C:\Users\pgris\AppData\Local\Temp\claude\C--Users-pgris-PycharmProjects-datamart-seg-anual\0e5805e4-8d75-4cb3-9e59-22aca541756e\scratchpad\borradores_tests\`)
-  y la fase RED de T1 medida (8 failed: `KeyError: 'connect_timeout'`, sin `connect_timeout_s`
+  de test `tests/test_f148_*.py` en el scratchpad de la sesión del implementer (carpeta
+  temporal, fuera del repositorio) y la fase RED de T1 medida (8 failed: `KeyError: 'connect_timeout'`, sin `connect_timeout_s`
   en `PostgresSettings`, rango no validado). Nada de producción tocado.
 
 ## 2026-10-23 · F-148 · `spec_ready` (spec-author) · rama `feature/F-148-robustez-nocturna`
