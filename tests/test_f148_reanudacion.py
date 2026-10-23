@@ -21,7 +21,9 @@ from pathlib import Path
 
 import pytest
 
+from etl_sigrid.application.orchestrator import Orchestrator
 from etl_sigrid.domain.ejecucion import Ejecucion, ejecucion_desde_batch, nueva_ejecucion
+from etl_sigrid.domain.entities import StepResult, StepStatus
 from etl_sigrid.domain.reanudacion import (
     PASOS_NUNCA_OMITIBLES,
     VENTANA_REANUDACION,
@@ -251,3 +253,120 @@ def test_f148_sql_fetch_terminados_en_lote() -> None:
 
     assert terminados == frozenset({"ingest_raw.con", "build_stg"})
     assert cursor.enviado == [(SQL_TERMINADOS_EN_LOTE, {"batch": "b1"})]
+
+
+# ===========================================================================
+# Orquestador (T8)
+# ===========================================================================
+
+
+class Paso:
+    def __init__(
+        self,
+        nombre: str,
+        deps: list[str] | None = None,
+        estado: StepStatus = StepStatus.SUCCESS,
+        revienta: BaseException | None = None,
+        ejecutados: list[str] | None = None,
+    ) -> None:
+        self._nombre = nombre
+        self._deps = deps or []
+        self._estado = estado
+        self._revienta = revienta
+        self.ejecutados = ejecutados if ejecutados is not None else []
+
+    @property
+    def name(self) -> str:
+        return self._nombre
+
+    @property
+    def stage(self) -> str:
+        return "etapa_" + self._nombre
+
+    @property
+    def depends_on(self) -> list[str]:
+        return self._deps
+
+    def run(self) -> StepResult:
+        self.ejecutados.append(self._nombre)
+        if self._revienta is not None:
+            raise self._revienta
+        return StepResult(
+            step_name=self._nombre,
+            status=self._estado,
+            started_at=datetime(2026, 10, 23),
+            finished_at=datetime(2026, 10, 23),
+        )
+
+
+class Grabador:
+    def __init__(self) -> None:
+        self.filas: list[tuple[str, str, str]] = []
+
+    def record(self, stage: str, resultado: StepResult) -> None:
+        self.filas.append((stage, resultado.step_name, resultado.status.value))
+
+
+def _cadena(ejecutados: list[str]) -> list[Paso]:
+    return [
+        Paso("a", ejecutados=ejecutados),
+        Paso("b", ["a"], ejecutados=ejecutados),
+        Paso("c", ["b"], ejecutados=ejecutados),
+    ]
+
+
+def test_f148_r21_r22_el_orquestador_omite_sin_ejecutar_ni_grabar(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from etl_sigrid.application import orchestrator
+
+    registro = LoggerFalso()
+    monkeypatch.setattr(orchestrator, "logger", registro)
+    ejecutados: list[str] = []
+    grabador = Grabador()
+
+    resultados = Orchestrator(
+        _cadena(ejecutados), recorder=grabador, terminados_en_lote=frozenset({"a", "b"})
+    ).run_all()
+
+    assert ejecutados == ["c"]
+    assert grabador.filas == [("etapa_c", "c", "SUCCESS")]
+    assert [(r.step_name, r.status) for r in resultados] == [
+        ("a", StepStatus.SUCCESS),
+        ("b", StepStatus.SUCCESS),
+        ("c", StepStatus.SUCCESS),
+    ]
+    assert resultados[0].metadata == {"reanudado": True}
+    assert resultados[0].finished_at is not None
+    assert resultados[2].metadata == {}
+    assert [c["step"] for c in registro.de("paso_reanudado")] == ["a", "b"]
+
+
+def test_f148_r21_el_orquestador_no_omite_si_la_dependencia_se_repite() -> None:
+    ejecutados: list[str] = []
+
+    Orchestrator(_cadena(ejecutados), terminados_en_lote=frozenset({"b", "c"})).run_all()
+
+    assert ejecutados == ["a", "b", "c"]
+
+
+def test_f148_r21_apply_grants_se_ejecuta_aunque_termino() -> None:
+    ejecutados: list[str] = []
+    pasos = [
+        Paso("build_mart", ejecutados=ejecutados),
+        Paso("apply_grants", ["build_mart"], ejecutados=ejecutados),
+    ]
+
+    Orchestrator(pasos, terminados_en_lote=frozenset({"build_mart", "apply_grants"})).run_all()
+
+    assert ejecutados == ["apply_grants"]
+
+
+def test_f148_r22_sin_terminados_todo_como_hoy() -> None:
+    ejecutados: list[str] = []
+    grabador = Grabador()
+
+    Orchestrator(_cadena(ejecutados), recorder=grabador).run_all()
+
+    assert ejecutados == ["a", "b", "c"]
+    assert len(grabador.filas) == 3
