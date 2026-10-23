@@ -14,11 +14,19 @@ se sustituye.
 
 from __future__ import annotations
 
+import logging
+
 import psycopg
 import pytest
+from psycopg import errors as pg_errors
 
 from config.settings import PostgresSettings
-from etl_sigrid.infrastructure.postgres import conninfo
+from etl_sigrid.infrastructure.postgres import conninfo, reintento_conexion
+from etl_sigrid.infrastructure.postgres.reintento_conexion import (
+    abrir_con_reintento,
+    es_error_transitorio,
+    psycopg_en_debug,
+)
 
 
 def _pg(**kwargs: object) -> PostgresSettings:
@@ -156,3 +164,184 @@ def test_f148_r3_intentos_admite_los_extremos(valor: int) -> None:
 def test_f148_r3_intentos_fuera_de_rango_aborta(valor: int) -> None:
     with pytest.raises(ValueError):
         _pg(connect_intentos=valor)
+
+
+# ---------------------------------------------------------------------------
+# R3-R4 · qué error se reintenta y cuál no
+# ---------------------------------------------------------------------------
+
+TRANSITORIOS = [
+    pytest.param(pg_errors.ConnectionTimeout("connection timeout expired"), id="timeout"),
+    pytest.param(psycopg.OperationalError("connection failed: server closed"), id="sin-sqlstate"),
+    pytest.param(pg_errors.lookup("08006")("se cayó"), id="08006"),
+    pytest.param(pg_errors.lookup("08001")("no conecta"), id="08001"),
+    pytest.param(pg_errors.lookup("53300")("too many connections"), id="53300"),
+    pytest.param(pg_errors.lookup("57P03")("the database system is starting up"), id="57P03"),
+]
+
+DEFINITIVOS = [
+    pytest.param(pg_errors.lookup("28P01")("rechazado"), id="28P01"),
+    pytest.param(pg_errors.lookup("28000")("rechazado"), id="28000"),
+    pytest.param(pg_errors.lookup("3D000")("no existe"), id="3D000"),
+    pytest.param(
+        psycopg.OperationalError('FATAL:  password authentication failed for user "etl"'),
+        id="password",
+    ),
+    pytest.param(
+        psycopg.OperationalError('FATAL:  no pg_hba.conf entry for host "1.2.3.4"'),
+        id="pg_hba",
+    ),
+    pytest.param(psycopg.OperationalError('FATAL:  role "etl" does not exist'), id="rol"),
+    pytest.param(
+        psycopg.OperationalError('FATAL:  database "sigrid_dm" does not exist'), id="base",
+    ),
+    pytest.param(pg_errors.lookup("57014")("canceling statement"), id="57014-otro-operational"),
+    pytest.param(pg_errors.lookup("42501")("permission denied"), id="permiso"),
+    pytest.param(ValueError("no es de psycopg"), id="ajeno"),
+]
+
+
+@pytest.mark.parametrize("error", TRANSITORIOS)
+def test_f148_r3_errores_transitorios(error: BaseException) -> None:
+    assert es_error_transitorio(error) is True
+
+
+@pytest.mark.parametrize("error", DEFINITIVOS)
+def test_f148_r4_errores_que_no_se_reintentan(error: BaseException) -> None:
+    assert es_error_transitorio(error) is False
+
+
+def test_f148_r4_la_autenticacion_manda_sobre_la_clase_de_conexion() -> None:
+    """Un 08 que trae la marca de autenticación no se reintenta: la contraseña
+    mala no se arregla esperando, y reintentar bloquearía la cuenta antes."""
+    error = pg_errors.lookup("08006")("password authentication failed for user x")
+    assert es_error_transitorio(error) is False
+
+
+# ---------------------------------------------------------------------------
+# R3, R5, R6 · el reintento con espera creciente
+# ---------------------------------------------------------------------------
+
+
+class Apertura:
+    """`abrir` de mentira: falla con los errores dados y luego conecta."""
+
+    def __init__(self, *errores: BaseException) -> None:
+        self._errores = list(errores)
+        self.llamadas = 0
+
+    def __call__(self) -> str:
+        self.llamadas += 1
+        if self._errores:
+            raise self._errores.pop(0)
+        return "conexion"
+
+
+def _timeout() -> BaseException:
+    return pg_errors.ConnectionTimeout("connection timeout expired")
+
+
+def test_f148_r3_reintenta_con_espera_2_4_8() -> None:
+    esperas: list[float] = []
+    abrir = Apertura(_timeout(), _timeout(), _timeout())
+
+    conexion, _segundos, intentos = abrir_con_reintento(abrir, intentos=4, dormir=esperas.append)
+
+    assert conexion == "conexion"
+    assert intentos == 4
+    assert abrir.llamadas == 4
+    assert esperas == [2, 4, 8]
+
+
+def test_f148_r3_la_espera_tiene_tope_de_30() -> None:
+    esperas: list[float] = []
+    abrir = Apertura(*[_timeout() for _ in range(5)])
+
+    abrir_con_reintento(abrir, intentos=6, dormir=esperas.append)
+
+    assert esperas == [2, 4, 8, 16, 30]
+
+
+def test_f148_r3_sin_fallo_un_solo_intento_y_sin_espera() -> None:
+    esperas: list[float] = []
+
+    conexion, _s, intentos = abrir_con_reintento(Apertura(), intentos=4, dormir=esperas.append)
+
+    assert (conexion, intentos, esperas) == ("conexion", 1, [])
+
+
+def test_f148_r3_mide_los_segundos(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(reintento_conexion, "perf_counter", Reloj(10.0, 12.5))
+
+    _c, segundos, _i = abrir_con_reintento(Apertura(), intentos=4, dormir=lambda _s: None)
+
+    assert segundos == pytest.approx(2.5)
+
+
+def test_f148_r5_agotados_los_intentos_propaga_el_ultimo_error() -> None:
+    ultimo = pg_errors.ConnectionTimeout("el cuarto")
+    abrir = Apertura(_timeout(), _timeout(), _timeout(), ultimo)
+
+    with pytest.raises(pg_errors.ConnectionTimeout) as exc:
+        abrir_con_reintento(abrir, intentos=4, dormir=lambda _s: None)
+
+    assert exc.value is ultimo
+    assert abrir.llamadas == 4
+
+
+def test_f148_r4_la_autenticacion_falla_al_primer_intento() -> None:
+    esperas: list[float] = []
+    abrir = Apertura(psycopg.OperationalError("password authentication failed for user x"))
+
+    with pytest.raises(psycopg.OperationalError):
+        abrir_con_reintento(abrir, intentos=4, dormir=esperas.append)
+
+    assert abrir.llamadas == 1
+    assert esperas == []
+
+
+def test_f148_r3_r6_el_reintento_se_registra_sin_secretos(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registro = LoggerFalso()
+    monkeypatch.setattr(reintento_conexion, "logger", registro)
+    error = psycopg.OperationalError("fallo con password=SUPERSECRETO host=x")
+
+    abrir_con_reintento(Apertura(error), intentos=4, dormir=lambda _s: None)
+
+    (aviso,) = registro.de("pg_conexion_reintento")
+    assert aviso["intento"] == 1
+    assert aviso["espera_s"] == 2
+    assert "SUPERSECRETO" not in str(aviso)
+    assert "password=***" in aviso["error"]
+
+
+# ---------------------------------------------------------------------------
+# R15 · psycopg en DEBUG solo mientras se conecta
+# ---------------------------------------------------------------------------
+
+
+def test_f148_r15_psycopg_en_debug_y_vuelve_a_su_nivel() -> None:
+    registrador = logging.getLogger("psycopg")
+    previo = registrador.level
+    registrador.setLevel(logging.WARNING)
+    try:
+        with psycopg_en_debug():
+            assert registrador.level == logging.DEBUG
+        assert registrador.level == logging.WARNING
+    finally:
+        registrador.setLevel(previo)
+
+
+def test_f148_r15_vuelve_a_su_nivel_aunque_falle() -> None:
+    registrador = logging.getLogger("psycopg")
+    previo = registrador.level
+    registrador.setLevel(logging.ERROR)
+    try:
+        with pytest.raises(RuntimeError), psycopg_en_debug():
+            raise RuntimeError("la conexión cae")
+        assert registrador.level == logging.ERROR
+    finally:
+        registrador.setLevel(previo)
+
+
