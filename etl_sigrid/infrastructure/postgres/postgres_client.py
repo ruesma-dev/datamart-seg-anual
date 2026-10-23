@@ -18,13 +18,13 @@ saben de psycopg, solo invocan métodos limpios.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from time import sleep
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import psycopg
 from psycopg import sql
@@ -52,6 +52,9 @@ from etl_sigrid.infrastructure.postgres.reintento_conexion import (
     psycopg_en_debug,
 )
 from etl_sigrid.infrastructure.postgres.timings import Timing
+
+if TYPE_CHECKING:  # pragma: no cover - solo para anotaciones
+    from etl_sigrid.infrastructure.postgres.sesion_carga import SesionDeCarga
 
 logger = get_logger(__name__)
 
@@ -668,6 +671,13 @@ FROM raw.{tabla}
 #: modificación, toda fila tocada desde la foto anterior está por encima de su
 #: máximo. Si no lo es, este recuento sale 0, que es justo la señal de NO SIRVE.
 SQL_FILAS_DESDE_TIEMOD = "SELECT COUNT(*) FROM raw.{tabla} WHERE {col} > %(umbral)s"
+
+#: F-148, R11. Cuántas filas de la tabla caen en el rango de ids de una página
+#: cuya conexión se rompió: dice si el COMMIT llegó. Plantilla de
+#: `psycopg.sql`: esquema, tabla e id se interpolan con `sql.Identifier`.
+SQL_FILAS_EN_RANGO = (
+    "SELECT count(*) FROM {schema}.{table} WHERE {id} BETWEEN %(lo)s AND %(hi)s"
+)
 
 SQL_RUN_START = """
 INSERT INTO _meta.etl_runs (stage, step, started_at, status, batch_id)
@@ -2141,6 +2151,38 @@ class PostgresClient:
 
         return rows_written
 
+    @contextmanager
+    def sesion_de_carga(
+        self,
+        schema: str,
+        table: str,
+        columns: Sequence[str],
+        *,
+        id_column: str,
+        tiemod_column: str | None = None,
+    ) -> Iterator[SesionDeCarga]:
+        """Sesión de carga de UNA tabla: una conexión para todas sus páginas (F-148).
+
+        La conexión la abre la sesión en la primera página, por `_connect` (con
+        su reintento y su `SET ROLE`), y se cierra al salir, haya ido bien o mal
+        (R13). No hace auto-bootstrap: la ingesta ya pasó por `connection()` al
+        registrar la tabla y al crearla.
+        """
+        from etl_sigrid.infrastructure.postgres.sesion_carga import SesionDeCarga
+
+        sesion = SesionDeCarga(
+            lambda: self._connect(self._conninfo),
+            schema,
+            table,
+            columns,
+            id_column=id_column,
+            tiemod_column=tiemod_column,
+        )
+        try:
+            yield sesion
+        finally:
+            sesion.cerrar()
+
     def reemplazar_filas(
         self,
         schema: str,
@@ -2190,9 +2232,7 @@ class PostgresClient:
             cur.execute(borrado, list(filtro.values()))
             with cur.copy(copia) as copy:
                 for fila in filas:
-                    copy.write(
-                        "\t".join(_pg_text_format(fila.get(c)) for c in columnas) + "\n"
-                    )
+                    copy.write(linea_copy(fila, columnas))
                     escritas += 1
             if control is not None:
                 sentencia, parametros = _sentencia_de_control(control)
@@ -2603,6 +2643,15 @@ def _pg_text_format(value: Any) -> str:
         .replace("\n", "\\n")
         .replace("\r", "\\r")
     )
+
+
+def linea_copy(fila: Mapping[str, Any], campos: Sequence[str]) -> str:
+    """Una línea de COPY en formato texto: los `campos` de `fila`, en orden.
+
+    Compartida por `reemplazar_filas` y la sesión de carga de F-148: un campo
+    que la fila no trae va como NULL.
+    """
+    return "\t".join(_pg_text_format(fila.get(c)) for c in campos) + "\n"
 
 
 # -------------------------------------------------------------------------
