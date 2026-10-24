@@ -9,6 +9,15 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-24 · F-148 · CERRADA (`done`, orden del humano) · R31 MANUAL pendiente: 7 noches desde la del 25-10
+
+- El humano la cierra para liberar `in_progress` (F-149, F-140). **R31 sigue vivo**: cada mañana,
+  las consultas de §8 de `specs/F-148-robustez-nocturna/design.md` (reintento por lote, FAILED de
+  `ingest_raw%`, huecos de más de 100 s) y una línea por noche aquí. Si una noche falla, feature nueva.
+- Noche 1 (25-10): pendiente. Ese día, además, `conexiones_abiertas`, `ejecucion_job=` y el coste
+  de `apply_grants.tras_*` (D4).
+- Registrada **F-149** (`sdd=false`): fuera las citas a `R-SIGRID-CON` de lo que sirve el MCP; v61.
+
 ## 2026-10-24 · F-148 · FUSIONADA (APROBADO pasada 2, `020c982`) · merge `8ed8cf5` · DESPLEGADA · faltan las 7 noches (R31)
 
 - Orden del humano (24-10): merge, diccionario y reinicio del MCP. `init.sh` sobre `main`:
