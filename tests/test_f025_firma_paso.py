@@ -48,6 +48,8 @@ class PgFirma:
         self.pasos: list[str] = []
         self.cierres: list[tuple] = []
         self._run = 0
+        # F-148, R17: la ingesta anota cuántas conexiones abrió el cliente.
+        self.conexiones_abiertas = 0
 
     def fetch_firma_origen(self) -> dict[int, dict]:
         if self._revienta:

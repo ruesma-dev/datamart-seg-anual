@@ -22,6 +22,7 @@ Sin red y sin BBDD: el cliente Postgres nunca llega a `psycopg` (se sustituye
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from types import SimpleNamespace
 from typing import Any
 
@@ -29,6 +30,7 @@ import pytest
 
 from etl_sigrid.domain.entities import ColumnSpec, TableSpec
 from etl_sigrid.infrastructure.postgres.postgres_client import PostgresClient
+from etl_sigrid.infrastructure.postgres.sesion_carga import MedidaPagina
 
 # ---------------------------------------------------------------------------
 # Dobles
@@ -428,9 +430,17 @@ def test_f066_r28_la_reconciliacion_va_antes_del_truncate() -> None:
         def get_max_id(self, *args: object, **kwargs: object) -> int:
             return 0
 
-        def copy_rows(self, **kwargs: object) -> int:
-            self.traza.append("copy")
-            return 1
+        # F-148: la ingesta copia por una sesión de carga, no con `copy_rows`.
+        @contextmanager
+        def sesion_de_carga(self, *args: object, **kwargs: object):
+            traza = self.traza
+
+            class _Sesion:
+                def copiar_pagina(self, filas: list) -> MedidaPagina:
+                    traza.append("copy")
+                    return MedidaPagina(filas=len(filas), copy_s=0.0, pg_connect_s=0.0, reintentos=0)
+
+            yield _Sesion()
 
     ajustes = SimpleNamespace(sigrid_api=SimpleNamespace(page_size=10_000))
     pg = _PgFalso()

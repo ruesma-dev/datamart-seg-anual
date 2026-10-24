@@ -116,7 +116,7 @@ def test_f147_r7_el_diccionario_real_valida_entero() -> None:
 
 
 def test_f147_r7_version_59() -> None:
-    assert str(_global()["version"]) == "59"
+    assert int(_global()["version"]) >= 59, "F-148 la sube a 60"
 
 
 def test_f147_r7_el_orden_no_se_repite() -> None:

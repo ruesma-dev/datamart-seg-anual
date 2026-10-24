@@ -71,7 +71,11 @@ objetos:
           Nombre del paso. **Si lleva un punto es un TRAMO** —`ingest_raw.obrfas`,
           un lote de `build_plan_mensual`— y si no, un paso de pipeline. Esa
           distincion es la que usa `v_frescura` para filtrar, y mezclarlos
-          multiplica las filas.
+          multiplica las filas. Desde F-148 hay ademas una fila
+          `apply_grants.tras_<paso>` tras cada uno de los diez build de la
+          nocturna (`apply_grants.tras_build_mart`...): los permisos que se
+          devuelven al terminar ese build, sin esperar al `apply_grants` final,
+          que sigue siendo el que decide.
         agregacion: no_sumable
       started_at:
         significado: >-
@@ -111,7 +115,13 @@ objetos:
           La ejecucion completa a la que pertenece esta fila: todas las que deja
           un mismo proceso lo comparten, y es lo que permite responder de que
           carga viene cada tabla de `raw`. El formato `YYYYMMDDTHHMMSSZ-xxxxxx`
-          **se ordena cronologicamente como texto**, sin parsear.
+          **se ordena cronologicamente como texto**, sin parsear. Desde F-148,
+          en la nocturna un lote abarca la ejecucion del job **con su
+          reintento**: la segunda replica adopta el `batch_id` de la primera y
+          omite lo que esta ya dejo en SUCCESS, asi que en un lote pueden
+          convivir dos filas del mismo paso (la FAILED o ABORTED del primer
+          intento y la del reintento). La ultima, por `started_at` e `id`, es
+          la que vale.
         agregacion: no_sumable
         nulo_significa: >-
           La fila es anterior a F-024, cuando la columna no existia. No es un

@@ -18,12 +18,13 @@ saben de psycopg, solo invocan métodos limpios.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from time import sleep
+from typing import TYPE_CHECKING, Any
 
 import psycopg
 from psycopg import sql
@@ -46,7 +47,14 @@ from etl_sigrid.infrastructure.postgres.grants import (
     build_veto_statements,
     partir_tabla_cualificada,
 )
+from etl_sigrid.infrastructure.postgres.reintento_conexion import (
+    abrir_con_reintento,
+    psycopg_en_debug,
+)
 from etl_sigrid.infrastructure.postgres.timings import Timing
+
+if TYPE_CHECKING:  # pragma: no cover - solo para anotaciones
+    from etl_sigrid.infrastructure.postgres.sesion_carga import SesionDeCarga
 
 logger = get_logger(__name__)
 
@@ -130,6 +138,9 @@ TIMINGS_SIN_ANCLA = 100
 # autenticación Entra la "contraseña" es un token que caduca y hay que
 # resolverlo en cada conexión, no una vez al arrancar.
 ConnInfo = str | Callable[[], str]
+
+#: Una apertura sana tarda menos de un segundo; más de esto se registra (F-148).
+UMBRAL_CONEXION_LENTA_S = 2.0
 
 
 # --- Troceo y puerta de disco del build de plan_mensual (F-019) -------------
@@ -632,7 +643,7 @@ ORDER BY started_at, id
 # SOLO LECTURA sobre `raw`. Responde si la marca de modificación de Sigrid
 # sirve como watermark **sin volver a leer Sigrid**: sus valores ya están
 # guardados en `_source_tiemod`, carga tras carga, desde que existe
-# `copy_rows(tiemod_column=...)`.
+# `copy_rows(tiemod_column=...)` (desde F-148, la sesión de carga).
 #
 # El COUNT(DISTINCT) no es gratis —obliga a recorrer la tabla entera— y por eso
 # esto es un comando que se lanza a mano, no un paso del pipeline.
@@ -661,6 +672,13 @@ FROM raw.{tabla}
 #: máximo. Si no lo es, este recuento sale 0, que es justo la señal de NO SIRVE.
 SQL_FILAS_DESDE_TIEMOD = "SELECT COUNT(*) FROM raw.{tabla} WHERE {col} > %(umbral)s"
 
+#: F-148, R11. Cuántas filas de la tabla caen en el rango de ids de una página
+#: cuya conexión se rompió: dice si el COMMIT llegó. Plantilla de
+#: `psycopg.sql`: esquema, tabla e id se interpolan con `sql.Identifier`.
+SQL_FILAS_EN_RANGO = (
+    "SELECT count(*) FROM {schema}.{table} WHERE {id} BETWEEN %(lo)s AND %(hi)s"
+)
+
 SQL_RUN_START = """
 INSERT INTO _meta.etl_runs (stage, step, started_at, status, batch_id)
 VALUES (%s, %s, %s, 'RUNNING', %s)
@@ -673,6 +691,22 @@ INSERT INTO _meta.etl_runs
      rows_processed, error_message, metadata, batch_id)
 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
 RETURNING id
+"""
+
+#: F-148, R18. El lote más reciente de esta ejecución del job dentro de la
+#: ventana. `cola` = '-' + sufijo (7 caracteres). Sin LIKE a propósito: no
+#: mezcla el comodín `%` con los parámetros de psycopg.
+SQL_LOTE_REANUDABLE = """
+SELECT batch_id FROM _meta.etl_runs
+WHERE right(batch_id, 7) = %(cola)s AND started_at >= %(desde)s
+ORDER BY batch_id DESC LIMIT 1
+"""
+
+#: F-148, R21 y R23. Lo que el lote ya dejó en SUCCESS, pasos y tramos
+#: (`ingest_raw.<tabla>`) juntos: el dominio separa unos de otros.
+SQL_TERMINADOS_EN_LOTE = """
+SELECT DISTINCT step FROM _meta.etl_runs
+WHERE batch_id = %(batch)s AND status = 'SUCCESS'
 """
 
 
@@ -718,6 +752,12 @@ class PostgresClient:
         set_role       : rol de grupo al que hacer SET ROLE al abrir cada
                          sesión, para que todos los objetos tengan el mismo
                          propietario conecte quien conecte.
+        connect_intentos: intentos al abrir una conexión ante un error
+                         transitorio (F-148, `PG_CONNECT_INTENTOS`).
+        dormir         : la espera entre intentos; se inyecta en los tests.
+
+    `conexiones_abiertas` cuenta las conexiones que ha abierto el cliente
+    (F-148, R17): es la medida del antes y el después de la sesión de carga.
     """
 
     def __init__(
@@ -728,6 +768,8 @@ class PostgresClient:
         *,
         auto_create_db: bool = True,
         set_role: str | None = None,
+        connect_intentos: int = 4,
+        dormir: Callable[[float], None] = sleep,
     ) -> None:
         self._conninfo = conninfo
         self._admin_conninfo = admin_conninfo
@@ -735,6 +777,9 @@ class PostgresClient:
         self._auto_create_db = auto_create_db
         self._set_role = (set_role or "").strip()
         self._bootstrap_done = False
+        self._connect_intentos = connect_intentos
+        self._dormir = dormir
+        self.conexiones_abiertas = 0
 
     # ---------------------------------------------------------------------
     # Conexión (con auto-bootstrap)
@@ -751,8 +796,26 @@ class PostgresClient:
         sesión (R7). Todo el cliente pasa por aquí: si alguna ruta se saltara
         el SET ROLE, crearía objetos con otro propietario y el siguiente
         proceso no podría recrearlos.
+
+        F-148: la apertura se reintenta ante un error transitorio (R3), con el
+        logger de psycopg en DEBUG mientras dura (R15), y deja
+        `pg_conexion_lenta` si tarda más de `UMBRAL_CONEXION_LENTA_S` o
+        necesitó reintento (R16). El `SET ROLE` NO se reintenta: si falla es un
+        permiso, no la red (R7).
         """
-        conn = psycopg.connect(self._resolve(conninfo), autocommit=autocommit)
+
+        def _abrir() -> psycopg.Connection:
+            with psycopg_en_debug():
+                return psycopg.connect(self._resolve(conninfo), autocommit=autocommit)
+
+        conn, segundos, intentos = abrir_con_reintento(
+            _abrir, intentos=self._connect_intentos, dormir=self._dormir
+        )
+        self.conexiones_abiertas += 1
+        if segundos > UMBRAL_CONEXION_LENTA_S or intentos > 1:
+            logger.warning(
+                "pg_conexion_lenta", connect_s=round(segundos, 3), intentos=intentos
+            )
         if self._set_role:
             try:
                 with conn.cursor() as cur:
@@ -1671,8 +1734,8 @@ class PostgresClient:
             SQL_INSERT_PUBLICACION,
             SQL_INSERT_REGLA,
             fila_publicacion,
-            filas_diccionario,
             filas_contexto,
+            filas_diccionario,
             filas_reglas,
         )
 
@@ -2055,54 +2118,37 @@ class PostgresClient:
 
     # ---------------------------------------------------------------------
 
-    def copy_rows(
+    @contextmanager
+    def sesion_de_carga(
         self,
         schema: str,
         table: str,
-        columns: list[str],
-        rows: Iterable[dict[str, Any]],
+        columns: Sequence[str],
         *,
+        id_column: str,
         tiemod_column: str | None = None,
-    ) -> int:
+    ) -> Iterator[SesionDeCarga]:
+        """Sesión de carga de UNA tabla: una conexión para todas sus páginas (F-148).
+
+        La conexión la abre la sesión en la primera página, por `_connect` (con
+        su reintento y su `SET ROLE`), y se cierra al salir, haya ido bien o mal
+        (R13). No hace auto-bootstrap: la ingesta ya pasó por `connection()` al
+        registrar la tabla y al crearla.
         """
-        Inserta filas en `schema.table` usando COPY FROM STDIN en formato texto.
+        from etl_sigrid.infrastructure.postgres.sesion_carga import SesionDeCarga
 
-        `rows` es un iterable de dicts (no se materializa entero en memoria).
-        `columns` define el orden y selección de columnas a insertar.
-        Añade automáticamente `_source_tiemod` si `tiemod_column` se proporciona
-        y existe en cada fila.
-
-        Devuelve el número de filas insertadas.
-        """
-        if not columns:
-            raise ValueError("Lista de columnas vacía")
-
-        # Cláusula de columnas para COPY. Incluye _source_tiemod si procede.
-        copy_columns = list(columns)
-        if tiemod_column:
-            copy_columns.append("_source_tiemod")
-
-        copy_sql = sql.SQL(
-            "COPY {}.{} ({}) FROM STDIN WITH (FORMAT text, NULL '\\N')"
-        ).format(
-            sql.Identifier(schema),
-            sql.Identifier(table),
-            sql.SQL(", ").join(sql.Identifier(c) for c in copy_columns),
+        sesion = SesionDeCarga(
+            lambda: self._connect(self._conninfo),
+            schema,
+            table,
+            columns,
+            id_column=id_column,
+            tiemod_column=tiemod_column,
         )
-
-        rows_written = 0
-
-        with self.connection() as conn, conn.cursor() as cur, cur.copy(copy_sql) as copy:
-            for row in rows:
-                fields: list[str] = []
-                for c in columns:
-                    fields.append(_pg_text_format(row.get(c)))
-                if tiemod_column:
-                    fields.append(_pg_text_format(row.get(tiemod_column)))
-                copy.write("\t".join(fields) + "\n")
-                rows_written += 1
-
-        return rows_written
+        try:
+            yield sesion
+        finally:
+            sesion.cerrar()
 
     def reemplazar_filas(
         self,
@@ -2118,8 +2164,8 @@ class PostgresClient:
         `DELETE` de las filas que casan con `filtro`, `COPY` de `filas` y, si se
         da, la fila de `control` (un `UPSERT` por su clave, o su `DELETE` si
         `control.valores` es `None`). Las tres cosas van por la MISMA conexion
-        y con un solo `commit`, que es lo que `copy_rows` no puede dar: abre una
-        conexion por llamada. Si algo falla, `connection()` hace `rollback` y
+        y con un solo `commit`, que es lo que `copy_rows` no podía dar: abría una
+        conexion por llamada (F-148 lo retiró). Si algo falla, `connection()` hace `rollback` y
         queda lo que habia: nunca dos copias ni media version.
 
         Un `filtro` vacio se rechaza ANTES de abrir la conexion: seria un
@@ -2153,9 +2199,7 @@ class PostgresClient:
             cur.execute(borrado, list(filtro.values()))
             with cur.copy(copia) as copy:
                 for fila in filas:
-                    copy.write(
-                        "\t".join(_pg_text_format(fila.get(c)) for c in columnas) + "\n"
-                    )
+                    copy.write(linea_copy(fila, columnas))
                     escritas += 1
             if control is not None:
                 sentencia, parametros = _sentencia_de_control(control)
@@ -2208,6 +2252,24 @@ class PostgresClient:
             return [
                 (int(fila[0]), str(fila[1]), fila[2]) for fila in cur.fetchall()
             ]
+
+    def buscar_lote_reanudable(self, sufijo: str, desde: datetime) -> str | None:
+        """El `batch_id` que esta réplica debe adoptar, o `None` (F-148, R18).
+
+        Es el lote más reciente con el sufijo de la ejecución del job iniciado
+        desde `desde`. Propaga las excepciones: quien llama avisa y arranca un
+        lote nuevo (R20).
+        """
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_LOTE_REANUDABLE, {"cola": "-" + sufijo, "desde": desde})
+            fila = cur.fetchone()
+        return None if fila is None else fila[0]
+
+    def fetch_terminados_en_lote(self, batch_id: str) -> frozenset[str]:
+        """Los `step` que el lote dejó en SUCCESS, con y sin punto (F-148)."""
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_TERMINADOS_EN_LOTE, {"batch": batch_id})
+            return frozenset(fila[0] for fila in cur.fetchall())
 
     def fetch_estado_raw(self) -> list[EstadoTablaRaw]:
         """Última ingesta conocida de cada tabla de `raw`, desde la vista."""
@@ -2566,6 +2628,15 @@ def _pg_text_format(value: Any) -> str:
         .replace("\n", "\\n")
         .replace("\r", "\\r")
     )
+
+
+def linea_copy(fila: Mapping[str, Any], campos: Sequence[str]) -> str:
+    """Una línea de COPY en formato texto: los `campos` de `fila`, en orden.
+
+    Compartida por `reemplazar_filas` y la sesión de carga de F-148: un campo
+    que la fila no trae va como NULL.
+    """
+    return "\t".join(_pg_text_format(fila.get(c)) for c in campos) + "\n"
 
 
 # -------------------------------------------------------------------------

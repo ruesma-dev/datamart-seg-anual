@@ -676,8 +676,16 @@
 # 20 publicadas; `_meta.diccionario_reglas` gana `resumen` y `entrega` AL
 # FINAL (contrato aditivo pactado con `mcp-bbdd`). Medida tras la feature:
 # 29.504 (tope de `tests/test_f147_presupuesto_contexto.py`).
+#
+# version 60 (F-148, 2026-10-23): UN LOTE ABARCA EL REINTENTO DEL JOB. La
+# segunda replica de la nocturna adopta el `batch_id` de la primera y omite lo
+# que esta dejo en SUCCESS: en `_meta.etl_runs` pueden convivir dos filas del
+# mismo paso en un lote, y aparecen las filas `apply_grants.tras_<paso>` (los
+# permisos tras cada uno de los diez build). Solo cambian las fichas de
+# `_meta.etl_runs.batch_id` y `_meta.etl_runs.step`; sin objetos ni columnas
+# nuevos.
 
-version: 59
+version: 60
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 

@@ -55,6 +55,9 @@ class Ejecucion:
 
     batch_id: str
     iniciada_en: datetime
+    #: F-148: True si esta ejecución ADOPTA el lote de una réplica anterior
+    #: del mismo job (R18). Solo entonces se lee lo que ese lote ya terminó.
+    reanudada: bool = False
 
 
 def nueva_ejecucion(
@@ -71,4 +74,21 @@ def nueva_ejecucion(
     return Ejecucion(
         batch_id=f"{instante.strftime(FORMATO_INSTANTE)}-{aleatorio}",
         iniciada_en=instante,
+    )
+
+
+def ejecucion_desde_batch(batch_id: str) -> Ejecucion:
+    """Identidad de una ejecución anterior a partir de su `batch_id` (F-148, R18).
+
+    La usa la réplica que reanuda el lote de la primera: adopta su `batch_id` y
+    recupera el instante en que empezó. `ValueError` si el texto no tiene la
+    forma `YYYYMMDDTHHMMSSZ-sufijo`: un lote raro no se adopta (R20).
+    """
+    instante, _separador, sufijo = batch_id.partition("-")
+    if not sufijo:
+        raise ValueError(f"batch_id sin sufijo: {batch_id!r}")
+    return Ejecucion(
+        batch_id=batch_id,
+        iniciada_en=datetime.strptime(instante, FORMATO_INSTANTE),
+        reanudada=True,
     )

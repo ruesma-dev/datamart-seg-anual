@@ -32,7 +32,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
-#: Columna técnica donde `copy_rows` deja el `tiemod` de Sigrid, tabla a tabla.
+#: Columna técnica donde la ingesta deja el `tiemod` de Sigrid, tabla a tabla.
 COLUMNA_TIEMOD = "_source_tiemod"
 
 CABECERA_CSV = ("tabla", "filas", "nulos", "minimo", "maximo", "distintos")
