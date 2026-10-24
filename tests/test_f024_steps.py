@@ -19,6 +19,7 @@ módulo del step, que es por donde el step consigue su cliente.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from datetime import date, datetime
 from types import SimpleNamespace
 
@@ -28,6 +29,7 @@ from etl_sigrid.application.steps.build_mart_step import BuildMartStep
 from etl_sigrid.application.steps.build_stg_step import BuildStgStep
 from etl_sigrid.domain.coherencia import EstadoPaso, EstadoTablaRaw
 from etl_sigrid.domain.entities import StepStatus
+from etl_sigrid.infrastructure.postgres.sesion_carga import MedidaPagina
 from tests.test_f019_tramos import LoggerFalso
 
 BATCH = "20260819T020000Z-abc123"
@@ -615,9 +617,17 @@ def test_f024_r3_la_ingesta_estampa_el_batch_por_tabla() -> None:
         def get_max_id(self, schema: str, table: str, id_column: str = "ide") -> int:
             return 0
 
-        def copy_rows(self, **kwargs: object) -> int:
-            self.traza.append("copy")
-            return 2
+        # F-148: la ingesta copia por una sesión de carga, no con `copy_rows`.
+        @contextmanager
+        def sesion_de_carga(self, *args: object, **kwargs: object):
+            traza = self.traza
+
+            class _Sesion:
+                def copiar_pagina(self, filas: list) -> MedidaPagina:
+                    traza.append("copy")
+                    return MedidaPagina(filas=len(filas), copy_s=0.0, pg_connect_s=0.0, reintentos=0)
+
+            yield _Sesion()
 
     pg = _PgFalso()
     paso = IngestRawStep(settings_falsos(), batch_id=BATCH)  # type: ignore[arg-type]

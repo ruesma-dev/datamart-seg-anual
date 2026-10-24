@@ -505,11 +505,16 @@ def test_f024_r3_run_all_un_solo_batch_para_todas_las_filas(cli) -> None:
     assert {b for _step, _estado, b in pg.pasos_registrados} == {batch}
     # El número NO se escribe a mano: era 6, F-047 lo dejó en 10 y la constante
     # se quedó atrás. Se ancla a la composición real, que es la que manda.
+    # F-148: además, una fila `apply_grants.tras_<build>` por cada uno de los
+    # diez build; se cuentan aparte para que la de cada paso siga exigida.
+    tras = [p for p, _e, _b in pg.pasos_registrados if p.startswith("apply_grants.tras_")]
+    de_paso = [p for p, _e, _b in pg.pasos_registrados if p not in tras]
     esperados = len(main.build_pipeline_steps(settings_falsos()))
-    assert len(pg.pasos_registrados) == esperados, (
-        f"se registraron {len(pg.pasos_registrados)} filas y el pipeline tiene "
+    assert len(de_paso) == esperados, (
+        f"se registraron {len(de_paso)} filas de paso y el pipeline tiene "
         f"{esperados} pasos: alguno no dejó rastro en `_meta.etl_runs`"
     )
+    assert len(tras) == len(main.PASOS_CON_PERMISOS)
 
 
 def test_f024_r3_dos_ejecuciones_no_comparten_batch(cli) -> None:

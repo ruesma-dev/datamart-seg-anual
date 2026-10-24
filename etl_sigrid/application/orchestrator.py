@@ -6,13 +6,25 @@ mediante orden topológico y los ejecuta secuencialmente.
 Diseño deliberado: secuencial, no paralelo. La complejidad de paralelizar
 no compensa para este volumen de datos. Y secuencial es mucho más fácil
 de debuggear.
+
+F-148 le añade dos cosas, las dos opcionales (sin ellas, todo como antes):
+
+  - `terminados_en_lote`: lo que la réplica anterior de la misma ejecución del
+    job ya dejó en SUCCESS. Esos pasos se omiten —sin ejecutarse ni grabar
+    fila— si sus dependencias también se omiten (R21-R22).
+  - `tras_paso`: un gancho que corre tras cada paso EJECUTADO, haya ido bien o
+    mal. `run-all` lo usa para devolver los permisos tras cada build (R25).
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable, Set
+from datetime import datetime
+
 from etl_sigrid.application.ports import StepRunRecorder
 from etl_sigrid.application.steps.base import PipelineStep
 from etl_sigrid.domain.entities import StepResult, StepStatus
+from etl_sigrid.domain.reanudacion import pasos_a_omitir
 from etl_sigrid.infrastructure.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -25,10 +37,15 @@ class Orchestrator:
         self,
         steps: list[PipelineStep],
         recorder: StepRunRecorder | None = None,
+        *,
+        terminados_en_lote: Set[str] = frozenset(),
+        tras_paso: Callable[[PipelineStep, StepResult], None] | None = None,
     ) -> None:
         self._steps = steps
         self._by_name = {s.name: s for s in steps}
         self._recorder = recorder
+        self._terminados_en_lote = terminados_en_lote
+        self._tras_paso = tras_paso
         self._validate_dag()
 
     def _record(self, stage: str, result: StepResult) -> None:
@@ -50,12 +67,45 @@ class Orchestrator:
                 error=str(e),
             )
 
+    def _tras(self, step: PipelineStep, result: StepResult) -> None:
+        """Llama al gancho `tras_paso`, si hay (F-148, R25-R26).
+
+        Envuelto como `_record`: un gancho que revienta avisa y la noche sigue.
+        Lo que haga el gancho no cambia el resultado del paso.
+        """
+        if self._tras_paso is None:
+            return
+        try:
+            self._tras_paso(step, result)
+        except Exception as e:  # el gancho nunca rompe el pipeline
+            logger.warning("tras_paso_fallido", step=step.name, error=str(e))
+
     def run_all(self) -> list[StepResult]:
         """Ejecuta todos los Steps en orden topológico."""
         ordered = self._topological_sort()
         results: list[StepResult] = []
+        omitidos = pasos_a_omitir(
+            [(s.name, s.depends_on) for s in ordered], self._terminados_en_lote
+        )
 
         for step in ordered:
+            if step.name in omitidos:
+                # F-148, R22: ni se ejecuta ni graba fila (`v_frescura` sigue
+                # diciendo cuándo se construyó de verdad), y cuenta como
+                # SUCCESS para sus dependientes.
+                ahora = datetime.utcnow()
+                logger.info("paso_reanudado", step=step.name)
+                results.append(
+                    StepResult(
+                        step_name=step.name,
+                        status=StepStatus.SUCCESS,
+                        started_at=ahora,
+                        finished_at=ahora,
+                        metadata={"reanudado": True},
+                    )
+                )
+                continue
+
             # Si alguna dependencia falló, marcamos este como SKIPPED
             if any(
                 r.step_name in step.depends_on and r.status != StepStatus.SUCCESS
@@ -94,6 +144,7 @@ class Orchestrator:
             )
             results.append(r)
             self._record(step.stage, r)
+            self._tras(step, r)
 
         return results
 

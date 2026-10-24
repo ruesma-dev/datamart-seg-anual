@@ -9,6 +9,121 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-23 · F-148 · `in_progress` (implementer) · rama `feature/F-148-robustez-nocturna`
+
+- Retomada tras el desbloqueo. Primer `init.sh` sobre la rama reubicada: un KO propio (el GUID
+  de la carpeta temporal que este implementer anotó abajo, cazado por `test_f003_r4`); retirado.
+- Tarea en curso, decisiones y desviaciones: en las viñetas que siguen y en `progress/impl_F-148.md`.
+- **T1-T13 hechas**, un commit por tarea (`F-148 T1` … `F-148 T13`). `init.sh` sobre `c2e226d`:
+  verde, 8.783 passed / 254 skipped en 22 min 24 s, `PUERTA COBERTURA` 100 % (281/281).
+- **T14 hecha**: campaña de mutación ENTERA, 92 mutantes, **92 muertos, 0 supervivientes**
+  (8 h 39 min, 3 workers, `--timeout 9000`), y los 92 reverificados EN SERIE, todos muertos
+  (`progress/mutacion_F-148.md`). El primer intento con 4 workers abortó en la línea base sin
+  aplicar nada.
+- **T15 hecha**: `bash harness/init.sh` sobre `a09fe92`, exit 0, 8.783 passed / 254 skipped,
+  cobertura 100 % (281/281), tamaño OK, `ENTORNO LISTO`. Lista para el reviewer:
+  `progress/impl_F-148.md`. `azure-apps`: commit local `40b0da9`, sin push.
+- **Desviaciones respecto a la spec, justificadas** (detalle en `impl_F-148.md`):
+  1. `es_error_transitorio` no lleva la rama explícita «clase `28`/`3D000` → False» de §5: esos
+     casos ya caen en False por las marcas de autenticación, la regex de rol/base inexistente y
+     porque `28…`/`3D000` no están entre los transitorios. Con la rama explícita la campaña
+     tendría mutantes equivalentes por construcción. Mismo comportamiento, probado caso a caso.
+  2. `Ejecucion` gana el campo `reanudada` (False por defecto; `ejecucion_desde_batch` lo pone a
+     True): es lo que dice a `run-all` si debe leer lo terminado del lote. Sin él, un lote NUEVO
+     con el sufijo del job leería filas ajenas.
+  3. En `main.py`, además de lo de §5: `_identidad_de_la_ejecucion` y `_terminados_del_lote`
+     (las dos ramas de R18-R20 separadas para poder probarlas) y `VARIABLE_EJECUCION_JOB`.
+  4. Los tests de versión del diccionario siguen la convención del repo: `test_f147` pasa a
+     `>= 59` y el de F-148 es `>= 60`.
+  5. `test_f024_cli` R3 cuenta aparte las diez filas `apply_grants.tras_*`; la exigencia de una
+     fila por paso se mantiene intacta.
+
+### F-148 · PENDIENTE DEL HUMANO tras APROBADO y merge (T13: `design.md` §7 y §8)
+
+Despliegue MANUAL, en este orden:
+
+0. **Tag que corre HOY el job: `r20261023-1016`** (F-147). Vuelta atrás, si la primera
+   nocturna con F-148 sale mal: `powershell -NoProfile -File infra/85_update_job.ps1 -Tag
+   r20261023-1016` (sin DDL que deshacer: F-148 no crea objetos).
+1. `powershell -NoProfile -File infra/70_build_image.ps1` (anotar el tag nuevo).
+2. `powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag nuevo>`. Sin variables nuevas
+   en el job; sin DDL; el diccionario v60 lo publica la propia nocturna con la imagen nueva (NO
+   publicar desde el puesto antes: memoria «publicar el diccionario solo con su imagen»).
+   **Comprobar que el job ya apunta a la imagen nueva** (memoria «el repositorio en verde no es
+   producción»): `az containerapp job show -n caj-datamart-seg-dev -g rg-datamart-seg-dev
+   --query "properties.template.containers[0].image" -o tsv` → debe acabar en `:<tag nuevo>`.
+3. Primera nocturna: comprobar en Log Analytics `ejecucion_job=<nombre>` en el arranque (D3),
+   `ingest_pagina` por página, `conexiones_abiertas` en la `metadata` de `ingest_raw` y filas
+   `apply_grants.tras_*` en `SUCCESS`. Después, **reiniciar el MCP** (`mcp-bbdd` cachea el
+   diccionario hasta reiniciar, como en F-147) y comprobar «Versión 60» en `contexto_bbdd()`.
+4. Medir el coste de los permisos por paso (D4): `SELECT step, finished_at - started_at FROM
+   _meta.etl_runs WHERE batch_id = '<lote>' AND step LIKE 'apply_grants%'`.
+5. `azure-apps`: hacer el `git push` de sus commits locales de F-148 (`40b0da9` y `4535829`)
+   SOLO cuando el humano lo autorice, y en ese momento quitar de `datamart_seg_anual.md` los dos
+   «PENDIENTE de desplegar» de F-148, anotando el tag nuevo y la fecha.
+6. Contar **7 noches SEGUIDAS** (R31) y anotar cada una aquí, una línea por noche:
+   - `_meta.etl_runs`: `SELECT batch_id, step, status, started_at FROM _meta.etl_runs WHERE
+     started_at >= '<día>' AND (step LIKE 'ingest_raw%' AND status IN ('FAILED','ABORTED'));`
+     → cero filas.
+   - **Una sola réplica por ejecución (R31 a)**: `az containerapp job execution list` NO enseña
+     los reintentos de réplica. Usar `SELECT step, count(*) FROM _meta.etl_runs WHERE batch_id =
+     '<lote>' AND position('.' IN step) = 0 GROUP BY step HAVING count(*) > 1` → cero filas; o
+     comprobar que no aparece `ejecucion_reanudada` en Log Analytics esa noche.
+   - Huecos > 100 s entre páginas (KQL, workspace del entorno del job) y su atribución:
+     `ContainerAppConsoleLogs_CL | where Log_s has "ingest_pagina" | extend j = parse_json(Log_s)
+     | project ts = todatetime(j.timestamp), tabla = tostring(j.table), page = toint(j.page),
+     http_s = todouble(j.http_s), pg_connect_s = todouble(j.pg_connect_s), copy_s =
+     todouble(j.copy_s), exec = ContainerGroupName_s | where http_s > 100 or pg_connect_s > 100
+     or copy_s > 100`. Un hueco de `http_s` no rompe la racha y se remite a `sigrid-api` (D6).
+   - Control independiente: la consulta H6 del diagnóstico (`sigrid_stream_page`, `gap_s >
+     100`); cada hueco suyo debe tener su `ingest_pagina` que lo explique.
+   - Noches contadas: (ninguna todavía)
+
+## 2026-10-23 · F-148 · `blocked` (implementer, ANTES de escribir código) · init.sh en rojo
+
+- **RESUELTO por el líder (2026-10-23)**: rama reubicada sobre `main` (`git rebase --onto main eb5e480`, solo local; base `9ff322f`) y `design.md` a 250 líneas (§12 compactada). F-148 vuelve a `spec_ready` y se relanza el implementer.
+
+- `bash harness/init.sh` (precondición 1 del implementer) sale en ROJO con 3 KO, ninguno de
+  código (1 failed, 6.774 passed, 253 skipped en 28 min 52 s; `-x` paró en el primero):
+  1. **La rama nació de `dev`, no de `main`.** `git merge-base HEAD main` = `9ff322f`, y entre
+     él y `HEAD` está `eb5e480` («Espejo de main en dev», el merge de `dev`) con los demás
+     espejos de `dev` detrás. Lo detectan `test_f112_r2_en_este_repositorio_la_base_no_esta_rezagada`
+     y la PUERTA COBERTURA («la base main se ha quedado por detrás: 2 de los 4 ya están en dev»).
+     `docs/CONVENTIONS.md` § Git: «Ninguna feature nace de `dev`».
+  2. **PUERTA TAMAÑO**: `specs/F-148-robustez-nocturna/design.md` 252 líneas > tope 250.
+- **Arreglo propuesto (líder; reescribe la historia LOCAL de la rama, sin push):**
+  `git rebase --onto main eb5e480 feature/F-148-robustez-nocturna` (mueve solo `21fea8c`,
+  `92eaa63` y este commit de bloqueo; tocan specs/, progress/, features.json y BACKLOG.md, sin
+  conflicto esperado con `main`) y recortar 2 líneas de `design.md` (p. ej. fundir las dos
+  líneas de cabecera de §12). Después, `status` de vuelta a `spec_ready` y relanzar al implementer.
+- Trabajo ya hecho y FUERA del árbol (para no romper la suite): borradores de los cinco ficheros
+  de test `tests/test_f148_*.py` en el scratchpad de la sesión del implementer (carpeta
+  temporal, fuera del repositorio) y la fase RED de T1 medida (8 failed: `KeyError: 'connect_timeout'`, sin `connect_timeout_s`
+  en `PostgresSettings`, rango no validado). Nada de producción tocado.
+
+## 2026-10-23 · F-148 · `spec_ready` (spec-author) · rama `feature/F-148-robustez-nocturna`
+
+- Spec escrita: `specs/F-148-robustez-nocturna/` (requirements 145, design 250, tasks 15
+  tareas). Diagnóstico redactado y sin datos sensibles en `progress/explore_F-148_corte.md`.
+- Enfoque del humano (1+2+3+4): sesión de carga con UNA conexión por tabla y COPY+COMMIT por
+  página; `connect_timeout` 15 s + reintento (4 intentos, 2/4/8 s; nunca ante autenticación);
+  keepalives + `tcp_user_timeout` 60 s con reintento IDEMPOTENTE de página (cuenta filas en el
+  rango de ids); reanudación por `CONTAINER_APP_JOB_EXECUTION_NAME` (sufijo del `batch_id`,
+  ventana 8 h; omite pasos `SUCCESS` del lote cuyas dependencias también se omiten, y tablas de
+  `raw` ya cargadas; `apply_grants` nunca se omite); permisos completos (`ApplyGrantsStep`
+  entero) tras cada uno de los diez build, como sub-fila `apply_grants.tras_<paso>`;
+  `ingest_pagina` con `http_s`/`pg_connect_s`/`copy_s`. Sin DDL ni variables nuevas en el job.
+- **Decisiones abiertas para el humano** (`design.md` §12): **D1** `connect_timeout` 15 o 10 s;
+  **D2** keepalives 30/10/3 y `tcp_user_timeout` 60 s; **D3** identidad del lote por
+  `CONTAINER_APP_JOB_EXECUTION_NAME` (si no existiera, no reanuda y todo sigue como hoy);
+  **D4** permisos tras cada build (coste por medir; recortar si > ~30 s cada uno); **D5** subir el
+  rigor de `estandar` a `critico` (servidor compartido + permisos del perfil restringido);
+  **D6** N = 7 noches seguidas, contando también los huecos > 100 s entre páginas (un hueco de
+  `http_s` no rompe la racha y se remite a `sigrid-api`); **D7** `ingest_pagina` en todas las
+  páginas o solo en las lentas.
+- Fuera (recomendación, escrituras en Azure del humano): logs del servidor compartido, mover la
+  hora (no recomendado), VNet/NAT Gateway.
+
 ## 2026-10-23 · F-147 · CERRADA (`done`, APROBADO en pasada 2, `ae59f75`) · merge `09886ce` · DESPLEGADA
 
 - Orden del humano (23-10): merge, despliegue, diccionario y reinicio del MCP. `init.sh` sobre
