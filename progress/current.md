@@ -9,6 +9,12 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-24 · F-149 · `in_progress` (implementer) · rama `feature/F-149-mcp-sin-reglas-no-publicadas`
+
+- `sdd=false`, rigor `estandar`. Se trabaja en un worktree temporal de la rama (el árbol principal
+  lo usa el spec-author de F-140), con el venv del árbol principal enlazado como `.venv` (ignorado).
+- Tarea en curso: T1, el test en RED (`tests/test_f149_mcp_sin_reglas_no_publicadas.py`).
+
 ## 2026-10-24 · F-148 · CERRADA (`done`, orden del humano) · R31 MANUAL pendiente: 7 noches desde la del 25-10
 
 - El humano la cierra para liberar `in_progress` (F-149, F-140). **R31 sigue vivo**: cada mañana,
