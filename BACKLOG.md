@@ -3,11 +3,13 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **137 features**, 71 abiertas (0 en curso, 1 con la spec lista, 0 bloqueadas y 70 en backlog) y 66 terminadas.
+Resumen: **137 features**, 71 abiertas (1 en curso, 1 con la spec lista, 0 bloqueadas y 69 en backlog) y 66 terminadas.
 
 ## En curso
 
-_Ninguna feature en curso._
+| # | Feature | Prioridad | Rigor | Rama |
+|---|---|---|---|---|
+| F-149 | Lo que sirve el MCP no nombra reglas que no se publican: fuera las citas a `R-SIGRID-CON` del bloque de convenciones y de las fichas de `compras` | 1 | estandar | `feature/F-149-mcp-sin-reglas-no-publicadas` |
 
 ## Spec lista
 
@@ -23,7 +25,6 @@ _Ninguna feature bloqueada._
 
 | # | Feature | Prioridad | Rigor | Rama |
 |---|---|---|---|---|
-| F-149 | Lo que sirve el MCP no nombra reglas que no se publican: fuera las citas a `R-SIGRID-CON` del bloque de convenciones y de las fichas de `compras` | 1 | estandar | `feature/F-149-mcp-sin-reglas-no-publicadas` |
 | F-054 | Glosario de negocio para la IA (`_meta.glosario`): qué significan en Ruesma la valorada, el incurrido, el ABC o la liquidatoria, y dónde están en el datamart | 4 | documental | `feature/F-054-conocimiento-de-negocio` |
 | F-140 | La fase 2 de la cartera (F-037): los ingredientes de la proyección de caja por obra (devengo pendiente, plazos de pago pactados y retenciones), sin convertir devengo en caja | 5 | estandar | `feature/F-140-proyeccion-caja-ingredientes` |
 | F-129 | El objetivo del comparativo se mide contra la oferta de referencia del propio comparativo (oficina técnica o planificado ABC), no contra el descompuesto: hoy casa el 29 % | 6 | critico | `feature/F-129-objetivo-contra-oferta-referencia` |
@@ -169,7 +170,7 @@ _Ninguna feature bloqueada._
 
 ### F-149 · Lo que sirve el MCP no nombra reglas que no se publican: fuera las citas a `R-SIGRID-CON` del bloque de convenciones y de las fichas de `compras`
 
-estado **pendiente** · prioridad 1 · rigor `estandar` · SDD no · rama `feature/F-149-mcp-sin-reglas-no-publicadas`
+estado **en curso** · prioridad 1 · rigor `estandar` · SDD no · rama `feature/F-149-mcp-sin-reglas-no-publicadas`
 
 Pedida por el humano el 2026-10-24. Tras F-147, `R-SIGRID-CON` es `fuera_mcp` (no se publica), pero `contexto_bbdd()` la sigue citando en el bloque `identidad_sigrid` de `_meta.diccionario_contexto` (`config/diccionario/00_global.yaml` ~l.1643: «es guia del ETL, en la regla `R-SIGRID-CON`») y `describir_tabla` la cita en dos columnas de `compras` (`compras.yaml` ~l.770 y ~l.1321: «(`con.cod`, `R-SIGRID-CON`)»). La IA lee una referencia a una regla que no puede consultar. QUÉ SE TOCA: esos tres textos (el bloque dice que cómo se lee Sigrid es guía interna del ETL, sin nombrar la regla; las columnas, «(`con.cod`)»); un test que impida que el texto publicado al MCP (bloques de contexto, fichas y columnas de objetos publicados al MCP, reglas publicadas) cite un código de regla que no se publica (`fuera_mcp`) o que no existe; diccionario v61. FUERA: los comentarios `#` del YAML y la ficha de `raw` (el MCP no expone `raw`); la regla `R-SIGRID-CON` sigue en el YAML como guía del ETL. DESPLIEGUE (tras APROBADO y merge): imagen y job, `publicar-diccionario` (v61) y `check-diccionario`, reiniciar el MCP leyendo antes la revisión activa y comprobar «Versión 61» en `contexto_bbdd()` y que no aparece `R-SIGRID-CON`.
 
