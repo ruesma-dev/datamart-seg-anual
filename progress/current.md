@@ -16,7 +16,8 @@
 - **T1 hecha** (`F-149 T1`): `tests/test_f149_mcp_sin_reglas_no_publicadas.py` en RED con los tres
   textos (`contexto convenciones.identidad_sigrid`, `ficha compras.albaranes`, `ficha compras.facturas`).
 - **T2 hecha** (`F-149 T2`): los tres textos, v61 con su comentario, `docs/CONVENTIONS.md` (una frase).
-- Tarea en curso: T3, `bash harness/init.sh` y mutación; informe en `progress/impl_F-149.md`.
+- **T3 hecha**: suite completa 8.782 passed / 283 skipped / 0 failed; mutación con ALCANCE VACÍO
+  (sin Python de producción); informe en `progress/impl_F-149.md`. Falta el `init.sh` final.
 - **Desviaciones, justificadas**:
   1. `tests/test_f147_contenido.py` R14 exigía que `identidad_sigrid` NOMBRARA `R-SIGRID-CON` (R14
      de F-147: «que remita a `R-SIGRID-CON`»). F-149, pedida por el humano, revoca justo eso: el test
