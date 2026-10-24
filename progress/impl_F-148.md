@@ -194,7 +194,7 @@ Números medidos, no estimados.
 | Evidencia | Valor | De dónde sale |
 |---|---|---|
 | Tests ejecutados | **8.783 passed, 254 skipped, 0 failed** | `bash harness/init.sh` sobre `c2e226d` (T1-T13), exit 0, `ENTORNO LISTO` |
-| Tests propios de F-148 | 162 (conexion 50, sesion_carga 33, reanudacion 44, permisos_por_paso 30, documentacion 5), todos en verde; el de `azure-apps` se ejecuta en el árbol principal (se salta solo en un worktree) | `pytest tests/test_f148_*.py` → `162 passed in 20.18s` |
+| Tests propios de F-148 | 177 tras la revisión (conexion 57, sesion_carga 33, reanudacion 52, permisos_por_paso 30, documentacion 5; antes 162), todos en verde; el de `azure-apps` se ejecuta en el árbol principal (se salta solo en un worktree) | `pytest tests/test_f148_*.py` → `162 passed in 20.18s` |
 | Cobertura de las líneas cambiadas | **100,0 % (281/281)**, umbral 80 %, nivel critico | `PUERTA COBERTURA` de `init.sh` (diff desde `9ff322f`, merge-base con `main`) |
 | Mutación (campaña ENTERA, sin muestreo) | **92 generados, 92 evaluados, 92 muertos, 0 supervivientes, 0 timeouts, 0 sin veredicto**; 31.149,2 s (8 h 39 min), 3 workers, `--timeout 9000`, línea base 1.002,7-1.014,4 s por worker | `python -m harness.mutacion --feature F-148 --max-mutantes 0 --workers 3 --timeout 9000` → `progress/mutacion_F-148.md` |
 | Reverificación EN SERIE de los muertos | **92/92 muertos** (90 por subconjunto, 2 por la suite entera); ningún falso muerto | `progress/mutacion_F-148.md`, sección «Reverificación EN SERIE» |
@@ -212,3 +212,8 @@ ningún mutante; se relanzó con `--workers 3 --timeout 9000`, el patrón de F-1
 **8.783 passed, 254 skipped en 2.265,46 s (37 min 45 s)**, `PUERTA COBERTURA` 100,0 % (281/281),
 `PUERTA TAMAÑO` OK (requirements 145/150, design 250/250, impl 164/220), `ENTORNO LISTO`. Es más
 lenta que la de `c2e226d` (22 min 24 s) por la máquina, no por los tests: mismo recuento.
+
+**`bash harness/init.sh` de la revisión, pasada 1** (sobre `dfd3bd1`, con este informe y la
+mutación del delta ya commiteados): exit 0, **8.798 passed, 254 skipped en 2.886,18 s (48 min 6 s)**,
+`PUERTA COBERTURA` 100,0 % (284/284), `PUERTA TAMAÑO` OK (requirements 148/150, design 250/250,
+impl 214/220), `ENTORNO LISTO`.
