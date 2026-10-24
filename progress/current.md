@@ -14,8 +14,12 @@
 - Retomada tras el desbloqueo. Primer `init.sh` sobre la rama reubicada: un KO propio (el GUID
   de la carpeta temporal que este implementer anotó abajo, cazado por `test_f003_r4`); retirado.
 - Tarea en curso, decisiones y desviaciones: en las viñetas que siguen y en `progress/impl_F-148.md`.
-- **T1-T13 hechas**, un commit por tarea (`F-148 T1` … `F-148 T13`). Queda T14 (campaña de
-  mutación ENTERA, rigor `critico`) y T15 (`init.sh` en verde).
+- **T1-T13 hechas**, un commit por tarea (`F-148 T1` … `F-148 T13`). `init.sh` sobre `c2e226d`:
+  verde, 8.783 passed / 254 skipped en 22 min 24 s, `PUERTA COBERTURA` 100 % (281/281).
+- **T14 hecha**: campaña de mutación ENTERA, 92 mutantes, **92 muertos, 0 supervivientes**
+  (8 h 39 min, 3 workers, `--timeout 9000`), y los 92 reverificados EN SERIE, todos muertos
+  (`progress/mutacion_F-148.md`). El primer intento con 4 workers abortó en la línea base sin
+  aplicar nada.
 - **Desviaciones respecto a la spec, justificadas** (detalle en `impl_F-148.md`):
   1. `es_error_transitorio` no lleva la rama explícita «clase `28`/`3D000` → False» de §5: esos
      casos ya caen en False por las marcas de autenticación, la regex de rol/base inexistente y
