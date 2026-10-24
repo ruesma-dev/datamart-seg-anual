@@ -9,6 +9,21 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-24 · F-148 · FUSIONADA (APROBADO pasada 2, `020c982`) · merge `8ed8cf5` · DESPLEGADA · faltan las 7 noches (R31)
+
+- Orden del humano (24-10): merge, diccionario y reinicio del MCP. `init.sh` sobre `main`:
+  8.797 passed (único KO, «estás en main»).
+- Job a `r20261024-1837`, comprobado con `az containerapp job show`. **Vuelta atrás**:
+  `infra/85_update_job.ps1 -Tag r20261023-1016` (sin DDL que deshacer).
+- v60 publicada desde el puesto con la imagen ya en el job (hash `a867f4dfb37f`, 20 reglas) y
+  `check-diccionario` OK. MCP reiniciado (`ca-mcp-bbdd-dev--0000023`, réplica 17:19 UTC):
+  `contexto_bbdd()` abre con «Versión 60»; 61.345 caracteres, igual que la v59.
+- `azure-apps` `51ec4f7`: F-148 «DESPLEGADO el 2026-10-24» (commits locales, sin remoto).
+- **Sigue `in_progress`**: la aceptación pide 7 noches seguidas (R31), desde la del 25-10.
+  Cada mañana: la consulta de reintento por lote, los FAILED de `ingest_raw%` y los huecos de más
+  de 100 s (§8 de `design.md`); una línea por noche aquí. La primera noche, además,
+  `conexiones_abiertas`, `ejecucion_job=` y el coste de `apply_grants.tras_*` (D4).
+
 ## 2026-10-23 · F-148 · `in_progress` (implementer) · rama `feature/F-148-robustez-nocturna`
 
 - Retomada tras el desbloqueo. Primer `init.sh` sobre la rama reubicada: un KO propio (el GUID
