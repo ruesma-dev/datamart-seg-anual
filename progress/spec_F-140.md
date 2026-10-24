@@ -2,7 +2,9 @@
 # F-140 · Informe del spec-author (fase 2 de la cartera: los ingredientes)
 
 Fecha: 2026-10-24. Rama `feature/F-140-proyeccion-caja-ingredientes` desde `main` (`7086e04`).
-Spec en `specs/F-140-proyeccion-caja-ingredientes/`. Decisiones abiertas D1-D12 en `design.md` §9.
+Spec en `specs/F-140-proyeccion-caja-ingredientes/`. Decisiones abiertas en `design.md` §9.
+**Rehecha el 2026-10-24** con las indicaciones del humano (criterio de caja, lista de hipótesis con
+valores por defecto y por obra, descuento de lo ejecutado desde la versión): §5-§7 son nuevas.
 
 Todas las cifras salen de lecturas de SOLO LECTURA: Azure con `main._get_pg()`,
 `_bootstrap_done = True` y `filas_solo_lectura` (nocturna del 2026-10-24), y Sigrid con
@@ -98,7 +100,58 @@ AGRUPACIONES (serie `AGR`, sin documento): 11.378 pagos sin obra, 88,56 M€ (27
 los 257.717 pagos y `cob.padide` en los 21.941 cobros, leído en Sigrid; el asiento compartido de
 `raw.rac` resuelve 178 a una obra y 555 a varias (descartado: conjetura).
 
-## 4. Lo que queda fuera de la medición
+## 5. Lo ejecutado desde la versión, por partida (indicación 3 del humano)
+
+Para cada (obra, concepto) con devengo pendiente: la versión V que rige el último mes pendiente, su
+mes (`date_trunc` de `version_fec_efectiva`) y, POR PARTIDA, el plan de V desde su mes
+(`stg.plan_mensual` filtrado por obra, ámbito master y versión), el plan de V en el intervalo
+[mes de V, último cierre], lo ejecutado en ese intervalo (`importe_mes` real de `mart`, que
+telescopa, F-118) y el plan restante (meses posteriores al cierre). M€:
+
+| Concepto · tipo de V | Obras (con intervalo) | Plan restante | Plan en el intervalo | Ejecutado en el intervalo | Adelantado | Retrasado | Pendiente ajustado | Ejecutado fuera del plan |
+|---|---|---|---|---|---|---|---|---|
+| COSTE · Cuatrimestral | 15 (15) | 66,62 | 49,46 | 34,88 | 5,22 | 19,81 | 84,51 | 0,94 |
+| COSTE · ABC | 4 (3) | 42,03 | 1,73 | 0,52 | 0,21 | 1,42 | 43,27 | 0,00 |
+| COSTE · Planif Inicial | 2 (1) | 5,33 | 0,63 | 1,03 | 0,71 | 0,31 | 5,42 | 0,03 |
+| VENTA · Cuatrimestral | 15 (15) | 67,16 | 47,11 | 32,14 | 4,83 | 19,79 | 84,31 | 1,28 |
+| VENTA · ABC | 4 (2) | 42,88 | 0,34 | 0,56 | 0,25 | 0,03 | 42,76 | — |
+| VENTA · Planif Inicial | 2 (1) | 5,38 | 0,58 | 0,67 | 0,18 | 0,09 | 5,29 | — |
+
+Pendiente ajustado de una partida = máx(0, plan de V desde su mes − ejecutado en el intervalo);
+adelantado y retrasado, la diferencia partida a partida en el intervalo. **Pesa**: en COSTE el
+pendiente ajustado es 133,2 M€ frente a 114,0 de plan restante (+19,2 M€, +16,8 %); en VENTA,
+132,4 frente a 115,4 (+16,9 M€): las obras van RETRASADAS respecto a su versión, y quitar solo los
+meses ya cerrados olvidaría lo planificado y no ejecutado. Partidas sobre-ejecutadas (ejecutado >
+plan desde V; su pendiente es 0): 913 de coste y 322 de venta. Partidas con pendiente pero SIN
+meses restantes en V (todo lo planificaba antes del cierre): 2.087 de coste (5,99 M€) y 1.720 de
+venta (6,09 M€). Partidas con plan pendiente: 20.842 de coste y 18.524 de venta (39.366 filas).
+
+## 6. La frontera con la cartera de F-037 (no contar dos veces)
+
+En las 21 obras con devengo pendiente (último cierre de cada una como corte):
+
+| Pieza | Importe | Obras | Dónde vive |
+|---|---|---|---|
+| Cartera viva de pagos (PREVISTO y no antiguo, con IVA) | 36,44 M€ | 19 | `tesoreria.efectos` |
+| Cartera viva de cobros | 21,31 M€ | 19 | `tesoreria.efectos` |
+| Pagos vivos EMITIDOS tras el último cierre | 0,86 M€ | 12 | `tesoreria.efectos.fecha_emision` |
+| Cobros vivos emitidos tras el último cierre | 0 | 0 | ídem |
+| Facturas de compra posteriores al cierre (base) | 0,83 M€ | 11 | `compras.facturas.fecha_factura` |
+| Albaranes recibidos pendientes de facturar | 8,23 M€ | 20 | `compras.fact_compras_linea.importe_pendiente_facturar` |
+
+Lo ejecutado y facturado ya es cartera (no es devengo pendiente); lo ejecutado y NO facturado (los
+albaranes) no está en ninguna de las dos; y lo facturado tras el cierre está en las dos.
+
+## 7. IVA y plazos de cliente (para los valores por defecto)
+
+- Facturas de compra de los últimos 12 meses (17.613): cuota de IVA / base = 7,99 / 144,53 M€ =
+  **5,5 %**. La marca `inversion_sujeto_pasivo` vale falso en TODAS: no sirve para separar la
+  inversión del sujeto pasivo, y el tipo efectivo dice que buena parte de la compra va sin IVA.
+- Forma de cobro más frecuente en los contratos con el cliente: `CF60` (110 de 705), luego `TR0R`
+  (97), `CF90R` (70), `TR0` (68). Forma de pago más frecuente en contratos de compra: `120` (5.624
+  de 19.170).
+
+## 8. Lo que queda fuera de la medición
 
 - `auxcob`/`auxefc` no están en `raw`: el lado de cobros necesita ingerirlas (D7).
 - La relación entre el devengo pendiente y QUÉ contrato lo facturará no existe en Sigrid: repartir

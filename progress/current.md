@@ -9,23 +9,26 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-24 · F-140 · `spec_ready` (spec-author) · rama `feature/F-140-proyeccion-caja-ingredientes`
+## 2026-10-24 · F-140 · `spec_ready` (spec-author, REHECHA) · rama `feature/F-140-proyeccion-caja-ingredientes`
 
-- Spec escrita: `specs/F-140-proyeccion-caja-ingredientes/` (requirements 150/150, design 250/250,
-  tasks 16). Mediciones de SOLO LECTURA (Azure y `sigrid-api`) en `progress/spec_F-140.md`.
-  F-148 sigue `in_progress` con sus 7 noches; no se ha tocado.
-- **Decisiones que tiene que validar el humano** (`design.md` §9, recomendada la A en todas):
-  D1 dónde viven (en `tesoreria`); D2 qué versión (la que `mart` elige por mes); D3 desde cuándo
-  es pendiente (tras el último cierre, con `mes_pasado_sin_cierre`); D4 publicar la cabecera del
-  corte (plan frente a real: 14,06 M€ de desfase en las cuatrimestrales); D5 grano con categoría;
-  D6 leer la fórmula de plazo en columnas (122 de 122); D7 **ingerir `auxcob` y `auxefc`** (hoy no
-  están) para el lado de cobros; D8 garantía por clase 4/5 (F-128) y no por `RET%`; D9 publicar
-  las DOS fuentes del plazo de retención (Sigrid, días desde factura; `retenciones.fin_obra`,
-  Negocio); D10 **la cascada de obra solo añade 113 pagos** (86,87 % → 86,95 %): implementarla
-  como pide la aceptación (A) o reescribir la aceptación (B); D11 días de pago del proveedor; D12
-  regla dura nueva `R-CAJA-HIPOTESIS`.
-- Siguiente paso: aprobación del humano (PARADA 1). Si elige otra opción en alguna D, el
-  spec-author reescribe requisitos y tareas antes de que entre el implementer.
+- Spec rehecha con las indicaciones del humano del 24-10: `specs/F-140-proyeccion-caja-ingredientes/`
+  (requirements 146/150, design 240/250, tasks 17). Mediciones de SOLO LECTURA en
+  `progress/spec_F-140.md` (§5-§7 nuevas). F-148 sigue `in_progress`; no se ha tocado.
+- Qué cambia: objetivo de caja (cobros y pagos) con la conversión EN VIVO por la IA; catálogo de 23
+  hipótesis (`design.md` §6) con valores por defecto PROPUESTOS (`validado: false`) y por obra;
+  regla `R-CAJA-HIPOTESIS` que obliga a declarar todas con su nivel (DEFECTO, OBRA, USUARIO); y el
+  devengo pendiente DESCONTADO por partida de lo ejecutado desde la versión. Medido: 133,2 M€ de
+  coste pendiente ajustado frente a 114,0 de plan restante (las obras van retrasadas).
+- **Decisiones que tiene que validar el humano** (`design.md` §9, A recomendada): D1-D12 de antes
+  (D2, D3, D4, D5, D9 y D12 reformuladas) y nuevas D13 (catálogo en YAML del repo), D14 (valores
+  por obra en el mismo YAML; el Excel auxiliar, como feature aparte), D15 (mantiene Control de
+  Costes, aprueba el humano), D16 (frontera con la cartera), D17 (defectos sin validar se publican
+  marcados), D18 (valores de obra leídos de los contratos con el cliente), D19 (reparto del pendiente
+  proporcional al perfil). **D10 (cascada de obra) queda ABIERTA** con su medida: +113 pagos.
+- **Y los valores por defecto de §6** (plazos, IVA 21/5,5 %, liquidación trimestral, certificación
+  a un mes...) los tiene que validar Negocio: son propuestas, varias sin dato que las sostenga.
+- Siguiente paso: aprobación del humano (PARADA 1).
+
 ## 2026-10-24 · F-149 · `in_progress` (implementer) · rama `feature/F-149-mcp-sin-reglas-no-publicadas`
 
 - `sdd=false`, rigor `estandar`. Se trabaja en un worktree temporal de la rama (el árbol principal
