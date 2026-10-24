@@ -42,19 +42,33 @@
 
 Despliegue MANUAL, en este orden:
 
-1. `powershell -NoProfile -File infra/70_build_image.ps1` (anotar el tag).
-2. `powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag>`. Sin variables nuevas en el
-   job; sin DDL; el diccionario v60 lo publica la propia nocturna con la imagen nueva (NO
+0. **Tag que corre HOY el job: `r20261023-1016`** (F-147). Vuelta atrás, si la primera
+   nocturna con F-148 sale mal: `powershell -NoProfile -File infra/85_update_job.ps1 -Tag
+   r20261023-1016` (sin DDL que deshacer: F-148 no crea objetos).
+1. `powershell -NoProfile -File infra/70_build_image.ps1` (anotar el tag nuevo).
+2. `powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag nuevo>`. Sin variables nuevas
+   en el job; sin DDL; el diccionario v60 lo publica la propia nocturna con la imagen nueva (NO
    publicar desde el puesto antes: memoria «publicar el diccionario solo con su imagen»).
+   **Comprobar que el job ya apunta a la imagen nueva** (memoria «el repositorio en verde no es
+   producción»): `az containerapp job show -n caj-datamart-seg-dev -g rg-datamart-seg-dev
+   --query "properties.template.containers[0].image" -o tsv` → debe acabar en `:<tag nuevo>`.
 3. Primera nocturna: comprobar en Log Analytics `ejecucion_job=<nombre>` en el arranque (D3),
    `ingest_pagina` por página, `conexiones_abiertas` en la `metadata` de `ingest_raw` y filas
-   `apply_grants.tras_*` en `SUCCESS`.
+   `apply_grants.tras_*` en `SUCCESS`. Después, **reiniciar el MCP** (`mcp-bbdd` cachea el
+   diccionario hasta reiniciar, como en F-147) y comprobar «Versión 60» en `contexto_bbdd()`.
 4. Medir el coste de los permisos por paso (D4): `SELECT step, finished_at - started_at FROM
    _meta.etl_runs WHERE batch_id = '<lote>' AND step LIKE 'apply_grants%'`.
-5. Contar **7 noches SEGUIDAS** (R31) y anotar cada una aquí, una línea por noche:
+5. `azure-apps`: hacer el `git push` de sus commits locales de F-148 (`40b0da9` y `4535829`)
+   SOLO cuando el humano lo autorice, y en ese momento quitar de `datamart_seg_anual.md` los dos
+   «PENDIENTE de desplegar» de F-148, anotando el tag nuevo y la fecha.
+6. Contar **7 noches SEGUIDAS** (R31) y anotar cada una aquí, una línea por noche:
    - `_meta.etl_runs`: `SELECT batch_id, step, status, started_at FROM _meta.etl_runs WHERE
      started_at >= '<día>' AND (step LIKE 'ingest_raw%' AND status IN ('FAILED','ABORTED'));`
-     → cero filas. Una sola réplica por ejecución (`az containerapp job execution list`).
+     → cero filas.
+   - **Una sola réplica por ejecución (R31 a)**: `az containerapp job execution list` NO enseña
+     los reintentos de réplica. Usar `SELECT step, count(*) FROM _meta.etl_runs WHERE batch_id =
+     '<lote>' AND position('.' IN step) = 0 GROUP BY step HAVING count(*) > 1` → cero filas; o
+     comprobar que no aparece `ejecucion_reanudada` en Log Analytics esa noche.
    - Huecos > 100 s entre páginas (KQL, workspace del entorno del job) y su atribución:
      `ContainerAppConsoleLogs_CL | where Log_s has "ingest_pagina" | extend j = parse_json(Log_s)
      | project ts = todatetime(j.timestamp), tabla = tostring(j.table), page = toint(j.page),
