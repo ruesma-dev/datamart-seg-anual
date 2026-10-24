@@ -19,7 +19,8 @@ D1-D7 cerradas por el humano según la propuesta (`design.md` §12). Un commit p
 ## Decisiones de diseño y desviaciones (justificadas también en `current.md`)
 
 1. **`es_error_transitorio` sin rama explícita «clase `28`/`3D000` → False»** (§5 la lista). Esos
-   casos ya dan False: marcas `password authentication failed` / `no pg_hba.conf entry`, regex
+   casos ya dan False: marcas de texto (desde la revisión: `password authentication failed`,
+   `pg_hba.conf`, `permission denied for database`), regex
    `(role|database) .* does not exist`, y `28…`/`3D000` no son `08…`/`53300`/`57P03`. La rama
    explícita sería código redundante = mutantes equivalentes por construcción. Probado caso a caso
    en la tabla de R3/R4 de `test_f148_conexion.py`.
@@ -123,6 +124,53 @@ E   AssertionError: docs/ARCHITECTURE.md no dice «una conexión por tabla»
 4 failed, 1 skipped in 0.32s             --- tras T11 (-k r29): 3 passed; tras T12: 5 passed
 ```
 
+## Revisión pasada 1 (CHANGES_REQUESTED, `progress/review_F-148.md`): lo hecho
+
+Commits `5b2d201` (R4), `0f98420` (R-a), `e978440` (ARCHITECTURE), `6cb0de3` (current.md) y el
+de este informe; en `azure-apps`, commit LOCAL `4535829` (sin push).
+
+1. **R4 real** (decisión del humano: SÍ). `MARCAS_DEFINITIVAS` = `password authentication
+   failed`, `pg_hba.conf` (cubre «no … entry» y «rejects connection») y `permission denied for
+   database`, con el porqué en el comentario: psycopg 3.3 abre SIN SQLSTATE. Tests: seis casos con
+   la forma REAL (`connection failed: connection to server at "h" (192.0.2.1), port 5432 failed:
+   FATAL:  …`, IP de documentación) y `test_f148_r4_la_apertura_real_llega_sin_sqlstate`, que
+   provoca un fallo REAL de libpq sin red (`service=` inexistente, `PGSERVICEFILE` en `tmp_path`)
+   y fija `sqlstate is None`. Los casos con SQLSTATE quedan anotados como contrato. R4 al día.
+2. **Riesgo R-a** (decisión del humano). `domain/reanudacion.py`: `LECTURAS_PARA_REANUDAR =
+   {"build_retenciones": {"build_stg", "build_mart"}}`; `pasos_a_omitir` omite solo si además las
+   lecturas presentes en la ejecución ya se omiten (si van detrás en el orden, se rehace: ante la
+   duda, construir). Orden, `depends_on` (`["ingest_raw"]`, lo fija un test) y noche normal sin
+   cambios. **Barrido** de los SQL de cada build: es el ÚNICO que lee sin declarar una tabla de un
+   build ANTERIOR (`05_fin_obra.sql`: `stg.plan_mensual`, `mart.master_versiones_tipadas`). El
+   resto: vistas vivas (las de `maestro` sobre `stg`, `compras.vencimientos` → `tesoreria`),
+   vistas solo sobre `raw` (`maestro.centros_coste`, `maestro.v_obra_fichas`), comentarios, o
+   lecturas de builds POSTERIORES (retenciones → cierre, compras → descompuestos/personal), que
+   en las dos réplicas son la noche anterior. R21 y `design.md` §10 al día (148/150 y 250/250).
+3. **Mutación del delta**: ver «Evidencias».
+4. **Documentación**: `ARCHITECTURE.md` (nocturnas del 17 al 23-10; lecturas al reanudar) y
+   `azure-apps` (`conexiones_abiertas` mide solo la ingesta y el ~550 no cuenta los diez
+   `apply_grants.tras_*`; 17-23 de octubre; R4 ampliado; retenciones al reanudar).
+5. **Despliegue MANUAL** en `current.md`: paso 0 con el tag de hoy `r20261023-1016` y su vuelta
+   atrás; comprobar la imagen del job tras reapuntarlo; reiniciar el MCP y ver «Versión 60»; push
+   de `azure-apps` solo con autorización; R31(a) por SQL o `ejecucion_reanudada`.
+
+**RED de R4** · `python -m pytest -q -p no:cacheprovider --tb=line tests/test_f148_conexion.py -k r4`
+```
+E   assert True is False  (es_error_transitorio(... FATAL:  pg_hba.conf rejects connection for host ...))
+E   assert True is False  (es_error_transitorio(... FATAL:  permission denied for database "sigrid_dm" ...))
+FAILED ...::test_f148_r4_errores_que_no_se_reintentan[real-pg_hba-rechaza]
+FAILED ...::test_f148_r4_errores_que_no_se_reintentan[real-sin-connect]
+2 failed, 17 passed, 38 deselected in 2.71s        --- tras el código: 57 passed (todo el fichero)
+```
+**RED de R-a** · `python -m pytest -q -p no:cacheprovider --tb=line tests/test_f148_reanudacion.py -k r21`
+```
+E   AssertionError: assert frozenset({'b...d_excel_aux'}) == frozenset({'i...d_excel_aux'})   (x2)
+E   AssertionError: assert frozenset({'b...'ingest_raw'}) == frozenset({'b...'ingest_raw'})
+E   AttributeError: module 'etl_sigrid.domain.reanudacion' has no attribute 'LECTURAS_PARA_REANUDAR'
+E   AssertionError: assert ['build_stg', 'build_mart'] == ['build_stg',..._retenciones']
+5 failed, 12 passed, 35 deselected in 2.06s   --- tras el código (con test_f110*): 85 passed
+```
+
 ## Verificaciones MANUAL pendientes (humano, tras APROBADO y merge)
 
 Copiadas a `progress/current.md` (T13): imagen nueva (`infra/70_build_image.ps1`) y job
@@ -150,15 +198,15 @@ Números medidos, no estimados.
 | Cobertura de las líneas cambiadas | **100,0 % (281/281)**, umbral 80 %, nivel critico | `PUERTA COBERTURA` de `init.sh` (diff desde `9ff322f`, merge-base con `main`) |
 | Mutación (campaña ENTERA, sin muestreo) | **92 generados, 92 evaluados, 92 muertos, 0 supervivientes, 0 timeouts, 0 sin veredicto**; 31.149,2 s (8 h 39 min), 3 workers, `--timeout 9000`, línea base 1.002,7-1.014,4 s por worker | `python -m harness.mutacion --feature F-148 --max-mutantes 0 --workers 3 --timeout 9000` → `progress/mutacion_F-148.md` |
 | Reverificación EN SERIE de los muertos | **92/92 muertos** (90 por subconjunto, 2 por la suite entera); ningún falso muerto | `progress/mutacion_F-148.md`, sección «Reverificación EN SERIE» |
+| Mutación del delta de la revisión (los dos módulos ENTEROS) | **20 generados, 20 muertos, 0 supervivientes, 0 timeouts**; 11.862,5 s, 3 workers, `--timeout 9000`; en serie, **20/20 muertos** por el subconjunto | `python -m harness.mutacion --feature F-148 --ficheros etl_sigrid/domain/reanudacion.py,etl_sigrid/infrastructure/postgres/reintento_conexion.py --workers 3 --timeout 9000 --max-mutantes 0` → `progress/mutacion_F-148_revision1.md` |
 | Tiempo de la suite | 1.344,07 s (22 min 24 s) con medición de cobertura | la línea final de pytest dentro de `init.sh` |
-| Tamaño | `PUERTA TAMAÑO` OK: requirements 145/150, design 250/250; este informe ≤ 220 | `init.sh` |
+| Tamaño | `PUERTA TAMAÑO` OK: requirements 148/150, design 250/250; este informe ≤ 220 | `init.sh` |
 | Lint | sin avisos nuevos en lo tocado: los ficheros nuevos pasan `ruff check` y `ruff format`; `main.py` tiene los mismos 73 avisos previos antes y después | `python -m ruff check` (la deuda previa no bloquea, `LINT_BLOQUEA=0`) |
 
 **Supervivientes: ninguno**, así que no hay análisis de equivalentes que pedir al humano.
 
-Primer intento de la campaña (4 workers por defecto): abortó en la línea base (la suite limpia
-superó los 600 s con 4 workers compitiendo) sin aplicar ningún mutante (`--estado` → «Sin campaña
-en curso»). Se relanzó con `--workers 3 --timeout 9000`, el mismo patrón que F-141.
+Primer intento de la campaña entera (4 workers): abortó en la línea base (> 600 s) sin aplicar
+ningún mutante; se relanzó con `--workers 3 --timeout 9000`, el patrón de F-141.
 
 **`bash harness/init.sh` final** (T15, sobre `a09fe92`, con este informe ya commiteado): exit 0,
 **8.783 passed, 254 skipped en 2.265,46 s (37 min 45 s)**, `PUERTA COBERTURA` 100,0 % (281/281),
