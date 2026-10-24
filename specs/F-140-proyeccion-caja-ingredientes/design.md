@@ -198,7 +198,7 @@ un plan viejo que rige (2 obras `Planif Inicial`, una de 2020: V va en cada fila
 validar tomado por dato (`validado` y la regla); la obra de las `AGR` y los cobros sin venta
 (F-040) siguen sin obra: Sigrid no guarda el vínculo.
 
-## 9. Decisiones (recomendada: A; las que no cambian respecto a `bc83e78` se mantienen)
+## 9. Decisiones (CERRADAS por el humano el 2026-10-25: todas A, D10 incluida)
 
 - **D1 · Dónde** (sin cambio). (A) En `tesoreria`. (B) Esquema nuevo. (C) Repartido.
 - **D2 · Qué versión** (reformulada). (A) V = la que `mart` elige para el último mes pendiente,
