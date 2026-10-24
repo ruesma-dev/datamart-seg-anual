@@ -183,7 +183,53 @@ TRANSITORIOS = [
     pytest.param(pg_errors.lookup("57P03")("the database system is starting up"), id="57P03"),
 ]
 
+#: Forma REAL de un error de apertura en psycopg 3.3: `generators.py` lanza
+#: `OperationalError(f"connection failed: {mensaje de libpq}")` SIN SQLSTATE
+#: (lo fija `test_f148_r4_la_apertura_real_llega_sin_sqlstate`). La IP es de
+#: documentación (RFC 5737), no de ninguna red real.
+APERTURA = 'connection failed: connection to server at "h" (192.0.2.1), port 5432 failed: '
+
 DEFINITIVOS = [
+    # Revisión de F-148, pasada 1: los errores definitivos tal como llegan al
+    # abrir, uno por marca. Antes de esta lista, los dos primeros se
+    # reintentaban cuatro veces.
+    pytest.param(
+        psycopg.OperationalError(
+            APERTURA + 'FATAL:  pg_hba.conf rejects connection for host "192.0.2.9", '
+            'user "etl", database "sigrid_dm", SSL encryption'
+        ),
+        id="real-pg_hba-rechaza",
+    ),
+    pytest.param(
+        psycopg.OperationalError(
+            APERTURA + 'FATAL:  permission denied for database "sigrid_dm"\n'
+            "DETAIL:  User does not have CONNECT privilege."
+        ),
+        id="real-sin-connect",
+    ),
+    pytest.param(
+        psycopg.OperationalError(
+            APERTURA + 'FATAL:  no pg_hba.conf entry for host "192.0.2.9", user "etl", '
+            'database "sigrid_dm", SSL encryption'
+        ),
+        id="real-pg_hba-sin-entrada",
+    ),
+    pytest.param(
+        psycopg.OperationalError(
+            APERTURA + 'FATAL:  password authentication failed for user "etl"'
+        ),
+        id="real-password",
+    ),
+    pytest.param(
+        psycopg.OperationalError(APERTURA + 'FATAL:  role "etl" does not exist'),
+        id="real-rol",
+    ),
+    pytest.param(
+        psycopg.OperationalError(APERTURA + 'FATAL:  database "sigrid_dm" does not exist'),
+        id="real-base",
+    ),
+    # Con SQLSTATE: la apertura de psycopg 3.3 no los produce, pero fijan el
+    # contrato de la función si una versión futura empieza a traerlo.
     pytest.param(pg_errors.lookup("28P01")("rechazado"), id="28P01"),
     pytest.param(pg_errors.lookup("28000")("rechazado"), id="28000"),
     pytest.param(pg_errors.lookup("3D000")("no existe"), id="3D000"),
@@ -214,6 +260,25 @@ def test_f148_r3_errores_transitorios(error: BaseException) -> None:
 @pytest.mark.parametrize("error", DEFINITIVOS)
 def test_f148_r4_errores_que_no_se_reintentan(error: BaseException) -> None:
     assert es_error_transitorio(error) is False
+
+
+def test_f148_r4_la_apertura_real_llega_sin_sqlstate(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    """Por qué las marcas de texto son la única defensa de R4 al abrir.
+
+    Una apertura que libpq rechaza en el propio proceso —un `service` que no
+    existe, sin red ni socket— recorre el mismo camino que una autenticación
+    fallida: `OperationalError` con el mensaje de libpq y `sqlstate` None.
+    """
+    monkeypatch.setenv("PGSERVICEFILE", str(tmp_path / "no_existe.conf"))
+    monkeypatch.setenv("PGSYSCONFDIR", str(tmp_path))
+
+    with pytest.raises(psycopg.OperationalError) as caido:
+        psycopg.connect("service=f148_no_existe connect_timeout=2")
+
+    assert caido.value.sqlstate is None
+    assert type(caido.value) is psycopg.OperationalError
 
 
 def test_f148_r4_la_autenticacion_manda_sobre_la_clase_de_conexion() -> None:

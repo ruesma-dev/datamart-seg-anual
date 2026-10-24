@@ -58,9 +58,18 @@ ESPERA_MAX_S = 30
 CLASE_CONEXION = "08"
 SQLSTATES_TRANSITORIOS = frozenset({"53300", "57P03"})
 
-#: libpq no siempre trae SQLSTATE al fallar la apertura, y entonces el texto
-#: es lo único que distingue una contraseña mala de una red caída.
-MARCAS_DEFINITIVAS = ("password authentication failed", "no pg_hba.conf entry")
+#: psycopg 3.3 NO trae SQLSTATE al fallar la apertura: `generators.py` lanza
+#: `OperationalError("connection failed: …")` con el texto de libpq y
+#: `sqlstate` None, así que el 28P01 o el 42501 del servidor nunca llegan. El
+#: texto es lo único que distingue un rechazo de una red caída. `pg_hba.conf`
+#: cubre las dos formas del rechazo de la puerta («no pg_hba.conf entry» y
+#: «pg_hba.conf rejects connection»); «permission denied for database» es la
+#: falta de CONNECT (revisión de F-148, pasada 1).
+MARCAS_DEFINITIVAS = (
+    "password authentication failed",
+    "pg_hba.conf",
+    "permission denied for database",
+)
 _DESTINO_INEXISTENTE = re.compile(r"(role|database) .* does not exist")
 
 

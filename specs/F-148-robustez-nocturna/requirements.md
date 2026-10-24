@@ -38,10 +38,11 @@ compartido (escrituras en Azure: quedan como recomendación, `design.md` §9).
   `PG_CONNECT_INTENTOS` intentos en total (por defecto **4**) con espera
   exponencial (2, 4, 8 s; tope 30 s) y registrar `pg_conexion_reintento` con
   intento, segundos y el error redactado.
-- **R4.** SI el error es de AUTENTICACIÓN o de destino inexistente (`sqlstate`
-  de clase `28`, `3D000`, o mensaje con «password authentication failed»,
-  «no pg_hba.conf entry», «role … does not exist», «database … does not
-  exist»), ENTONCES el sistema NO debe reintentar: falla al primer intento.
+- **R4.** SI el error es de AUTENTICACIÓN, PERMISO o destino inexistente
+  (mensaje con «password authentication failed», «pg_hba.conf» —«no … entry» y
+  «rejects connection»—, «permission denied for database», «role/database …
+  does not exist»; o `sqlstate` fuera de los de R3), ENTONCES NO debe
+  reintentar. psycopg 3.3 abre SIN `sqlstate`: el texto es la defensa.
 - **R5.** SI se agotan los intentos, ENTONCES el sistema debe propagar la última
   excepción, igual que hoy.
 - **R6.** Ningún log del reintento ni de la instrumentación debe contener la
