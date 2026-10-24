@@ -2207,11 +2207,12 @@
         "Los pagos de personal no salen de `tesoreria_restringida` (misma regla que F-037)",
         "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
       ],
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "rigor": "estandar",
       "priority": 5,
-      "branch": "feature/F-140-proyeccion-caja-ingredientes"
+      "branch": "feature/F-140-proyeccion-caja-ingredientes",
+      "notes": "2026-10-24: spec en specs/F-140-proyeccion-caja-ingredientes/ (requirements 150, design 250, tasks 16 tareas), mediciones de solo lectura en progress/spec_F-140.md. Decisiones abiertas D1-D12 en design.md §9, cada una con su recomendación (A). Hallazgos que cambian la ficha: la fórmula de plazo se puede leer (122 de 122, contrastada con los efectos: «450R» vence a 457 días de mediana); auxcob y auxefc no están ingeridas (D7); el plazo de devolución de la retención tiene dos fuentes que no coinciden, Sigrid (días desde factura) y retenciones.fin_obra (D9); la cascada de obra solo añade 113 pagos (86,87 % -> 86,95 %, D10) porque las agrupaciones AGR no tienen vínculo en Sigrid (padide vacío en origen)."
     },
     {
       "id": "F-141",

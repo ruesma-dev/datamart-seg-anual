@@ -9,6 +9,23 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-24 · F-140 · `spec_ready` (spec-author) · rama `feature/F-140-proyeccion-caja-ingredientes`
+
+- Spec escrita: `specs/F-140-proyeccion-caja-ingredientes/` (requirements 150/150, design 250/250,
+  tasks 16). Mediciones de SOLO LECTURA (Azure y `sigrid-api`) en `progress/spec_F-140.md`.
+  F-148 sigue `in_progress` con sus 7 noches; no se ha tocado.
+- **Decisiones que tiene que validar el humano** (`design.md` §9, recomendada la A en todas):
+  D1 dónde viven (en `tesoreria`); D2 qué versión (la que `mart` elige por mes); D3 desde cuándo
+  es pendiente (tras el último cierre, con `mes_pasado_sin_cierre`); D4 publicar la cabecera del
+  corte (plan frente a real: 14,06 M€ de desfase en las cuatrimestrales); D5 grano con categoría;
+  D6 leer la fórmula de plazo en columnas (122 de 122); D7 **ingerir `auxcob` y `auxefc`** (hoy no
+  están) para el lado de cobros; D8 garantía por clase 4/5 (F-128) y no por `RET%`; D9 publicar
+  las DOS fuentes del plazo de retención (Sigrid, días desde factura; `retenciones.fin_obra`,
+  Negocio); D10 **la cascada de obra solo añade 113 pagos** (86,87 % → 86,95 %): implementarla
+  como pide la aceptación (A) o reescribir la aceptación (B); D11 días de pago del proveedor; D12
+  regla dura nueva `R-CAJA-HIPOTESIS`.
+- Siguiente paso: aprobación del humano (PARADA 1). Si elige otra opción en alguna D, el
+  spec-author reescribe requisitos y tareas antes de que entre el implementer.
 ## 2026-10-24 · F-149 · `in_progress` (implementer) · rama `feature/F-149-mcp-sin-reglas-no-publicadas`
 
 - `sdd=false`, rigor `estandar`. Se trabaja en un worktree temporal de la rama (el árbol principal
