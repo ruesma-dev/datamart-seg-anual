@@ -116,10 +116,10 @@ Nada se ha ejecutado contra Azure ni Sigrid.
 |---|---|---|
 | Tests propios de F-149 | **13 passed** en 5,17 s (RED: 4 failed, 9 passed) | `pytest tests/test_f149_mcp_sin_reglas_no_publicadas.py` |
 | Suite completa | **8.782 passed, 283 skipped, 0 failed** en 1.112,30 s (18 min 32 s) | `pytest tests -q`, sin `-x`, tras el último cambio de tests (`fa8c04a`) |
-| `init.sh` final | ver la sección siguiente | `bash harness/init.sh` |
+| `init.sh` final | **exit 0, `ENTORNO LISTO`**, 8.782 passed / 283 skipped | `bash harness/init.sh` sobre `43e5554` |
 | Cobertura de líneas cambiadas | **N/A**: «F-149 no cambia líneas Python de producción frente a main» | `PUERTA COBERTURA` de `init.sh` |
 | Mutación | **0 mutantes: ALCANCE VACÍO**, «ni una línea de producción que mutar»; la herramienta no escribe `progress/mutacion_F-149.md` a propósito | `python -m harness.mutacion --feature F-149` |
-| Tiempo de la suite | 1.112,30 s sin cobertura; el de `init.sh`, abajo | línea final de pytest |
+| Tiempo de la suite | 1.112,30 s sin cobertura; 3.296,99 s con cobertura dentro de `init.sh` | línea final de pytest |
 
 Sobre la mutación vacía: lo que F-149 cambia es texto del diccionario y tests, y la herramienta solo
 muta Python de producción. La defensa equivalente es la del propio detector: la fase RED (cazó los
@@ -131,4 +131,6 @@ positivos (`raw`, la propia `fuera_mcp`, una cita a regla publicada).
 - Primer intento (antes de arreglar `test_f006_copias.py`): exit 1, un KO, pytest con `-x` paró en
   `test_f006_r26_la_convencion_de_sigrid_no_duplica_la_regla` (`1 failed, 342 passed`). Arreglado
   en `fa8c04a` (desviación 1).
-- Final: PENDIENTE_DE_ESTA_EJECUCION
+- Final (sobre `43e5554`, con este informe ya commiteado): **exit 0, `ENTORNO LISTO`**; pytest con
+  cobertura `8782 passed, 283 skipped` en 3.296,99 s (54 min 56 s; la máquina iba cargada);
+  `PUERTA COBERTURA: N/A`; `PUERTA TAMAÑO` OK (impl 134/220); único aviso, ruff 275 (deuda previa).

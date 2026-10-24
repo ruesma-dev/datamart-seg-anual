@@ -17,7 +17,8 @@
   textos (`contexto convenciones.identidad_sigrid`, `ficha compras.albaranes`, `ficha compras.facturas`).
 - **T2 hecha** (`F-149 T2`): los tres textos, v61 con su comentario, `docs/CONVENTIONS.md` (una frase).
 - **T3 hecha**: suite completa 8.782 passed / 283 skipped / 0 failed; mutación con ALCANCE VACÍO
-  (sin Python de producción); informe en `progress/impl_F-149.md`. Falta el `init.sh` final.
+  (sin Python de producción); informe en `progress/impl_F-149.md`. `init.sh` final sobre `43e5554`:
+  exit 0, `ENTORNO LISTO`. Lista para el reviewer.
 - **Desviaciones, justificadas**:
   1. `tests/test_f147_contenido.py` R14 exigía que `identidad_sigrid` NOMBRARA `R-SIGRID-CON` (R14
      de F-147: «que remita a `R-SIGRID-CON`»). F-149, pedida por el humano, revoca justo eso: el test
