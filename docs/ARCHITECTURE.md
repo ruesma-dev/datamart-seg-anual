@@ -1015,7 +1015,7 @@ coherencia se garantiza por **verificación** y **visibilidad**:
 `SesionDeCarga` (`sesion_carga.py`) abre la conexión en la primera página y
 la reutiliza para todas, con `COPY` + `COMMIT` por página; antes cada página
 abría la suya (~3.500 aperturas por noche contra el Postgres compartido, y
-una de ellas colgó la nocturna del 2026-10-22 130 s por apertura). La
+en las nocturnas del 17 al 23 de octubre hubo aperturas colgadas hasta 130 s). La
 transacción sigue siendo por página, así que la consecuencia para cualquier
 post mortem no cambia: una muerte a mitad de tabla la deja **truncada y
 parcial**, no intacta. Si la conexión se rompe a mitad de una página, la
@@ -1271,7 +1271,10 @@ ingest_raw → load_excel_aux → build_stg → build_mart
   sufijo del `batch_id` sale de su SHA-256: la segunda réplica encuentra el
   lote de la primera (de las últimas 8 h), lo **adopta** y omite lo que ya
   quedó en `SUCCESS`: un paso, si sus dependencias también se omiten
-  (`apply_grants` nunca), y cada tabla de `raw` ya cargada. Como el lote es el
+  (`apply_grants` nunca), y cada tabla de `raw` ya cargada. Lo que un paso lee
+  sin declararlo también cuenta, solo para omitir (`LECTURAS_PARA_REANUDAR`):
+  si se rehace `build_stg` o `build_mart`, se rehacen las retenciones, que leen
+  los dos para el fin de obra (F-110, D4). Como el lote es el
   mismo, la puerta de `build_stg` ve un solo lote. Un paso omitido no graba
   fila: `v_frescura` sigue diciendo cuándo se construyó de verdad. Sin la
   variable (el puesto, los comandos sueltos) todo es como antes.
