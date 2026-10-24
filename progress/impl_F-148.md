@@ -160,5 +160,7 @@ Primer intento de la campaña (4 workers por defecto): abortó en la línea base
 superó los 600 s con 4 workers compitiendo) sin aplicar ningún mutante (`--estado` → «Sin campaña
 en curso»). Se relanzó con `--workers 3 --timeout 9000`, el mismo patrón que F-141.
 
-**`bash harness/init.sh` final** (T15, sobre el HEAD con este informe): ver la última línea de
-`progress/current.md` en la sección de F-148.
+**`bash harness/init.sh` final** (T15, sobre `a09fe92`, con este informe ya commiteado): exit 0,
+**8.783 passed, 254 skipped en 2.265,46 s (37 min 45 s)**, `PUERTA COBERTURA` 100,0 % (281/281),
+`PUERTA TAMAÑO` OK (requirements 145/150, design 250/250, impl 164/220), `ENTORNO LISTO`. Es más
+lenta que la de `c2e226d` (22 min 24 s) por la máquina, no por los tests: mismo recuento.

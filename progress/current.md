@@ -20,6 +20,9 @@
   (8 h 39 min, 3 workers, `--timeout 9000`), y los 92 reverificados EN SERIE, todos muertos
   (`progress/mutacion_F-148.md`). El primer intento con 4 workers abortó en la línea base sin
   aplicar nada.
+- **T15 hecha**: `bash harness/init.sh` sobre `a09fe92`, exit 0, 8.783 passed / 254 skipped,
+  cobertura 100 % (281/281), tamaño OK, `ENTORNO LISTO`. Lista para el reviewer:
+  `progress/impl_F-148.md`. `azure-apps`: commit local `40b0da9`, sin push.
 - **Desviaciones respecto a la spec, justificadas** (detalle en `impl_F-148.md`):
   1. `es_error_transitorio` no lleva la rama explícita «clase `28`/`3D000` → False» de §5: esos
      casos ya caen en False por las marcas de autenticación, la regex de rol/base inexistente y
