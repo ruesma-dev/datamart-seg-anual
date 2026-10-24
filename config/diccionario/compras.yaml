@@ -767,7 +767,7 @@ objetos:
         nulo_significa: El documento no tiene obra de cabecera.
         agregacion: no_sumable
       codigo_obra_cabecera:
-        significado: Codigo de la obra de cabecera (`con.cod`, `R-SIGRID-CON`).
+        significado: Codigo de la obra de cabecera (`con.cod`).
         nulo_significa: Sin obra de cabecera.
       nombre_obra_cabecera:
         significado: Nombre de la obra de cabecera (`con.res`).
@@ -1318,7 +1318,7 @@ objetos:
         nulo_significa: La factura no tiene obra de cabecera.
         agregacion: no_sumable
       codigo_obra_cabecera:
-        significado: Codigo de la obra de cabecera (`con.cod`, `R-SIGRID-CON`).
+        significado: Codigo de la obra de cabecera (`con.cod`).
         nulo_significa: Sin obra de cabecera.
       nombre_obra_cabecera:
         significado: Nombre de la obra de cabecera (`con.res`).
