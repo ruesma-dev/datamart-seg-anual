@@ -98,7 +98,9 @@ compartido (escrituras en Azure: quedan como recomendación, `design.md` §9).
   (`reanudacion_no_disponible`) y arrancar un lote nuevo: no tumba la noche.
 - **R21.** Al reanudar, el orquestador debe omitir un paso SOLO si tiene fila de
   paso (sin punto) en `SUCCESS` en el lote y TODAS sus dependencias
-  (`depends_on`) también se omiten. `apply_grants` no se omite nunca.
+  (`depends_on`) también se omiten, y lo mismo lo que LEE sin declararlo
+  (`LECTURAS_PARA_REANUDAR`: `build_retenciones` lee `build_stg` y
+  `build_mart`, riesgo R-a), solo al reanudar. `apply_grants` nunca.
 - **R22.** Un paso omitido no se ejecuta ni graba fila en `_meta.etl_runs`
   (`v_frescura` sigue diciendo cuándo se construyó de verdad), cuenta como
   `SUCCESS` para sus dependientes y deja `paso_reanudado` en el log.

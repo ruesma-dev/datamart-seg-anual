@@ -15,7 +15,7 @@ carga, reintento de conexión y consultas, **infraestructura**. Sin DDL nuevo.
 
 | Ruta | Qué |
 |---|---|
-| `etl_sigrid/domain/reanudacion.py` | `VENTANA_REANUDACION`, `PASOS_NUNCA_OMITIBLES`, `sufijo_de_ejecucion_job`, `pasos_a_omitir`, `tablas_a_omitir` (puro) |
+| `etl_sigrid/domain/reanudacion.py` | `VENTANA_REANUDACION`, `PASOS_NUNCA_OMITIBLES`, `LECTURAS_PARA_REANUDAR`, `sufijo_de_ejecucion_job`, `pasos_a_omitir`, `tablas_a_omitir` (puro) |
 | `etl_sigrid/infrastructure/postgres/reintento_conexion.py` | `es_error_transitorio(exc)`, `abrir_con_reintento(...)` (tenacity), `psycopg_en_debug()` |
 | `etl_sigrid/infrastructure/postgres/sesion_carga.py` | `SesionDeCarga` y `MedidaPagina`: una conexión por tabla, COPY + COMMIT por página, reintento idempotente |
 | `tests/test_f148_{conexion,sesion_carga,reanudacion,permisos_por_paso,documentacion}.py` | R1-R7 y R15-R16 · R8-R14 y R17 · R18-R24 · R25-R28 · R29-R30 (estático) |
@@ -68,13 +68,11 @@ margen a un TLS + SCRAM lento sin acercarse a los 130 s. Peor caso de R3: 4 × 1
 
 **Dominio · `domain/reanudacion.py`**
 - `VENTANA_REANUDACION = timedelta(hours=8)` — el `replicaTimeout` es 7 h.
-- `PASOS_NUNCA_OMITIBLES = frozenset({"apply_grants"})`.
-- `sufijo_de_ejecucion_job(nombre: str) -> str` — `sha256(nombre)[:6]`, mismo
-  ancho que `BYTES_DEL_SUFIJO`.
-- `pasos_a_omitir(orden: Sequence[tuple[str, Sequence[str]]], terminados:
-  AbstractSet[str]) -> frozenset[str]` — recorre en orden topológico; omite si
-  `nombre in terminados`, no está en `PASOS_NUNCA_OMITIBLES` y todas sus
-  dependencias están ya omitidas.
+- `PASOS_NUNCA_OMITIBLES = frozenset({"apply_grants"})`; `LECTURAS_PARA_REANUDAR`
+  (riesgo R-a, §10). `sufijo_de_ejecucion_job(nombre)` — `sha256(nombre)[:6]`.
+- `pasos_a_omitir(orden, terminados) -> frozenset[str]` — en orden topológico,
+  omite si `nombre in terminados`, no es `PASOS_NUNCA_OMITIBLES` y sus
+  dependencias y sus lecturas presentes en `orden` ya están omitidas.
 - `tablas_a_omitir(declaradas: Iterable[str], terminados: AbstractSet[str]) ->
   frozenset[str]` — `ingest_raw.<t>` en `SUCCESS` ∩ declaradas (excluye
   `ingest_raw.firma_origen` por construcción).
@@ -203,8 +201,7 @@ Control independiente: la consulta H6 del diagnóstico (`sigrid_stream_page`,
   servidor llega a ver la conexión colgada. Afecta al servidor compartido.
 - **No mover la hora** (paradas de 00:09 a 00:46, servidor ocioso). **VNet +
   NAT Gateway**, solo si 7 noches con este arreglo no bastan.
-- Fijar versiones (`psycopg`, imagen base), feature aparte; y sigue pendiente
-  la bajada del servidor de B2s a B1ms.
+- Fijar versiones (`psycopg`, imagen base), feature aparte; bajada a B1ms pendiente.
 
 ## 10 · Riesgos y alternativas descartadas
 
@@ -212,11 +209,17 @@ Control independiente: la consulta H6 del diagnóstico (`sigrid_stream_page`,
   DESTRUCCIÓN** (como `build_cierre` → `build_mart`). Una no declarada podría
   dejar un objeto destruido sin recrear tras reanudar; el guardián
   `check-declarados` del final de `run-all` lo detecta y sale con 1.
+- **R-a, lecturas sin declarar** (revisión, pasada 1): `build_retenciones`
+  lee `stg.plan_mensual` y `mart.master_versiones_tipadas` sin depender de ellos
+  (F-110, D4). `LECTURAS_PARA_REANUDAR` (dominio) los cuenta como dependencias
+  SOLO para omitir: si se rehace `build_stg` o `build_mart`, se rehacen las
+  retenciones; la noche normal no cambia. Barrido: es el único build que lee
+  sin declarar una tabla de un build ANTERIOR; el resto lee vistas vivas, `raw`
+  o builds posteriores (la noche anterior en las dos réplicas).
 - **Un lote con dos intentos**: `timings`/`perfil-carga` verán dos filas del
-  mismo paso en el lote (FAILED y SUCCESS). Es lo que ocurrió; se documenta en
-  la ficha (R29), no se oculta.
-- **Permisos por paso ×10**: coste sin medir (D4). Si es alto, se reduce la
-  lista `PASOS_CON_PERMISOS`; la autoridad sigue siendo el `apply_grants` final.
+  mismo paso (FAILED y SUCCESS); se documenta en la ficha (R29).
+- **Permisos por paso ×10**: coste sin medir (D4); si es alto, se recorta
+  `PASOS_CON_PERMISOS` (la autoridad sigue siendo el `apply_grants` final).
 - **Descartado: conceder solo el esquema del paso** (más barato): saltaría la
   búsqueda de vistas que filtran del perfil restringido y le daría lectura
   temporal de algo que el final le revocaría. Se reutiliza el paso entero.
@@ -234,16 +237,13 @@ el reintento vía `_connect`); el DDL de `_meta`; `abortar_runs_huerfanos`.
 
 ## 12 · Decisiones del humano (CERRADAS el 2026-10-23, todas según la propuesta)
 
-- **D1** `connect_timeout` 15 s (elegido) o 10 s.
-- **D2** Valores de keepalives (30/10/3) y `tcp_user_timeout` 60 s (§4).
-- **D3** Identidad del lote por `CONTAINER_APP_JOB_EXECUTION_NAME` (variable
-  documentada por Microsoft para jobs; se confirma en la primera nocturna). Si
-  no estuviera, la reanudación no se activa y todo funciona como hoy.
+- **D1/D2** `connect_timeout` 15 s; keepalives 30/10/3 y `tcp_user_timeout` 60 s (§4).
+- **D3** Lote por `CONTAINER_APP_JOB_EXECUTION_NAME` (documentada para jobs; se
+  confirma en la primera nocturna). Sin ella no se reanuda: todo como hoy.
 - **D4** Permisos completos tras cada uno de los diez build; medir y, si cuesta
   más de ~30 s cada uno, recortar la lista.
-- **D5** Rigor: la feature está en `estandar`; toca las conexiones al servidor
-  compartido y el camino de los permisos del perfil restringido. Propuesta:
-  subir a `critico` (campaña de mutación entera). Elegido.
+- **D5** Rigor `critico` (estaba en `estandar`): toca las conexiones al servidor
+  compartido y los permisos del perfil restringido. Campaña de mutación entera.
 - **D6** N = 7 noches (propuesto). Un hueco de `http_s` > 100 s no rompe la
   racha y se remite a `sigrid-api` (hipótesis B del diagnóstico).
 - **D7** `ingest_pagina` en TODAS las páginas (~3.000 líneas más por noche) o

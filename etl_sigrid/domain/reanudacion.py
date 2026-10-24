@@ -14,6 +14,9 @@ Lo que se omite, y por qué así:
   - Un PASO, solo si tiene fila sin punto en `SUCCESS` en el lote y todas sus
     dependencias también se omiten: si se repite la ingesta, `build_stg` se
     reconstruye encima aunque hubiera terminado (R21).
+  - Ni si se rehace algo que el paso LEE sin declararlo como dependencia
+    (`LECTURAS_PARA_REANUDAR`): unas retenciones omitidas sobre un `stg`
+    rehecho quedarían calculadas con el de la primera réplica (riesgo R-a).
   - `apply_grants` nunca: es barato, idempotente y el que decide la noche.
   - Una TABLA de `raw`, si su fila `ingest_raw.<tabla>` está en `SUCCESS` en el
     lote. Como el lote es el mismo, la puerta de `build_stg` ve un solo lote
@@ -35,6 +38,17 @@ VENTANA_REANUDACION = timedelta(hours=8)
 
 #: Pasos que se ejecutan aunque el lote ya los tenga en `SUCCESS`.
 PASOS_NUNCA_OMITIBLES = frozenset({"apply_grants"})
+
+#: Lo que un paso lee de otro build SIN declararlo en `depends_on`, solo para
+#: decidir si se omite al reanudar (riesgo R-a de la revisión de F-148). No
+#: cambia el orden ni las dependencias de la noche normal: `build_retenciones`
+#: sigue dependiendo solo de la ingesta para construirse aunque `stg` falle
+#: (F-110, D4), pero `05_fin_obra.sql` lee `stg.plan_mensual` y
+#: `mart.master_versiones_tipadas`. Es el único build que lee sin declararlo
+#: una tabla de un build ANTERIOR de la misma noche (barrido de la revisión).
+LECTURAS_PARA_REANUDAR: dict[str, frozenset[str]] = {
+    "build_retenciones": frozenset({"build_stg", "build_mart"}),
+}
 
 #: Caracteres hexadecimales del sufijo: los mismos que el aleatorio de F-024
 #: (`BYTES_DEL_SUFIJO` = 3 bytes), para que el `batch_id` siga ordenando.
@@ -64,13 +78,20 @@ def pasos_a_omitir(
     un paso ya se sabe si sus dependencias se omiten. Las filas con punto de
     `terminados` (tramos como `ingest_raw.con`) no casan con ningún nombre de
     paso y no acreditan nada.
+
+    Las lecturas de `LECTURAS_PARA_REANUDAR` cuentan como dependencias si el
+    paso leído está en esta ejecución; si aún no se ha decidido (va detrás en
+    `orden`), el paso se rehace: ante la duda, construir.
     """
+    en_ejecucion = {nombre for nombre, _dependencias in orden}
     omitidos: set[str] = set()
     for nombre, dependencias in orden:
+        lecturas = LECTURAS_PARA_REANUDAR.get(nombre, frozenset()) & en_ejecucion
         if (
             nombre in terminados
             and nombre not in PASOS_NUNCA_OMITIBLES
             and all(dep in omitidos for dep in dependencias)
+            and lecturas <= omitidos
         ):
             omitidos.add(nombre)
     return frozenset(omitidos)

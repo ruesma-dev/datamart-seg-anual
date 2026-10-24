@@ -25,7 +25,9 @@ import pytest
 import main
 from etl_sigrid.application.orchestrator import Orchestrator
 from etl_sigrid.application.steps import ingest_raw_step
+from etl_sigrid.application.steps.build_retenciones_step import BuildRetencionesStep
 from etl_sigrid.application.steps.ingest_raw_step import IngestRawStep
+from etl_sigrid.domain import reanudacion
 from etl_sigrid.domain.coherencia import EstadoTablaRaw, evaluar_coherencia_raw
 from etl_sigrid.domain.ejecucion import Ejecucion, ejecucion_desde_batch, nueva_ejecucion
 from etl_sigrid.domain.entities import StepResult, StepStatus
@@ -141,6 +143,86 @@ def test_f148_r21_solo_cuentan_las_filas_de_paso_sin_punto() -> None:
 
 def test_f148_r21_sin_terminados_no_se_omite_nada() -> None:
     assert pasos_a_omitir(ORDEN, set()) == frozenset()
+
+
+# --- Riesgo R-a (revisión de F-148, pasada 1): lo que se lee sin declararlo ---
+#
+# `build_retenciones` depende solo de `ingest_raw`, pero `05_fin_obra.sql` lee
+# `stg.plan_mensual` y `mart.master_versiones_tipadas` (F-110, D4). Si al
+# reanudar se rehace `build_stg` o `build_mart`, omitir las retenciones las
+# dejaría calculadas sobre el stg/mart de la primera réplica.
+
+ORDEN_NOCHE = [
+    ("ingest_raw", []),
+    ("load_excel_aux", []),
+    ("build_stg", ["ingest_raw", "load_excel_aux"]),
+    ("build_mart", ["build_stg"]),
+    ("build_retenciones", ["ingest_raw"]),
+]
+TODO_NOCHE = {nombre for nombre, _d in ORDEN_NOCHE}
+
+
+def test_f148_r21_retenciones_se_rehace_si_stg_se_repite() -> None:
+    terminados = TODO_NOCHE - {"build_stg"}
+
+    omitidos = pasos_a_omitir(ORDEN_NOCHE, terminados)
+
+    assert omitidos == frozenset({"ingest_raw", "load_excel_aux"})
+
+
+def test_f148_r21_retenciones_se_rehace_si_solo_mart_se_repite() -> None:
+    terminados = TODO_NOCHE - {"build_mart"}
+
+    omitidos = pasos_a_omitir(ORDEN_NOCHE, terminados)
+
+    assert omitidos == frozenset({"ingest_raw", "load_excel_aux", "build_stg"})
+
+
+def test_f148_r21_retenciones_se_omite_si_lo_que_lee_tambien() -> None:
+    assert pasos_a_omitir(ORDEN_NOCHE, TODO_NOCHE) == frozenset(TODO_NOCHE)
+
+
+def test_f148_r21_una_lectura_que_no_esta_en_la_ejecucion_no_cuenta() -> None:
+    """`build-retenciones` suelto no tiene `build_stg` ni `build_mart` que esperar."""
+    orden = [("ingest_raw", []), ("build_retenciones", ["ingest_raw"])]
+
+    assert pasos_a_omitir(orden, {"ingest_raw", "build_retenciones"}) == frozenset(
+        {"ingest_raw", "build_retenciones"}
+    )
+
+
+def test_f148_r21_una_lectura_posterior_en_el_orden_no_acredita() -> None:
+    """Conservador: si lo leído aún no se ha decidido, el paso se rehace."""
+    orden = [
+        ("ingest_raw", []),
+        ("build_retenciones", ["ingest_raw"]),
+        ("build_stg", ["ingest_raw"]),
+        ("build_mart", ["build_stg"]),
+    ]
+    terminados = {nombre for nombre, _d in orden}
+
+    assert pasos_a_omitir(orden, terminados) == frozenset(terminados - {"build_retenciones"})
+
+
+def test_f148_r21_lecturas_para_reanudar_son_las_de_f110() -> None:
+    assert {
+        "build_retenciones": frozenset({"build_stg", "build_mart"}),
+    } == reanudacion.LECTURAS_PARA_REANUDAR
+
+
+def test_f148_r21_las_lecturas_siguen_en_el_sql_y_no_en_depends_on() -> None:
+    """Si `05_fin_obra.sql` deja de leer stg o mart, la declaración sobra.
+
+    Y la reanudación no cambia la noche normal: `depends_on` sigue siendo solo
+    la ingesta (F-110, D4: si `stg` falla, las retenciones se construyen igual).
+    """
+    sql = (RAIZ / "etl_sigrid/infrastructure/postgres/sql/retenciones/05_fin_obra.sql").read_text(
+        encoding="utf-8"
+    )
+
+    assert "stg.plan_mensual" in sql
+    assert "mart.master_versiones_tipadas" in sql
+    assert BuildRetencionesStep(SimpleNamespace()).depends_on == ["ingest_raw"]
 
 
 def test_f148_r23_tablas_a_omitir_son_las_declaradas_en_success() -> None:
@@ -368,6 +450,16 @@ def test_f148_r21_apply_grants_se_ejecuta_aunque_termino() -> None:
     Orchestrator(pasos, terminados_en_lote=frozenset({"build_mart", "apply_grants"})).run_all()
 
     assert ejecutados == ["apply_grants"]
+
+
+def test_f148_r21_el_orquestador_rehace_retenciones_si_rehace_stg() -> None:
+    """R-a: la segunda réplica rehace `build_stg`, luego también las retenciones."""
+    ejecutados: list[str] = []
+    pasos = [Paso(nombre, list(deps), ejecutados=ejecutados) for nombre, deps in ORDEN_NOCHE]
+
+    Orchestrator(pasos, terminados_en_lote=frozenset(TODO_NOCHE - {"build_stg"})).run_all()
+
+    assert ejecutados == ["build_stg", "build_mart", "build_retenciones"]
 
 
 def test_f148_r22_sin_terminados_todo_como_hoy() -> None:
