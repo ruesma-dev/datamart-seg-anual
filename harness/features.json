@@ -2348,12 +2348,27 @@
         "`azure-apps/datamart_seg_anual.md` al día si cambia la hora, el job o lo que se consume del Postgres compartido",
         "`bash harness/init.sh` en verde y APROBADO del reviewer; despliegue MANUAL en `progress/current.md`"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "rigor": "critico",
       "priority": 1,
       "branch": "feature/F-148-robustez-nocturna",
-      "notes": "2026-10-23: alta con prioridad máxima por orden del humano. Empieza por el diagnóstico (solo lectura). 2026-10-23: diagnóstico (progress/explore_F-148_corte.md) revisado con el humano, que elige el enfoque 1+2+3+4; spec en specs/F-148-robustez-nocturna/ con decisiones abiertas D1-D7 en design.md §12 (D5: subir el rigor a critico). 2026-10-23: BLOCKED por el implementer antes de escribir código: init.sh en rojo por dos causas ajenas a la implementación (la rama nació de `dev` y no de `main`; design.md 252 > 250 líneas). Detalle y arreglo propuesto en progress/current.md. 2026-10-23: desbloqueada por el líder (rama sobre main, design.md a 250); implementer en curso. 2026-10-24: review APROBADO en pasada 2 (020c982). Merge 8ed8cf5 por orden del humano; init.sh sobre main 8797 passed. Desplegada: imagen r20261024-1837 (vuelta atrás r20261023-1016), v60 publicada desde el puesto y MCP reiniciado. Sigue in_progress hasta cumplir R31: 7 noches seguidas sin corte, desde la del 25-10."
+      "notes": "2026-10-23: alta con prioridad máxima por orden del humano. Empieza por el diagnóstico (solo lectura). 2026-10-23: diagnóstico (progress/explore_F-148_corte.md) revisado con el humano, que elige el enfoque 1+2+3+4; spec en specs/F-148-robustez-nocturna/ con decisiones abiertas D1-D7 en design.md §12 (D5: subir el rigor a critico). 2026-10-23: BLOCKED por el implementer antes de escribir código: init.sh en rojo por dos causas ajenas a la implementación (la rama nació de `dev` y no de `main`; design.md 252 > 250 líneas). Detalle y arreglo propuesto en progress/current.md. 2026-10-23: desbloqueada por el líder (rama sobre main, design.md a 250); implementer en curso. 2026-10-24: review APROBADO en pasada 2 (020c982). Merge 8ed8cf5 por orden del humano; init.sh sobre main 8797 passed. Desplegada: imagen r20261024-1837 (vuelta atrás r20261023-1016), v60 publicada desde el puesto y MCP reiniciado. Sigue in_progress hasta cumplir R31: 7 noches seguidas sin corte, desde la del 25-10. 2026-10-24: CERRADA por orden del humano con R31 (7 noches seguidas sin corte, desde la del 25-10) como verificación MANUAL pendiente en progress/current.md; si una noche falla se abre feature nueva."
+    },
+    {
+      "id": "F-149",
+      "title": "Lo que sirve el MCP no nombra reglas que no se publican: fuera las citas a `R-SIGRID-CON` del bloque de convenciones y de las fichas de `compras`",
+      "description": "Pedida por el humano el 2026-10-24. Tras F-147, `R-SIGRID-CON` es `fuera_mcp` (no se publica), pero `contexto_bbdd()` la sigue citando en el bloque `identidad_sigrid` de `_meta.diccionario_contexto` (`config/diccionario/00_global.yaml` ~l.1643: «es guia del ETL, en la regla `R-SIGRID-CON`») y `describir_tabla` la cita en dos columnas de `compras` (`compras.yaml` ~l.770 y ~l.1321: «(`con.cod`, `R-SIGRID-CON`)»). La IA lee una referencia a una regla que no puede consultar. QUÉ SE TOCA: esos tres textos (el bloque dice que cómo se lee Sigrid es guía interna del ETL, sin nombrar la regla; las columnas, «(`con.cod`)»); un test que impida que el texto publicado al MCP (bloques de contexto, fichas y columnas de objetos publicados al MCP, reglas publicadas) cite un código de regla que no se publica (`fuera_mcp`) o que no existe; diccionario v61. FUERA: los comentarios `#` del YAML y la ficha de `raw` (el MCP no expone `raw`); la regla `R-SIGRID-CON` sigue en el YAML como guía del ETL. DESPLIEGUE (tras APROBADO y merge): imagen y job, `publicar-diccionario` (v61) y `check-diccionario`, reiniciar el MCP leyendo antes la revisión activa y comprobar «Versión 61» en `contexto_bbdd()` y que no aparece `R-SIGRID-CON`.",
+      "acceptance": [
+        "Ningún texto que llega al MCP (bloques de `_meta.diccionario_contexto`, fichas y columnas publicadas, reglas publicadas) cita `R-SIGRID-CON` ni otro código de regla `fuera_mcp` o inexistente, con test y RED",
+        "Diccionario v61 con su comentario; `check-diccionario` OK tras publicar",
+        "`bash harness/init.sh` en verde y APROBADO del reviewer; despliegue MANUAL en `progress/current.md`"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 1,
+      "branch": "feature/F-149-mcp-sin-reglas-no-publicadas"
     }
   ]
 }

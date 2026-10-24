@@ -1904,3 +1904,21 @@ Verificado: `init.sh` 8.619 passed, cobertura 100 %; mutación 19/20 con el supe
 Review: pasada 1 rechazada (MANUAL sin reinicio del MCP ni vuelta atrás, R11), pasada 2 APROBADO.
 Desplegada el 23-10: imagen `r20261023-1016`, v59 y MCP reiniciado; servido 88.666 → 61.345
 caracteres (−31 %); el resto, con la F-029 de `mcp-bbdd`.
+
+## F-148 · Robustez de la nocturna · 2026-10-24
+
+Diagnóstico (solo lectura, `progress/explore_F-148_corte.md`): el «connection timeout expired» de
+las 00:0x era una apertura de conexión de la ingesta que se colgaba 130 s (el `connect_timeout` por
+defecto de psycopg 3), sin reintento; el servidor estaba sano. La ingesta abría una conexión por
+página (~2.800 en `obrparpre`). Arreglo (enfoque 1+2+3+4 del humano, D1-D7 según la propuesta):
+`connect_timeout` 15 s, keepalives y `tcp_user_timeout` 60 s, reintento 2/4/8 s solo ante
+transitorios (nunca contraseña, `pg_hba.conf` ni `permission denied for database`); una conexión
+por tabla con COPY y COMMIT por página y reintento idempotente de la página; `ingest_pagina` con
+`http_s`/`pg_connect_s`/`copy_s`; el reintento del job adopta su lote y omite lo terminado (y rehace
+retenciones si rehace `stg` o `mart`); permisos completos tras cada uno de los diez build.
+
+Rigor `critico`. Verificado: `init.sh` 8.798 passed, cobertura 100 %; mutación entera 92/92 y del
+delta 20/20, reverificadas en serie. Review: pasada 1 rechazada (R4 sin SQLSTATE al abrir,
+`azure-apps` y despliegue MANUAL incompletos), pasada 2 APROBADO. Merge `8ed8cf5`; desplegada el
+24-10 (imagen `r20261024-1837`, v60, MCP reiniciado). Cerrada por orden del humano con R31 (7
+noches seguidas sin corte, desde la del 25-10) como verificación MANUAL pendiente.

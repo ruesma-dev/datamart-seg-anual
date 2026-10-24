@@ -3,13 +3,11 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **136 features**, 71 abiertas (1 en curso, 1 con la spec lista, 0 bloqueadas y 69 en backlog) y 65 terminadas.
+Resumen: **137 features**, 71 abiertas (0 en curso, 1 con la spec lista, 0 bloqueadas y 70 en backlog) y 66 terminadas.
 
 ## En curso
 
-| # | Feature | Prioridad | Rigor | Rama |
-|---|---|---|---|---|
-| F-148 | Robustez de la nocturna: la causa del «connection timeout expired» de las 00:0x en `ingest_raw.obrparpre`, reanudar en vez de repetir desde la ingesta, y permisos que no dependan del final | 1 | critico | `feature/F-148-robustez-nocturna` |
+_Ninguna feature en curso._
 
 ## Spec lista
 
@@ -25,6 +23,7 @@ _Ninguna feature bloqueada._
 
 | # | Feature | Prioridad | Rigor | Rama |
 |---|---|---|---|---|
+| F-149 | Lo que sirve el MCP no nombra reglas que no se publican: fuera las citas a `R-SIGRID-CON` del bloque de convenciones y de las fichas de `compras` | 1 | estandar | `feature/F-149-mcp-sin-reglas-no-publicadas` |
 | F-054 | Glosario de negocio para la IA (`_meta.glosario`): qué significan en Ruesma la valorada, el incurrido, el ABC o la liquidatoria, y dónde están en el datamart | 4 | documental | `feature/F-054-conocimiento-de-negocio` |
 | F-140 | La fase 2 de la cartera (F-037): los ingredientes de la proyección de caja por obra (devengo pendiente, plazos de pago pactados y retenciones), sin convertir devengo en caja | 5 | estandar | `feature/F-140-proyeccion-caja-ingredientes` |
 | F-129 | El objetivo del comparativo se mide contra la oferta de referencia del propio comparativo (oficina técnica o planificado ABC), no contra el descompuesto: hoy casa el 29 % | 6 | critico | `feature/F-129-objetivo-contra-oferta-referencia` |
@@ -122,6 +121,7 @@ _Ninguna feature bloqueada._
 | F-145 | La ficha de los adjuntos dice cómo los abre hoy `mcp-bbdd` (F-025): por la pareja {empresa, código} con respaldo en la empresa 1, sin `ADJUNTO_AMBIGUO` | 1 | estandar |
 | F-146 | El perfil restringido del MCP (el «General» de la plantilla) no ve NADA de contabilidad: fuera el esquema `contabilidad` entero, no tabla a tabla | 1 | estandar |
 | F-147 | Presupuesto del contexto del MCP: reglas con resumen corto y detalle bajo demanda, y una puerta que impida que `contexto_bbdd` crezca en silencio | 1 | estandar |
+| F-148 | Robustez de la nocturna: la causa del «connection timeout expired» de las 00:0x en `ingest_raw.obrparpre`, reanudar en vez de repetir desde la ingesta, y permisos que no dependan del final | 1 | critico |
 | F-009 | Inventario del entorno Azure existente | 2 | documental |
 | F-042 | La clave de mart.fact_seguimiento_mensual esta rota: 8.778 combinaciones duplicadas | 2 | critico |
 | F-056 | El mayor y el plan de cuentas como arbol: stg y mart sobre la contabilidad (raw por F-066) | 2 | critico |
@@ -167,11 +167,11 @@ _Ninguna feature bloqueada._
 
 ## Detalle
 
-### F-148 · Robustez de la nocturna: la causa del «connection timeout expired» de las 00:0x en `ingest_raw.obrparpre`, reanudar en vez de repetir desde la ingesta, y permisos que no dependan del final
+### F-149 · Lo que sirve el MCP no nombra reglas que no se publican: fuera las citas a `R-SIGRID-CON` del bloque de convenciones y de las fichas de `compras`
 
-estado **en curso** · prioridad 1 · rigor `critico` · SDD sí · rama `feature/F-148-robustez-nocturna`
+estado **pendiente** · prioridad 1 · rigor `estandar` · SDD no · rama `feature/F-149-mcp-sin-reglas-no-publicadas`
 
-Pedida por el humano el 2026-10-23 con PRIORIDAD MÁXIMA: «hay que ver la razón del corte». MEDIDO en `_meta.etl_runs` (Azure, solo lectura, 2026-10-23 00:15 UTC): el PRIMER intento de la nocturna muere en `ingest_raw.obrparpre` con «connection timeout expired» el 17, 18, 19, 22 y 23 de octubre (empieza hacia las 00:03 y cae entre 4 y 12 minutos después; el resto de `ingest_raw` y los builds quedan SKIPPED) y lo salva el reintento del job (`replicaRetryLimit` 1), que vuelve a empezar por la ingesta: el 22 terminó a las 04:31. El 15, 16, 20 y 21 el primer intento pasó. Sin margen: si falla también el reintento, ese día no hay datos, y como los permisos se aplican al final (`apply_grants`), una muerte a medias deja tablas sin GRANT (incidencia del 2026-10-20). TRES PARTES: (1) DIAGNÓSTICO, lo primero y lo que pide el humano: por qué caduca la conexión a esa hora —«connection timeout expired» es el `connect_timeout` de libpq al abrir conexión NUEVA contra `psql-albaranes-rs9k2` (Postgres COMPARTIDO), así que hay que mirar quién más carga el servidor a las 00:00 (jobs y backups de otros proyectos, ventana de mantenimiento, créditos de CPU del SKU, conexiones máximas), cuántas conexiones abre la ingesta de `obrparpre` y con qué `connect_timeout`, y los logs del servidor y del job; (2) el arreglo de la causa (o mover la hora, o reintentar la conexión dentro del paso), según lo que salga; (3) que un reintento REANUDE donde se quedó en vez de repetir la ingesta entera y que los permisos de cada esquema no dependan de que la noche llegue al final. Ver memoria del proyecto sobre los créditos de CPU del SKU y F-065 (¿cabe la nocturna en la hucha?).
+Pedida por el humano el 2026-10-24. Tras F-147, `R-SIGRID-CON` es `fuera_mcp` (no se publica), pero `contexto_bbdd()` la sigue citando en el bloque `identidad_sigrid` de `_meta.diccionario_contexto` (`config/diccionario/00_global.yaml` ~l.1643: «es guia del ETL, en la regla `R-SIGRID-CON`») y `describir_tabla` la cita en dos columnas de `compras` (`compras.yaml` ~l.770 y ~l.1321: «(`con.cod`, `R-SIGRID-CON`)»). La IA lee una referencia a una regla que no puede consultar. QUÉ SE TOCA: esos tres textos (el bloque dice que cómo se lee Sigrid es guía interna del ETL, sin nombrar la regla; las columnas, «(`con.cod`)»); un test que impida que el texto publicado al MCP (bloques de contexto, fichas y columnas de objetos publicados al MCP, reglas publicadas) cite un código de regla que no se publica (`fuera_mcp`) o que no existe; diccionario v61. FUERA: los comentarios `#` del YAML y la ficha de `raw` (el MCP no expone `raw`); la regla `R-SIGRID-CON` sigue en el YAML como guía del ETL. DESPLIEGUE (tras APROBADO y merge): imagen y job, `publicar-diccionario` (v61) y `check-diccionario`, reiniciar el MCP leyendo antes la revisión activa y comprobar «Versión 61» en `contexto_bbdd()` y que no aparece `R-SIGRID-CON`.
 
 ### F-054 · Glosario de negocio para la IA (`_meta.glosario`): qué significan en Ruesma la valorada, el incurrido, el ABC o la liquidatoria, y dónde están en el datamart
 
@@ -730,6 +730,12 @@ Decisión del humano del 2026-10-21. Hoy el restringido (F-141) tiene `contabili
 estado **terminada** · prioridad 1 · rigor `estandar` · SDD sí · rama `feature/F-147-presupuesto-contexto-mcp`
 
 Pedida por el humano el 2026-10-22, preocupado por el consumo de tokens. MEDIDO en Azure con la v58: `contexto_bbdd()` de `mcp-bbdd` sirve unos 86.000 caracteres (22-25k tokens) en cada conversación, antes de la primera pregunta, y se quedan en el historial de todos los mensajes siguientes. Reparto: 27 reglas enteras ~50.000 (regla 29.401 + motivo 14.653), enrutado ~20.000 (283 `ejemplos_preguntas` de 114 objetos; compras sola 100), bloques de `diccionario_contexto` ~14.000. Las fichas de `describir_tabla` miden 2.328 de media y hasta 16.726 (`maestro.obras`). REPARTO DE RESPONSABILIDAD: CÓMO se sirve es de `mcp-bbdd` (su F-029, pendiente: índice de reglas en `contexto_bbdd` y texto entero con `describir_tabla` de su `ambito`); CUÁNTO se publica es de aquí, y su ficha dice que un resumen corto por regla es contrato de `_meta` y feature nuestra. ENFOQUE A DECIDIR CON EL HUMANO tras revisar las reglas una a una (divulgación progresiva): cada regla publica un `resumen` corto e imperativo que basta por sí solo para no cometer el error, y el detalle (`regla`, `motivo`) solo cuando hace falta. Hallazgos de la revisión inicial: las 27 son `bloqueante`, así que la severidad no discrimina; todas tienen `ambito`; cuatro son de perfiles (R-CONTABILIDAD/TESORERIA/COMPRAS-RESTRINGIDA y R-PERFIL-RESTRINGIDO, ~9.600) y podrían fundirse; R-SIGRID-CON (~4.300) habla de `raw`, que el MCP no expone a nadie; R-EMPRESA-POR-DEFECTO tiene 4.886 de regla. Relacionada: F-054 (glosario) no debe entrar en lo que se sirve entero.
+
+### F-148 · Robustez de la nocturna: la causa del «connection timeout expired» de las 00:0x en `ingest_raw.obrparpre`, reanudar en vez de repetir desde la ingesta, y permisos que no dependan del final
+
+estado **terminada** · prioridad 1 · rigor `critico` · SDD sí · rama `feature/F-148-robustez-nocturna`
+
+Pedida por el humano el 2026-10-23 con PRIORIDAD MÁXIMA: «hay que ver la razón del corte». MEDIDO en `_meta.etl_runs` (Azure, solo lectura, 2026-10-23 00:15 UTC): el PRIMER intento de la nocturna muere en `ingest_raw.obrparpre` con «connection timeout expired» el 17, 18, 19, 22 y 23 de octubre (empieza hacia las 00:03 y cae entre 4 y 12 minutos después; el resto de `ingest_raw` y los builds quedan SKIPPED) y lo salva el reintento del job (`replicaRetryLimit` 1), que vuelve a empezar por la ingesta: el 22 terminó a las 04:31. El 15, 16, 20 y 21 el primer intento pasó. Sin margen: si falla también el reintento, ese día no hay datos, y como los permisos se aplican al final (`apply_grants`), una muerte a medias deja tablas sin GRANT (incidencia del 2026-10-20). TRES PARTES: (1) DIAGNÓSTICO, lo primero y lo que pide el humano: por qué caduca la conexión a esa hora —«connection timeout expired» es el `connect_timeout` de libpq al abrir conexión NUEVA contra `psql-albaranes-rs9k2` (Postgres COMPARTIDO), así que hay que mirar quién más carga el servidor a las 00:00 (jobs y backups de otros proyectos, ventana de mantenimiento, créditos de CPU del SKU, conexiones máximas), cuántas conexiones abre la ingesta de `obrparpre` y con qué `connect_timeout`, y los logs del servidor y del job; (2) el arreglo de la causa (o mover la hora, o reintentar la conexión dentro del paso), según lo que salga; (3) que un reintento REANUDE donde se quedó en vez de repetir la ingesta entera y que los permisos de cada esquema no dependan de que la noche llegue al final. Ver memoria del proyecto sobre los créditos de CPU del SKU y F-065 (¿cabe la nocturna en la hucha?).
 
 ### F-009 · Inventario del entorno Azure existente
 
