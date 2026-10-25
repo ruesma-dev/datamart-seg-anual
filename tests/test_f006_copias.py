@@ -180,15 +180,23 @@ def test_f006_r26_la_convencion_de_sigrid_no_duplica_la_regla() -> None:
     Ya divergió: la convención decía ocho tablas «propiedades de `con`» y la
     regla diez, y la convención afirmaba dónde vive cada campo cuando la regla
     ya había dejado de afirmarlo.
+
+    F-149 (petición del humano del 2026-10-24): la convención ya NO nombra la
+    regla. Remitía a `R-SIGRID-CON`, pero la convención llega al MCP y la regla
+    es `fuera_mcp` desde F-147: era citar algo que la IA no puede leer. Lo que
+    sigue valiendo es lo de fondo, que no repita su contenido, y que diga que
+    cómo se lee Sigrid es guía interna del ETL.
     """
     import yaml
 
     datos = yaml.safe_load((DIR_DICCIONARIO / "00_global.yaml").read_text(encoding="utf-8"))
     convencion = str(datos["convenciones"]["identidad_sigrid"])
 
-    assert "R-SIGRID-CON" in convencion, (
-        "la convención tiene que remitir a la regla, que es la única versión"
+    assert "R-SIGRID-CON" not in convencion, (
+        "la convención llega al MCP y la regla no: nombrarla es citar lo que la "
+        "IA no puede leer (F-149)"
     )
+    assert "guia interna del ETL" in " ".join(convencion.split())
     tablas = set(re.findall(r"`(\w+)`", convencion))
     del tablas  # solo para dejar claro que no se comprueba una lista: no debe haberla
     assert "viven en `con`" not in convencion, (

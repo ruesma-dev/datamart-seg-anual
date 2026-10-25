@@ -67,7 +67,11 @@ encaja: `docs/ARCHITECTURE.md`.
   `motivo` son el detalle. **`entrega`** dice qué se sirve: `resumen` (por
   defecto), `entera` (solo si la regla no le llegaría al agente por ningún
   objeto) o `fuera_mcp` (no se publica: guía del ETL). Las cifras que envejecen
-  van al `motivo` o a la ficha, nunca al `resumen`.
+  van al `motivo` o a la ficha, nunca al `resumen`. **Lo que llega al MCP
+  (bloques de contexto, fichas y columnas de los esquemas que sirve, reglas
+  publicadas) no cita una regla `fuera_mcp` ni un código inexistente** (F-149,
+  `tests/test_f149_mcp_sin_reglas_no_publicadas.py`); los comentarios `#` y la
+  ficha de `raw` sí pueden.
 - **Lo que `contexto_bbdd` sirve entero tiene presupuesto con trinquete**
   (`PRESUPUESTO_MAX` en `tests/test_f147_presupuesto_contexto.py`): reglas,
   2 primeras `ejemplos_preguntas` por ficha y bloques de contexto. Si un cambio

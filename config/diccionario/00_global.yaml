@@ -684,8 +684,16 @@
 # permisos tras cada uno de los diez build). Solo cambian las fichas de
 # `_meta.etl_runs.batch_id` y `_meta.etl_runs.step`; sin objetos ni columnas
 # nuevos.
+#
+# version 61 (F-149, 2026-10-24): LO QUE SIRVE EL MCP NO NOMBRA REGLAS QUE NO
+# SE PUBLICAN. `R-SIGRID-CON` es `fuera_mcp` desde F-147, pero la seguian
+# citando el bloque `convenciones.identidad_sigrid` de
+# `_meta.diccionario_contexto` y `codigo_obra_cabecera` de `compras.facturas` y
+# `compras.albaranes`. Ahora el bloque dice que como se lee Sigrid es guia
+# interna del ETL y las dos columnas, «(`con.cod`)». Sin objetos, columnas ni
+# reglas nuevos: 20 reglas publicadas, como la v60. La regla sigue en el YAML.
 
-version: 60
+version: 61
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -1633,15 +1641,16 @@ convenciones:
     Los timestamps de `_meta` son UTC SIN zona horaria (TIMESTAMP, escritos con
     datetime.utcnow()). Compararlos contra un now() local da el desfase de
     Espana como antiguedad, que en verano son dos horas.
-  # Remite a la regla y no repite su contenido A PROPOSITO: cuando lo repetia
-  # se quedo atras (la regla amplio la lista de tablas y esta convencion siguio
+  # No repite el contenido de `R-SIGRID-CON` A PROPOSITO: cuando lo repetia se
+  # quedo atras (la regla amplio la lista de tablas y esta convencion siguio
   # publicando la version anterior: dos versiones que se contradecian). F-147:
-  # la regla ya no se publica (`fuera_mcp`); esta linea dice por que.
+  # la regla ya no se publica (`fuera_mcp`); esta linea dice por que. F-149:
+  # tampoco la NOMBRA, porque la IA leia una referencia a una regla que no
+  # puede consultar (lo vigila `tests/test_f149_mcp_sin_reglas_no_publicadas.py`).
   identidad_sigrid: >-
     `raw` (la copia de Sigrid) no se consulta desde el MCP. Como se lee
     Sigrid -la clave `ide`, las tablas que son propiedades de `con` y de que
-    lado sale cada campo- es guia del ETL, en la regla `R-SIGRID-CON`, que es
-    la unica version.
+    lado sale cada campo- es guia interna del ETL.
 
 # ===========================================================================
 # EJES DEL MODELO (R4)

@@ -1922,3 +1922,14 @@ delta 20/20, reverificadas en serie. Review: pasada 1 rechazada (R4 sin SQLSTATE
 `azure-apps` y despliegue MANUAL incompletos), pasada 2 APROBADO. Merge `8ed8cf5`; desplegada el
 24-10 (imagen `r20261024-1837`, v60, MCP reiniciado). Cerrada por orden del humano con R31 (7
 noches seguidas sin corte, desde la del 25-10) como verificación MANUAL pendiente.
+
+## F-149 · El MCP no cita reglas que no se publican · 2026-10-25
+
+Pedida por el humano el 24-10. Tras F-147 `R-SIGRID-CON` es `fuera_mcp`, pero el bloque
+`identidad_sigrid` y dos columnas de `compras` la seguían citando. Se reescriben los tres textos y
+un test impide que lo que llega al MCP (bloques de contexto, fichas y columnas publicadas, reglas
+publicadas) cite un código `fuera_mcp` o inexistente; recorre las cadenas decodificadas, no el JSON
+serializado (review 1: un código tras `
+` o tabulador escapaba). Diccionario v61. `sdd=false`.
+Review: pasada 1 rechazada, pasada 2 APROBADO. Desplegada el 25-10: imagen `r20261025-0927`, v61 y
+MCP reiniciado.
