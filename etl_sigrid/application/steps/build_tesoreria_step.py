@@ -181,23 +181,8 @@ class BuildTesoreriaStep(PipelineStep):
 
         total_rows = 0
         for sub in SUB_PASOS:
-            if sub.sql_file is None:
-                t0 = datetime.utcnow()
-                try:
-                    total_rows += _cargar_hipotesis(pg)
-                except Exception as e:  # el YAML que falta o no valida, igual
-                    logger.error("tesoreria_substep_failed", sub_step=sub.name, exc_info=True)
-                    result.status = StepStatus.FAILED
-                    result.error_message = f"Fallo en {sub.name}: {e}"
-                    result.finished_at = datetime.utcnow()
-                    return result
-                logger.info(
-                    "tesoreria_substep_done", sub_step=sub.name,
-                    duration_s=round((datetime.utcnow() - t0).total_seconds(), 2),
-                )
-                continue
-            sql_path = sql_dir / sub.sql_file
-            if not sql_path.exists():
+            sql_path = None if sub.sql_file is None else sql_dir / sub.sql_file
+            if sql_path is not None and not sql_path.exists():
                 # R18: el nombre del sub-paso va en el mensaje, como en un fallo
                 result.status = StepStatus.FAILED
                 result.error_message = (
@@ -208,10 +193,14 @@ class BuildTesoreriaStep(PipelineStep):
 
             t0 = datetime.utcnow()
             try:
-                pg.execute_sql_file(sql_path)
+                if sql_path is None:
+                    # F-140: la carga de hipótesis, sin SQL; sus filas son las escritas
+                    cargadas = _cargar_hipotesis(pg)
+                else:
+                    pg.execute_sql_file(sql_path)
             except Exception as e:  # captura amplia a proposito:
-                # cualquier fallo del SQL -incluida la guarda de 02- tiene que
-                # salir con el nombre del sub-paso
+                # cualquier fallo del SQL -incluida la guarda de 02- o del YAML
+                # de hipótesis tiene que salir con el nombre del sub-paso
                 duration = (datetime.utcnow() - t0).total_seconds()
                 logger.error(
                     "tesoreria_substep_failed",
@@ -223,7 +212,10 @@ class BuildTesoreriaStep(PipelineStep):
                 return result
 
             rows = 0
-            if sub.target_schema and sub.target_table:
+            if sql_path is None:
+                rows = cargadas
+                total_rows += rows
+            elif sub.target_schema and sub.target_table:
                 rows = pg.count_rows(sub.target_schema, sub.target_table)
                 total_rows += rows
             logger.info(

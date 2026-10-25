@@ -178,3 +178,23 @@ def test_f140_r5_la_carga_va_justo_antes_de_08(pg) -> None:
     assert modulo.SUB_PASOS[i].sql_file is None
     assert modulo.SUB_PASOS[i + 1].sql_file == "08_hipotesis_caja_obra.sql"
     assert nombres.index("devengo_pendiente") < i, "08 lee las obras de devengo_corte_obra"
+
+
+# ===========================================================================
+# R20 · la reanudación de F-148 conoce lo que 07 lee sin declararlo
+# ===========================================================================
+
+def test_f140_r20_la_tesoreria_lee_stg_y_mart_al_reanudar() -> None:
+    from etl_sigrid.domain import reanudacion
+
+    assert reanudacion.LECTURAS_PARA_REANUDAR["build_tesoreria"] == frozenset(
+        {"build_stg", "build_mart"}
+    )
+
+
+def test_f140_r20_la_lectura_sigue_en_el_sql_y_no_en_depends_on() -> None:
+    """Si `07` deja de leer `stg` o `mart`, la declaración sobra."""
+    texto = (DIR_SQL / "07_devengo_pendiente.sql").read_text(encoding="utf-8")
+    assert "JOIN stg.plan_mensual pm ON" in texto
+    assert "FROM mart.fact_seguimiento_mensual f" in texto
+    assert _paso().depends_on == ["ingest_raw"], "la noche normal no cambia"

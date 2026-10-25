@@ -44,10 +44,13 @@ PASOS_NUNCA_OMITIBLES = frozenset({"apply_grants"})
 #: cambia el orden ni las dependencias de la noche normal: `build_retenciones`
 #: sigue dependiendo solo de la ingesta para construirse aunque `stg` falle
 #: (F-110, D4), pero `05_fin_obra.sql` lee `stg.plan_mensual` y
-#: `mart.master_versiones_tipadas`. Es el único build que lee sin declararlo
-#: una tabla de un build ANTERIOR de la misma noche (barrido de la revisión).
+#: `mart.master_versiones_tipadas`. Desde F-140 `build_tesoreria` hace lo mismo:
+#: `07_devengo_pendiente.sql` lee `stg.plan_mensual` y `mart`. Son los únicos
+#: builds que leen sin declararlo una tabla de un build ANTERIOR de la misma
+#: noche (barrido de la revisión de F-148, ampliado por F-140).
 LECTURAS_PARA_REANUDAR: dict[str, frozenset[str]] = {
     "build_retenciones": frozenset({"build_stg", "build_mart"}),
+    "build_tesoreria": frozenset({"build_stg", "build_mart"}),
 }
 
 #: Caracteres hexadecimales del sufijo: los mismos que el aleatorio de F-024

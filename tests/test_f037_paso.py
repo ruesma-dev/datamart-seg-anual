@@ -43,6 +43,12 @@ class _PgFalso:
         self.contados.append((schema, table))
         return self._filas
 
+    def cargar_hipotesis_caja(self, catalogo, obras) -> int:
+        """F-140: la carga del YAML, sin SQL; devuelve las filas escritas."""
+        if self._falla_en == "hipotesis_carga":
+            raise RuntimeError("efectos de personal: la carga no llega a escribir")
+        return self._filas
+
 
 @pytest.fixture
 def instalar(monkeypatch: pytest.MonkeyPatch):
@@ -67,18 +73,32 @@ def test_f037_r17_nombre_stage_y_dependencias() -> None:
     assert paso.depends_on == ["ingest_raw"]
 
 
-def test_f037_r17_los_cuatro_sub_pasos_en_orden_con_su_tabla() -> None:
+def test_f037_r17_los_sub_pasos_en_orden_con_su_tabla() -> None:
+    """Los cuatro de F-037 y, detrás, los seis de F-140 (R20)."""
     assert [(s.name, s.sql_file, s.target_schema, s.target_table) for s in SUB_PASOS] == [
         ("setup", "00_setup.sql", None, None),
         ("efectos_completo", "01_efectos_completo.sql", "tesoreria_restringida", "efectos"),
         ("efectos_general", "02_efectos_general.sql", "tesoreria", "efectos"),
         ("efectos_restringidos_mes", "03_efectos_restringidos_mes.sql",
          "tesoreria", "efectos_restringidos_mes"),
+        ("plazos_forma_pago", "04_plazos_forma_pago.sql", None, None),
+        ("condiciones_compra", "05_condiciones_contrato_compra.sql",
+         "tesoreria", "condiciones_contrato_compra"),
+        ("condiciones_cliente", "06_condiciones_contrato_cliente.sql",
+         "tesoreria", "condiciones_contrato_cliente"),
+        ("devengo_pendiente", "07_devengo_pendiente.sql",
+         "tesoreria", "devengo_pendiente_partida"),
+        ("hipotesis_carga", None, None, None),
+        ("hipotesis_obra", "08_hipotesis_caja_obra.sql", "tesoreria", "hipotesis_caja_obra"),
     ]
 
 
+#: Los sub-pasos con fichero SQL (la carga de hipótesis de F-140 no lo tiene).
+FICHEROS = [s.sql_file for s in SUB_PASOS if s.sql_file is not None]
+
+
 def test_f037_r17_los_ficheros_existen_y_no_sobra_ninguno() -> None:
-    assert sorted(p.name for p in DIR_SQL.glob("*.sql")) == [s.sql_file for s in SUB_PASOS]
+    assert sorted(p.name for p in DIR_SQL.glob("*.sql")) == FICHEROS
 
 
 # ===========================================================================
@@ -89,13 +109,17 @@ def test_f037_r17_encadena_los_sql_y_cuenta_sus_tablas(instalar) -> None:
     pg = instalar(_PgFalso(filas=7))
     resultado = _paso().run()
     assert resultado.status == StepStatus.SUCCESS
-    assert pg.ejecutados == [s.sql_file for s in SUB_PASOS]
+    assert pg.ejecutados == FICHEROS
     assert pg.contados == [
         ("tesoreria_restringida", "efectos"),
         ("tesoreria", "efectos"),
         ("tesoreria", "efectos_restringidos_mes"),
+        ("tesoreria", "condiciones_contrato_compra"),
+        ("tesoreria", "condiciones_contrato_cliente"),
+        ("tesoreria", "devengo_pendiente_partida"),
+        ("tesoreria", "hipotesis_caja_obra"),
     ]
-    assert resultado.rows_processed == 21
+    assert resultado.rows_processed == 7 * 8, "siete tablas contadas y la carga"
     assert resultado.finished_at is not None
     assert resultado.finished_at >= resultado.started_at
     assert resultado.error_message is None
@@ -107,12 +131,15 @@ def test_f037_r17_encadena_los_sql_y_cuenta_sus_tablas(instalar) -> None:
 
 @pytest.mark.parametrize("sub", SUB_PASOS, ids=lambda s: s.name)
 def test_f037_r18_un_sql_que_revienta_da_failed_con_su_nombre(instalar, sub) -> None:
-    pg = instalar(_PgFalso(falla_en=sub.sql_file))
+    pg = instalar(_PgFalso(falla_en=sub.sql_file or sub.name))
     resultado = _paso().run()
     assert resultado.status == StepStatus.FAILED
     assert resultado.error_message.startswith(f"Fallo en {sub.name}: ")
     assert "efectos de personal" in resultado.error_message, "el mensaje del SQL viaja"
-    assert pg.ejecutados[-1] == sub.sql_file, "lo que venía detrás no se ejecuta"
+    hasta = SUB_PASOS[: SUB_PASOS.index(sub) + 1]
+    assert pg.ejecutados == [s.sql_file for s in hasta if s.sql_file], (
+        "lo que venía detrás no se ejecuta"
+    )
     assert resultado.finished_at is not None
 
 
@@ -170,7 +197,9 @@ def test_f037_r18_el_log_dice_las_filas_de_cada_sub_paso(instalar, monkeypatch) 
     hechos = [kw for ev, kw in eventos if ev == "tesoreria_substep_done"]
     assert [(h["sub_step"], h["rows"]) for h in hechos] == [
         ("setup", 0), ("efectos_completo", 5), ("efectos_general", 5),
-        ("efectos_restringidos_mes", 5),
+        ("efectos_restringidos_mes", 5), ("plazos_forma_pago", 0),
+        ("condiciones_compra", 5), ("condiciones_cliente", 5), ("devengo_pendiente", 5),
+        ("hipotesis_carga", 5), ("hipotesis_obra", 5),
     ]
     assert all(isinstance(h["duration_s"], float) for h in hechos)
 

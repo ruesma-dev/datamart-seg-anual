@@ -205,8 +205,10 @@ def test_f148_r21_una_lectura_posterior_en_el_orden_no_acredita() -> None:
 
 
 def test_f148_r21_lecturas_para_reanudar_son_las_de_f110() -> None:
+    """Y la de F-140: `07_devengo_pendiente.sql` lee `stg` y `mart`."""
     assert {
         "build_retenciones": frozenset({"build_stg", "build_mart"}),
+        "build_tesoreria": frozenset({"build_stg", "build_mart"}),
     } == reanudacion.LECTURAS_PARA_REANUDAR
 
 
