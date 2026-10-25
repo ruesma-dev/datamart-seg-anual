@@ -1,7 +1,10 @@
 # etl_sigrid/application/steps/build_tesoreria_step.py
 """
 Step que materializa la cartera de cobros y pagos (F-037, fase 1) en DOS
-esquemas, con el patrón de F-135.
+esquemas, con el patrón de F-135, y los INGREDIENTES de la proyección de caja
+(F-140): lo pactado, el devengo pendiente y las hipótesis. Ningún plazo se
+aplica aquí a ninguna fecha: convertir devengo en caja lo hace quien consulta,
+declarando sus hipótesis (`R-CAJA-HIPOTESIS`).
 
 * `tesoreria_restringida` — la cartera COMPLETA: una fila por efecto de
   `raw.pag` y `raw.cob`, con `restringido` y `motivo_restriccion`. Solo la leen
@@ -20,13 +23,32 @@ Encadena los archivos SQL en orden:
                                        personal recalculado desde `raw` y general +
                                        restringidos = completa)
     03_efectos_restringidos_mes.sql  - general: cuántos faltan, sin importes
+    04_plazos_forma_pago.sql         - F-140: las formas de pago y cobro con su
+                                       fórmula leída (vista)
+    05_condiciones_contrato_compra.sql - F-140: lo pactado con el proveedor
+    06_condiciones_contrato_cliente.sql - F-140: lo pactado con el cliente
+    07_devengo_pendiente.sql         - F-140: lo que la última versión master
+                                       espera devengar tras el cierre, por
+                                       partida, por mes y por obra
+    (hipotesis_carga)                - F-140: Python, sin SQL: lee y valida
+                                       `config/hipotesis_caja.yaml` y lo carga
+                                       en una transacción; con errores, FAILED
+                                       con la lista y no escribe
+    08_hipotesis_caja_obra.sql       - F-140: el valor de cada hipótesis en cada
+                                       obra (MANUAL > SIGRID > DEFECTO)
+
+Cada fichero es su transacción: si `07` falla, quedan las tablas de ayer y la
+cartera de hoy ya está hecha.
 
 Los permisos NO van aquí: los da (y los veta y verifica) `apply_grants` cada
 noche. Este paso solo construye.
 
-Lee de `raw.*` y de la vista `maestro.centros_coste`, que es SQL puro sobre
-`raw` y nunca se dropea: `depends_on = ["ingest_raw"]`, el mismo motivo que en
-`build_contabilidad_step.py`.
+Lee de `raw.*` y de las vistas `maestro.centros_coste` y `maestro.v_obra_fichas`,
+SQL puro sobre `raw` que nunca se dropea: `depends_on = ["ingest_raw"]`, el
+mismo motivo que en `build_contabilidad_step.py`. Desde F-140 `07` lee además
+`stg.plan_mensual` y `mart`, que la nocturna construye ANTES (`build_stg`,
+`build_mart`); no se declaran en `depends_on` para no cambiar el orden de la
+noche, y la reanudación de F-148 los conoce (`LECTURAS_PARA_REANUDAR`).
 
 **Ningún paso declara `build_tesoreria` en su `depends_on`** (D9), tampoco
 `build_compras`, aunque su `compras.vencimientos` sea una vista de
@@ -45,6 +67,7 @@ from pathlib import Path
 from config.settings import Settings
 from etl_sigrid.application.steps.base import PipelineStep
 from etl_sigrid.domain.entities import StepResult, StepStatus
+from etl_sigrid.infrastructure.config.hipotesis_caja_yaml import cargar_hipotesis_caja
 from etl_sigrid.infrastructure.logging_config import get_logger
 from etl_sigrid.infrastructure.postgres.client_factory import build_postgres_client
 
@@ -53,15 +76,18 @@ logger = get_logger(__name__)
 
 @dataclass(slots=True, frozen=True)
 class _SubStep:
+    """Un sub-paso. Sin `sql_file` es la carga de hipótesis (Python)."""
+
     name: str
-    sql_file: str
+    sql_file: str | None
     target_schema: str | None = None
     target_table: str | None = None
 
 
-#: Los cuatro ficheros SQL, EN ORDEN, y de qué tabla se cuentan filas. La
-#: general (02) y los recuentos (03) van detrás de la completa: leen de ella.
-#: Es DATO fuera de `run()` para que un test pueda sustituirla.
+#: Los sub-pasos, EN ORDEN, y de qué tabla se cuentan filas. La general (02) y
+#: los recuentos (03) van detrás de la completa: leen de ella. `07` lee la
+#: cartera general (la frontera, D16-A) y `08` lee el corte de `07` y la carga
+#: de hipótesis. Es DATO fuera de `run()` para que un test pueda sustituirla.
 SUB_PASOS: tuple[_SubStep, ...] = (
     _SubStep(name="setup", sql_file="00_setup.sql"),
     _SubStep(
@@ -82,7 +108,47 @@ SUB_PASOS: tuple[_SubStep, ...] = (
         target_schema="tesoreria",
         target_table="efectos_restringidos_mes",
     ),
+    _SubStep(name="plazos_forma_pago", sql_file="04_plazos_forma_pago.sql"),
+    _SubStep(
+        name="condiciones_compra",
+        sql_file="05_condiciones_contrato_compra.sql",
+        target_schema="tesoreria",
+        target_table="condiciones_contrato_compra",
+    ),
+    _SubStep(
+        name="condiciones_cliente",
+        sql_file="06_condiciones_contrato_cliente.sql",
+        target_schema="tesoreria",
+        target_table="condiciones_contrato_cliente",
+    ),
+    _SubStep(
+        name="devengo_pendiente",
+        sql_file="07_devengo_pendiente.sql",
+        target_schema="tesoreria",
+        target_table="devengo_pendiente_partida",
+    ),
+    _SubStep(name="hipotesis_carga", sql_file=None),
+    _SubStep(
+        name="hipotesis_obra",
+        sql_file="08_hipotesis_caja_obra.sql",
+        target_schema="tesoreria",
+        target_table="hipotesis_caja_obra",
+    ),
 )
+
+
+def _cargar_hipotesis(pg) -> int:
+    """Lee, valida y carga el YAML de hipótesis (R2-R4). Lanza con la lista.
+
+    Con un solo error no se escribe nada: ni el catálogo ni los valores.
+    """
+    leidas = cargar_hipotesis_caja()
+    if leidas.errores:
+        raise ValueError(
+            f"{len(leidas.errores)} errores en config/hipotesis_caja.yaml: "
+            + "; ".join(leidas.errores)
+        )
+    return pg.cargar_hipotesis_caja(leidas.catalogo, leidas.obras)
 
 
 class BuildTesoreriaStep(PipelineStep):
@@ -115,6 +181,21 @@ class BuildTesoreriaStep(PipelineStep):
 
         total_rows = 0
         for sub in SUB_PASOS:
+            if sub.sql_file is None:
+                t0 = datetime.utcnow()
+                try:
+                    total_rows += _cargar_hipotesis(pg)
+                except Exception as e:  # el YAML que falta o no valida, igual
+                    logger.error("tesoreria_substep_failed", sub_step=sub.name, exc_info=True)
+                    result.status = StepStatus.FAILED
+                    result.error_message = f"Fallo en {sub.name}: {e}"
+                    result.finished_at = datetime.utcnow()
+                    return result
+                logger.info(
+                    "tesoreria_substep_done", sub_step=sub.name,
+                    duration_s=round((datetime.utcnow() - t0).total_seconds(), 2),
+                )
+                continue
             sql_path = sql_dir / sub.sql_file
             if not sql_path.exists():
                 # R18: el nombre del sub-paso va en el mensaje, como en un fallo
