@@ -18,11 +18,19 @@
 - **T2 hecha** (`F-149 T2`): los tres textos, v61 con su comentario, `docs/CONVENTIONS.md` (una frase).
 - **T3 hecha**: suite completa 8.782 passed / 283 skipped / 0 failed; mutación con ALCANCE VACÍO
   (sin Python de producción); informe en `progress/impl_F-149.md`. `init.sh` final sobre `43e5554`:
-  exit 0, `ENTORNO LISTO`. Lista para el reviewer.
+  exit 0, `ENTORNO LISTO`.
+- **Review pasada 1: CHANGES_REQUESTED** (`progress/review_F-149.md`, `af70115`). (1) El detector no
+  veía un código al principio de línea o tras un tabulador: la fila se serializaba a JSON y `
+` deja
+  la `R` sin frontera de palabra. **T5**: test nuevo en RED (`f938dae`) y `_texto` recorre las cadenas
+  DECODIFICADAS de la fila (también el JSON de `ficha` y `datos`) en vez de serializarla. (2) La
+  desviación 1 no nombraba `test_f006_copias.py`: corregido abajo.
 - **Desviaciones, justificadas**:
-  1. `tests/test_f147_contenido.py` R14 exigía que `identidad_sigrid` NOMBRARA `R-SIGRID-CON` (R14
-     de F-147: «que remita a `R-SIGRID-CON`»). F-149, pedida por el humano, revoca justo eso: el test
-     pasa a prohibir la cita y conserva el tope de 300 caracteres.
+  1. Dos tests exigían que `identidad_sigrid` NOMBRARA `R-SIGRID-CON`, y F-149, pedida por el humano,
+     revoca justo eso: `tests/test_f147_contenido.py` R14 (R14 de F-147: «que remita a
+     `R-SIGRID-CON`») pasa a prohibir la cita y conserva el tope de 300 caracteres;
+     `tests/test_f006_copias.py` R26 («tiene que remitir a la regla») pasa a prohibir la cita, añade
+     que diga «guia interna del ETL» y conserva prohibido «viven en `con`» (no repetir la regla).
   2. El worktree no tiene `.env` y `init.sh` lo exige (sección 5) y los tests de CLI lo leen. NO se
      copió el `.env` real: se creó uno de MARCADOR, ignorado por git, con dos líneas sin secretos
      (`SIGRID_API_BASE_URL=https://sigrid-api.invalid` y `SIGRID_API_FUNCTION_KEY=` vacía). Copiar

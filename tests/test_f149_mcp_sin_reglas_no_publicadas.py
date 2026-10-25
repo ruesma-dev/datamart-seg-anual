@@ -65,7 +65,7 @@ def esquemas_fuera_del_mcp() -> frozenset[str]:
 def textos_al_mcp(dicc: Diccionario) -> list[tuple[str, str]]:
     """(sitio, texto) de cada fila que la publicación deja al alcance del MCP.
 
-    La fila entera se serializa: así entra cualquier campo de texto, también los
+    Se recorre la fila ENTERA: así entra cualquier campo de texto, también los
     que se añadan mañana a la ficha, a la regla o al bloque, sin tocar esto.
     """
     fuera = esquemas_fuera_del_mcp()
@@ -81,7 +81,31 @@ def textos_al_mcp(dicc: Diccionario) -> list[tuple[str, str]]:
 
 
 def _texto(fila: tuple) -> str:
-    return json.dumps(fila, ensure_ascii=False, default=str)
+    """Las cadenas de la fila, DECODIFICADAS, una por línea.
+
+    No se serializa la fila a JSON: ahí un salto de línea es el texto `\\n`, y
+    entre su `n` y la `R` de un código no hay frontera de palabra (review de la
+    pasada 1). Los campos que ya son JSON (`ficha` de `_meta.diccionario`,
+    `datos` de `_meta.diccionario_contexto`) se decodifican y se recorren.
+    """
+    return "\n".join(_cadenas(fila))
+
+
+def _cadenas(valor: object) -> list[str]:
+    """Toda cadena dentro de `valor`, recorriendo tuplas, listas y dicts."""
+    if isinstance(valor, str):
+        try:
+            decodificado = json.loads(valor)
+        except ValueError:
+            return [valor]
+        if isinstance(decodificado, (dict, list)):
+            return [valor, *_cadenas(decodificado)]
+        return [valor]
+    if isinstance(valor, dict):
+        return [c for k, v in valor.items() for c in (*_cadenas(k), *_cadenas(v))]
+    if isinstance(valor, (list, tuple)):
+        return [c for v in valor for c in _cadenas(v)]
+    return [str(valor)] if valor is not None else []
 
 
 def citas_no_publicadas(dicc: Diccionario) -> list[tuple[str, str]]:
