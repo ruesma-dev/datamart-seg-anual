@@ -1,111 +1,90 @@
 <!-- progress/review_F-149.md -->
-Revisión completa (pasada 1) · `git diff main...HEAD` · base `main` 18c1d11 · HEAD 89eb0f5
+Revisión incremental desde af70115 (pasada 2) · `git diff af70115..5e09b8b` · HEAD 5e09b8b
 
 # F-149 · Review · lo que sirve el MCP no nombra reglas que no se publican
 
-- **Veredicto: CHANGES_REQUESTED** (un cambio de fondo y uno de papeleo; ver al final).
-- **Nivel de rigor:** `estandar`, declarado en `harness/features.json`. Exige fase RED, cobertura de
+- **Veredicto: APPROVED** (los dos cambios de la pasada 1, resueltos; init.sh en verde)**
+- **Nivel de rigor:** `estandar`, declarado en `harness/features.json`: fase RED, cobertura de
   líneas cambiadas y campaña de mutación (sin cero supervivientes obligatorio).
 - `sdd=false`: se valida contra los tres `acceptance`; lo que depende de `tasks.md` es N/A.
-- Revisado en el worktree de la rama (`.../scratchpad/wt_main`), no en el árbol principal.
+- Lo aprobado en la pasada 1 (todo menos los dos cambios requeridos) queda dado por bueno: textos
+  nuevos, v61, R14/R26 invertidos sin debilitar, despliegue MANUAL completo, `.env` de marcador
+  ignorado y fuera de todo commit. El delta solo toca `tests/test_f149_*`, `progress/current.md` e
+  `progress/impl_F-149.md`: ni producción, ni YAML, ni firmas públicas, así que no reabre nada.
 
-## Lo que se verificó
+## Pasada 1 · resumen (`af70115`, CHANGES_REQUESTED)
 
-- `bash harness/init.sh` desde el worktree: **exit 0, `ENTORNO LISTO`**; pytest con cobertura `8782 passed, 283 skipped` en 3.317 s; `PUERTA COBERTURA: N/A` con motivo; `PUERTA TAMAÑO` OK; único aviso ruff 275 (deuda previa).
-- **RED reproducida por mí**: `git archive f127f1f` (commit T1, sin tocar los YAML) a una copia en el
-  scratchpad y el test nuevo sobre ella: `4 failed, 9 passed`, los mismos cuatro que pega el informe.
-- Sobre HEAD, el barrido mira 215 textos: 158 fichas (234 menos las 76 de `raw`), 20 reglas
-  publicadas y 37 entradas de contexto. Cuadra con lo que publica `PublicarDiccionarioStep.run`
-  (`cargar_diccionario` + `derivar_avisos`, l.123/131) y con `filas_reglas`, que ya excluye las
-  `fuera_mcp`. Con una regex más laxa sobre lo servido no aparece ningún código extra.
-- Otras superficies: las citas que quedan a `R-SIGRID-CON` están en comentarios `#` del YAML, en la
-  ficha de `raw` y en comentarios `--` de cuatro `.sql` (`maestro/06`, `personal/01-03`): ninguna
-  llega al MCP (FUERA según la feature). `preguntas_aceptacion` y `reglas` crudas de `global_raw` no
-  están en `CONTEXTO_PUBLICADO`.
-- Textos nuevos (punto 3): `identidad_sigrid` = «`raw` (la copia de Sigrid) no se consulta desde el
-  MCP. Como se lee Sigrid -la clave `ide`, las tablas que son propiedades de `con` y de que lado sale
-  cada campo- es guia interna del ETL.» Correcto para la IA: no promete nada que no pueda leer, y no
-  repite el contenido de la regla (R26 de F-006). Las columnas, «(`con.cod`)», como su vecina
-  `nombre_obra_cabecera` «(`con.res`)». v61 con su comentario de versión (punto 4).
-- Tests que cambian de sentido (punto 2): R14 de F-147 conserva el tope de 300 y solo invierte la
-  cita; R26 de F-006 invierte la cita, AÑADE «guia interna del ETL» y conserva «viven en `con`»
-  prohibido. Nada se debilita más allá de lo que la feature revoca.
-- Despliegue MANUAL (punto 5): `progress/current.md` trae tag actual y vuelta atrás, imagen, job con
-  comprobación de la imagen ANTES de publicar, `publicar-diccionario` (n_reglas 20),
-  `check-diccionario`, lectura de `latestReadyRevisionName` y reinicio de ESA revisión, y la
-  comprobación final en `contexto_bbdd()`/`describir_tabla`. Completo y coherente con F-147/F-148.
-- `.env` de marcador (punto 6): `git check-ignore` → `.gitignore:31:.env`; no está en `git ls-files`
-  ni en ningún commit de `main..HEAD`; dos claves sin secretos. El junction `.venv` también ignorado.
-- `ruff check` de los tres ficheros de test: limpio.
+1. El detector serializaba la fila a JSON; un salto de línea quedaba como `\n` y el `\b` de
+   `CODIGO_DE_REGLA` no veía un código que abriera línea o siguiera a un tabulador.
+2. `current.md` no nombraba el cambio de sentido de R26 en `tests/test_f006_copias.py`.
 
-## Hallazgo de fondo: el detector no ve un código al principio de línea
+## Pasada 2 · verificación de los dos cambios
 
-`textos_al_mcp` serializa cada fila con `json.dumps`, y JSON escribe un salto de línea como `\n`
-(barra + `n`). `CODIGO_DE_REGLA` empieza por `\b`, y entre la `n` del escape y la `R` del código no
-hay frontera de palabra. Resultado: **un código que abre una línea o va tras un tabulador no se caza,
-en ningún campo** (descripción, columna, bloque de contexto, regla). Probado con los propios helpers
-del test (`_con`, `_ficha`, `_columna`):
+**Cambio 1, resuelto.** `_texto` ahora une con saltos reales las cadenas de la fila, recorriendo
+tuplas, listas y dicts (claves incluidas) y decodificando los campos que son JSON (`ficha`,
+`datos`). Es la vía (a) que se pidió. Comprobado:
 
-| Texto servido | `citas_no_publicadas` hoy |
-|---|---|
-| `'Ver R-GUIA-ETL.'` (en línea) | cazado |
-| `'Primera linea.\nR-GUIA-ETL manda.'` (descripción) | **`[]`** |
-| `'x\nR-GUIA-ETL'` (significado de columna) | **`[]`** |
-| `'linea\nR-GUIA-ETL dice'` (bloque `convenciones`) | **`[]`** |
-| `'a\tR-GUIA-ETL'` | **`[]`** |
+- **RED reproducida por mí**: `git archive f938dae` a una copia del scratchpad y el fichero de test
+  sobre ella da `1 failed, 13 passed`; falla justo
+  `test_f149_caza_un_codigo_al_principio_de_linea_o_tras_un_tabulador` (l.250). Sobre HEAD,
+  `14 passed`.
+- **Sondas propias sobre HEAD**, con los helpers del test: un código tras `\t` en una descripción,
+  tras `\n` en `nulo_significa`, en `ejemplos_preguntas`, en el `motivo` de una regla publicada y en
+  una entrada de lista de un bloque de contexto (`esquemas`): los cinco cazados. El test nuevo cubre
+  columna, descripción y bloque.
+- **Sin falsos positivos ni pérdida de alcance**: sobre el diccionario real, `citas_no_publicadas`
+  sigue en `[]` y el barrido mira los mismos 215 textos (158 fichas, 20 reglas, 37 de contexto).
+  Conservar la cadena JSON original junto a la decodificada solo añade texto, nunca quita.
+- `ruff check` del fichero: limpio.
 
-Hoy ningún texto servido lleva salto de línea (todos son `>-` de un párrafo), así que el veredicto
-sobre el diccionario real es correcto. Pero el fichero promete «cerrar la clase, no el caso» y
-cubrir «los campos que se añadan mañana», y un bloque `|` o un `>-` con dos párrafos que empiece por
-el código pasaría en verde. Es exactamente el punto 1 del encargo («cubrir de verdad TODO»).
+**Cambio 2, resuelto.** La desviación 1 de `current.md` nombra ya los dos tests y lo que conserva
+cada uno (R14: tope de 300; R26: «guia interna del ETL» y «viven en `con`» prohibido).
 
-## Checkpoints
+**Observación, no bloquea.** En `progress/current.md` l.23-24, la frase de la pasada 1 dice «a
+JSON y `` ` ``⏎`` ` `` deja la `R`»: el `\n` del texto se escribió como un salto de línea real y el
+span de código queda vacío. Es papeleo de sesión, no toca ningún `acceptance`; se arregla al cerrar
+(«y el texto `\n` deja la `R` sin frontera de palabra»).
+
+## `bash harness/init.sh` (pasada 2, sobre 5e09b8b)
+
+**exit 0, `ENTORNO LISTO`**; pytest con cobertura `8783 passed, 283 skipped` en 2.530 s (42 min); `PUERTA COBERTURA: N/A` con motivo impreso; `PUERTA TAMAÑO` OK (impl 166/220, review 91/140); sin `[KO]`; único aviso ruff 275 (deuda previa).
+
+## Checkpoints (estado tras la pasada 2)
 
 - C1: [x] init.sh exit 0 (esta pasada) · [x] ficheros del arnés presentes.
 - C2: [x] una sola `in_progress` (F-149) · [x] rama `feature/F-149-mcp-sin-reglas-no-publicadas` ·
-  [x] `current.md`: lo anterior que conserva son pendientes vivos (R31 de F-148), no restos ·
-  [x] las `done` tienen su resumen en `history.md` (F-149 no cierra nada).
-- C3: [x] hexagonal: sin cambios en `etl_sigrid/`; el detector vive en el test · [x] primera línea
-  con ruta en el test nuevo · [x] sin prints, TODOs ni secretos; sin dependencias nuevas ·
-  [x] semántica Sigrid: sin SQL ni importes tocados.
+  [x] `current.md`: lo que conserva de antes son pendientes vivos (R31 de F-148) · [x] las `done`
+  tienen resumen en `history.md` (F-149 no cierra nada).
+- C3: [x] sin cambios en `etl_sigrid/`; el detector vive en el test · [x] primera línea con ruta ·
+  [x] sin prints, TODOs ni secretos; sin dependencias nuevas · [x] semántica Sigrid: sin SQL ni
+  importes tocados.
 - C3 bis: N/A, no toca `docs/referencia/`.
-- C4: [ ] acceptance 1 con test y RED: el test existe y su RED es real, pero tiene el agujero de
-  arriba · [x] acceptance 2: `test_f149_version_61`; `check-diccionario` queda MANUAL tras publicar ·
-  [x] tests sin red ni BBDD · [x] MANUAL en `current.md` con comandos exactos · [x] dobles: no
-  añade ningún `Fake`/`Stub` (usa los constructores reales de `test_f006_formato`).
-- C4 bis: [x] rigor declarado (`estandar`) · [x] fase RED con traza real, reproducida por mí ·
-  [x] cobertura: `N/A` con motivo impreso por `init.sh` («no cambia líneas Python de producción») ·
-  [x] mutación: N/A justificado. Recalculé con `harness.alcance` el diff `main...HEAD`: producción
-  `{}`. **Prueba de control** (`generar_mutantes` ignorando la exclusión sobre los `.py` del diff):
-  28 mutantes, así que el generador funciona y el cero es exclusión por diseño, no herramienta rota.
-  Sin campaña no hay informe que reejecutar ni RM1/RM2 que medir (N/A por alcance vacío). ·
-  RM5: N/A por nivel `estandar` · RM6: N/A, no se quitó código defensivo · campaña manual: N/A,
-  no se sustituyó (la defensa del detector son sus tests sintéticos) · [x] «Evidencias» con los
-  cuatro números.
+- C4: [x] acceptance 1 con test y RED real (T1 y T5, las dos reproducidas por mí) · [x] acceptance
+  2: `test_f149_version_61`; `check-diccionario` queda MANUAL tras publicar · [x] tests sin red ni
+  BBDD · [x] MANUAL en `current.md` con comandos exactos · [x] dobles: no añade ningún `Fake`/`Stub`.
+- C4 bis: [x] rigor declarado · [x] fase RED con traza real en el informe (T1: 4 failed; T5:
+  1 failed) · [x] cobertura `N/A` con motivo impreso por `init.sh` («no cambia líneas Python de
+  producción») · [x] mutación N/A justificado: alcance de producción `{}` recalculado con
+  `harness.alcance` en la pasada 1, y el delta no añade producción; prueba de control con
+  `generar_mutantes` ignorando la exclusión (28 mutantes sobre los tests): el cero es por diseño ·
+  sin campaña no hay informe, RM1/RM2 N/A por alcance vacío · RM5 N/A por nivel `estandar` ·
+  RM6 N/A, no se quitó código defensivo · campaña manual N/A, no se sustituyó · [x] «Evidencias»
+  con los cuatro números al día (14 tests, 8.783 en la suite).
 - C4 ter: N/A, no hay `harness/rutas_sensibles.json`.
-- C5: N/A `tasks.md` (`sdd=false`); commits `F-149 Tn:` presentes · [x] sin temporales trackeados ·
-  [x] `features.json` en `in_progress`, que es el estado real.
+- C5: N/A `tasks.md` (`sdd=false`); commits `F-149 Tn:` (T0-T5) · [x] sin temporales trackeados ·
+  [x] `features.json` en `in_progress`, el estado real hasta el merge.
 
 ## Cobertura acceptance → test
 
 | Acceptance | Test |
 |---|---|
-| 1 · nada servido cita `fuera_mcp` o inexistente | `test_f149_nada_de_lo_que_llega_al_mcp_cita_una_regla_que_no_se_publica`, `..._r_sigrid_con_no_aparece_...`, `..._el_barrido_mira_...` y seis sintéticos (columna, contexto, regla, aviso, inexistente, exclusiones) |
-| 2 · v61 con comentario; `check-diccionario` tras publicar | `test_f149_version_61`; `check-diccionario` MANUAL (paso 4) |
+| 1 · nada servido cita `fuera_mcp` o inexistente | `test_f149_nada_de_lo_que_llega_al_mcp_cita_una_regla_que_no_se_publica`, `..._r_sigrid_con_no_aparece_...`, `..._el_barrido_mira_...` y siete sintéticos (columna, contexto, regla, aviso, inexistente, exclusiones, principio de línea/tabulador) |
+| 2 · v61 con comentario; `check-diccionario` tras publicar | `test_f149_version_61`; `check-diccionario` MANUAL (paso 4 de `current.md`) |
 | 3 · init.sh verde, APROBADO, MANUAL en `current.md` | init.sh de esta pasada; `current.md` § «F-149 · Despliegue MANUAL» |
 
 ## Cambios requeridos
 
-1. `tests/test_f149_mcp_sin_reglas_no_publicadas.py` l.55 (`CODIGO_DE_REGLA`) y l.84 (`_texto`):
-   que un código tras salto de línea o tabulador se cace. Dos vías, a elegir: (a) recorrer los
-   valores de la fila en vez de serializarla, decodificando los dos campos que ya son JSON
-   (`ficha`, último de `filas_diccionario`; `datos`, último de `filas_contexto`), o (b) cambiar el
-   `\b` por `(?:(?<![A-Za-z0-9_])|(?<=\x5c[nrt]))`; probé la (b) en el scratchpad y caza los cuatro
-   casos de la tabla sin cambiar el veredicto real (`[]`). Añadir un test sintético, p. ej.
-   `test_f149_caza_un_codigo_al_principio_de_linea`, con el código tras `\n` en una columna y en un
-   bloque de contexto, y pegar en el informe su RED contra la regex de hoy.
-2. `progress/current.md`, desviación 1 de F-149: nombra solo `test_f147_contenido.py` R14; añadir
-   `test_f006_copias.py` R26, que también cambió de sentido (el informe ya lo dice).
+Ninguno. Al cerrar, corregir la observación de `progress/current.md` l.23-24.
 
 ## Propuesta de automejora (no aplicada)
 
