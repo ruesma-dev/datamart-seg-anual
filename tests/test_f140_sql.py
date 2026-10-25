@@ -386,10 +386,13 @@ def test_f140_r11_plazos_a_cero_son_nulos_y_la_fecha_tal_cual() -> None:
 
 @pytest.mark.parametrize("ruta", NUEVOS, ids=lambda r: r.name)
 def test_f140_r16_sin_aritmetica_de_fechas(ruta: Path) -> None:
-    """Sumar un plazo a una fecha es convertir a caja: no se hace en el ETL."""
+    """Sumar un plazo a una fecha es convertir a caja: no se hace en el ETL.
+
+    `\\binterval\\b`: el tipo, no las columnas `plan_intervalo` de R12.
+    """
     texto = _sin_comment_on(ruta).lower()
-    for prohibido in ("interval", "make_interval", "date_add", "+ f.", "+ dias"):
-        assert prohibido not in texto, f"{ruta.name}: {prohibido}"
+    for prohibido in (r"\binterval\b", r"make_interval", r"date_add", r"\+ f\.", r"\+ dias"):
+        assert not re.search(prohibido, texto), f"{ruta.name}: {prohibido}"
 
 
 @pytest.mark.parametrize("ruta", NUEVOS, ids=lambda r: r.name)
@@ -415,7 +418,8 @@ def test_f140_r18_lo_de_personal_no_se_lee(ruta: Path, prohibido: str) -> None:
 
 @pytest.mark.parametrize("ruta", NUEVOS, ids=lambda r: r.name)
 def test_f140_sin_grants_ni_drop(ruta: Path) -> None:
-    ejecutable = _ejecutable(ruta).upper()
+    """Las temporales de `07` (`ON COMMIT DROP`) mueren solas: eso no es un DROP."""
+    ejecutable = _ejecutable(ruta).upper().replace("ON COMMIT DROP AS", "")
     assert not re.search(r"\b(GRANT|REVOKE)\b", ejecutable)
     assert "DROP " not in ejecutable
 
@@ -513,3 +517,292 @@ def test_f140_r17_solo_obras_de_verdad_y_un_conjunto_de_varias_no_decide() -> No
     assert pago.count("CASE WHEN count(DISTINCT ob.ide) = 1 THEN min(ob.ide) END AS obra_id") == 2
     assert "AND COALESCE(p.cenide, 0) = 0" in pago.split("efectos AS (")[0]
     assert "OR k.ide = l.docoriide" in pago, "contratos de la cabecera y de las líneas"
+
+
+# ===========================================================================
+# 07 · el devengo pendiente (R12-R15, D3-A, D5-A, D16-A, D19-A)
+# ===========================================================================
+
+TABLAS_DEVENGO = (
+    "tesoreria.devengo_pendiente_partida",
+    "tesoreria.devengo_pendiente_obra_mes",
+    "tesoreria.devengo_corte_obra",
+)
+
+
+def _devengo() -> str:
+    return _sin_comment_on(RUTA_DEVENGO)
+
+
+def _sin_to_regclass(texto: str) -> str:
+    """La guarda de entrada nombra sus fuentes sin leerlas."""
+    return re.sub(r"to_regclass\('[^']*'\)", "", texto)
+
+
+@pytest.mark.parametrize("tabla", TABLAS_DEVENGO)
+def test_f140_r12_r14_r15_truncate_e_insert_con_las_columnas_del_setup(tabla: str) -> None:
+    texto = _devengo()
+    assert texto.index(f"TRUNCATE {tabla};") < texto.index(f"INSERT INTO {tabla} (")
+    columnas, select = _insert(RUTA_DEVENGO, tabla)
+    assert columnas == _columnas(tabla)
+    assert _alias_del_select(select) == columnas
+
+
+def test_f140_r12_r14_r15_el_orden_de_los_tres_insert() -> None:
+    texto = _devengo()
+    posiciones = [texto.index(f"INSERT INTO {t} (") for t in TABLAS_DEVENGO]
+    assert posiciones == sorted(posiciones), "partida, luego obra y mes, luego el corte"
+
+
+def test_f140_r13_el_unico_acceso_a_stg_filtra_obra_ambito_y_version() -> None:
+    texto = _sin_to_regclass(_devengo())
+    assert re.findall(r"\bstg\.\w+", texto) == ["stg.plan_mensual"]
+    assert (
+        "JOIN stg.plan_mensual pm ON pm.obra_id = v.obra_id "
+        "AND pm.ambito_id = v.ambito_id AND pm.version = v.version_master"
+    ) in texto
+
+
+@pytest.mark.parametrize(
+    "ruta", sorted(DIR_TESORERIA.glob("*.sql")), ids=lambda r: r.name
+)
+def test_f140_r13_ninguna_lectura_de_plan_mensual_sin_version(ruta: Path) -> None:
+    """`R-VERSION-MASTER`: sin la versión, se suman todas las de la obra."""
+    texto = _sin_to_regclass(_sin_comment_on(ruta))
+    for m in re.finditer(r"stg\.plan_mensual (\w+) ON (.*?)(?= (?:LEFT )?JOIN | WHERE | GROUP BY |\)|;)", texto):
+        alias, condicion = m.group(1), m.group(2)
+        assert f"{alias}.version = " in condicion, f"{ruta.name}: {m.group(0)}"
+        assert f"{alias}.obra_id = " in condicion and f"{alias}.ambito_id = " in condicion
+    assert texto.count("stg.plan_mensual") == len(
+        re.findall(r"stg\.plan_mensual \w+ ON ", texto)
+    ), f"{ruta.name}: toda lectura de plan_mensual va con su ON filtrado"
+
+
+def test_f140_r13_los_ambitos_master_por_concepto() -> None:
+    assert "CASE p.concepto WHEN 'COSTE' THEN 8 WHEN 'VENTA' THEN 11 END AS ambito_id" in _devengo()
+
+
+def test_f140_r12_lo_ejecutado_son_las_filas_reales_del_intervalo() -> None:
+    texto = _devengo()
+    assert (
+        "JOIN mart.fact_seguimiento_mensual f ON f.obra_id = v.obra_id "
+        "AND f.concepto = v.concepto AND f.tipo_dato = 'REAL' "
+        "AND f.anio_mes >= v.mes_version AND f.anio_mes <= v.mes_ultimo_cierre"
+    ) in texto
+
+
+def test_f140_r12_la_version_es_la_del_ultimo_mes_pendiente() -> None:
+    """D2-A: la de `mart` en el último mes planificado posterior al cierre."""
+    texto = _devengo()
+    assert (
+        "(array_agg(f.version_master ORDER BY f.anio_mes DESC, f.version_master DESC))[1] "
+        "AS version_master"
+    ) in texto
+    assert "f.tipo_dato = 'PLANIFICADO' AND (u.mes_ultimo_cierre IS NULL OR f.anio_mes > u.mes_ultimo_cierre)" in texto
+    assert "COUNT(DISTINCT f.version_master) AS num_versiones_pendientes" in texto
+    assert "date_trunc('month', t.version_fec_efectiva)::DATE AS mes_version" in texto
+    assert "FROM mart.master_versiones_tipadas x" in texto
+
+
+def test_f140_r12_los_tramos_del_plan_de_la_version() -> None:
+    texto = _devengo()
+    assert (
+        "COALESCE(SUM(p.importe_mes) FILTER (WHERE p.anio_mes >= v.mes_version), 0) "
+        "AS plan_desde_version"
+    ) in texto
+    assert (
+        "COALESCE(SUM(p.importe_mes) FILTER (WHERE p.anio_mes >= v.mes_version "
+        "AND p.anio_mes <= v.mes_ultimo_cierre), 0) AS plan_intervalo"
+    ) in texto
+    assert (
+        "COALESCE(SUM(p.importe_mes) FILTER (WHERE p.anio_mes >= v.mes_version "
+        "AND (v.mes_ultimo_cierre IS NULL OR p.anio_mes > v.mes_ultimo_cierre)), 0) "
+        "AS plan_restante"
+    ) in texto
+
+
+def test_f140_r12_pendiente_y_sobre_ejecutado_como_el_dominio() -> None:
+    texto = _devengo()
+    assert "GREATEST(0, d.plan_desde_version - d.ejecutado_intervalo) AS pendiente" in texto
+    assert "GREATEST(0, d.ejecutado_intervalo - d.plan_desde_version) AS sobre_ejecutado" in texto
+
+
+def test_f140_r14_el_reparto_proporcional_con_el_resto_al_ultimo_mes() -> None:
+    texto = _devengo()
+    assert "ROUND(d.pendiente * pr.importe_mes / d.total_perfil, 2) AS parte" in texto
+    assert (
+        "ROW_NUMBER() OVER (PARTITION BY pr.obra_id, pr.concepto, pr.partida_id "
+        "ORDER BY pr.anio_mes DESC) AS desde_el_final"
+    ) in texto
+    assert (
+        "CASE WHEN r.desde_el_final = 1 THEN r.pendiente - (r.suma_partes - r.parte) "
+        "ELSE r.parte END"
+    ) in texto
+
+
+def test_f140_r14_el_perfil_son_los_meses_con_plan_tras_el_cierre() -> None:
+    """Como `repartir_pendiente`: meses a cero fuera y suma positiva para repartir."""
+    texto = _devengo()
+    assert (
+        "p.anio_mes >= v.mes_version AND (v.mes_ultimo_cierre IS NULL OR "
+        "p.anio_mes > v.mes_ultimo_cierre) AND p.importe_mes <> 0"
+    ) in texto
+    assert "d.pendiente > 0 AND d.total_perfil > 0" in texto
+
+
+def test_f140_r14_sin_perfil_todo_al_primer_mes_marcado() -> None:
+    texto = _devengo()
+    assert "COALESCE(d.total_perfil, 0) <= 0" in texto
+    assert "v.primer_mes_pendiente AS anio_mes" in texto
+    assert "TRUE AS es_retraso" in texto
+
+
+def test_f140_r14_la_guarda_de_la_suma_al_centimo() -> None:
+    texto = _devengo()
+    guarda = texto[texto.index("INSERT INTO tesoreria.devengo_pendiente_obra_mes"):]
+    guarda = guarda[guarda.index("DO $$"):guarda.index("END $$;")]
+    assert "tesoreria.devengo_pendiente_partida" in guarda
+    assert "tesoreria.devengo_pendiente_obra_mes" in guarda
+    assert "IS DISTINCT FROM" in guarda and "RAISE EXCEPTION" in guarda
+    assert texto.index("DO $$", texto.index("INSERT INTO tesoreria.devengo_pendiente_obra_mes")) < (
+        texto.index("INSERT INTO tesoreria.devengo_corte_obra")
+    ), "la guarda va antes del corte"
+
+
+def test_f140_r14_mes_pasado_sin_cierre_contra_el_mes_del_build() -> None:
+    assert "x.anio_mes < date_trunc('month', CURRENT_DATE)::DATE AS mes_pasado_sin_cierre" in _devengo()
+
+
+def test_f140_r15_la_frontera_con_la_cartera_general() -> None:
+    """D16-A: la cartera viva del sentido del concepto y lo emitido tras el cierre."""
+    texto = _devengo()
+    assert "FROM tesoreria.efectos e" in texto
+    assert "e.sentido = CASE v.concepto WHEN 'COSTE' THEN 'PAGO' WHEN 'VENTA' THEN 'COBRO' END" in texto
+    assert "e.estado_tesoreria = 'PREVISTO' AND NOT e.previsto_antiguo" in texto
+    assert (
+        "SUM(e.importe) FILTER (WHERE v.mes_ultimo_cierre IS NULL OR "
+        "date_trunc('month', e.fecha_emision)::DATE > v.mes_ultimo_cierre)"
+    ) in texto
+
+
+def test_f140_r15_adelantado_retrasado_y_ejecutado_sin_plan() -> None:
+    texto = _devengo()
+    assert "SUM(GREATEST(0, d.ejecutado_intervalo - d.plan_intervalo)) AS adelantado" in texto
+    assert "SUM(GREATEST(0, d.plan_intervalo - d.ejecutado_intervalo)) AS retrasado" in texto
+    assert "WHERE NOT EXISTS (SELECT 1 FROM _dev_partida d WHERE d.obra_id = r.obra_id" in texto
+
+
+def test_f140_r15_el_real_a_origen_suma_los_meses_reales_hasta_el_cierre() -> None:
+    texto = _devengo()
+    assert (
+        "f.tipo_dato = 'REAL' AND f.anio_mes <= v.mes_ultimo_cierre"
+    ) in texto
+
+
+def test_f140_las_guardas_de_entrada_antes_de_vaciar() -> None:
+    texto = _devengo()
+    primera = texto.index("DO $$")
+    assert primera < texto.index("TRUNCATE")
+    entrada = texto[primera:texto.index("END $$;")]
+    for objeto in ("mart.fact_seguimiento_mensual", "mart.master_versiones_tipadas",
+                   "stg.plan_mensual", "tesoreria.efectos"):
+        assert f"to_regclass('{objeto}') IS NULL" in entrada, objeto
+
+
+def test_f140_la_version_sin_fecha_efectiva_tumba_el_paso() -> None:
+    """Sin el mes de V no hay intervalo: falla cerrado, no se adivina."""
+    texto = _devengo()
+    assert "WHERE mes_version IS NULL" in texto
+    assert "devengo_pendiente: " in texto
+
+
+def test_f140_las_tablas_temporales_mueren_con_la_transaccion() -> None:
+    texto = _devengo()
+    temporales = re.findall(r"CREATE TEMP TABLE (\w+)", texto)
+    assert temporales and all(t.startswith("_dev_") for t in temporales)
+    assert texto.count("ON COMMIT DROP") == len(temporales)
+    assert not re.search(r"CREATE (?!TEMP TABLE)", texto)
+
+
+# ===========================================================================
+# 08 · el valor de cada hipótesis en cada obra (R3, R5, D18-A)
+# ===========================================================================
+
+def _hipotesis_obra() -> str:
+    return _sin_comment_on(RUTA_HIPOTESIS_OBRA)
+
+
+def test_f140_r3_la_guarda_de_la_clave_obra_antes_de_vaciar() -> None:
+    texto = _hipotesis_obra()
+    guarda = texto[texto.index("DO $$"):texto.index("END $$;")]
+    assert "FROM tesoreria.hipotesis_caja_manual m" in guarda
+    assert (
+        "WHERE NOT EXISTS (SELECT 1 FROM maestro.v_obra_fichas fo WHERE fo.clave_obra = m.clave_obra)"
+    ) in guarda
+    assert "RAISE EXCEPTION 'hipotesis_caja_obra: " in guarda
+    assert texto.index("END $$;") < texto.index("TRUNCATE tesoreria.hipotesis_caja_obra;")
+
+
+def test_f140_r5_truncate_e_insert_con_las_columnas_del_setup() -> None:
+    tabla = "tesoreria.hipotesis_caja_obra"
+    texto = _hipotesis_obra()
+    assert texto.index(f"TRUNCATE {tabla};") < texto.index(f"INSERT INTO {tabla} (")
+    columnas, select = _insert(RUTA_HIPOTESIS_OBRA, tabla)
+    assert columnas == _columnas(tabla)
+    assert _alias_del_select(select) == columnas
+
+
+def test_f140_r5_el_case_lleva_el_orden_de_resolver_hipotesis() -> None:
+    """MANUAL > SIGRID > DEFECTO, con los niveles de `resolver_hipotesis`."""
+    texto = _hipotesis_obra()
+    assert (
+        "CASE WHEN m.valor IS NOT NULL THEN m.valor WHEN s.valor IS NOT NULL THEN s.valor "
+        "ELSE h.valor_defecto END AS valor"
+    ) in texto
+    fuente = re.search(
+        r"CASE WHEN m\.valor IS NOT NULL THEN '(\w+)' WHEN s\.valor IS NOT NULL THEN '(\w+)' "
+        r"ELSE '(\w+)' END AS fuente", texto,
+    )
+    assert fuente and fuente.groups() == dom.ORDEN_FUENTES
+    nivel = re.search(
+        r"CASE WHEN m\.valor IS NOT NULL THEN '(\w+)' WHEN s\.valor IS NOT NULL THEN '(\w+)' "
+        r"ELSE '(\w+)' END AS nivel", texto,
+    )
+    assert nivel
+    esperado = tuple(dom.resolver_hipotesis("d", s, m)[1] for m, s in (("m", None), (None, "s"), (None, None)))
+    assert nivel.groups() == esperado
+    assert set(nivel.groups()) <= set(dom.NIVELES)
+
+
+def test_f140_r5_el_universo_obras_con_devengo_o_con_valor_manual() -> None:
+    texto = _hipotesis_obra()
+    assert "fo.obra_id IN (SELECT c.obra_id FROM tesoreria.devengo_corte_obra c)" in texto
+    assert "OR fo.clave_obra IN (SELECT x.clave_obra FROM tesoreria.hipotesis_caja_manual x)" in texto
+    assert "CROSS JOIN tesoreria.hipotesis_caja h" in texto
+    assert texto.rstrip().endswith("WHERE h.admite_obra;"), "solo las que admiten valor por obra"
+
+
+def test_f140_r5_d18_sigrid_solo_h09_h10_h11() -> None:
+    texto = _hipotesis_obra()
+    codigos = re.findall(r"'(H[0-9]{2})'::VARCHAR\(3\) AS codigo", texto)
+    assert tuple(codigos) == dom.CODIGOS_SIGRID
+    assert texto.count("FROM tesoreria.condiciones_contrato_cliente k") == 3
+
+
+def test_f140_r5_d18_sigrid_solo_si_el_valor_es_unico() -> None:
+    """Todos los contratos de la obra dan valor, y el mismo."""
+    texto = _hipotesis_obra()
+    assert texto.count(
+        "CASE WHEN count(*) = count(c.valor) AND count(DISTINCT c.valor) = 1 "
+        "THEN to_jsonb(min(c.valor)) END AS valor"
+    ) == 3
+
+
+def test_f140_r5_d18_de_donde_sale_cada_valor_sigrid() -> None:
+    texto = _hipotesis_obra()
+    assert (
+        "CASE WHEN k.formula_reconocida AND k.num_vencimientos = 1 "
+        "THEN k.dias_vencimientos[1] END AS valor"
+    ) in texto, "H09: un plazo único; varios vencimientos no son un valor"
+    assert "k.retencion_porcentaje AS valor" in texto, "H10"
+    assert "COALESCE(k.plazo_retencion_meses, k.plazo_garantia_meses) AS valor" in texto, "H11"
