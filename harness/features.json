@@ -2364,7 +2364,7 @@
         "Diccionario v61 con su comentario; `check-diccionario` OK tras publicar",
         "`bash harness/init.sh` en verde y APROBADO del reviewer; despliegue MANUAL en `progress/current.md`"
       ],
-      "status": "pending",
+      "status": "in_progress",
       "sdd": false,
       "rigor": "estandar",
       "priority": 1,

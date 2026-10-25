@@ -9,6 +9,56 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-24 · F-149 · `in_progress` (implementer) · rama `feature/F-149-mcp-sin-reglas-no-publicadas`
+
+- `sdd=false`, rigor `estandar`. Se trabaja en un worktree temporal de la rama (el árbol principal
+  lo usa el spec-author de F-140), con el venv del árbol principal enlazado como `.venv` (ignorado).
+- **T1 hecha** (`F-149 T1`): `tests/test_f149_mcp_sin_reglas_no_publicadas.py` en RED con los tres
+  textos (`contexto convenciones.identidad_sigrid`, `ficha compras.albaranes`, `ficha compras.facturas`).
+- **T2 hecha** (`F-149 T2`): los tres textos, v61 con su comentario, `docs/CONVENTIONS.md` (una frase).
+- **T3 hecha**: suite completa 8.782 passed / 283 skipped / 0 failed; mutación con ALCANCE VACÍO
+  (sin Python de producción); informe en `progress/impl_F-149.md`. `init.sh` final sobre `43e5554`:
+  exit 0, `ENTORNO LISTO`.
+- **Review pasada 1: CHANGES_REQUESTED** (`progress/review_F-149.md`, `af70115`). (1) El detector no
+  veía un código al principio de línea o tras un tabulador: la fila se serializaba a JSON y `
+` deja
+  la `R` sin frontera de palabra. **T5**: test nuevo en RED (`f938dae`) y `_texto` recorre las cadenas
+  DECODIFICADAS de la fila (también el JSON de `ficha` y `datos`) en vez de serializarla. (2) La
+  desviación 1 no nombraba `test_f006_copias.py`: corregido abajo.
+  `init.sh` sobre `40a44f3`: exit 0, `ENTORNO LISTO`, 8.783 passed. Lista para la pasada 2.
+- **Desviaciones, justificadas**:
+  1. Dos tests exigían que `identidad_sigrid` NOMBRARA `R-SIGRID-CON`, y F-149, pedida por el humano,
+     revoca justo eso: `tests/test_f147_contenido.py` R14 (R14 de F-147: «que remita a
+     `R-SIGRID-CON`») pasa a prohibir la cita y conserva el tope de 300 caracteres;
+     `tests/test_f006_copias.py` R26 («tiene que remitir a la regla») pasa a prohibir la cita, añade
+     que diga «guia interna del ETL» y conserva prohibido «viven en `con`» (no repetir la regla).
+  2. El worktree no tiene `.env` y `init.sh` lo exige (sección 5) y los tests de CLI lo leen. NO se
+     copió el `.env` real: se creó uno de MARCADOR, ignorado por git, con dos líneas sin secretos
+     (`SIGRID_API_BASE_URL=https://sigrid-api.invalid` y `SIGRID_API_FUNCTION_KEY=` vacía). Copiar
+     `.env.example` no valía: trae `SIGRID_API_TIMEOUT_S=300.0`, por encima del techo de 230, y tumba
+     23 tests de CLI (defecto previo de `.env.example`, fuera de alcance; anotado para el líder).
+- `azure-apps`: NO cambia. F-149 no toca lo que exponemos ni consumimos (ni objetos, ni columnas,
+  ni tablas de `_meta`); `datamart_seg_anual.md` ~l.220 dice «hoy `R-SIGRID-CON`» de las `fuera_mcp`,
+  y sigue siendo cierto.
+
+### F-149 · Despliegue MANUAL (tras APROBADO y merge a `main`; lo autoriza el humano)
+
+0. Tag que corre HOY el job: `r20261024-1837` (F-148). Vuelta atrás: `powershell -NoProfile -File
+   infra/85_update_job.ps1 -Tag r20261024-1837` (sin DDL: F-149 solo cambia texto del diccionario).
+1. `powershell -NoProfile -File infra/70_build_image.ps1` (anotar el tag nuevo).
+2. `powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag nuevo>` y comprobar que el job ya
+   apunta a ella: `az containerapp job show -n caj-datamart-seg-dev -g rg-datamart-seg-dev --query
+   "properties.template.containers[0].image" -o tsv` → acaba en `:<tag nuevo>`. ANTES de publicar
+   (memoria «publicar el diccionario solo con su imagen»: si no, la nocturna republica la v60).
+3. `.venv/Scripts/python.exe main.py publicar-diccionario` (v61; esperado `n_reglas` = 20, como v60).
+4. `.venv/Scripts/python.exe main.py check-diccionario` → OK.
+5. Reiniciar el MCP (cachea el diccionario). Leer ANTES la revisión activa:
+   `az containerapp show -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --query
+   properties.latestReadyRevisionName -o tsv` y reiniciar ESA:
+   `az containerapp revision restart -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --revision <revisión> -o none`.
+6. `contexto_bbdd()` abre con «Versión 61» y su texto NO contiene `R-SIGRID-CON`; `describir_tabla`
+   de `compras.facturas` y `compras.albaranes`: `codigo_obra_cabecera` dice «(`con.cod`)».
+
 ## 2026-10-24 · F-148 · CERRADA (`done`, orden del humano) · R31 MANUAL pendiente: 7 noches desde la del 25-10
 
 - El humano la cierra para liberar `in_progress` (F-149, F-140). **R31 sigue vivo**: cada mañana,

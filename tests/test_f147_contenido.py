@@ -415,10 +415,14 @@ def test_f147_r13_albaran_absurdo_conserva_lo_que_no_cambia() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_f147_r14_identidad_sigrid_es_una_entrada_corta_que_remite() -> None:
+def test_f147_r14_identidad_sigrid_es_una_entrada_corta_que_no_nombra_la_regla() -> None:
+    """R14 pedía que la entrada REMITIERA a `R-SIGRID-CON`. F-149 (petición del
+    humano del 2026-10-24) lo revoca: el bloque llega al MCP y la regla no, así
+    que nombrarla era citar algo que la IA no puede leer. Sigue siendo corta y
+    sigue diciendo que es guía del ETL (`tests/test_f149_*`)."""
     texto = str(_global()["convenciones"]["identidad_sigrid"])
 
-    assert "R-SIGRID-CON" in texto
+    assert "R-SIGRID-CON" not in texto
     assert len(normalizado(texto)) <= 300
 
 
