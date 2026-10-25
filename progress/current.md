@@ -59,6 +59,24 @@
 6. `contexto_bbdd()` abre con «Versión 61» y su texto NO contiene `R-SIGRID-CON`; `describir_tabla`
    de `compras.facturas` y `compras.albaranes`: `codigo_obra_cabecera` dice «(`con.cod`)».
 
+## 2026-10-25 · F-149 · CERRADA (`done`, APROBADO pasada 2, `2d2ced1`) · merge `8e666f9` · DESPLEGADA
+
+- Orden del humano (25-10). `init.sh` sobre `main`: 8.782 passed (único KO, «estás en main»).
+- Imagen `r20261025-0927` construida desde un worktree limpio de `main` y job a ella (comprobado).
+  v61 publicada (hash `143606a4bee2`, 20 reglas) y `check-diccionario` OK; MCP reiniciado
+  (`ca-mcp-bbdd-dev--0000023`): «Versión 61», 61.300 caracteres, sin `R-SIGRID-CON`.
+- Firewall: regla `puesto-pgris-2026-10-25` (la creó el humano; IP del puesto nueva).
+
+## R31 de F-148 · racha de noches sin corte
+
+- **Noche 1 · 25-10 · OK.** Una réplica, sin reintento (ningún paso repetido en el lote
+  `20261025T000021Z-e8fb62`), 0 FAILED en `ingest_raw%`. 4.846 páginas: `pg_connect_s` máx 0,06,
+  `copy_s` máx 0,7, 0 reintentos. Un hueco de **135,2 s en `http_s`** (`con` p93, 00:03): es
+  `sigrid-api`, no la conexión (hipótesis B); no rompe la racha (D6) y se remite a `sigrid-api`.
+  `conexiones_abiertas` = 385 (antes ~3.000). Permisos por paso: diez `apply_grants.tras_*` en
+  SUCCESS, 1,2-1,5 s cada uno (D4: muy por debajo de 30 s). Terminó a las 06:14 por ser domingo
+  (reconstrucción completa: `build_stg` 158 min, el domingo anterior 143).
+
 ## 2026-10-24 · F-148 · CERRADA (`done`, orden del humano) · R31 MANUAL pendiente: 7 noches desde la del 25-10
 
 - El humano la cierra para liberar `in_progress` (F-149, F-140). **R31 sigue vivo**: cada mañana,

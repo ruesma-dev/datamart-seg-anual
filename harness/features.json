@@ -2364,11 +2364,12 @@
         "Diccionario v61 con su comentario; `check-diccionario` OK tras publicar",
         "`bash harness/init.sh` en verde y APROBADO del reviewer; despliegue MANUAL en `progress/current.md`"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": false,
       "rigor": "estandar",
       "priority": 1,
-      "branch": "feature/F-149-mcp-sin-reglas-no-publicadas"
+      "branch": "feature/F-149-mcp-sin-reglas-no-publicadas",
+      "notes": "2026-10-25: CERRADA. Review APROBADO en pasada 2 (2d2ced1). Merge 8e666f9 por orden del humano; init.sh sobre main 8782 passed. Desplegada: imagen r20261025-0927, v61 publicada y MCP reiniciado; contexto_bbdd 61.300 caracteres, sin R-SIGRID-CON."
     }
   ]
 }
