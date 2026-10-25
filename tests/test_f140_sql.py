@@ -224,3 +224,204 @@ def test_f140_r5_setup_las_columnas_de_la_hipotesis_por_obra() -> None:
     assert _columnas("tesoreria.hipotesis_caja_obra") == [
         "obra_id", "empresa_id", "clave_obra", "codigo", "valor", "nivel", "fuente", "motivo",
     ]
+
+
+# ===========================================================================
+# 04 · las formas de pago y de cobro (R9)
+# ===========================================================================
+
+COLUMNAS_PLAZOS = [
+    "sentido", "forma_id", "codigo", "nombre", "medio_id", "medio", *COLUMNAS_FORMULA,
+    "fecha_baja",
+]
+
+
+def _alias_del_select(texto: str) -> list[str]:
+    """Los alias `AS x` del SELECT exterior, en orden, hasta su primer FROM."""
+    m = re.search(r"SELECT (.*?) FROM ", texto)
+    assert m
+    return re.findall(r" AS (\w+)(?=,|$)", m.group(1))
+
+
+def _ramas_plazos() -> list[str]:
+    compacto = _sin_comment_on(RUTA_PLAZOS)
+    ramas = compacto.split("UNION ALL")
+    assert len(ramas) == 2, "un UNION ALL de PAGO y COBRO"
+    return ramas
+
+
+def test_f140_r9_es_una_vista_que_se_reemplaza() -> None:
+    assert "CREATE OR REPLACE VIEW tesoreria.plazos_forma_pago AS" in _ejecutable(RUTA_PLAZOS)
+    assert "TABLE" not in _sin_comment_on(RUTA_PLAZOS).upper()
+
+
+@pytest.mark.parametrize("rama", [0, 1])
+def test_f140_r9_las_columnas_de_cada_rama(rama: int) -> None:
+    assert _alias_del_select(_ramas_plazos()[rama]) == COLUMNAS_PLAZOS
+
+
+@pytest.mark.parametrize(
+    ("rama", "sentido", "forma", "medio"),
+    [(0, "PAGO", "raw.auxpag", "raw.auxefp"), (1, "COBRO", "raw.auxcob", "raw.auxefc")],
+)
+def test_f140_r9_cada_sentido_con_su_catalogo(rama, sentido, forma, medio) -> None:
+    texto = _ramas_plazos()[rama]
+    assert f"'{sentido}'" in texto
+    assert f"FROM {forma} f LEFT JOIN {medio} m ON m.ide = NULLIF(f.efeide, 0)" in texto
+    assert "WHERE" not in texto, "sin filtro: las de baja se publican con su fecha"
+
+
+@pytest.mark.parametrize("rama", [0, 1])
+def test_f140_r9_la_formula_verbatim_y_leida_con_las_funciones(rama: int) -> None:
+    texto = _ramas_plazos()[rama]
+    assert "f.formul AS plazo_formula" in texto
+    assert "tesoreria.fn_plazo_dias(f.formul) AS dias_vencimientos" in texto
+    assert "cardinality(tesoreria.fn_plazo_dias(f.formul)) AS num_vencimientos" in texto
+    assert "tesoreria.fn_plazo_dias_retencion(f.formul) AS dias_retencion" in texto
+    assert "tesoreria.fn_plazo_reconocido(f.formul) AS formula_reconocida" in texto
+    assert "tesoreria.fn_fecha(f.fecbaj) AS fecha_baja" in texto
+
+
+# ===========================================================================
+# 05 · las condiciones del contrato de compra (R10)
+# ===========================================================================
+
+def _insert(ruta: Path, tabla: str) -> tuple[list[str], str]:
+    """Las columnas del INSERT y el SELECT que lo llena."""
+    compacto = _sin_comment_on(ruta)
+    m = re.search(rf"INSERT INTO {re.escape(tabla)} \((.*?)\) (SELECT .*?);", compacto)
+    assert m, f"falta el INSERT de {tabla}"
+    return [c.strip() for c in m.group(1).split(",")], m.group(2)
+
+
+@pytest.mark.parametrize(
+    ("ruta", "tabla"),
+    [(RUTA_COMPRA, "tesoreria.condiciones_contrato_compra"),
+     (RUTA_CLIENTE, "tesoreria.condiciones_contrato_cliente")],
+    ids=["compra", "cliente"],
+)
+def test_f140_r10_r11_truncate_e_insert_en_el_orden_del_setup(ruta, tabla) -> None:
+    compacto = _ejecutable(ruta)
+    assert compacto.index(f"TRUNCATE {tabla};") < compacto.index(f"INSERT INTO {tabla} (")
+    columnas, select = _insert(ruta, tabla)
+    assert columnas == _columnas(tabla)
+    assert _alias_del_select(select) == columnas, "cada expresión con el alias de su columna"
+    sin_comentarios = _sin_comment_on(ruta).upper()
+    assert "CREATE" not in sin_comentarios and "DROP" not in sin_comentarios
+
+
+def test_f140_r10_sin_terceros_empleados() -> None:
+    """R10: un tercero empleado (`con.tip = 43`) no se publica (medido: 0)."""
+    _cols, select = _insert(RUTA_COMPRA, "tesoreria.condiciones_contrato_compra")
+    assert "LEFT JOIN raw.con t ON t.ide = NULLIF(c.entide, 0)" in select
+    assert select.endswith("WHERE t.tip IS DISTINCT FROM 43")
+
+
+def test_f140_r10_la_garantia_por_clase_4_y_5() -> None:
+    """D8-A: clase 4 o 5 de `ctrrec.reccla` (criterio de F-128), la de menor `pos`."""
+    _cols, select = _insert(RUTA_COMPRA, "tesoreria.condiciones_contrato_compra")
+    assert "WHERE r.docide = c.ide AND r.reccla IN (4, 5) ORDER BY r.pos, r.ide LIMIT 1" in select
+    assert "ROUND((r.valpor * 100)::NUMERIC, 4) AS porcentaje" in select
+    assert "'RET%'" not in select, "no el criterio por código de F-067"
+
+
+def test_f140_r10_la_forma_de_pago_y_los_dias_del_proveedor() -> None:
+    _cols, select = _insert(RUTA_COMPRA, "tesoreria.condiciones_contrato_compra")
+    assert "LEFT JOIN raw.auxpag f ON f.ide = NULLIF(c.pagide, 0)" in select
+    assert "LEFT JOIN raw.prv prv ON prv.ide = NULLIF(c.entide, 0)" in select
+    assert "NULLIF(btrim(prv.pagdia), '') AS proveedor_dias_fijos_pago" in select
+    assert "NULLIF(btrim(prv.pagmes), '') AS proveedor_meses_sin_pago" in select
+    for expresion in ("f.formul AS plazo_formula",
+                      "tesoreria.fn_plazo_reconocido(f.formul) AS formula_reconocida"):
+        assert expresion in select
+
+
+def test_f140_r10_importes_base_e_iva_tal_cual() -> None:
+    _cols, select = _insert(RUTA_COMPRA, "tesoreria.condiciones_contrato_compra")
+    assert "c.totbas::NUMERIC(18, 2) AS importe_base" in select
+    assert "c.totiva::NUMERIC(18, 2) AS importe_iva" in select
+
+
+def test_f140_r10_el_estado_con_el_tipo_del_contrato() -> None:
+    _cols, select = _insert(RUTA_COMPRA, "tesoreria.condiciones_contrato_compra")
+    assert "LEFT JOIN raw.conest ce ON ce.tip = 44 AND ce.est = con.est" in select
+
+
+# ===========================================================================
+# 06 · las condiciones del contrato con el cliente (R11)
+# ===========================================================================
+
+def test_f140_r11_desde_obrctr_con_la_forma_de_cobro() -> None:
+    _cols, select = _insert(RUTA_CLIENTE, "tesoreria.condiciones_contrato_cliente")
+    assert "FROM raw.obrctr o" in select
+    assert "LEFT JOIN raw.auxcob f ON f.ide = NULLIF(o.pagide, 0)" in select
+    assert "LEFT JOIN raw.auxefc m ON m.ide = NULLIF(f.efeide, 0)" in select
+    assert "WHERE" not in select, "todos los contratos con el cliente"
+
+
+def test_f140_r11_la_retencion_coegar_y_si_no_la_de_retide() -> None:
+    _cols, select = _insert(RUTA_CLIENTE, "tesoreria.condiciones_contrato_cliente")
+    assert (
+        "CASE WHEN COALESCE(o.coegar, 0) <> 0 THEN ROUND(o.coegar::NUMERIC, 4) "
+        "WHEN r.ide IS NOT NULL THEN ROUND((r.valpor * 100)::NUMERIC, 4) END "
+        "AS retencion_porcentaje" in select
+    )
+    assert (
+        "CASE WHEN COALESCE(o.coegar, 0) <> 0 THEN 'COEGAR' "
+        "WHEN r.ide IS NOT NULL THEN 'RECARGO' END AS retencion_fuente" in select
+    )
+    assert "LEFT JOIN raw.rec r ON r.ide = NULLIF(o.retide, 0)" in select
+
+
+def test_f140_r11_plazos_a_cero_son_nulos_y_la_fecha_tal_cual() -> None:
+    _cols, select = _insert(RUTA_CLIENTE, "tesoreria.condiciones_contrato_cliente")
+    assert "NULLIF(o.plaret, 0) AS plazo_retencion_meses" in select
+    assert "NULLIF(o.plagar, 0) AS plazo_garantia_meses" in select
+    assert "tesoreria.fn_fecha(o.fecinigar) AS fecha_inicio_garantia" in select
+
+
+# ===========================================================================
+# R6, R16, R18 · lo que el SQL nuevo NO hace
+# ===========================================================================
+
+@pytest.mark.parametrize("ruta", NUEVOS, ids=lambda r: r.name)
+def test_f140_r16_sin_aritmetica_de_fechas(ruta: Path) -> None:
+    """Sumar un plazo a una fecha es convertir a caja: no se hace en el ETL."""
+    texto = _sin_comment_on(ruta).lower()
+    for prohibido in ("interval", "make_interval", "date_add", "+ f.", "+ dias"):
+        assert prohibido not in texto, f"{ruta.name}: {prohibido}"
+
+
+@pytest.mark.parametrize("ruta", NUEVOS, ids=lambda r: r.name)
+def test_f140_r6_ningun_valor_de_hipotesis_se_aplica(ruta: Path) -> None:
+    """Solo `08` lee las hipótesis, y no hace cuentas con ellas."""
+    texto = _sin_comment_on(ruta)
+    if ruta == RUTA_HIPOTESIS_OBRA:
+        sin_conteos = re.sub(r"count\(\*\)|SELECT \*", "", texto, flags=re.IGNORECASE)
+        assert not re.search(r"[*/]|\s[+-]\s", sin_conteos), "08 no hace aritmética"
+    else:
+        assert "hipotesis" not in texto.lower(), f"{ruta.name} no lee hipótesis"
+
+
+@pytest.mark.parametrize("ruta", NUEVOS, ids=lambda r: r.name)
+@pytest.mark.parametrize(
+    "prohibido",
+    [r"raw\.pag\b", r"raw\.cob\b", r"tesoreria_restringida", r"raw\.emp\b",
+     r"raw\.hmores\b", r"\bpersonal\."],
+)
+def test_f140_r18_lo_de_personal_no_se_lee(ruta: Path, prohibido: str) -> None:
+    assert not re.search(prohibido, _sin_comment_on(ruta)), f"{ruta.name}: {prohibido}"
+
+
+@pytest.mark.parametrize("ruta", NUEVOS, ids=lambda r: r.name)
+def test_f140_sin_grants_ni_drop(ruta: Path) -> None:
+    ejecutable = _ejecutable(ruta).upper()
+    assert not re.search(r"\b(GRANT|REVOKE)\b", ejecutable)
+    assert "DROP " not in ejecutable
+
+
+@pytest.mark.parametrize("ruta", NUEVOS, ids=lambda r: r.name)
+def test_f140_la_cabecera_dice_su_ruta_lo_que_lee_y_lo_que_escribe(ruta: Path) -> None:
+    texto = _sql(ruta)
+    assert texto.startswith(f"-- etl_sigrid/infrastructure/postgres/sql/tesoreria/{ruta.name}")
+    assert "-- Lee de:" in texto and "-- Escribe en:" in texto
