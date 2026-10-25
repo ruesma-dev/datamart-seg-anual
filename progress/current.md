@@ -9,6 +9,17 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-25 · F-140 · `in_progress` (implementer) · rama `feature/F-140-proyeccion-caja-ingredientes`
+
+- Decisiones D1-D19 cerradas por el humano el 2026-10-25: todas A, D10 incluida (cascada con
+  `obra_via`). Rigor `estandar`. Diccionario v61 -> v62. Informe: `progress/impl_F-140.md`.
+- Tarea en curso: T1 (dominio: formula y partida).
+- Calibracion de solo lectura (2026-10-25, Azure): el universo de (obra, concepto) es el de
+  CUALQUIER mes planificado posterior al ultimo cierre real, incluidas las obras sin real (1 de
+  coste y 2 de venta): 21 y 21, 113,98 y 115,43 M EUR, como `progress/spec_F-140.md` §2. Plan
+  restante, intervalo, ejecutado, adelantado, retrasado y pendiente por tipo de V casan al
+  centimo de M EUR con §5.
+
 ## 2026-10-24 · F-140 · `spec_ready` (spec-author, REHECHA) · rama `feature/F-140-proyeccion-caja-ingredientes`
 
 - Spec rehecha con las indicaciones del humano del 24-10: `specs/F-140-proyeccion-caja-ingredientes/`
