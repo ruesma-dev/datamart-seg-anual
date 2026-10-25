@@ -3,7 +3,7 @@ Revisión incremental desde af70115 (pasada 2) · `git diff af70115..5e09b8b` ·
 
 # F-149 · Review · lo que sirve el MCP no nombra reglas que no se publican
 
-- **Veredicto: APPROVED** (los dos cambios de la pasada 1, resueltos; init.sh en verde)**
+- **Veredicto: APPROVED** (los dos cambios de la pasada 1, resueltos; init.sh en verde)
 - **Nivel de rigor:** `estandar`, declarado en `harness/features.json`: fase RED, cobertura de
   líneas cambiadas y campaña de mutación (sin cero supervivientes obligatorio).
 - `sdd=false`: se valida contra los tres `acceptance`; lo que depende de `tasks.md` es N/A.
