@@ -25,6 +25,7 @@
   la `R` sin frontera de palabra. **T5**: test nuevo en RED (`f938dae`) y `_texto` recorre las cadenas
   DECODIFICADAS de la fila (también el JSON de `ficha` y `datos`) en vez de serializarla. (2) La
   desviación 1 no nombraba `test_f006_copias.py`: corregido abajo.
+  `init.sh` sobre `40a44f3`: exit 0, `ENTORNO LISTO`, 8.783 passed. Lista para la pasada 2.
 - **Desviaciones, justificadas**:
   1. Dos tests exigían que `identidad_sigrid` NOMBRARA `R-SIGRID-CON`, y F-149, pedida por el humano,
      revoca justo eso: `tests/test_f147_contenido.py` R14 (R14 de F-147: «que remita a

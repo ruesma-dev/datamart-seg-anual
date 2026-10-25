@@ -143,7 +143,7 @@ Nada se ha ejecutado contra Azure ni Sigrid.
 |---|---|---|
 | Tests propios de F-149 | **14 passed** en 3,53 s (RED T1: 4 failed, 9 passed; RED T5: 1 failed) | `pytest tests/test_f149_mcp_sin_reglas_no_publicadas.py` |
 | Suite completa | **8.782 passed, 283 skipped, 0 failed** en 1.112,30 s (18 min 32 s) | `pytest tests -q`, sin `-x`, tras el último cambio de tests (`fa8c04a`) |
-| `init.sh` final | **exit 0, `ENTORNO LISTO`**, 8.782 passed / 283 skipped | `bash harness/init.sh` sobre `43e5554` |
+| `init.sh` final | **exit 0, `ENTORNO LISTO`**, 8.783 passed / 283 skipped (pasada 1: 8.782) | `bash harness/init.sh` sobre `40a44f3` |
 | Cobertura de líneas cambiadas | **N/A**: «F-149 no cambia líneas Python de producción frente a main» | `PUERTA COBERTURA` de `init.sh` |
 | Mutación | **0 mutantes: ALCANCE VACÍO**, «ni una línea de producción que mutar»; la herramienta no escribe `progress/mutacion_F-149.md` a propósito | `python -m harness.mutacion --feature F-149` |
 | Tiempo de la suite | 1.112,30 s sin cobertura; 3.296,99 s con cobertura dentro de `init.sh` | línea final de pytest |
@@ -161,3 +161,6 @@ positivos (`raw`, la propia `fuera_mcp`, una cita a regla publicada).
 - Final (sobre `43e5554`, con este informe ya commiteado): **exit 0, `ENTORNO LISTO`**; pytest con
   cobertura `8782 passed, 283 skipped` en 3.296,99 s (54 min 56 s; la máquina iba cargada);
   `PUERTA COBERTURA: N/A`; `PUERTA TAMAÑO` OK (impl 134/220); único aviso, ruff 275 (deuda previa).
+- Tras la review pasada 1 (sobre `40a44f3`, con este informe ya commiteado): **exit 0, `ENTORNO
+  LISTO`**; pytest con cobertura `8783 passed, 283 skipped` en 2.456,53 s (40 min 56 s; el test
+  nuevo suma uno); `PUERTA COBERTURA: N/A`; `PUERTA TAMAÑO` OK (impl 163/220, review 112/140).
