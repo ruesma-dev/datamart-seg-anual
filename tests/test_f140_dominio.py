@@ -228,3 +228,62 @@ def test_f140_r16_el_patron_no_caza_los_ingredientes(columna: str) -> None:
 
 def test_f140_r16_el_patron_es_un_regex_valido() -> None:
     re.compile(dom.PATRON_COLUMNA_DE_CAJA)
+
+
+# ===========================================================================
+# R17 · la obra de un efecto sin centro (D10-A, la cascada)
+# ===========================================================================
+
+from etl_sigrid.domain import tesoreria as dom_tes  # noqa: E402
+from etl_sigrid.domain.tesoreria import obra_del_efecto  # noqa: E402
+
+
+def test_f140_r17_las_vias_y_su_orden() -> None:
+    assert dom_tes.VIA_CENTRO == "CENTRO"
+    assert dom_tes.VIA_CONTRATO == "CONTRATO"
+    assert dom_tes.VIA_FACTURA_CABECERA == "FACTURA_CABECERA"
+    assert dom_tes.VIA_FACTURA_LINEAS == "FACTURA_LINEAS"
+    assert dom_tes.VIAS_EN_ORDEN == (
+        "CENTRO", "CONTRATO", "FACTURA_CABECERA", "FACTURA_LINEAS"
+    )
+
+
+def test_f140_r17_el_centro_con_obra_manda() -> None:
+    assert obra_del_efecto(7, True, [8], 9, [10]) == (7, "CENTRO")
+
+
+def test_f140_r17_el_centro_sin_obra_no_sigue_la_cascada() -> None:
+    """Un centro que no es obra (estructura, delegación) dice que NO es de obra."""
+    assert obra_del_efecto(None, True, [8], 9, [10]) == (None, None)
+
+
+def test_f140_r17_sin_centro_el_contrato_unico() -> None:
+    assert obra_del_efecto(None, False, [8, 8], 9, [10]) == (8, "CONTRATO")
+
+
+def test_f140_r17_dos_obras_de_contrato_no_deciden() -> None:
+    assert obra_del_efecto(None, False, [8, 11], 9, [10]) == (9, "FACTURA_CABECERA")
+
+
+def test_f140_r17_sin_contrato_la_cabecera() -> None:
+    assert obra_del_efecto(None, False, [], 9, [10]) == (9, "FACTURA_CABECERA")
+
+
+@pytest.mark.parametrize("cabecera", [None, 0])
+def test_f140_r17_sin_cabecera_las_lineas_si_son_una_obra(cabecera) -> None:
+    assert obra_del_efecto(None, False, [], cabecera, [10, 10, None]) == (10, "FACTURA_LINEAS")
+
+
+def test_f140_r17_lineas_de_varias_obras_no_deciden() -> None:
+    assert obra_del_efecto(None, False, [], None, [10, 12]) == (None, None)
+
+
+def test_f140_r17_nada_que_mirar() -> None:
+    assert obra_del_efecto(None, False, [], None, []) == (None, None)
+
+
+def test_f140_r17_los_ceros_y_nulos_no_son_obra() -> None:
+    """`NULLIF(x, 0)` del SQL: un 0 de Sigrid es «sin obra»."""
+    assert obra_del_efecto(None, False, [0, None], 0, [0]) == (None, None)
+    assert obra_del_efecto(None, False, [0, 8], None, []) == (8, "CONTRATO")
+    assert obra_del_efecto(0, True, [8], 9, [10]) == (None, None)

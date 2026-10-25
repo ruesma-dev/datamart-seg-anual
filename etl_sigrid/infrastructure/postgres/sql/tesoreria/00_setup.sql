@@ -137,6 +137,11 @@ CREATE INDEX IF NOT EXISTS idx_tesr_efe_obra      ON tesoreria_restringida.efect
 CREATE INDEX IF NOT EXISTS idx_tesr_efe_documento ON tesoreria_restringida.efectos (documento_id);
 CREATE INDEX IF NOT EXISTS idx_tesr_efe_remesa    ON tesoreria_restringida.efectos (remesa_id);
 
+-- F-140 (D10-A): por que via se asigno la obra (CENTRO, CONTRATO,
+-- FACTURA_CABECERA, FACTURA_LINEAS). Con ALTER, como F-101: queda AL FINAL en
+-- la base de hoy y en una nueva, y `compras.vencimientos` no la ve.
+ALTER TABLE tesoreria_restringida.efectos ADD COLUMN IF NOT EXISTS obra_via VARCHAR(16);
+
 
 -- ---------------------------------------------------------------------------
 -- tesoreria.efectos — LA CARTERA GENERAL (R10, R11)
@@ -199,6 +204,9 @@ CREATE INDEX IF NOT EXISTS idx_tes_efe_tercero   ON tesoreria.efectos (tercero_i
 CREATE INDEX IF NOT EXISTS idx_tes_efe_obra      ON tesoreria.efectos (obra_id);
 CREATE INDEX IF NOT EXISTS idx_tes_efe_documento ON tesoreria.efectos (documento_id);
 CREATE INDEX IF NOT EXISTS idx_tes_efe_remesa    ON tesoreria.efectos (remesa_id);
+
+-- F-140 (D10-A): la misma columna, al final, copiada de la completa por `02`.
+ALTER TABLE tesoreria.efectos ADD COLUMN IF NOT EXISTS obra_via VARCHAR(16);
 
 
 -- ---------------------------------------------------------------------------

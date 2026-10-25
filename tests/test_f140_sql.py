@@ -425,3 +425,91 @@ def test_f140_la_cabecera_dice_su_ruta_lo_que_lee_y_lo_que_escribe(ruta: Path) -
     texto = _sql(ruta)
     assert texto.startswith(f"-- etl_sigrid/infrastructure/postgres/sql/tesoreria/{ruta.name}")
     assert "-- Lee de:" in texto and "-- Escribe en:" in texto
+
+
+# ===========================================================================
+# R17 · la cascada de obra de los efectos (D10-A)
+# ===========================================================================
+
+from etl_sigrid.domain import tesoreria as dom_tes  # noqa: E402
+
+RUTA_COMPLETO = DIR_TESORERIA / "01_efectos_completo.sql"
+RUTA_GENERAL = DIR_TESORERIA / "02_efectos_general.sql"
+
+
+def _rama_efectos(nombre: str) -> str:
+    ramas = _sin_comment_on(RUTA_COMPLETO).split("UNION ALL")
+    assert len(ramas) == 2
+    return ramas[0] if nombre == "PAGO" else ramas[1]
+
+
+def test_f140_r17_las_dos_carteras_ganan_obra_via_al_final() -> None:
+    compacto = _ejecutable(RUTA_SETUP)
+    for tabla in ("tesoreria_restringida.efectos", "tesoreria.efectos"):
+        assert f"ALTER TABLE {tabla} ADD COLUMN IF NOT EXISTS obra_via VARCHAR(16);" in compacto
+    assert "obra_via" not in _cuerpo_tabla_efectos("tesoreria.efectos"), (
+        "va con ALTER, como F-101: al final en una base nueva y en la de hoy"
+    )
+
+
+def _cuerpo_tabla_efectos(tabla: str) -> str:
+    m = re.search(rf"CREATE TABLE IF NOT EXISTS {re.escape(tabla)} \((.*?)\);",
+                  _ejecutable(RUTA_SETUP))
+    assert m
+    return m.group(1)
+
+
+def test_f140_r17_los_insert_terminan_en_obra_via() -> None:
+    for ruta, tabla in ((RUTA_COMPLETO, "tesoreria_restringida.efectos"),
+                        (RUTA_GENERAL, "tesoreria.efectos")):
+        m = re.search(rf"INSERT INTO {re.escape(tabla)} \((.*?)\)", _ejecutable(ruta))
+        assert m
+        assert [c.strip() for c in m.group(1).split(",")][-1] == "obra_via", ruta.name
+    assert _sin_comment_on(RUTA_COMPLETO).rstrip().split("FROM marcados m")[0].rstrip().endswith(
+        "m.obra_via"
+    )
+    general = _sin_comment_on(RUTA_GENERAL)
+    assert "r.previsto_antiguo, r.obra_via FROM tesoreria_restringida.efectos r" in general
+
+
+def test_f140_r17_el_case_lleva_las_vias_del_dominio_en_su_orden() -> None:
+    pago = _rama_efectos("PAGO")
+    assert (
+        "CASE WHEN oc.obra_id IS NOT NULL THEN oc.obra_id "
+        "WHEN f.obra_cabecera IS NOT NULL THEN f.obra_cabecera "
+        "WHEN ol.obra_id IS NOT NULL THEN ol.obra_id END AS obra_id"
+    ) in pago
+    via = re.search(r"CASE WHEN oc\.obra_id IS NOT NULL THEN '(\w+)' "
+                    r"WHEN f\.obra_cabecera IS NOT NULL THEN '(\w+)' "
+                    r"WHEN ol\.obra_id IS NOT NULL THEN '(\w+)' END AS obra_via", pago)
+    assert via, "la vía de la cascada"
+    assert via.groups() == dom_tes.VIAS_EN_ORDEN[1:]
+
+
+def test_f140_r17_el_centro_manda_y_sin_obra_corta_la_cascada() -> None:
+    pago = _rama_efectos("PAGO")
+    assert (
+        "LEFT JOIN obra_documento od ON od.documento_id = NULLIF(p.conide, 0) "
+        "AND COALESCE(p.cenide, 0) = 0"
+    ) in pago, "solo sin centro se mira el documento"
+    assert "COALESCE(cc.obra_id, od.obra_id) AS obra_id" in pago
+    assert (
+        f"CASE WHEN cc.obra_id IS NOT NULL THEN '{dom_tes.VIA_CENTRO}' ELSE od.obra_via END "
+        "AS obra_via"
+    ) in pago
+
+
+def test_f140_r17_los_cobros_solo_por_el_centro() -> None:
+    """Sin documento de venta (F-040) no hay cascada en los cobros."""
+    cobro = _rama_efectos("COBRO")
+    assert "cc.obra_id AS obra_id" in cobro
+    assert f"CASE WHEN cc.obra_id IS NOT NULL THEN '{dom_tes.VIA_CENTRO}' END AS obra_via" in cobro
+    assert "obra_documento" not in cobro
+
+
+def test_f140_r17_solo_obras_de_verdad_y_un_conjunto_de_varias_no_decide() -> None:
+    pago = _rama_efectos("PAGO")
+    assert pago.count("JOIN raw.obr ") == 3, "contrato, cabecera y líneas: obras de raw.obr"
+    assert pago.count("CASE WHEN count(DISTINCT ob.ide) = 1 THEN min(ob.ide) END AS obra_id") == 2
+    assert "AND COALESCE(p.cenide, 0) = 0" in pago.split("efectos AS (")[0]
+    assert "OR k.ide = l.docoriide" in pago, "contratos de la cabecera y de las líneas"

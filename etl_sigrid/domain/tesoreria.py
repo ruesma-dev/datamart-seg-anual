@@ -192,3 +192,55 @@ def es_previsto_antiguo(estado: str, vencimiento: date | None, fecha_build: date
         and vencimiento is not None
         and vencimiento < fecha_limite_previsto_antiguo(fecha_build)
     )
+
+
+# ---------------------------------------------------------------------------
+# F-140 (D10-A) · la obra de un efecto sin centro: la cascada de documento
+# ---------------------------------------------------------------------------
+
+#: Por qué vía se asignó la obra del efecto (`obra_via`), en orden de precedencia.
+VIA_CENTRO = "CENTRO"
+VIA_CONTRATO = "CONTRATO"
+VIA_FACTURA_CABECERA = "FACTURA_CABECERA"
+VIA_FACTURA_LINEAS = "FACTURA_LINEAS"
+VIAS_EN_ORDEN: tuple[str, ...] = (
+    VIA_CENTRO, VIA_CONTRATO, VIA_FACTURA_CABECERA, VIA_FACTURA_LINEAS,
+)
+
+
+def _obra_unica(obras) -> int | None:
+    """La obra si el conjunto (sin 0 ni `None`) tiene UNA sola; si no, `None`."""
+    distintas = {o for o in obras if _informado(o)}
+    return next(iter(distintas)) if len(distintas) == 1 else None
+
+
+def obra_del_efecto(
+    obra_centro: int | None,
+    tiene_centro: bool,
+    obras_contrato,
+    obra_cabecera: int | None,
+    obras_lineas,
+) -> tuple[int | None, str | None]:
+    """`(obra, via)` de un efecto, con la cascada de F-140 (R17, D10-A).
+
+    Mismo orden que el `CASE` de `01_efectos_completo.sql`:
+
+    1. Con centro de coste, el centro decide: su obra (`CENTRO`) o, si el
+       centro no es una obra (estructura, delegación), NINGUNA: un centro que
+       no es obra dice que el gasto no es de obra, y la cascada no lo enmienda.
+    2. Sin centro, la obra de los contratos de la factura si es UNA sola
+       (`CONTRATO`); la de su cabecera (`FACTURA_CABECERA`); la de sus líneas
+       si es UNA sola (`FACTURA_LINEAS`). Un conjunto con más de una obra no
+       decide y pasa al escalón siguiente.
+    """
+    if tiene_centro:
+        return (obra_centro, VIA_CENTRO) if _informado(obra_centro) else (None, None)
+    obra = _obra_unica(obras_contrato)
+    if obra is not None:
+        return obra, VIA_CONTRATO
+    if _informado(obra_cabecera):
+        return obra_cabecera, VIA_FACTURA_CABECERA
+    obra = _obra_unica(obras_lineas)
+    if obra is not None:
+        return obra, VIA_FACTURA_LINEAS
+    return None, None
