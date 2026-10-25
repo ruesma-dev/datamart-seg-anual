@@ -169,7 +169,7 @@ def test_f090_r24_la_ficha_de_gra_da_las_exclusiones() -> None:
 
 
 def test_f090_r24_raw_yaml_cuenta_76() -> None:
-    assert "Son 76 tablas" in (DIR_DICCIONARIO / "raw.yaml").read_text(encoding="utf-8")
+    assert "Son 78 tablas" in (DIR_DICCIONARIO / "raw.yaml").read_text(encoding="utf-8")
 
 
 def test_f090_r24_global_version_y_recuento() -> None:
@@ -177,7 +177,7 @@ def test_f090_r24_global_version_y_recuento() -> None:
     assert int(glob["version"]) >= 48, "F-090 sube la versión del diccionario"
     texto = (DIR_DICCIONARIO / "00_global.yaml").read_text(encoding="utf-8")
     assert "version 48 (F-090" in texto
-    assert "las 76 tablas" in texto
+    assert "las 78 tablas" in texto  # +2 de F-138, +2 de F-140
     assert glob["pendientes"] == []
 
 
@@ -185,7 +185,7 @@ def test_f090_r24_global_version_y_recuento() -> None:
 # R25 · ARCHITECTURE y azure-apps
 # ===========================================================================
 
-DATOS_DOCUMENTOS = ("76 tablas", "F-090", "`gra`", "`rcg`", "compras.documento_adjuntos",
+DATOS_DOCUMENTOS = ("78 tablas", "F-090", "`gra`", "`rcg`", "compras.documento_adjuntos",
                     "ruesma_rep", "documents/read", "sigrid-api")
 
 

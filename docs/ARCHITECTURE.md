@@ -503,9 +503,9 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
   Azure. Hoy **lee y valida, no carga** a `aux.*`: las tablas destino y el
   esquema de los libros no están definidos todavía.
 
-### Qué se copia de Sigrid: 76 tablas, y qué NO está ahí (F-066, F-074, F-080, F-102, F-107, F-095, F-085, F-090, F-138)
+### Qué se copia de Sigrid: 78 tablas, y qué NO está ahí (F-066, F-074, F-080, F-102, F-107, F-095, F-085, F-090, F-138, F-140)
 
-`config/tables_sigrid.yaml` declara **76 tablas**: eran 31, F-066 las dejó en 56
+`config/tables_sigrid.yaml` declara **78 tablas**: eran 31, F-066 las dejó en 56
 el 2026-09-06, F-074 sumó nueve más el 2026-09-09, F-080 otras tres el
 2026-09-11 —`auxnap`, `auxban` y `rpa`, el bloque de pago del efecto y las
 remesas—, F-102 una el 2026-09-23 —`auxemp`, las 38 empresas del grupo, que da
@@ -532,7 +532,11 @@ adjuntos de personal) y **sin binario** (`gra` sin `ima`, `pul`, `tex` ni
 familias** (falla cerrada ante una familia nueva) que deja fuera la 43,
 empleados. Además de recuperar la columna `con.tex` (el memo del documento,
 informado en el 65,5 % de las facturas; traerlo cuesta +26 % de tiempo de
-lectura sobre `con`, medio minuto de la ventana nocturna).
+lectura sobre `con`, medio minuto de la ventana nocturna). F-140 suma las dos
+últimas el 2026-10-25, `auxcob` (las 52 formas de COBRO, a donde apunta
+`obrctr.pagide`) y `auxefc` (sus 8 medios): la pareja de `auxpag`/`auxefp` en el
+lado del cliente, enteras y con `tiemod`, para leer la fórmula de plazo del
+contrato con el cliente (`tesoreria.plazos_forma_pago`).
 Las 25 que entraron el primer día vienen en tres grupos, y ninguna se supuso: todo lo
 que sigue se midió contra Sigrid ese día por `sigrid-api` en solo lectura.
 

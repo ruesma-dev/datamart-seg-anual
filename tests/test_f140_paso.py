@@ -198,3 +198,56 @@ def test_f140_r20_la_lectura_sigue_en_el_sql_y_no_en_depends_on() -> None:
     assert "JOIN stg.plan_mensual pm ON" in texto
     assert "FROM mart.fact_seguimiento_mensual f" in texto
     assert _paso().depends_on == ["ingest_raw"], "la noche normal no cambia"
+
+
+# ===========================================================================
+# R21 · la ingesta de las formas de cobro (D7-A)
+# ===========================================================================
+
+import yaml  # noqa: E402
+
+RUTA_TABLAS = RAIZ / "config" / "tables_sigrid.yaml"
+RUTA_RAW_YAML = RAIZ / "config" / "diccionario" / "raw.yaml"
+
+
+def _tablas_ingesta() -> list[dict]:
+    return yaml.safe_load(RUTA_TABLAS.read_text(encoding="utf-8"))["tables"]
+
+
+@pytest.mark.parametrize("tabla", ["auxcob", "auxefc"])
+def test_f140_r21_las_formas_de_cobro_entran_como_las_de_pago(tabla: str) -> None:
+    """Mismo trato que `auxpag`/`auxefp`: enteras, con `tiemod` y la lista estándar."""
+    por_nombre = {t["source_table"]: t for t in _tablas_ingesta()}
+    entrada = por_nombre[tabla]
+    pareja = por_nombre[{"auxcob": "auxpag", "auxefc": "auxefp"}[tabla]]
+    assert entrada["target_table"] == tabla
+    assert entrada["id_column"] == "ide"
+    assert entrada["incremental_column"] == "tiemod"
+    assert entrada["where"] is None
+    assert entrada["exclude_columns"] == pareja["exclude_columns"]
+
+
+def test_f140_r21_el_censo_pasa_a_78() -> None:
+    nombres = [t["source_table"] for t in _tablas_ingesta()]
+    assert len(nombres) == 78
+    assert len(set(nombres)) == 78, "tabla declarada dos veces"
+
+
+def test_f140_r21_el_comentario_dice_cifras_y_para_que() -> None:
+    texto = RUTA_TABLAS.read_text(encoding="utf-8")
+    for tabla, cifras in (("auxcob", ("F-140", "52 filas", "04_plazos_forma_pago.sql",
+                                      "06_condiciones_contrato_cliente.sql")),
+                          ("auxefc", ("F-140", "8 filas", "auxcob.efeide"))):
+        bloque = texto.split(f"- source_table: {tabla}\n", 1)[1].split("- source_table:", 1)[0]
+        for dato in cifras:
+            assert dato in bloque, f"el comentario de {tabla} no dice «{dato}»"
+
+
+@pytest.mark.parametrize("tabla", ["auxcob", "auxefc"])
+def test_f140_r21_las_fichas_de_raw(tabla: str) -> None:
+    raw = yaml.safe_load(RUTA_RAW_YAML.read_text(encoding="utf-8"))["objetos"]
+    ficha = raw[tabla]
+    assert ficha["clave_negocio"] == ["ide"]
+    assert ficha["paso_etl"] == "ingest_raw"
+    assert ficha["consumo_recomendado"] is False
+    assert "F-140" in ficha["descripcion"]

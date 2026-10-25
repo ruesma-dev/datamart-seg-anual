@@ -2,7 +2,7 @@
 #
 # Fichas del esquema `raw`: la copia de Sigrid, tabla a tabla.
 #
-# **A NIVEL DE OBJETO, NO DE COLUMNA** (DA-2 de la spec). Son 76 tablas con
+# **A NIVEL DE OBJETO, NO DE COLUMNA** (DA-2 de la spec). Son 78 tablas con
 # cientos de campos de cuatro letras cuyo diccionario completo —tipos, indices y
 # referencias— vive en `azure-apps/sigrid_tablas.md`. Cada ficha remite alli con
 # el `grep` de su bloque. Lo que SI se documenta aqui es lo que ese documento no
@@ -1948,6 +1948,44 @@ objetos:
 
       **No se traen** 13 columnas de binario o texto ilimitado: la lista estandar de documentos que comparten todas las tablas de compras del ETL; esta tabla no tiene la mayoria de esos nombres, y excluir un nombre inexistente es inofensivo. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
     grano: Una fila por medio de pago, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  auxcob:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Catalogo de 52 filas: traduce codigos. La formula de cada forma de cobro, ya leida, esta en `tesoreria.plazos_forma_pago`.
+    descripcion: >-
+      **Formas de cobro** (52 filas, 13 columnas; F-140). Es a donde apunta el contrato con el cliente (`obrctr.pagide`), la pareja de `auxpag` en el lado del cobro, con la formula de plazo en `formul`. Leida (dias de cada vencimiento y de la retencion) se publica en `tesoreria.plazos_forma_pago` y en `tesoreria.condiciones_contrato_cliente`.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `auxcob`, y se localiza con `grep -n "^| auxcob " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full`, asi que cada noche la tabla se **recarga entera** desde Sigrid.
+
+      **No se trae** `tex` (texto ilimitado), por la lista estandar de documentos de compras que comparte con `auxpag`.
+    grano: Una fila por forma de cobro, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  auxefc:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Ocho filas de catalogo. Se ingiere para traducir el medio de cobro al que apunta cada forma de cobro.
+    descripcion: >-
+      **Medios de cobro** (8 filas, 13 columnas; F-140), a donde apunta `auxcob.efeide`: la pareja de `auxefp` en el lado del cobro. El medio traducido sale en `tesoreria.plazos_forma_pago.medio` y en `tesoreria.condiciones_contrato_cliente.medio_cobro`.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `auxefc`, y se localiza con `grep -n "^| auxefc " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full`, asi que cada noche la tabla se **recarga entera** desde Sigrid.
+    grano: Una fila por medio de cobro, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
     refresco: nocturno
