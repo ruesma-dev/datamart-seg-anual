@@ -358,3 +358,156 @@ def test_f140_r5_el_orden_de_las_fuentes() -> None:
 def test_f140_r5_los_codigos_que_lee_sigrid() -> None:
     """D18-A: H09-H11, de los contratos con el cliente."""
     assert dom.CODIGOS_SIGRID == ("H09", "H10", "H11")
+
+
+# ===========================================================================
+# R1 · el YAML real y su lector (T3)
+# ===========================================================================
+
+from etl_sigrid.infrastructure.config import hipotesis_caja_yaml as lector  # noqa: E402
+
+#: Los defectos de `design.md` §6, código por código (unidad, valor).
+DEFECTOS_DEL_DISENO = {
+    "H01": ("OPCION", "CONTRATO"),
+    "H02": ("MAPA_DIAS", {"CD": 120, "CI": 120, "CP": 120, "OTRO": 120}),
+    "H03": ("MESES", 0),
+    "H04": ("BOOLEANO", True),
+    "H05": ("DIAS", 0),
+    "H06": ("PORCENTAJE", 0),
+    "H07": ("OPCION", "FIN_OBRA"),
+    "H08": ("MESES", 1),
+    "H09": ("DIAS", 60),
+    "H10": ("PORCENTAJE", 0),
+    "H11": ("MESES", 12),
+    "H12": ("PORCENTAJE", 21),
+    "H13": ("PORCENTAJE", 5.5),
+    "H14": ("OPCION", "TRIMESTRAL"),
+    "H15": ("OPCION", "PARTES_IGUALES"),
+    "H16": ("OPCION", "PRIMER_MES"),
+    "H17": ("BOOLEANO", True),
+    "H18": ("OPCION", "POR_PARTIDA"),
+    "H19": ("OPCION", "PRIMER_MES"),
+    "H20": ("OPCION", "MES_SIGUIENTE"),
+    "H21": ("OPCION", "DESCONTAR"),
+    "H22": ("PORCENTAJE", 0),
+    "H23": ("OPCION", "FIN_DE_MES"),
+}
+
+#: Las alternativas que el diseño nombra (§6): son las `opciones` de la OPCION.
+ALTERNATIVAS_DEL_DISENO = {
+    "H07": {"SIGRID"},
+    "H14": {"MENSUAL", "NO_MODELAR"},
+    "H16": {"EXCLUIR"},
+    "H18": {"SOLO_MESES_CERRADOS"},
+    "H19": {"REPARTIR", "EXCLUIR"},
+    "H20": {"EXCLUIR"},
+    "H23": {"MITAD_DE_MES"},
+}
+
+
+def test_f140_r1_yaml_real_pasa_la_validacion() -> None:
+    leido = lector.cargar_hipotesis_caja(RUTA_YAML)
+    assert leido.errores == []
+    assert [h.codigo for h in leido.catalogo] == [f"H{n:02d}" for n in range(1, 24)]
+
+
+def test_f140_r1_yaml_los_defectos_son_los_del_diseno() -> None:
+    catalogo = {h.codigo: h for h in lector.cargar_hipotesis_caja(RUTA_YAML).catalogo}
+    for codigo, (unidad, valor) in DEFECTOS_DEL_DISENO.items():
+        assert (catalogo[codigo].unidad, catalogo[codigo].valor_defecto) == (unidad, valor), codigo
+
+
+def test_f140_r1_yaml_las_alternativas_son_opciones() -> None:
+    catalogo = {h.codigo: h for h in lector.cargar_hipotesis_caja(RUTA_YAML).catalogo}
+    for codigo, alternativas in ALTERNATIVAS_DEL_DISENO.items():
+        assert alternativas <= set(catalogo[codigo].opciones), codigo
+    for h in catalogo.values():
+        if h.unidad == "OPCION":
+            assert h.opciones[0] == h.valor_defecto, f"{h.codigo}: el defecto va primero"
+
+
+def test_f140_r1_yaml_nada_esta_validado_todavia() -> None:
+    """D17-A: los defectos son PROPUESTAS hasta que Negocio los valide."""
+    for h in lector.cargar_hipotesis_caja(RUTA_YAML).catalogo:
+        assert h.validado is False and h.fecha_validacion is None, h.codigo
+
+
+def test_f140_r1_yaml_solo_h17_no_admite_obra() -> None:
+    catalogo = lector.cargar_hipotesis_caja(RUTA_YAML).catalogo
+    assert [h.codigo for h in catalogo if not h.admite_obra] == ["H17"]
+
+
+def test_f140_r1_yaml_la_seccion_obras_nace_vacia() -> None:
+    assert lector.cargar_hipotesis_caja(RUTA_YAML).obras == []
+
+
+def test_f140_r1_yaml_el_sentido_de_cada_hipotesis() -> None:
+    catalogo = {h.codigo: h for h in lector.cargar_hipotesis_caja(RUTA_YAML).catalogo}
+    pagos = {"H01", "H02", "H03", "H04", "H05", "H06", "H07", "H13", "H20"}
+    cobros = {"H08", "H09", "H10", "H11", "H12", "H22"}
+    for codigo, h in catalogo.items():
+        esperado = "PAGO" if codigo in pagos else "COBRO" if codigo in cobros else "AMBOS"
+        assert h.sentido == esperado, codigo
+
+
+def test_f140_r1_yaml_los_sigrid_admiten_obra() -> None:
+    catalogo = {h.codigo: h for h in lector.cargar_hipotesis_caja(RUTA_YAML).catalogo}
+    for codigo in dom.CODIGOS_SIGRID:
+        assert catalogo[codigo].admite_obra, codigo
+
+
+def test_f140_yaml_ruta_por_defecto_es_la_del_repositorio() -> None:
+    assert lector.RUTA_POR_DEFECTO == RUTA_YAML
+    assert lector.cargar_hipotesis_caja().errores == []
+
+
+def _escribir(tmp_path: Path, texto: str) -> Path:
+    ruta = tmp_path / "hipotesis.yaml"
+    ruta.write_text(texto, encoding="utf-8")
+    return ruta
+
+
+def test_f140_yaml_sin_seccion_hipotesis_es_un_error(tmp_path) -> None:
+    leido = lector.cargar_hipotesis_caja(_escribir(tmp_path, "obras: []\n"))
+    assert leido.catalogo == () and any("hipotesis" in e for e in leido.errores)
+
+
+def test_f140_yaml_que_no_es_un_mapa_es_un_error(tmp_path) -> None:
+    leido = lector.cargar_hipotesis_caja(_escribir(tmp_path, "- H01\n"))
+    assert leido.errores and leido.catalogo == ()
+
+
+@pytest.mark.parametrize("texto", ["", "hipotesis: H01\n", "hipotesis: []\nobras: 3\n"])
+def test_f140_yaml_mal_formado_da_errores(tmp_path, texto) -> None:
+    assert lector.cargar_hipotesis_caja(_escribir(tmp_path, texto)).errores
+
+
+def test_f140_yaml_sin_obras_es_lista_vacia(tmp_path) -> None:
+    texto = RUTA_YAML.read_text(encoding="utf-8").replace("\nobras: []", "\n")
+    leido = lector.cargar_hipotesis_caja(_escribir(tmp_path, texto))
+    assert leido.errores == [] and leido.obras == []
+
+
+def test_f140_yaml_un_valor_de_obra_se_valida_contra_el_catalogo(tmp_path) -> None:
+    texto = RUTA_YAML.read_text(encoding="utf-8").replace(
+        "\nobras: []",
+        "\nobras:\n  - clave_obra: 1-0704\n    codigo: H09\n    valor: 90\n"
+        "    motivo: contrato\n    fecha: 2026-10-25\n"
+        "  - clave_obra: 1-0704\n    codigo: H99\n    valor: 1\n"
+        "    motivo: x\n    fecha: 2026-10-25\n",
+    )
+    leido = lector.cargar_hipotesis_caja(_escribir(tmp_path, texto))
+    assert len(leido.obras) == 2
+    assert leido.errores and all("H99" in e for e in leido.errores), leido.errores
+
+
+def test_f140_yaml_un_catalogo_roto_no_valida_las_obras(tmp_path) -> None:
+    """Sin catálogo válido no se sabe contra qué validar: un solo bloque de errores."""
+    texto = RUTA_YAML.read_text(encoding="utf-8").replace("unidad: DIAS", "unidad: HORAS", 1)
+    leido = lector.cargar_hipotesis_caja(_escribir(tmp_path, texto))
+    assert leido.catalogo == () and any("HORAS" in e for e in leido.errores)
+
+
+def test_f140_yaml_un_fichero_que_no_existe_falla(tmp_path) -> None:
+    with pytest.raises(FileNotFoundError):
+        lector.cargar_hipotesis_caja(tmp_path / "no_existe.yaml")
