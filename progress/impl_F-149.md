@@ -6,7 +6,8 @@
   spec-author de F-140. Intérprete: el venv del árbol principal, enlazado como `.venv` (ignorado).
 - Commits (`git log 18c1d11..HEAD`): `072da4a` T0 `in_progress` · `f127f1f` T1 test en RED ·
   `8134d5e` T2 textos, v61 y los tests de F-147 · `ecc7604` T3 despliegue en `current.md` ·
-  `fa8c04a` T3 test de F-006 y BACKLOG · y el de este informe.
+  `fa8c04a` T3 test de F-006 y BACKLOG · `43e5554`/`89eb0f5` T4 informe · tras la review pasada 1:
+  `f938dae` T5 test en RED (código al principio de línea) · `4ff8d0f` T5 detector y `current.md`.
 
 ## Qué cambió
 
@@ -14,7 +15,7 @@
 |---|---|
 | `config/diccionario/00_global.yaml` | `convenciones.identidad_sigrid`: «… es guia interna del ETL.» (fuera «en la regla `R-SIGRID-CON`, que es la unica version»); su comentario `#` explica F-149. `version: 61` con su comentario. |
 | `config/diccionario/compras.yaml` | `codigo_obra_cabecera` de `compras.albaranes` (~l.770) y `compras.facturas` (~l.1321): «Codigo de la obra de cabecera (`con.cod`).» |
-| `tests/test_f149_mcp_sin_reglas_no_publicadas.py` | NUEVO, 13 tests (abajo). |
+| `tests/test_f149_mcp_sin_reglas_no_publicadas.py` | NUEVO, 14 tests (abajo; el 14.º, de la review pasada 1). |
 | `tests/test_f147_contenido.py` | R14 exigía que `identidad_sigrid` NOMBRARA la regla; ahora lo prohíbe (sigue el tope de 300). |
 | `tests/test_f006_copias.py` | R26 exigía lo mismo («tiene que remitir a la regla»); ahora prohíbe la cita y exige «guia interna del ETL». Lo de fondo (no repetir el contenido de la regla) sigue igual. |
 | `docs/CONVENTIONS.md` | Una frase en la viñeta de `entrega`: lo que llega al MCP no cita una `fuera_mcp` ni un código inexistente. |
@@ -27,7 +28,8 @@ Sin cambios en `etl_sigrid/`: ni una línea de producción. La regla `R-SIGRID-C
 
 1. **«Lo que llega al MCP» se calcula con el código que publica, no con una copia.** El test aplica
    `cargar_diccionario` + `derivar_avisos` (como `PublicarDiccionarioStep.run`) y barre las filas de
-   `filas_diccionario`, `filas_reglas` y `filas_contexto`, serializadas enteras a JSON: entra todo
+   `filas_diccionario`, `filas_reglas` y `filas_contexto`, recorriendo TODAS sus cadenas ya
+   decodificadas (los campos que son JSON, `ficha` y `datos`, se decodifican y se recorren): entra todo
    campo de texto (descripción, grano, columnas, relaciones, preguntas, `avisos`, `texto` y `datos`
    del contexto, título/regla/motivo/resumen de las reglas), también los que se añadan mañana.
 2. **Qué fichas sirve el MCP**: las de todos los esquemas salvo los vetados incluso al login total,
@@ -37,7 +39,12 @@ Sin cambios en `etl_sigrid/`: ni una línea de producción. La regla `R-SIGRID-C
 3. **Qué regla «se publica»**: `Regla.publicable` (todas menos `fuera_mcp`, D4 de F-147). Una cita
    a un código que no está en el YAML cuenta igual que una `fuera_mcp`.
 4. **Código de regla**: `\bR-[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*` (la letra tras `R-` evita un `R-1`).
-   Sobre el diccionario real encuentra 21 códigos distintos y ningún falso positivo.
+   Sobre el diccionario real encuentra 20 códigos distintos, todos publicados, y ningún falso
+   positivo. **Review pasada 1**: hasta `f938dae` la fila se serializaba a JSON, y ahí un salto de
+   línea es el texto `\n`: entre su `n` y la `R` no hay frontera de palabra, así que un código que
+   abría una línea o seguía a un tabulador no se veía. Ahora el regex se aplica a las cadenas
+   decodificadas, unidas por saltos de línea reales (vía (a) de la review). El barrido mira 215
+   textos: 158 fichas, 20 reglas y 37 entradas de contexto, las cifras que midió el reviewer.
 5. **Los `avisos` también cuentan**: una futura `fuera_mcp` con ámbito en un esquema servido pondría
    su código en los `avisos` de cada ficha de ese esquema; hay un test para ese caso.
 6. El detector vive en el test, no en `etl_sigrid/`: la feature pide un test, y no hay comportamiento
@@ -52,7 +59,8 @@ Sin cambios en `etl_sigrid/`: ni una línea de producción. La regla `R-SIGRID-C
   consulta desde el MCP»; `version >= 61`.
 - Detector sobre diccionarios sintéticos: caza una `fuera_mcp` en una columna, en un bloque de
   contexto, en una regla publicada y en un `aviso` derivado; caza un código inexistente; no mira
-  fichas de `raw` ni el texto de la propia `fuera_mcp`; una cita a una regla publicada no es hallazgo.
+  fichas de `raw` ni el texto de la propia `fuera_mcp`; una cita a una regla publicada no es hallazgo;
+  caza un código al principio de línea o tras un tabulador (columna, descripción y bloque).
 
 ## Fase RED
 
@@ -80,6 +88,25 @@ FAILED tests/test_f149_mcp_sin_reglas_no_publicadas.py::test_f149_version_61
 
 Los 9 que ya pasaban en RED son los del detector sobre diccionarios sintéticos y los controles: no
 dependen del texto real. Tras `F-149 T2`, el mismo comando: `13 passed in 5.17s`.
+
+### RED de la review pasada 1 (T5)
+
+Test `test_f149_caza_un_codigo_al_principio_de_linea_o_tras_un_tabulador` commiteado (`f938dae`)
+ANTES de tocar el detector. Comando:
+
+`.venv/Scripts/python.exe -m pytest tests/test_f149_mcp_sin_reglas_no_publicadas.py -q -p no:cacheprovider -k principio_de_linea`
+
+```
+E       AssertionError: assert [] == [('contexto c...STE-NINGUNA')]
+E         
+E         Right contains 3 more items, first extra item: ('contexto convenciones.identidad', 'R-GUIA-ETL')
+E         Use -v to get more diff
+1 failed, 13 deselected in 0.97s
+```
+
+El detector viejo devolvía `[]` en los tres casos (salto de línea en una columna y en un bloque,
+tabulador en una descripción). Tras `4ff8d0f`, el fichero entero da `14 passed in 3.53s`, y el
+veredicto sobre el diccionario real sigue siendo `[]`.
 
 ## Desviaciones (también en `progress/current.md`)
 
@@ -114,7 +141,7 @@ Nada se ha ejecutado contra Azure ni Sigrid.
 
 | Evidencia | Valor real | Cómo |
 |---|---|---|
-| Tests propios de F-149 | **13 passed** en 5,17 s (RED: 4 failed, 9 passed) | `pytest tests/test_f149_mcp_sin_reglas_no_publicadas.py` |
+| Tests propios de F-149 | **14 passed** en 3,53 s (RED T1: 4 failed, 9 passed; RED T5: 1 failed) | `pytest tests/test_f149_mcp_sin_reglas_no_publicadas.py` |
 | Suite completa | **8.782 passed, 283 skipped, 0 failed** en 1.112,30 s (18 min 32 s) | `pytest tests -q`, sin `-x`, tras el último cambio de tests (`fa8c04a`) |
 | `init.sh` final | **exit 0, `ENTORNO LISTO`**, 8.782 passed / 283 skipped | `bash harness/init.sh` sobre `43e5554` |
 | Cobertura de líneas cambiadas | **N/A**: «F-149 no cambia líneas Python de producción frente a main» | `PUERTA COBERTURA` de `init.sh` |
