@@ -233,3 +233,22 @@ def test_f149_una_cita_a_una_regla_publicada_no_es_un_hallazgo() -> None:
     ficha = _ficha(descripcion="No se suma entre meses (`R-FRESCURA`).")
 
     assert citas_no_publicadas(_con(ficha)) == []
+
+
+def test_f149_caza_un_codigo_al_principio_de_linea_o_tras_un_tabulador() -> None:
+    """Review pasada 1: con la fila serializada a JSON, un salto de línea es el
+    texto `\n` y entre su `n` y la `R` no hay frontera de palabra, así que un
+    código que abría una línea —un bloque `|`, un `>-` de dos párrafos— pasaba
+    sin verse. Se caza en una columna, en una descripción y en un bloque."""
+    ficha = _ficha(
+        esquema="compras",
+        descripcion="Primera linea.\tR-NO-EXISTE-NINGUNA tambien.",
+        columnas=(_columna(significado="Codigo de obra.\nR-GUIA-ETL manda."),),
+    )
+    contexto = {"convenciones": {"identidad": "Linea uno.\nR-GUIA-ETL dice."}}
+
+    assert citas_no_publicadas(_con(ficha, contexto=contexto)) == [
+        ("contexto convenciones.identidad", "R-GUIA-ETL"),
+        ("ficha compras.fact_seguimiento_mensual", "R-GUIA-ETL"),
+        ("ficha compras.fact_seguimiento_mensual", "R-NO-EXISTE-NINGUNA"),
+    ]
