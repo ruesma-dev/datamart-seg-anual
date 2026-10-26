@@ -15,7 +15,7 @@
   `obra_via`). Rigor `estandar`. Diccionario v61 -> v62. Informe: `progress/impl_F-140.md`.
 - Hechas T1-T14 (commits `F-140 T1`..`F-140 T14`; `azure-apps` `7f84d73`, local). T15 y T16
   son MANUALES (humano: despliegue, permisos, publicar el diccionario, MCP, prueba R25) y
-  siguen pendientes. En curso: T17 (`bash harness/init.sh`). Informe: `progress/impl_F-140.md`;
+  siguen pendientes. T17 hecha: `bash harness/init.sh` en verde. Informe: `progress/impl_F-140.md`;
   mutacion 20/141, 19 muertos, el superviviente con test nuevo (`progress/mutacion_F-140.md`).
 - Diccionario del arbol tras T11 (v62): **248 objetos, 2143 columnas, 122 de consumo**, 22
   reglas en el YAML (21 publicadas). Presupuesto de F-147 SUBIDO a 30.873 con su motivo

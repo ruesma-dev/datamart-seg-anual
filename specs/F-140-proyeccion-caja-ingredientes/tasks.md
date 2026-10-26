@@ -19,4 +19,4 @@ Rama `feature/F-140-proyeccion-caja-ingredientes`. Un commit por tarea (`F-140 T
 - [x] T14: campaña de mutación sobre `domain/proyeccion_caja.py`, el lector del YAML, `build_tesoreria_step.py`, `domain/reanudacion.py` y, si D10-A, `obra_del_efecto`  |  Verificación: `python -m harness.mutacion --feature F-140` y `progress/mutacion_F-140.md`
 - [ ] T15: despliegue (`design.md` §8): imagen y tag del job; `ingest` de `auxcob` y `auxefc`; `build-tesoreria` con su duración frente a los +3-4 min (R27)  |  Verificación: MANUAL (humano)
 - [ ] T16: tras T15: R19 (estándar lee, restringido «permission denied»), R28; `publicar-diccionario`, `check-diccionario`, `check-declarados`, `check-unicidad`; reiniciar el MCP; R25 en conversación nueva («¿qué caja necesitará la obra X los próximos seis meses?» y luego «y si cobramos a 90 días»: lista las 23 hipótesis con valor y nivel, H09 pasa a `USUARIO`)  |  Verificación: MANUAL (humano), resultados en `progress/impl_F-140.md`
-- [ ] T17: ejecutar `bash harness/init.sh` en verde  |  Verificación: `bash harness/init.sh`
+- [x] T17: ejecutar `bash harness/init.sh` en verde  |  Verificación: `bash harness/init.sh`
