@@ -38,6 +38,64 @@
   coste y 2 de venta): 21 y 21, 113,98 y 115,43 M EUR, como `progress/spec_F-140.md` §2. Plan
   restante, intervalo, ejecutado, adelantado, retrasado y pendiente por tipo de V casan al
   centimo de M EUR con §5.
+- **Review pasada 1: CHANGES_REQUESTED** (`progress/review_F-140.md`). Decisiones del humano:
+  P1 = (a), `08` publica las 23 hipotesis por obra con H17 siempre a DEFECTO (483 filas hoy;
+  resumen de `R-CAJA-HIPOTESIS` y presupuesto de F-147 sin cambios, remedido: 30.873); P2 (venta
+  con y sin coeficientes) = feature aparte, la registra el lider tras el merge. Corregido en esta
+  rama: P1-a, H11 en meses enteros, ruff, esta lista MANUAL, `features.json` y los textos de
+  `azure-apps` y `ARCHITECTURE.md` (el YAML que no valida ya no «falla sin escribir»).
+
+### F-140 · Despliegue MANUAL, T15 y T16 (tras APROBADO y merge a `main`; lo autoriza el humano)
+
+Lo hace el humano, en este orden. Lectura con `.venv/Scripts/python.exe` desde el puesto (la IP
+del puesto tiene que estar en el firewall del Postgres). Ninguno de estos pasos es de un agente.
+
+0. Tag que corre HOY el job: `r20261025-0927` (F-149). Vuelta atras: `powershell -NoProfile -File
+   infra/85_update_job.ps1 -Tag r20261025-0927`. El DDL de F-140 es aditivo (tablas nuevas,
+   `ADD COLUMN IF NOT EXISTS obra_via`): la imagen vieja lo ignora, no hace falta deshacerlo.
+1. **T15 · imagen**: `powershell -NoProfile -File infra/70_build_image.ps1` (anotar el tag nuevo).
+2. `powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag nuevo>` y comprobar que el job
+   ya apunta a ella: `az containerapp job show -n caj-datamart-seg-dev -g rg-datamart-seg-dev
+   --query "properties.template.containers[0].image" -o tsv` → acaba en `:<tag nuevo>`.
+3. **T15 · ingesta** de las dos tablas nuevas, una a una:
+   `.venv/Scripts/python.exe main.py ingest --table auxcob --full` (esperado ~52 filas) y
+   `.venv/Scripts/python.exe main.py ingest --table auxefc --full` (esperado ~8 filas).
+4. **T15 · build y R27**: `.venv/Scripts/python.exe main.py build-tesoreria`, anotando la
+   duracion total y la de `devengo_pendiente` (estimado +3-4 min sobre F-037; SUCCESS en los
+   diez sub-pasos). Si falla `hipotesis_carga`, el mensaje lista los errores del YAML.
+5. **T16 · R19**, con los dos logins reales, `$dsnE = "host=<host> dbname=sigrid_dm
+   user=mcp_sigrid_dm_ro sslmode=require"` y `$dsnR` igual con `user=mcp_sigrid_dm_restringido`
+   (`PGPASSWORD` de cada uno leido del vault como en la P6 de F-141, y `Remove-Item
+   Env:PGPASSWORD` al acabar): `foreach ($t in $nuevos) { psql -X -c "SELECT 1 FROM $t LIMIT 1"
+   $dsnE }` con `$nuevos` = `tesoreria.plazos_forma_pago`,
+   `tesoreria.condiciones_contrato_compra`, `tesoreria.condiciones_contrato_cliente`,
+   `tesoreria.devengo_pendiente_partida`, `tesoreria.devengo_pendiente_obra_mes`,
+   `tesoreria.devengo_corte_obra`, `tesoreria.hipotesis_caja`, `tesoreria.hipotesis_caja_manual`,
+   `tesoreria.hipotesis_caja_obra` → una fila (la manual, 0 filas sin error) con `$dsnE`; y el
+   mismo bucle con `$dsnR` → «permission denied» en los nueve.
+6. **T16 · R28**, solo lectura (`psql -X -A -c "<consulta>" $dsnE`):
+   `SELECT concepto, count(*), round(sum(plan_restante)/1e6,2), round(sum(pendiente)/1e6,2) FROM
+   tesoreria.devengo_corte_obra GROUP BY 1` → 21 y 21 obras, pendiente ~133,2 / ~132,4 M EUR (±
+   la variacion diaria); `SELECT count(*), count(*) FILTER (WHERE formula_reconocida) FROM
+   tesoreria.plazos_forma_pago` → 122 y 122; `SELECT obra_via, count(*) FROM tesoreria.efectos
+   WHERE sentido = 'PAGO' GROUP BY 1` → CONTRATO ~4, FACTURA_CABECERA ~107, FACTURA_LINEAS ~2;
+   `SELECT count(*), count(DISTINCT obra_id), count(DISTINCT codigo) FROM
+   tesoreria.hipotesis_caja_obra` → 483, 21, 23.
+7. **T16 · diccionario, SOLO con la imagen ya en el job** (paso 2 comprobado; si no, la nocturna
+   republica la v61): `.venv/Scripts/python.exe main.py publicar-diccionario` (v62, 21 reglas
+   publicadas).
+8. `.venv/Scripts/python.exe main.py check-diccionario` → OK;
+   `.venv/Scripts/python.exe main.py check-declarados` → sin faltantes;
+   `.venv/Scripts/python.exe main.py check-unicidad` → las claves de los objetos nuevos sin
+   duplicados.
+9. Reiniciar el MCP (cachea el diccionario): `az containerapp show -g rg-mcp-bbdd-dev -n
+   ca-mcp-bbdd-dev --query properties.latestReadyRevisionName -o tsv` y
+   `az containerapp revision restart -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --revision <revision>
+   -o none`. `contexto_bbdd()` abre con «Versión 62» y lista `R-CAJA-HIPOTESIS`.
+10. **T16 · R25**, conversacion NUEVA con el MCP: «¿que caja necesitara la obra X los proximos
+    seis meses?» → lista las 23 hipotesis con valor y nivel sin pedirlo y avisa de las no
+    validadas; despues «y si cobramos a 90 dias» → H09 pasa a `USUARIO`. Anotar el resultado en
+    `progress/impl_F-140.md`.
 
 ## 2026-10-24 · F-140 · `spec_ready` (spec-author, REHECHA) · rama `feature/F-140-proyeccion-caja-ingredientes`
 
