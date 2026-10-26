@@ -22,8 +22,11 @@
 - v62 publicada (hash `109d9aa99693`, 248 objetos, 21 reglas); `check-diccionario`,
   `check-declarados` (248/248) y `check-unicidad` (0 claves rotas) OK. MCP reiniciado
   (`ca-mcp-bbdd-dev--0000023`, réplica 20:40 UTC): sus logs cargan la «versión 62».
-- **Pendiente MANUAL del humano**: R19 (paso 5 de abajo, los dos logins del vault) y R25 (paso
-  10, conversación nueva con el MCP). `azure-apps` `995e369` local, sin push.
+- **R19 OK** (26-10, el líder por encargo del humano; contraseñas leídas del vault a memoria, sin
+  imprimir): con `mcp_sigrid_dm_ro` los nueve objetos nuevos se leen (la manual, 0 filas sin
+  error); con `mcp_sigrid_dm_restringido`, «permission denied for schema tesoreria» en los nueve.
+- **Pendiente MANUAL del humano: R25** (paso 10, conversación NUEVA con el MCP: el conector de la
+  sesión del líder quedó caído tras el reinicio). `azure-apps` `995e369` local (no tiene remoto).
 
 ## 2026-10-25 · F-140 · `in_progress` (implementer) · rama `feature/F-140-proyeccion-caja-ingredientes`
 
