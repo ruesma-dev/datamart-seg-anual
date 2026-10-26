@@ -76,6 +76,10 @@
   `conexiones_abiertas` = 385 (antes ~3.000). Permisos por paso: diez `apply_grants.tras_*` en
   SUCCESS, 1,2-1,5 s cada uno (D4: muy por debajo de 30 s). Terminó a las 06:14 por ser domingo
   (reconstrucción completa: `build_stg` 158 min, el domingo anterior 143).
+- **Noche 2 · 26-10 · OK.** Una réplica, sin reintento (lote `20261026T000022Z-4977b1`, ningún
+  paso repetido), 0 FAILED en `ingest_raw%`, todo SUCCESS; terminó a las 04:28. 4.846 páginas:
+  `http_s` máx 3,5, `pg_connect_s` máx 0,056, `copy_s` máx 0,5, 0 reintentos, ningún hueco de más
+  de 100 s. `conexiones_abiertas` = 385. **Racha: 2 de 7.**
 
 ## 2026-10-24 · F-148 · CERRADA (`done`, orden del humano) · R31 MANUAL pendiente: 7 noches desde la del 25-10
 
