@@ -9,6 +9,22 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-26 · F-140 · CERRADA (`done`, APROBADO pasada 2, `5bd69c8`) · merge `9b91165` · DESPLEGADA
+
+- Orden del humano (26-10). Imagen `r20261026-2111` desde un worktree limpio de `main`; el job
+  la apunta (lo cambió el humano: el clasificador de permisos bloquea al agente; comprobado con
+  `az`). Vuelta atrás: `infra/85_update_job.ps1 -Tag r20261025-0927` (DDL aditivo).
+- T15: `ingest --table auxcob --full` 52 filas, `auxefc` 8. `build-tesoreria` SUCCESS en 239,7 s
+  (R27): `devengo_pendiente` 118,9 s, `condiciones_compra` 28,5 s, 583.399 filas.
+- R28 OK: corte COSTE 21 obras, restante 113,98, pendiente 133,20 M EUR; VENTA 21, 115,42,
+  132,37; plazos 122/122; `obra_via` PAGO: CONTRATO 6, FACTURA_CABECERA 115, FACTURA_LINEAS 2;
+  `hipotesis_caja_obra` 483 filas, 21 obras, 23 códigos (DEFECTO 447, OBRA 36).
+- v62 publicada (hash `109d9aa99693`, 248 objetos, 21 reglas); `check-diccionario`,
+  `check-declarados` (248/248) y `check-unicidad` (0 claves rotas) OK. MCP reiniciado
+  (`ca-mcp-bbdd-dev--0000023`, réplica 20:40 UTC): sus logs cargan la «versión 62».
+- **Pendiente MANUAL del humano**: R19 (paso 5 de abajo, los dos logins del vault) y R25 (paso
+  10, conversación nueva con el MCP). `azure-apps` `995e369` local, sin push.
+
 ## 2026-10-25 · F-140 · `in_progress` (implementer) · rama `feature/F-140-proyeccion-caja-ingredientes`
 
 - Decisiones D1-D19 cerradas por el humano el 2026-10-25: todas A, D10 incluida (cascada con

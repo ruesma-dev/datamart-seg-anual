@@ -2207,12 +2207,12 @@
         "Los pagos de personal no salen de `tesoreria_restringida` (misma regla que F-037)",
         "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "rigor": "estandar",
       "priority": 5,
       "branch": "feature/F-140-proyeccion-caja-ingredientes",
-      "notes": "2026-10-24: spec en specs/F-140-proyeccion-caja-ingredientes/, REHECHA el mismo día con las indicaciones del humano (de devengo a criterio de caja, en vivo por la IA; catálogo de 23 hipótesis con valores por defecto y por obra; descuento por partida de lo ejecutado desde la versión). Mediciones de solo lectura en progress/spec_F-140.md (§5: el pendiente ajustado por partida es 133,2 M€ de coste frente a 114,0 de plan restante, las obras van retrasadas). Decisiones D1-D19 CERRADAS por el humano el 2026-10-25, todas en A (D10 incluida: la cascada de obra de los pagos sin centro, +113 pagos, 86,87 % -> 86,95 %), e implementadas. 2026-10-26: implementada (T1-T14 y T17; informe progress/impl_F-140.md, mutación 20/141 con 19 muertos y el superviviente con test nuevo). Review pasada 1 CHANGES_REQUESTED: P1 = (a), hipotesis_caja_obra publica las 23 hipótesis por obra (H17 a DEFECTO); P2 (venta con y sin coeficientes) = feature aparte, tras el merge. T15 y T16 MANUAL (humano), con sus comandos en progress/current.md."
+      "notes": "2026-10-26: CERRADA. Review APROBADO en pasada 2 (5bd69c8); pasada 1 CHANGES_REQUESTED (MANUAL sin comando, notes, azure-apps y P1: 23 hipotesis por obra con H17 a DEFECTO). Merge 9b91165 por orden del humano. Desplegada el 26-10: imagen r20261026-2111, ingest auxcob (52) y auxefc (8), build-tesoreria 239,7 s (devengo_pendiente 118,9 s, R27), R28 OK, v62 publicada y MCP reiniciado (v62 en sus logs). P2 (venta con coeficientes) va a F-150. Pendiente MANUAL del humano: R19 con los dos logins y R25 en conversacion nueva."
     },
     {
       "id": "F-141",
