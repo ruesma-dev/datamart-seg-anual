@@ -1238,6 +1238,56 @@ tables:
     # Hasta F-081 esta entrada se lo atribuia a la otra columna, y era falso:
     # quien la creyera publicaria una columna vacia con un rotulo convincente.
 
+  - source_table: auxcob
+    target_table: auxcob
+    id_column: ide
+    incremental_column: tiemod
+    where: null
+    exclude_columns:
+      - tex
+      - med
+      - des
+      - obs
+      - ima
+      - emptex
+      - dirtex
+      - eiotex
+      - desesp
+      - texcom
+      - serdesdat
+      - texobs
+      - coestr
+    # F-140 (D7-A). Formas de COBRO (52 filas, 13 columnas, medido contra
+    # Sigrid el 2026-10-25): la pareja de `auxpag` en el lado del cliente, a
+    # donde apunta `obrctr.pagide`. Misma forma y mismo trato que `auxpag`:
+    # entera, con `tiemod` (medido) y la lista estandar, que aqui solo quita
+    # `tex`. `formul` es texto ilimitado y entra: es la formula de plazo que
+    # leen `sql/tesoreria/04_plazos_forma_pago.sql` y
+    # `sql/tesoreria/06_condiciones_contrato_cliente.sql`.
+
+  - source_table: auxefc
+    target_table: auxefc
+    id_column: ide
+    incremental_column: tiemod
+    where: null
+    exclude_columns:
+      - tex
+      - med
+      - des
+      - obs
+      - ima
+      - emptex
+      - dirtex
+      - eiotex
+      - desesp
+      - texcom
+      - serdesdat
+      - texobs
+      - coestr
+    # F-140 (D7-A). Medios de COBRO (8 filas, 13 columnas, medido el
+    # 2026-10-25), a donde apunta `auxcob.efeide`: la pareja de `auxefp`. Con
+    # `tiemod`; `est` es texto ilimitado y entra igual, como en `auxefp`.
+
   - source_table: conest
     target_table: conest
     id_column: ide

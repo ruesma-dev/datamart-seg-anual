@@ -4,8 +4,9 @@
 --
 -- LA CARTERA DE COBROS Y PAGOS (fase 1): una fila por EFECTO de `raw.pag`
 -- (sentido PAGO) y de `raw.cob` (sentido COBRO), tal cual. Es un HECHO de
--- Sigrid, no un calculo: la fase 2 (devengo pendiente, plazos, retenciones de
--- contrato) y cualquier conversion devengo -> caja quedan FUERA.
+-- Sigrid, no un calculo. La fase 2 (F-140: devengo pendiente, plazos y
+-- condiciones de contrato, catalogo de hipotesis) va al final de este fichero;
+-- la conversion devengo -> caja sigue FUERA: la hace la IA, declarandola.
 --
 -- Modulo independiente, como `contabilidad`: lee SOLO de `raw.*` y de la vista
 -- `maestro.centros_coste` (el puente centro de coste -> obra, SQL puro sobre
@@ -136,6 +137,11 @@ CREATE INDEX IF NOT EXISTS idx_tesr_efe_obra      ON tesoreria_restringida.efect
 CREATE INDEX IF NOT EXISTS idx_tesr_efe_documento ON tesoreria_restringida.efectos (documento_id);
 CREATE INDEX IF NOT EXISTS idx_tesr_efe_remesa    ON tesoreria_restringida.efectos (remesa_id);
 
+-- F-140 (D10-A): por que via se asigno la obra (CENTRO, CONTRATO,
+-- FACTURA_CABECERA, FACTURA_LINEAS). Con ALTER, como F-101: queda AL FINAL en
+-- la base de hoy y en una nueva, y `compras.vencimientos` no la ve.
+ALTER TABLE tesoreria_restringida.efectos ADD COLUMN IF NOT EXISTS obra_via VARCHAR(16);
+
 
 -- ---------------------------------------------------------------------------
 -- tesoreria.efectos — LA CARTERA GENERAL (R10, R11)
@@ -199,6 +205,9 @@ CREATE INDEX IF NOT EXISTS idx_tes_efe_obra      ON tesoreria.efectos (obra_id);
 CREATE INDEX IF NOT EXISTS idx_tes_efe_documento ON tesoreria.efectos (documento_id);
 CREATE INDEX IF NOT EXISTS idx_tes_efe_remesa    ON tesoreria.efectos (remesa_id);
 
+-- F-140 (D10-A): la misma columna, al final, copiada de la completa por `02`.
+ALTER TABLE tesoreria.efectos ADD COLUMN IF NOT EXISTS obra_via VARCHAR(16);
+
 
 -- ---------------------------------------------------------------------------
 -- tesoreria.efectos_restringidos_mes — CUANTOS faltan, SIN importes (R13, D6)
@@ -215,4 +224,255 @@ CREATE TABLE IF NOT EXISTS tesoreria.efectos_restringidos_mes (
     estado_tesoreria  VARCHAR(10) NOT NULL,
     num_efectos       BIGINT      NOT NULL,
     PRIMARY KEY (empresa_id, sentido, anio, mes, estado_tesoreria)
+);
+
+
+-- ============================================================================
+-- F-140 · LA FASE 2: LOS INGREDIENTES PARA PASAR EL DEVENGO A CAJA
+--
+-- EL DATAMART NO CONVIERTE DEVENGO EN CAJA (regla del humano). Publica los
+-- ingredientes -las formas de pago y cobro con su formula leida, las
+-- condiciones de los contratos, el devengo pendiente de cada obra descontado
+-- lo ejecutado desde su version- y el CATALOGO de hipotesis de conversion con
+-- sus valores por defecto y por obra. Ninguna tabla tiene una columna de caja
+-- (un plazo, una retencion o un IVA aplicados a un devengo): lo prueba
+-- `tests/test_f140_sql.py` con `PATRON_COLUMNA_DE_CAJA` del dominio.
+--
+-- Mismo patron que la cartera: `CREATE TABLE IF NOT EXISTS` aqui y `TRUNCATE`
+-- + `INSERT` en cada build, sin `DROP` ni `GRANT` (el esquema ya lo concede y
+-- lo veta entero `apply_grants`).
+-- ============================================================================
+
+-- ---------------------------------------------------------------------------
+-- La formula de plazo (`auxpag.formul`, `auxcob.formul`): R7, R8
+--
+-- Tokens separados por blancos; `N` = dias de un vencimiento y `NR` = dias del
+-- efecto de RETENCION. Lo que no casa con esa gramatica (un token ajeno, dos
+-- `NR`, vacia o NULL) NO se interpreta: falla cerrado. Mismos literales que
+-- `etl_sigrid/domain/proyeccion_caja.py` (`REGEX_TOKEN_DIAS`,
+-- `REGEX_TOKEN_RETENCION`, `SEPARADOR_TOKENS`); un test los compara.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION tesoreria.fn_plazo_reconocido(f TEXT)
+RETURNS BOOLEAN
+LANGUAGE sql IMMUTABLE AS $$
+    SELECT f IS NOT NULL
+       AND btrim(f) <> ''
+       AND NOT EXISTS (
+           SELECT 1
+           FROM unnest(regexp_split_to_array(btrim(f), '\s+')) AS u(t)
+           WHERE t !~ '^[0-9]+$' AND t !~ '^[0-9]+R$'
+       )
+       AND (SELECT count(*)
+            FROM unnest(regexp_split_to_array(btrim(f), '\s+')) AS u(t)
+            WHERE t ~ '^[0-9]+R$') <= 1;
+$$;
+
+COMMENT ON FUNCTION tesoreria.fn_plazo_reconocido(TEXT) IS
+'F-140. Cierto si la formula de plazo de Sigrid casa con su gramatica: tokens N (dias de un vencimiento) y como mucho un NR (dias de la retencion). Vacia, NULL, un token ajeno o dos NR: falso (falla cerrado).';
+
+-- Los dias de cada vencimiento, EN EL ORDEN ESCRITO; sin reconocer, vacio.
+CREATE OR REPLACE FUNCTION tesoreria.fn_plazo_dias(f TEXT)
+RETURNS INT[]
+LANGUAGE sql IMMUTABLE AS $$
+    SELECT CASE WHEN tesoreria.fn_plazo_reconocido(f)
+                THEN ARRAY(SELECT u.t::INT
+                           FROM unnest(regexp_split_to_array(btrim(f), '\s+'))
+                                WITH ORDINALITY AS u(t, n)
+                           WHERE u.t ~ '^[0-9]+$' ORDER BY u.n)
+                ELSE '{}'::INT[] END;
+$$;
+
+COMMENT ON FUNCTION tesoreria.fn_plazo_dias(TEXT) IS
+'F-140. Los dias de cada vencimiento de una formula de plazo, en el orden escrito ("30 60 90" da {30,60,90}). Vacio si no tiene ninguno o si la formula no se reconoce.';
+
+-- Los dias del efecto de retencion (`NR`); sin `NR` o sin reconocer, NULL.
+CREATE OR REPLACE FUNCTION tesoreria.fn_plazo_dias_retencion(f TEXT)
+RETURNS INT
+LANGUAGE sql IMMUTABLE AS $$
+    SELECT CASE WHEN tesoreria.fn_plazo_reconocido(f)
+                THEN (SELECT left(t, -1)::INT
+                      FROM unnest(regexp_split_to_array(btrim(f), '\s+')) AS u(t)
+                      WHERE t ~ '^[0-9]+R$') END;
+$$;
+
+COMMENT ON FUNCTION tesoreria.fn_plazo_dias_retencion(TEXT) IS
+'F-140. Los dias del efecto de retencion de una formula de plazo ("120 450R" da 450). NULL si no tiene retencion o si la formula no se reconoce.';
+
+
+-- ---------------------------------------------------------------------------
+-- El catalogo de hipotesis (R1, R4) y los valores por obra del YAML (R3)
+--
+-- Los carga el sub-paso `hipotesis_carga` (Python) desde
+-- `config/hipotesis_caja.yaml`, validado por el dominio, en UNA transaccion.
+-- Los valores van en JSONB: una hipotesis es un DIAS, un PORCENTAJE, una
+-- OPCION, un BOOLEANO o un MAPA_DIAS.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS tesoreria.hipotesis_caja (
+    codigo            VARCHAR(3)   PRIMARY KEY,
+    sentido           VARCHAR(5)   NOT NULL,
+    descripcion       TEXT         NOT NULL,
+    unidad            VARCHAR(10)  NOT NULL,
+    valor_defecto     JSONB NOT NULL,
+    opciones          JSONB,
+    fuente_defecto    TEXT         NOT NULL,
+    ingrediente       TEXT,
+    validado          BOOLEAN      NOT NULL,
+    fecha_validacion  DATE,
+    admite_obra       BOOLEAN      NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS tesoreria.hipotesis_caja_manual (
+    clave_obra  VARCHAR(40)  NOT NULL,
+    codigo      VARCHAR(3)   NOT NULL,
+    valor       JSONB NOT NULL,
+    motivo      TEXT         NOT NULL,
+    fecha       DATE         NOT NULL,
+    PRIMARY KEY (clave_obra, codigo)
+);
+
+-- El valor RESUELTO por obra (R5): MANUAL > SIGRID > DEFECTO.
+CREATE TABLE IF NOT EXISTS tesoreria.hipotesis_caja_obra (
+    obra_id     INTEGER      NOT NULL,
+    empresa_id  INTEGER,
+    clave_obra  VARCHAR(40),
+    codigo      VARCHAR(3)   NOT NULL,
+    valor       JSONB NOT NULL,
+    nivel       VARCHAR(7)   NOT NULL,
+    fuente      VARCHAR(7)   NOT NULL,
+    motivo      TEXT,
+    PRIMARY KEY (obra_id, codigo)
+);
+
+
+-- ---------------------------------------------------------------------------
+-- Las condiciones pactadas (R10, R11): una fila por contrato
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS tesoreria.condiciones_contrato_compra (
+    contrato_id                     INTEGER       PRIMARY KEY,
+    codigo_contrato                 VARCHAR(24),
+    empresa_id                      INTEGER,
+    obra_id                         INTEGER,
+    codigo_obra                     VARCHAR(24),
+    proveedor_id                    INTEGER,
+    proveedor_nombre                VARCHAR(128),
+    estado_id                       INTEGER,
+    estado                          VARCHAR(48),
+    importe_base                    NUMERIC(18,2),
+    importe_iva                     NUMERIC(18,2),
+    forma_pago_id                   INTEGER,
+    forma_pago_codigo               VARCHAR(16),
+    forma_pago                      VARCHAR(48),
+    medio_pago                      VARCHAR(48),
+    plazo_formula                   TEXT,
+    dias_vencimientos               INT[],
+    num_vencimientos                INTEGER,
+    dias_retencion                  INTEGER,
+    formula_reconocida              BOOLEAN       NOT NULL,
+    proveedor_dias_fijos_pago       VARCHAR(24),
+    proveedor_meses_sin_pago        VARCHAR(24),
+    retencion_garantia_porcentaje   NUMERIC(10,4),
+    retencion_garantia_concepto     VARCHAR(128),
+    retencion_garantia_clase        INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_tes_ccc_obra      ON tesoreria.condiciones_contrato_compra (obra_id);
+CREATE INDEX IF NOT EXISTS idx_tes_ccc_proveedor ON tesoreria.condiciones_contrato_compra (proveedor_id);
+
+CREATE TABLE IF NOT EXISTS tesoreria.condiciones_contrato_cliente (
+    contrato_cliente_id       INTEGER       PRIMARY KEY,
+    codigo_contrato           VARCHAR(24),
+    descripcion               VARCHAR(128),
+    empresa_id                INTEGER,
+    obra_id                   INTEGER,
+    codigo_obra               VARCHAR(24),
+    cliente_id                INTEGER,
+    cliente_nombre            VARCHAR(128),
+    forma_cobro_id            INTEGER,
+    forma_cobro_codigo        VARCHAR(16),
+    forma_cobro               VARCHAR(48),
+    medio_cobro               VARCHAR(48),
+    plazo_formula             TEXT,
+    dias_vencimientos         INT[],
+    num_vencimientos          INTEGER,
+    dias_retencion            INTEGER,
+    formula_reconocida        BOOLEAN       NOT NULL,
+    retencion_porcentaje      NUMERIC(10,4),
+    retencion_fuente          VARCHAR(16),
+    retencion_concepto        VARCHAR(128),
+    plazo_retencion_meses     NUMERIC(10,2),
+    plazo_garantia_meses      NUMERIC(10,2),
+    fecha_inicio_garantia     DATE
+);
+
+CREATE INDEX IF NOT EXISTS idx_tes_ccl_obra ON tesoreria.condiciones_contrato_cliente (obra_id);
+
+
+-- ---------------------------------------------------------------------------
+-- El devengo pendiente (R12-R15): por partida, por obra y mes, y su corte
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS tesoreria.devengo_pendiente_partida (
+    obra_id               INTEGER       NOT NULL,
+    empresa_id            INTEGER,
+    clave_obra            VARCHAR(40),
+    partida_id            INTEGER       NOT NULL,
+    codigo_partida        VARCHAR(24),
+    concepto              VARCHAR(5)    NOT NULL,
+    categoria             VARCHAR(8),
+    version_master        INTEGER       NOT NULL,
+    tipo_master           VARCHAR(20),
+    mes_version           DATE,
+    mes_ultimo_cierre     DATE,
+    plan_desde_version    NUMERIC(18,2) NOT NULL,
+    plan_intervalo        NUMERIC(18,2) NOT NULL,
+    ejecutado_intervalo   NUMERIC(18,2) NOT NULL,
+    plan_restante         NUMERIC(18,2) NOT NULL,
+    pendiente             NUMERIC(18,2) NOT NULL,
+    sobre_ejecutado       NUMERIC(18,2) NOT NULL,
+    PRIMARY KEY (obra_id, partida_id, concepto)
+);
+
+CREATE TABLE IF NOT EXISTS tesoreria.devengo_pendiente_obra_mes (
+    obra_id                      INTEGER       NOT NULL,
+    empresa_id                   INTEGER,
+    clave_obra                   VARCHAR(40),
+    anio_mes                     DATE          NOT NULL,
+    concepto                     VARCHAR(5)    NOT NULL,
+    categoria                    VARCHAR(8)    NOT NULL,
+    version_master               INTEGER       NOT NULL,
+    mes_ultimo_cierre            DATE,
+    importe_plan_restante        NUMERIC(18,2) NOT NULL,
+    importe_pendiente            NUMERIC(18,2) NOT NULL,
+    importe_retraso_sin_perfil   NUMERIC(18,2) NOT NULL,
+    num_partidas                 INTEGER       NOT NULL,
+    mes_pasado_sin_cierre        BOOLEAN       NOT NULL,
+    PRIMARY KEY (obra_id, anio_mes, concepto, categoria)
+);
+
+CREATE TABLE IF NOT EXISTS tesoreria.devengo_corte_obra (
+    obra_id                       INTEGER       NOT NULL,
+    empresa_id                    INTEGER,
+    clave_obra                    VARCHAR(40),
+    concepto                      VARCHAR(5)    NOT NULL,
+    version_master                INTEGER       NOT NULL,
+    tipo_master                   VARCHAR(20),
+    mes_version                   DATE,
+    mes_ultimo_cierre             DATE,
+    primer_mes_pendiente          DATE,
+    num_versiones_pendientes      INTEGER       NOT NULL,
+    num_partidas                  INTEGER       NOT NULL,
+    plan_desde_version            NUMERIC(18,2) NOT NULL,
+    plan_intervalo                NUMERIC(18,2) NOT NULL,
+    ejecutado_intervalo           NUMERIC(18,2) NOT NULL,
+    plan_restante                 NUMERIC(18,2) NOT NULL,
+    pendiente                     NUMERIC(18,2) NOT NULL,
+    sobre_ejecutado               NUMERIC(18,2) NOT NULL,
+    adelantado                    NUMERIC(18,2) NOT NULL,
+    retrasado                     NUMERIC(18,2) NOT NULL,
+    ejecutado_sin_plan            NUMERIC(18,2) NOT NULL,
+    retraso_sin_perfil            NUMERIC(18,2) NOT NULL,
+    real_origen_corte             NUMERIC(18,2) NOT NULL,
+    plan_total                    NUMERIC(18,2) NOT NULL,
+    cartera_viva                  NUMERIC(18,2) NOT NULL,
+    cartera_emitida_tras_cierre   NUMERIC(18,2) NOT NULL,
+    PRIMARY KEY (obra_id, concepto)
 );

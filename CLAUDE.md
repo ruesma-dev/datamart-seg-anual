@@ -103,7 +103,13 @@ confirmación cubre el plan que se enseñó, no lo que apareció después.
   cobros y pagos (un efecto de `raw.pag`/`raw.cob` por fila) en dos esquemas,
   como la contabilidad: `tesoreria` (la general) y `tesoreria_restringida` (con
   los pagos de nómina, embargo y cuota; solo el perfil total). BAJA no se suma
-  y `fecha_real` vacía no es pendiente (`R-TESORERIA-ESTADO`). **`compras/` publica
+  y `fecha_real` vacía no es pendiente (`R-TESORERIA-ESTADO`). Desde F-140 publica
+  también los INGREDIENTES de la caja futura, no la caja: lo pactado
+  (`condiciones_contrato_*`, `plazos_forma_pago`), el devengo pendiente de la
+  última versión master descontado por partida (`devengo_*`, lee `stg` y `mart`
+  de la misma noche) y las 23 hipótesis de `config/hipotesis_caja.yaml` (las
+  mantiene Control de Costes; si el YAML no valida, el paso falla). Quien pase
+  devengo a caja las declara todas (`R-CAJA-HIPOTESIS`). **`compras/` publica
   también las alarmas de los documentos (F-138)**: `raw.conala` (lista explícita
   de 17 familias, sin empleados) da `compras.documento_alarmas` y la marca
   «liquidatoria» de facturas, albaranes y proformas (`documento_liquidatoria`,

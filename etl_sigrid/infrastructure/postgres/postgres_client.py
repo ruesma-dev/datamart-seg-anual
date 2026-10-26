@@ -1771,6 +1771,37 @@ class PostgresClient:
         )
         return escritas
 
+    # ---------------------------------------------------------------------
+    # Hipótesis de caja (F-140)
+    # ---------------------------------------------------------------------
+
+    def cargar_hipotesis_caja(self, catalogo, obras) -> int:
+        """Reemplaza el catálogo y los valores manuales; devuelve las filas escritas.
+
+        `catalogo` y `obras` llegan YA validados por el dominio (el paso no
+        llama aquí si hay errores). Vaciar y llenar va en UNA transacción: quien
+        consulte ve el catálogo de ayer o el de hoy, nunca uno a medias. Es
+        `TRUNCATE` y no `DROP`: los permisos de la tabla no se pierden.
+        """
+        from etl_sigrid.infrastructure.postgres.hipotesis_caja_sql import (
+            SQL_INSERT_CATALOGO,
+            SQL_INSERT_MANUAL,
+            SQL_VACIAR,
+            filas_catalogo,
+            filas_manuales,
+        )
+
+        filas_h = filas_catalogo(catalogo)
+        filas_m = filas_manuales(obras)
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_VACIAR)
+            if filas_h:
+                cur.executemany(SQL_INSERT_CATALOGO, filas_h)
+            if filas_m:
+                cur.executemany(SQL_INSERT_MANUAL, filas_m)
+        logger.info("hipotesis_caja_cargadas", catalogo=len(filas_h), manuales=len(filas_m))
+        return len(filas_h) + len(filas_m)
+
     def list_objetos_catalogo(self, schemas: Sequence[str]) -> list[tuple]:
         """Los objetos que la base tiene DE VERDAD, para `check-diccionario`.
 

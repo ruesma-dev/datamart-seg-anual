@@ -9,6 +9,114 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-25 · F-140 · `in_progress` (implementer) · rama `feature/F-140-proyeccion-caja-ingredientes`
+
+- Decisiones D1-D19 cerradas por el humano el 2026-10-25: todas A, D10 incluida (cascada con
+  `obra_via`). Rigor `estandar`. Diccionario v61 -> v62. Informe: `progress/impl_F-140.md`.
+- Hechas T1-T14 (commits `F-140 T1`..`F-140 T14`; `azure-apps` `7f84d73`, local). T15 y T16
+  son MANUALES (humano: despliegue, permisos, publicar el diccionario, MCP, prueba R25) y
+  siguen pendientes. T17 hecha: `bash harness/init.sh` en verde. Informe: `progress/impl_F-140.md`;
+  mutacion 20/141, 19 muertos, el superviviente con test nuevo (`progress/mutacion_F-140.md`).
+- Diccionario del arbol tras T11 (v62): **248 objetos, 2143 columnas, 122 de consumo**, 22
+  reglas en el YAML (21 publicadas). Presupuesto de F-147 SUBIDO a 30.873 con su motivo
+  (+325 de `R-CAJA-HIPOTESIS`, +1.099 de enrutado de las nueve fichas recomendadas).
+- (6) La CTE de T6 publica `factura_id`, no `documento_id`, y su alias de `raw.dcf` es `fc`:
+  el guardian de nulos del diccionario (`test_f006_fichas`) leia la primera proyeccion de
+  `documento_id`/`codigo_documento` del fichero y acusaba a la ficha de la restringida.
+- Desviaciones y decisiones de implementacion (justificadas en `progress/impl_F-140.md`):
+  (1) `07` usa tablas temporales `ON COMMIT DROP` con `ANALYZE` (sin estadisticas, 875 s en solo
+  lectura); (2) la carga del YAML necesita un metodo nuevo del cliente, `cargar_hipotesis_caja`, y
+  su SQL en `infrastructure/postgres/hipotesis_caja_sql.py` (fuera de la lista de ficheros);
+  (3) SIGRID de H09 solo con formula de UN vencimiento, y de H09-H11 solo si TODOS los contratos
+  de la obra dan valor y el mismo; (4) tres tests propios ajustados al escribir 07 (`\binterval\b`,
+  `ON COMMIT DROP`, `to_regclass`); (5) `main.py` no se toca: su docstring de `build-tesoreria`
+  sigue citando 4 SQL.
+- Contraste de 07 en solo lectura (logica como CTE): 21+21 obras, restante 113,98/115,42 M EUR,
+  pendiente 133,20/132,37, guarda de la suma sin fallos, 0 partidas sin categoria.
+- Calibracion de solo lectura (2026-10-25, Azure): el universo de (obra, concepto) es el de
+  CUALQUIER mes planificado posterior al ultimo cierre real, incluidas las obras sin real (1 de
+  coste y 2 de venta): 21 y 21, 113,98 y 115,43 M EUR, como `progress/spec_F-140.md` §2. Plan
+  restante, intervalo, ejecutado, adelantado, retrasado y pendiente por tipo de V casan al
+  centimo de M EUR con §5.
+- **Review pasada 1: CHANGES_REQUESTED** (`progress/review_F-140.md`). Decisiones del humano:
+  P1 = (a), `08` publica las 23 hipotesis por obra con H17 siempre a DEFECTO (483 filas hoy;
+  resumen de `R-CAJA-HIPOTESIS` y presupuesto de F-147 sin cambios, remedido: 30.873); P2 (venta
+  con y sin coeficientes) = feature aparte, la registra el lider tras el merge. Corregido en esta
+  rama: P1-a, H11 en meses enteros, ruff, esta lista MANUAL, `features.json` y los textos de
+  `azure-apps` y `ARCHITECTURE.md` (el YAML que no valida ya no «falla sin escribir»).
+
+### F-140 · Despliegue MANUAL, T15 y T16 (tras APROBADO y merge a `main`; lo autoriza el humano)
+
+Lo hace el humano, en este orden. Lectura con `.venv/Scripts/python.exe` desde el puesto (la IP
+del puesto tiene que estar en el firewall del Postgres). Ninguno de estos pasos es de un agente.
+
+0. Tag que corre HOY el job: `r20261025-0927` (F-149). Vuelta atras: `powershell -NoProfile -File
+   infra/85_update_job.ps1 -Tag r20261025-0927`. El DDL de F-140 es aditivo (tablas nuevas,
+   `ADD COLUMN IF NOT EXISTS obra_via`): la imagen vieja lo ignora, no hace falta deshacerlo.
+1. **T15 · imagen**: `powershell -NoProfile -File infra/70_build_image.ps1` (anotar el tag nuevo).
+2. `powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag nuevo>` y comprobar que el job
+   ya apunta a ella: `az containerapp job show -n caj-datamart-seg-dev -g rg-datamart-seg-dev
+   --query "properties.template.containers[0].image" -o tsv` → acaba en `:<tag nuevo>`.
+3. **T15 · ingesta** de las dos tablas nuevas, una a una:
+   `.venv/Scripts/python.exe main.py ingest --table auxcob --full` (esperado ~52 filas) y
+   `.venv/Scripts/python.exe main.py ingest --table auxefc --full` (esperado ~8 filas).
+4. **T15 · build y R27**: `.venv/Scripts/python.exe main.py build-tesoreria`, anotando la
+   duracion total y la de `devengo_pendiente` (estimado +3-4 min sobre F-037; SUCCESS en los
+   diez sub-pasos). Si falla `hipotesis_carga`, el mensaje lista los errores del YAML.
+5. **T16 · R19**, con los dos logins reales, `$dsnE = "host=<host> dbname=sigrid_dm
+   user=mcp_sigrid_dm_ro sslmode=require"` y `$dsnR` igual con `user=mcp_sigrid_dm_restringido`
+   (`PGPASSWORD` de cada uno leido del vault como en la P6 de F-141, y `Remove-Item
+   Env:PGPASSWORD` al acabar): `foreach ($t in $nuevos) { psql -X -c "SELECT 1 FROM $t LIMIT 1"
+   $dsnE }` con `$nuevos` = `tesoreria.plazos_forma_pago`,
+   `tesoreria.condiciones_contrato_compra`, `tesoreria.condiciones_contrato_cliente`,
+   `tesoreria.devengo_pendiente_partida`, `tesoreria.devengo_pendiente_obra_mes`,
+   `tesoreria.devengo_corte_obra`, `tesoreria.hipotesis_caja`, `tesoreria.hipotesis_caja_manual`,
+   `tesoreria.hipotesis_caja_obra` → una fila (la manual, 0 filas sin error) con `$dsnE`; y el
+   mismo bucle con `$dsnR` → «permission denied» en los nueve.
+6. **T16 · R28**, solo lectura (`psql -X -A -c "<consulta>" $dsnE`):
+   `SELECT concepto, count(*), round(sum(plan_restante)/1e6,2), round(sum(pendiente)/1e6,2) FROM
+   tesoreria.devengo_corte_obra GROUP BY 1` → 21 y 21 obras, pendiente ~133,2 / ~132,4 M EUR (±
+   la variacion diaria); `SELECT count(*), count(*) FILTER (WHERE formula_reconocida) FROM
+   tesoreria.plazos_forma_pago` → 122 y 122; `SELECT obra_via, count(*) FROM tesoreria.efectos
+   WHERE sentido = 'PAGO' GROUP BY 1` → CONTRATO ~4, FACTURA_CABECERA ~107, FACTURA_LINEAS ~2;
+   `SELECT count(*), count(DISTINCT obra_id), count(DISTINCT codigo) FROM
+   tesoreria.hipotesis_caja_obra` → 483, 21, 23.
+7. **T16 · diccionario, SOLO con la imagen ya en el job** (paso 2 comprobado; si no, la nocturna
+   republica la v61): `.venv/Scripts/python.exe main.py publicar-diccionario` (v62, 21 reglas
+   publicadas).
+8. `.venv/Scripts/python.exe main.py check-diccionario` → OK;
+   `.venv/Scripts/python.exe main.py check-declarados` → sin faltantes;
+   `.venv/Scripts/python.exe main.py check-unicidad` → las claves de los objetos nuevos sin
+   duplicados.
+9. Reiniciar el MCP (cachea el diccionario): `az containerapp show -g rg-mcp-bbdd-dev -n
+   ca-mcp-bbdd-dev --query properties.latestReadyRevisionName -o tsv` y
+   `az containerapp revision restart -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --revision <revision>
+   -o none`. `contexto_bbdd()` abre con «Versión 62» y lista `R-CAJA-HIPOTESIS`.
+10. **T16 · R25**, conversacion NUEVA con el MCP: «¿que caja necesitara la obra X los proximos
+    seis meses?» → lista las 23 hipotesis con valor y nivel sin pedirlo y avisa de las no
+    validadas; despues «y si cobramos a 90 dias» → H09 pasa a `USUARIO`. Anotar el resultado en
+    `progress/impl_F-140.md`.
+
+## 2026-10-24 · F-140 · `spec_ready` (spec-author, REHECHA) · rama `feature/F-140-proyeccion-caja-ingredientes`
+
+- Spec rehecha con las indicaciones del humano del 24-10: `specs/F-140-proyeccion-caja-ingredientes/`
+  (requirements 146/150, design 240/250, tasks 17). Mediciones de SOLO LECTURA en
+  `progress/spec_F-140.md` (§5-§7 nuevas). F-148 sigue `in_progress`; no se ha tocado.
+- Qué cambia: objetivo de caja (cobros y pagos) con la conversión EN VIVO por la IA; catálogo de 23
+  hipótesis (`design.md` §6) con valores por defecto PROPUESTOS (`validado: false`) y por obra;
+  regla `R-CAJA-HIPOTESIS` que obliga a declarar todas con su nivel (DEFECTO, OBRA, USUARIO); y el
+  devengo pendiente DESCONTADO por partida de lo ejecutado desde la versión. Medido: 133,2 M€ de
+  coste pendiente ajustado frente a 114,0 de plan restante (las obras van retrasadas).
+- **Decisiones que tiene que validar el humano** (`design.md` §9, A recomendada): D1-D12 de antes
+  (D2, D3, D4, D5, D9 y D12 reformuladas) y nuevas D13 (catálogo en YAML del repo), D14 (valores
+  por obra en el mismo YAML; el Excel auxiliar, como feature aparte), D15 (mantiene Control de
+  Costes, aprueba el humano), D16 (frontera con la cartera), D17 (defectos sin validar se publican
+  marcados), D18 (valores de obra leídos de los contratos con el cliente), D19 (reparto del pendiente
+  proporcional al perfil). **D10 (cascada de obra) queda ABIERTA** con su medida: +113 pagos.
+- **Y los valores por defecto de §6** (plazos, IVA 21/5,5 %, liquidación trimestral, certificación
+  a un mes...) los tiene que validar Negocio: son propuestas, varias sin dato que las sostenga.
+- Siguiente paso: aprobación del humano (PARADA 1).
+
 ## 2026-10-24 · F-149 · `in_progress` (implementer) · rama `feature/F-149-mcp-sin-reglas-no-publicadas`
 
 - `sdd=false`, rigor `estandar`. Se trabaja en un worktree temporal de la rama (el árbol principal

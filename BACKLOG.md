@@ -3,11 +3,13 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **139 features**, 72 abiertas (0 en curso, 1 con la spec lista, 0 bloqueadas y 71 en backlog) y 67 terminadas.
+Resumen: **139 features**, 72 abiertas (1 en curso, 1 con la spec lista, 0 bloqueadas y 70 en backlog) y 67 terminadas.
 
 ## En curso
 
-_Ninguna feature en curso._
+| # | Feature | Prioridad | Rigor | Rama |
+|---|---|---|---|---|
+| F-140 | La fase 2 de la cartera (F-037): los ingredientes de la proyección de caja por obra (devengo pendiente, plazos de pago pactados y retenciones), sin convertir devengo en caja | 5 | estandar | `feature/F-140-proyeccion-caja-ingredientes` |
 
 ## Spec lista
 
@@ -26,7 +28,6 @@ _Ninguna feature bloqueada._
 | F-150 | La receta de la caja (fase 1): el procedimiento de devengo a caja en el diccionario, el coeficiente de venta por partida y los reparto en varios meses | 1 | estandar | `feature/F-150-receta-caja` |
 | F-151 | La función de caja proyectada (fase 2): `tesoreria.fn_caja_proyectada(obra, hipótesis del usuario)` | 2 | critico | `feature/F-151-funcion-caja-proyectada` |
 | F-054 | Glosario de negocio para la IA (`_meta.glosario`): qué significan en Ruesma la valorada, el incurrido, el ABC o la liquidatoria, y dónde están en el datamart | 4 | documental | `feature/F-054-conocimiento-de-negocio` |
-| F-140 | La fase 2 de la cartera (F-037): los ingredientes de la proyección de caja por obra (devengo pendiente, plazos de pago pactados y retenciones), sin convertir devengo en caja | 5 | estandar | `feature/F-140-proyeccion-caja-ingredientes` |
 | F-129 | El objetivo del comparativo se mide contra la oferta de referencia del propio comparativo (oficina técnica o planificado ABC), no contra el descompuesto: hoy casa el 29 % | 6 | critico | `feature/F-129-objetivo-contra-oferta-referencia` |
 | F-127 | El mayor analítico: los apuntes de la contabilidad analítica (apa) y sus saldos por cuenta analítica y mes, con las cuentas de contrapartida (CP) de los trabajadores | 7 | critico | `feature/F-127-mayor-analitico` |
 | F-092 | El catálogo de productos (maestro por empresa, árbol de naturalezas y su vínculo con la cuenta analítica) y el centro de coste en la cascada | 8 | estandar | `feature/F-092-productos-y-centro-de-coste` |
@@ -189,7 +190,7 @@ Pedida por el humano el 2026-09-02: 'enriquecer el conocimiento para cuando lea 
 
 ### F-140 · La fase 2 de la cartera (F-037): los ingredientes de la proyección de caja por obra (devengo pendiente, plazos de pago pactados y retenciones), sin convertir devengo en caja
 
-estado **pendiente** · prioridad 5 · rigor `estandar` · SDD sí · rama `feature/F-140-proyeccion-caja-ingredientes`
+estado **en curso** · prioridad 5 · rigor `estandar` · SDD sí · rama `feature/F-140-proyeccion-caja-ingredientes`
 
 Nace el 2026-10-14 por orden del humano («como feature con prioridad 4»), al preguntar qué es la fase 2 de F-037. F-037 (fase 1, desplegada el 14-10) publicó la cartera TAL CUAL: cada efecto de `raw.pag`/`raw.cob` con su vencimiento previsto, fecha real y estado, en `tesoreria` y `tesoreria_restringida`. Es un hecho, no un cálculo. La FASE 2, tal como la dejó escrita la ficha de F-037 y su spec (`specs/F-037-tesoreria/requirements.md`, «FUERA»), es sumar la PROYECCIÓN DE OBRA. ================ LA REGLA DEL HUMANO, que manda sobre el diseño: **el datamart NO convierte devengo en caja**. Publica los INGREDIENTES y la conversión la hace la IA en la consulta, con la hipótesis DECLARADA; la ficha del diccionario tiene que obligar a declararla, porque un resultado que no dice de qué hipótesis sale es un número inventado con aspecto de dato. Los ingredientes: (1) el devengo pendiente por obra y mes, desde `stg.plan_mensual` (ojo a `R-VERSION-MASTER`: conviven todas las versiones master); (2) el plazo de pago pactado, desde `auxpag` y `auxefp` (formas de pago y sus efectos); (3) el porcentaje y el plazo de la retención, desde `ctrrec`. Además, lo que la spec de F-037 dejó para esta fase (D4-B): asignar obra a los efectos sin centro con la cascada de `retenciones` y el respaldo por las líneas del documento (hoy el puente centro -> obra cubre el 78 %). FRONTERAS: F-054 (que el diccionario explique cómo se hace un flujo de caja en Ruesma) es el complemento documental; F-040 (ventas) condiciona el lado de cobros, que en la fase 1 se publicó con cobertura floja (sin documento de venta); F-095 y F-128 (retenciones). Los pagos de personal siguen restringidos como en F-037 (`R-TESORERIA-RESTRINGIDA`).
 
