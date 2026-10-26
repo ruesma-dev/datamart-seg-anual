@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **137 features**, 70 abiertas (0 en curso, 1 con la spec lista, 0 bloqueadas y 69 en backlog) y 67 terminadas.
+Resumen: **139 features**, 72 abiertas (0 en curso, 1 con la spec lista, 0 bloqueadas y 71 en backlog) y 67 terminadas.
 
 ## En curso
 
@@ -23,6 +23,8 @@ _Ninguna feature bloqueada._
 
 | # | Feature | Prioridad | Rigor | Rama |
 |---|---|---|---|---|
+| F-150 | La receta de la caja (fase 1): el procedimiento de devengo a caja en el diccionario, el coeficiente de venta por partida y los reparto en varios meses | 1 | estandar | `feature/F-150-receta-caja` |
+| F-151 | La función de caja proyectada (fase 2): `tesoreria.fn_caja_proyectada(obra, hipótesis del usuario)` | 2 | critico | `feature/F-151-funcion-caja-proyectada` |
 | F-054 | Glosario de negocio para la IA (`_meta.glosario`): qué significan en Ruesma la valorada, el incurrido, el ABC o la liquidatoria, y dónde están en el datamart | 4 | documental | `feature/F-054-conocimiento-de-negocio` |
 | F-140 | La fase 2 de la cartera (F-037): los ingredientes de la proyección de caja por obra (devengo pendiente, plazos de pago pactados y retenciones), sin convertir devengo en caja | 5 | estandar | `feature/F-140-proyeccion-caja-ingredientes` |
 | F-129 | El objetivo del comparativo se mide contra la oferta de referencia del propio comparativo (oficina técnica o planificado ABC), no contra el descompuesto: hoy casa el 29 % | 6 | critico | `feature/F-129-objetivo-contra-oferta-referencia` |
@@ -166,6 +168,18 @@ _Ninguna feature bloqueada._
 | F-142 | Que cualquier IA pueda leer los adjuntos: `abrir_adjunto` devuelve el contenido CONVERTIDO (texto por página, o imagen si es un escaneo) de PDF y ofimática, también Word 97 y Excel antiguos, y el original a petición | 74 | estandar |
 
 ## Detalle
+
+### F-150 · La receta de la caja (fase 1): el procedimiento de devengo a caja en el diccionario, el coeficiente de venta por partida y los reparto en varios meses
+
+estado **pendiente** · prioridad 1 · rigor `estandar` · SDD sí · rama `feature/F-150-receta-caja`
+
+Pedida por el humano el 2026-10-26, nace de la P2 de la review de F-140 y de su conversación sobre cómo se construye la caja. F-140 publica los ingredientes y las 23 hipótesis, pero no el ORDEN en que se aplican: la IA improvisa la secuencia en cada conversación. QUÉ SE HACE: (1) la RECETA, el procedimiento ordenado de devengo a caja (devengo del mes, desfase a certificación o factura, venta con coeficientes, plazo de cobro o pago, retención y su devolución, IVA y su liquidación, cartera viva y emitido tras el cierre sin duplicar), publicada en la ficha de `tesoreria.hipotesis_caja` y no en el resumen de la regla, para no subir el presupuesto de F-147; `R-CAJA-HIPOTESIS` remite a ella. (2) EL COEFICIENTE DE VENTA POR PARTIDA: el devengo de VENTA de F-140 sale de `mart`, SIN coeficientes, y lo que se certifica y se cobra va CON ellos (`R-VENTA-COEFICIENTES`). El humano propone sacarlos del ámbito de CERTIFICACIÓN. Medido el 2026-10-26 (solo lectura, versión master vigente de cada obra): el master de certificación (ámbito 9) existe en 121 de 126 obras; 40 obras con coeficiente en el 9 y 41 en el venta (11), ninguna con coeficiente solo en uno; el ratio con/sin coincide por partida en 69.022 de 85.909 partidas comunes; lo normal es 1,19 en toda la obra y en 13 obras conviven partidas a 1,000 con otras a 1,19-1,26 (una obra a 0,967), así que un coeficiente medio de obra falla en las mixtas. El 9 casi no está planificado en el tiempo (planificación en 7.178 de 85.914 partidas; fecha de planificación en 199 de 3.115 versiones) y su importe difiere del de venta en 26.678 partidas (743,6 frente a 772,3 M EUR sin coeficientes): el spec-author decide si el 9 da solo el coeficiente (importe con/sin por partida, con el 11 de respaldo) o también el importe a certificar, con el perfil temporal del 11. Se publica como columna (`coeficiente_venta`) en `tesoreria.devengo_pendiente_partida` y su agregado por obra-mes. (3) REPARTO EN VARIOS MESES: tanto el cobro como el pago pueden partirse en varios meses y empezar varios meses después (p. ej. formas de pago con varios vencimientos, o una certificación cobrada en dos plazos). Hoy H03/H08 son un único desfase y H02/H09 un único plazo: el catálogo debe admitir un perfil de reparto (lista de desfase en meses y porcentaje) por sentido, con defecto y valor por obra, y la receta debe aplicarlo. FUERA: la función que calcula la caja (F-151); validar las hipótesis con Control de Costes.
+
+### F-151 · La función de caja proyectada (fase 2): `tesoreria.fn_caja_proyectada(obra, hipótesis del usuario)`
+
+estado **pendiente** · prioridad 2 · rigor `critico` · SDD sí · rama `feature/F-151-funcion-caja-proyectada`
+
+Pedida por el humano el 2026-10-26. Libera a la IA del cálculo: una función SQL publicada que recibe la obra y las hipótesis que cambie el usuario (JSONB), rellena las demás con las de la obra o las de por defecto (`tesoreria.hipotesis_caja_obra`) y devuelve la caja mes a mes, cobros y pagos, con las 23 (o las que haya tras F-150) aplicadas y declaradas a su lado. Mismas hipótesis, misma caja: reproducible y testeable. La IA la llama con un `SELECT` (el MCP lo admite). Aplica la receta de F-150, incluidos el coeficiente de venta por partida y los repartos en varios meses con inicio diferido. Al publicarse, `R-CAJA-HIPOTESIS` manda usar la función; la receta de F-150 SIGUE disponible para cálculos especiales, que la IA declara como tales. FUERA: validar las hipótesis (mientras `validado` sea falso, la salida lo avisa).
 
 ### F-054 · Glosario de negocio para la IA (`_meta.glosario`): qué significan en Ruesma la valorada, el incurrido, el ABC o la liquidatoria, y dónde están en el datamart
 
