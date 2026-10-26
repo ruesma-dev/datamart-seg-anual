@@ -180,12 +180,12 @@ Medidas reales, no estimadas.
 
 | Evidencia | Valor |
 |---|---|
-| Tests ejecutados (`bash harness/init.sh`, con cobertura, 2026-10-26, HEAD `898771a`) | **9.338 passed, 0 failed, 268 skipped** en 4.077,49 s. Una pasada previa sin cobertura (antes de `01cc541`) dio 9.337 passed y 2 rojos, recuentos de 76 tablas de F-095/F-097, ya arreglados |
+| Tests ejecutados (`bash harness/init.sh`, con cobertura, 2026-10-26, HEAD `ae806aa`, tras la pasada 1 del review) | **9.340 passed, 0 failed, 268 skipped** en 3.803,86 s (+2 tests de P1-a; antes de la review, 9.338 en `898771a`) |
 | Tests de F-140 | `test_f140_dominio`, `_hipotesis` (+3 del superviviente), `_sql`, `_paso`, `_diccionario`: en verde dentro de la suite |
 | Cobertura de las líneas cambiadas | **96,6 %** (311/322 líneas cambiadas, umbral 80 %): línea `PUERTA COBERTURA` de `init.sh` |
 | Mutación (`python -m harness.mutacion --feature F-140 --workers 2 --timeout 2400`) | **141 generados, 20 evaluados (muestreo `estandar`, semilla 20260820), 19 muertos, 1 superviviente, 0 timeouts**, 6.448,8 s. El superviviente era un hueco real: test nuevo que lo mata (verificado a mano, `3 failed` con el mutante). Análisis en `progress/mutacion_F-140.md` |
-| Tiempo de la suite | 4.077,49 s con cobertura (`init.sh`); 1.324,66 s sin ella; línea base de la campaña 777,7 y 785,8 s por worktree |
-| `bash harness/init.sh` final | **Verde** (`ENTORNO LISTO`, exit 0): pytest 9.338 passed, `PUERTA COBERTURA` 96,6 %, `PUERTA TAMAÑO` (requirements 146/150, design 240/250, impl 167/220), ruff 281 avisos de deuda previa (no bloquea) |
+| Tiempo de la suite | 3.803,86 s con cobertura (`init.sh`, tras la review; 4.077,49 s antes); 1.324,66 s sin ella; línea base de la campaña 777,7 y 785,8 s por worktree |
+| `bash harness/init.sh` final | **Verde** (`ENTORNO LISTO`, exit 0) en `ae806aa`: pytest 9.340 passed, `PUERTA COBERTURA` 96,6 % (311/322), `PUERTA TAMAÑO` (requirements 146/150, design 240/250, impl 193/220, review 140/140), ruff 275 avisos de deuda previa (281 antes: los 6 de F-140, corregidos) |
 
 **Nota sobre la campaña**: el primer intento con 4 workers y el timeout automático abortó
 («LÍNEA BASE SIN TERMINAR»: la suite limpia no cabe en 600 s con 4 suites compitiendo). Se
