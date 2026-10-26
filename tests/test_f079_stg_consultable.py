@@ -105,6 +105,12 @@ GRUPO_B_FUNCIONES = (
     # (fecha y serie, copiadas de `compras` para no depender de ella).
     "tesoreria.fn_fecha",
     "tesoreria.fn_serie",
+    # F-140 (2026-10-25): las tres que leen la formula de plazo de Sigrid; su
+    # resultado ya esta en `dias_vencimientos`, `dias_retencion` y
+    # `formula_reconocida`.
+    "tesoreria.fn_plazo_dias",
+    "tesoreria.fn_plazo_dias_retencion",
+    "tesoreria.fn_plazo_reconocido",
     # F-097 (2026-09-28): las tres funciones locales del build de
     # `descompuestos`: el troceado del texto y las dos conversiones.
     "descompuestos.fn_fecha",
@@ -154,6 +160,13 @@ GRUPO_D_F095 = {
 GRUPO_E_F097 = {
     "descompuestos._des_texto": "el texto crudo sin trocear",
     "descompuestos._versiones_cargadas": "el control del incremental",
+}
+
+#: GRUPO F · la copia de la seccion `obras` del YAML de hipotesis de F-140, fuera
+#: de la superficie por diseno: la pregunta se responde desde
+#: `tesoreria.hipotesis_caja_obra`, que ya la resuelve.
+GRUPO_F_F140 = {
+    "tesoreria.hipotesis_caja_manual": "ya resuelta en hipotesis_caja_obra",
 }
 
 
@@ -435,6 +448,7 @@ def test_f079_r3_el_inventario_de_lo_que_no_se_toca_esta_completo() -> None:
 
     inventario = (
         set(GRUPO_B_FUNCIONES) | set(GRUPO_C) | set(GRUPO_D_F095) | set(GRUPO_E_F097)
+        | set(GRUPO_F_F140)
     )
     assert fuera == inventario, (
         f"sin inventariar: {sorted(fuera - inventario)}; "

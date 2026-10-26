@@ -36,7 +36,7 @@ from tests.test_f006_formato import PASOS_NOCTURNOS, _dicc, _esquemas
 RAIZ = Path(__file__).resolve().parents[1]
 DIR_DICCIONARIO = RAIZ / "config" / "diccionario"
 
-#: Las 21 reglas del YAML tras F-147 (D1, D3): 27 - 4 de perfiles + 1
+#: Las 21 reglas del YAML tras F-147 (D1, D3): 27 - 4 de perfiles + 1 (22 desde F-140, que anade `R-CAJA-HIPOTESIS`)
 #: - 3 de `fact_compras_linea` + 1 - `R-COSTE-CONSULTA`.
 REGLAS_TRAS_F147 = {
     "R-FRESCURA", "R-IMPORTE-MES", "R-VENTA-COEFICIENTES", "R-UNIVERSO-OBRA",
@@ -46,6 +46,8 @@ REGLAS_TRAS_F147 = {
     "R-OBRA-ACTIVA", "R-VERSION-MASTER", "R-FAS-AMBIGUO", "R-CLAVE-SUSTITUTA",
     "R-PARTIDA-CODIGO-NO-UNICO", "R-RETENCION-NO-JOIN-LINEAS",
     "R-COMPRAS-SIN-IVA", "R-COMPRAS-LINEA",
+    # F-140 (2026-10-25), la que obliga a declarar las hipotesis de caja.
+    "R-CAJA-HIPOTESIS",
 }
 
 #: Los ocho códigos que F-147 retira (R8). Se escriben partidos para que este

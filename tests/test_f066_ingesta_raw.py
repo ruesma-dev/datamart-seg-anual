@@ -46,10 +46,11 @@ FICHERO_PENDIENTES = RAIZ / "config" / "objetos_pendientes.yaml"
 #: F-085 añade `usu` --los usuarios de Sigrid, sin credenciales-- y son 72;
 #: F-090 añade `rcg` y `gra` --el índice de adjuntos de compras, filtradas-- y
 #: son 74; F-138 añade `conala` y `auxala` --las alarmas de los
-#: documentos, filtrada la primera-- y son 76. La
+#: documentos, filtrada la primera-- y son 76; F-140 añade `auxcob` y `auxefc`
+#: --las formas y los medios de cobro-- y son 78. La
 #: constante se mueve con la realidad a propósito: es lo que hace que
 #: los tres documentos que citan el número no se queden viejos en silencio.
-TOTAL_TABLAS = 76
+TOTAL_TABLAS = 78
 
 #: La lista estándar de nombres de texto/binario ilimitado de documentos, tal y
 #: como la declara el bloque COMPRAS de `config/tables_sigrid.yaml`.

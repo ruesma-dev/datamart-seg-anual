@@ -1933,3 +1933,16 @@ serializado (review 1: un código tras `
 ` o tabulador escapaba). Diccionario v61. `sdd=false`.
 Review: pasada 1 rechazada, pasada 2 APROBADO. Desplegada el 25-10: imagen `r20261025-0927`, v61 y
 MCP reiniciado.
+
+## F-140 · Los ingredientes de la proyección de caja · 2026-10-26
+
+Pedida por el humano: pasar el devengo de la obra (cobros y pagos) a caja con hipótesis que la IA
+declara en vivo, con defecto y valor por obra, descontando por partida lo ejecutado desde la
+versión cuatrimestral. El ETL publica los INGREDIENTES, no la caja: plazos de las formas de pago,
+condiciones de los contratos de compra y de cliente, devengo pendiente por partida, obra-mes y
+corte (con la frontera con la cartera), las 23 hipótesis de `config/hipotesis_caja.yaml` y su
+valor por obra, la cascada `obra_via` de los pagos sin centro y la ingesta de `auxcob`/`auxefc`
+(78 tablas). Regla `R-CAJA-HIPOTESIS`; diccionario v62. Rigor `estandar`. Review: pasada 1
+rechazada (papeleo y P1: 23 hipótesis por obra), pasada 2 APROBADO. Desplegada el 26-10: imagen
+`r20261026-2111`, `build-tesoreria` 239,7 s, v62 y MCP reiniciado. Siguen F-150 (receta,
+coeficiente de venta, repartos en varios meses) y F-151 (función de caja).

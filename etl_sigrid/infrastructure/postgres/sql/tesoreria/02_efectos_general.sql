@@ -38,7 +38,7 @@ INSERT INTO tesoreria.efectos (
     cuenta_contable_nombre, banco_id, banco, sucursal_id, sucursal,
     retencion_id, centro_coste_id, obra_id, codigo_obra, nombre_obra,
     remesa_id, codigo_remesa, fecha_remesa, importe_remesa,
-    previsto_antiguo
+    previsto_antiguo, obra_via
 )
 SELECT
     r.efecto_id,
@@ -89,7 +89,8 @@ SELECT
                               WHERE x.restringido AND x.remesa_id IS NOT NULL)
          THEN NULL
          ELSE r.importe_remesa END AS importe_remesa,
-    r.previsto_antiguo
+    r.previsto_antiguo,
+    r.obra_via
 FROM tesoreria_restringida.efectos r
 WHERE NOT r.restringido;
 

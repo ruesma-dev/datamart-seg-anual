@@ -53,6 +53,11 @@ COLUMNAS_COMPLETO = (
 )
 COLUMNAS_GENERAL = COLUMNAS_COMPLETO[:-2]
 
+#: F-140 (D10-A): `obra_via` entra en las dos carteras con `ALTER TABLE ... ADD
+#: COLUMN IF NOT EXISTS` (no en el `CREATE TABLE`), así que va DETRÁS de las de
+#: arriba en los dos `INSERT`. `compras.vencimientos` no la publica.
+COLUMNA_OBRA_VIA = "obra_via"
+
 
 @cache
 def _sql(ruta: Path) -> str:
@@ -252,7 +257,7 @@ def test_f037_r5_columnas_del_insert_en_el_orden_del_setup() -> None:
     compacto = _ejecutable(RUTA_COMPLETO)
     m = re.search(r"INSERT INTO tesoreria_restringida\.efectos \((.*?)\)", compacto)
     assert m
-    assert [c.strip() for c in m.group(1).split(",")] == list(COLUMNAS_COMPLETO)
+    assert [c.strip() for c in m.group(1).split(",")] == [*COLUMNAS_COMPLETO, COLUMNA_OBRA_VIA]
 
 
 @pytest.mark.parametrize("rama", ["PAGO", "COBRO"])
@@ -350,19 +355,30 @@ def test_f037_r7_solo_el_pago_es_factura_de_compra_y_tiene_cif_y_remesa_rpa() ->
 
 
 @pytest.mark.parametrize("rama", ["PAGO", "COBRO"])
-def test_f037_r8_la_obra_sale_solo_del_centro(rama: str) -> None:
-    """D4-A: ni contrato ni líneas (añadirían 6 y 112 efectos)."""
+def test_f037_r8_la_obra_sale_primero_del_centro(rama: str) -> None:
+    """R8 de F-037, cambiado por F-140 (D10-A, decisión del humano del 2026-10-25).
+
+    Antes: la obra salía SOLO del centro (D4-A de F-037). Ahora el centro sigue
+    mandando, y solo en los PAGOS sin centro entra la cascada del documento
+    (contrato, cabecera, líneas: `tests/test_f140_sql.py`, R17). Los COBROS no
+    tienen documento de venta (F-040): siguen solo con el centro.
+    """
     texto = _rama(rama)
     assert (
         "LEFT JOIN maestro.centros_coste cc ON cc.centro_coste_id = NULLIF(p.cenide, 0)"
         in texto
     )
-    for expresion in ("cc.obra_id AS obra_id", "cc.codigo_obra AS codigo_obra",
-                      "cc.nombre_obra AS nombre_obra"):
-        assert expresion in texto
+    if rama == "COBRO":
+        for expresion in ("cc.obra_id AS obra_id", "cc.codigo_obra AS codigo_obra",
+                          "cc.nombre_obra AS nombre_obra"):
+            assert expresion in texto
+        for prohibido in ("obra_documento", "ctride", "obride", "raw.dcfpro"):
+            assert prohibido not in texto, f"el cobro no tiene cascada: {prohibido}"
+    else:
+        assert "COALESCE(cc.obra_id, od.obra_id) AS obra_id" in texto
     ejecutable = _sin_comentarios(_sql(RUTA_COMPLETO))
-    for prohibido in ("compras.contratos", "ctride", "obride", "factura_lineas", "raw.dcfpro"):
-        assert prohibido not in ejecutable, f"D4-A: la obra no sale de {prohibido}"
+    assert "compras.contratos" not in ejecutable, "compras se construye después"
+    assert "factura_lineas" not in ejecutable
 
 
 @pytest.mark.parametrize(
@@ -472,7 +488,7 @@ def test_f037_r10_la_general_es_la_completa_sin_los_restringidos() -> None:
     compacto = _sin_comment_on(RUTA_GENERAL)
     m = re.search(r"INSERT INTO tesoreria\.efectos \((.*?)\)", compacto)
     assert m
-    assert [c.strip() for c in m.group(1).split(",")] == list(COLUMNAS_GENERAL)
+    assert [c.strip() for c in m.group(1).split(",")] == [*COLUMNAS_GENERAL, COLUMNA_OBRA_VIA]
     assert "FROM tesoreria_restringida.efectos r" in compacto
     assert re.search(r"WHERE NOT r\.restringido;", compacto)
     for prohibida in ("r.restringido,", "r.motivo_restriccion"):
@@ -485,7 +501,7 @@ def test_f037_r10_el_select_de_la_general_respeta_el_orden() -> None:
     cuerpo = compacto[compacto.index("SELECT "):compacto.index(" FROM tesoreria_restringida.efectos r")]
     salida = re.findall(r"(?:r\.(\w+)(?:,|$))|(?:AS (\w+)(?:,|$))", cuerpo + ",")
     nombres = [a or b for a, b in salida]
-    assert nombres == list(COLUMNAS_GENERAL)
+    assert nombres == [*COLUMNAS_GENERAL, COLUMNA_OBRA_VIA]
 
 
 def test_f037_r11_la_remesa_mixta_pierde_su_importe() -> None:

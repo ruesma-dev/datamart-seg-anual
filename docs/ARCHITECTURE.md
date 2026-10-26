@@ -72,7 +72,8 @@ restringida o si general más restringidos no suman el completo. Regla dura
 una fila por EFECTO de `raw.pag` (PAGO) y `raw.cob` (COBRO), tal cual, con su
 estado PREVISTO/REALIZADO/BAJA (precedencia de F-094, igual en los dos
 sentidos: la baja gana y `est = 10` sin fecha real es REALIZADO), su signo de
-caja (`importe_flujo`), la obra SOLO por el centro de coste y la marca
+caja (`importe_flujo`), la obra por el centro de coste (y, desde F-140, en los
+pagos sin centro, por su factura: `obra_via`) y la marca
 `previsto_antiguo` (PREVISTO vencido hace más de 2 años: deuda sin puntear, no
 caja). Mismo patrón de DOS esquemas que la contabilidad:
 `tesoreria_restringida.efectos` es la cartera COMPLETA con `restringido` y
@@ -87,8 +88,45 @@ desde F-037 una VISTA de `tesoreria.efectos` (pago y factura de compra, mismas
 columnas), y un `DROP ... CASCADE` se la llevaría cada noche. `build_tesoreria`
 solo depende de `ingest_raw`, va delante de `build_compras` en la lista y nadie
 lo declara en su `depends_on`: si falla, su `TRUNCATE` se deshace y compras lee
-la cartera de ayer. Es cartera, no devengo: la proyección de obra (fase 2) no
-existe. Reglas duras `R-TESORERIA-ESTADO` y `R-PERFILES`.
+la cartera de ayer. Es cartera, no devengo. Reglas duras `R-TESORERIA-ESTADO`
+y `R-PERFILES`.
+
+**Los ingredientes de la caja futura (F-140, 2026-10-25), en el mismo esquema.**
+El ETL **no** convierte devengo en caja: publica lo necesario para que lo haga
+quien consulta, declarando sus hipótesis (regla dura `R-CAJA-HIPOTESIS`).
+
+- **Lo pactado**: `tesoreria.plazos_forma_pago` (vista: las formas de pago de
+  `auxpag` y de cobro de `auxcob`, con la fórmula de plazo leída por tres
+  funciones `fn_plazo_*` que replican `domain/proyeccion_caja.py`),
+  `tesoreria.condiciones_contrato_compra` (por contrato de `raw.ctr`: forma de
+  pago, días fijos del proveedor, retención de garantía) y
+  `tesoreria.condiciones_contrato_cliente` (por contrato de `raw.obrctr`).
+- **El devengo pendiente** (`07_devengo_pendiente.sql`, una transacción con
+  tablas temporales y `ANALYZE`: sin estadísticas el planificador elegía bucles
+  anidados y tardaba 875 s): para la última versión master V de cada obra con
+  meses planificados tras su último cierre, lo pendiente se descuenta **por
+  partida** de lo ejecutado desde que V entró en vigor
+  (`tesoreria.devengo_pendiente_partida`), se reparte por mes según el plan de V
+  (`tesoreria.devengo_pendiente_obra_mes`; una guarda `DO` exige que la suma
+  cuadre) y se resume por obra con su frontera con la cartera
+  (`tesoreria.devengo_corte_obra`: `cartera_viva` y
+  `cartera_emitida_tras_cierre`, para no contar dos veces lo ya emitido). Lee
+  `stg.plan_mensual` y `mart.fact_seguimiento_mensual` de la misma noche:
+  `build_stg` y `build_mart` van delante, y la reanudación de F-148 lo sabe
+  (`LECTURAS_PARA_REANUDAR`).
+- **Las hipótesis**: las 23 (H01-H23) viven en `config/hipotesis_caja.yaml`, que
+  mantiene Control de Costes y aprueba el humano; `build_tesoreria` lo valida
+  (`infrastructure/config/hipotesis_caja_yaml.py`) justo antes de cargarlo y,
+  si tiene errores, el paso queda FAILED con la lista: lo de `01`-`07` (cartera,
+  condiciones y devengo) ya está escrito con los datos de hoy, y lo que NO se
+  escribe son las tres tablas de hipótesis, que se quedan como estaban (si el
+  fallo es una obra del YAML que no existe, la guarda de `08` salta con el
+  catálogo y la sección manual ya cargados y `hipotesis_caja_obra` es la de
+  ayer). Se publican en `tesoreria.hipotesis_caja` (catálogo, todas
+  `validado` falso hoy), `tesoreria.hipotesis_caja_manual` (la sección `obras`)
+  y `tesoreria.hipotesis_caja_obra` (las 23 en cada obra, con su nivel: MANUAL >
+  SIGRID > DEFECTO; SIGRID solo para H09-H11, de los contratos con el cliente).
+- Ingesta: `auxcob` y `auxefc` entran a `raw` (78 tablas).
 
 **`descompuestos` (F-097, 2026-09-28) es de qué se compone cada partida**, por
 ORIGEN, y es el primer esquema del datamart que NO se reconstruye de cero:
@@ -503,9 +541,9 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
   Azure. Hoy **lee y valida, no carga** a `aux.*`: las tablas destino y el
   esquema de los libros no están definidos todavía.
 
-### Qué se copia de Sigrid: 76 tablas, y qué NO está ahí (F-066, F-074, F-080, F-102, F-107, F-095, F-085, F-090, F-138)
+### Qué se copia de Sigrid: 78 tablas, y qué NO está ahí (F-066, F-074, F-080, F-102, F-107, F-095, F-085, F-090, F-138, F-140)
 
-`config/tables_sigrid.yaml` declara **76 tablas**: eran 31, F-066 las dejó en 56
+`config/tables_sigrid.yaml` declara **78 tablas**: eran 31, F-066 las dejó en 56
 el 2026-09-06, F-074 sumó nueve más el 2026-09-09, F-080 otras tres el
 2026-09-11 —`auxnap`, `auxban` y `rpa`, el bloque de pago del efecto y las
 remesas—, F-102 una el 2026-09-23 —`auxemp`, las 38 empresas del grupo, que da
@@ -532,7 +570,11 @@ adjuntos de personal) y **sin binario** (`gra` sin `ima`, `pul`, `tex` ni
 familias** (falla cerrada ante una familia nueva) que deja fuera la 43,
 empleados. Además de recuperar la columna `con.tex` (el memo del documento,
 informado en el 65,5 % de las facturas; traerlo cuesta +26 % de tiempo de
-lectura sobre `con`, medio minuto de la ventana nocturna).
+lectura sobre `con`, medio minuto de la ventana nocturna). F-140 suma las dos
+últimas el 2026-10-25, `auxcob` (las 52 formas de COBRO, a donde apunta
+`obrctr.pagide`) y `auxefc` (sus 8 medios): la pareja de `auxpag`/`auxefp` en el
+lado del cliente, enteras y con `tiemod`, para leer la fórmula de plazo del
+contrato con el cliente (`tesoreria.plazos_forma_pago`).
 Las 25 que entraron el primer día vienen en tres grupos, y ninguna se supuso: todo lo
 que sigue se midió contra Sigrid ese día por `sigrid-api` en solo lectura.
 

@@ -2207,11 +2207,12 @@
         "Los pagos de personal no salen de `tesoreria_restringida` (misma regla que F-037)",
         "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
       ],
-      "status": "pending",
+      "status": "done",
       "sdd": true,
       "rigor": "estandar",
       "priority": 5,
-      "branch": "feature/F-140-proyeccion-caja-ingredientes"
+      "branch": "feature/F-140-proyeccion-caja-ingredientes",
+      "notes": "2026-10-26: CERRADA. Review APROBADO en pasada 2 (5bd69c8); pasada 1 CHANGES_REQUESTED (MANUAL sin comando, notes, azure-apps y P1: 23 hipotesis por obra con H17 a DEFECTO). Merge 9b91165 por orden del humano. Desplegada el 26-10: imagen r20261026-2111, ingest auxcob (52) y auxefc (8), build-tesoreria 239,7 s (devengo_pendiente 118,9 s, R27), R28 OK, v62 publicada y MCP reiniciado (v62 en sus logs). P2 (venta con coeficientes) va a F-150. Pendiente MANUAL del humano: R19 con los dos logins y R25 en conversacion nueva."
     },
     {
       "id": "F-141",

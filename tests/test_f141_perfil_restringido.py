@@ -1524,7 +1524,12 @@ AVISO = "No disponible para el perfil restringido"
 NO_DISPONIBLES = {
     # F-146: el esquema entero (las cuatro tablas; `fn_fecha` es una función)
     "contabilidad.yaml": ["plan_cuentas", "mayor", "saldos_cuenta_mes", "apuntes_restringidos_mes"],
-    "tesoreria.yaml": ["efectos", "efectos_restringidos_mes"],
+    # F-140 anade al esquema sus ocho tablas y su vista (las tres funciones no cuentan)
+    "tesoreria.yaml": ["efectos", "efectos_restringidos_mes", "plazos_forma_pago",
+                       "condiciones_contrato_compra", "condiciones_contrato_cliente",
+                       "devengo_pendiente_partida", "devengo_pendiente_obra_mes",
+                       "devengo_corte_obra", "hipotesis_caja", "hipotesis_caja_manual",
+                       "hipotesis_caja_obra"],
     "personal.yaml": ["recursos", "partes_lineas", "v_pbi_horas_obra_mes", "partes",
                       "recursos_tipos_hora", "usuarios_sigrid"],
 }
