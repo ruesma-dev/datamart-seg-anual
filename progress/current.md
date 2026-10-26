@@ -25,8 +25,16 @@
 - **R19 OK** (26-10, el líder por encargo del humano; contraseñas leídas del vault a memoria, sin
   imprimir): con `mcp_sigrid_dm_ro` los nueve objetos nuevos se leen (la manual, 0 filas sin
   error); con `mcp_sigrid_dm_restringido`, «permission denied for schema tesoreria» en los nueve.
-- **Pendiente MANUAL del humano: R25** (paso 10, conversación NUEVA con el MCP: el conector de la
-  sesión del líder quedó caído tras el reinicio). `azure-apps` `995e369` local (no tiene remoto).
+- **R25 OK** (27-10, el líder por encargo del humano, con `claude -p` en una sesión NUEVA, sin
+  contexto ni `CLAUDE.md`, solo con las herramientas del MCP). Turno 1, «¿qué caja necesitará la
+  obra 0696 los próximos seis meses?»: caja mes a mes y las 23 hipótesis con su valor sin pedirlo,
+  todas DEFECTO salvo H09 (60 días, de los contratos), avisa de que ninguna está validada y de que
+  no es un dato del sistema. Turno 2, «¿y si cobramos a 90 días?»: cambia SOLO H09 «porque así lo
+  pides tú» (nivel usuario) y rehace la caja. Hallazgos de la IA para F-150 y Control de Costes:
+  H12 (IVA de venta 21 %) choca con vivienda al 10 %; H10 queda a 0 % porque los contratos del
+  cliente no coinciden (5 % los principales); y en la 0696 la fase «Octubre 2026» ya existe con
+  la venta de septiembre anulada, así que el corte trata octubre como cerrado (a revisar).
+  `azure-apps` `995e369` local (no tiene remoto).
 
 ## 2026-10-25 · F-140 · `in_progress` (implementer) · rama `feature/F-140-proyeccion-caja-ingredientes`
 
