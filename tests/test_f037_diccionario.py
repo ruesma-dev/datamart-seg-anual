@@ -15,7 +15,7 @@ import pytest
 import yaml
 
 from tests._texto import contiene
-from tests.test_f037_sql import COLUMNAS_COMPLETO, COLUMNAS_GENERAL
+from tests.test_f037_sql import COLUMNA_OBRA_VIA, COLUMNAS_COMPLETO, COLUMNAS_GENERAL
 
 RAIZ = Path(__file__).resolve().parents[1]
 DICC = RAIZ / "config" / "diccionario"
@@ -62,8 +62,9 @@ def _regla(codigo: str) -> dict:
 @pytest.mark.parametrize(
     ("nombre", "columnas"),
     [
-        ("tesoreria.efectos", COLUMNAS_GENERAL),
-        ("tesoreria_restringida.efectos", COLUMNAS_COMPLETO),
+        # F-140 (D10-A) anade `obra_via` al final de las dos.
+        ("tesoreria.efectos", (*COLUMNAS_GENERAL, COLUMNA_OBRA_VIA)),
+        ("tesoreria_restringida.efectos", (*COLUMNAS_COMPLETO, COLUMNA_OBRA_VIA)),
         ("tesoreria.efectos_restringidos_mes",
          ("empresa_id", "sentido", "anio", "mes", "estado_tesoreria", "num_efectos")),
     ],
@@ -181,7 +182,9 @@ def test_f037_r27_la_ficha_declara_cobros_flojos_retenciones_y_fase_2() -> None:
     texto = _texto(_ficha("tesoreria.efectos"))
     assert "21.914" in texto and "F-040" in texto, "cobertura floja de cobros"
     assert contiene(texto, "19,9 M EUR"), "la duda de las retenciones de cliente de baja"
-    assert contiene(texto, "NO DEVENGO") and contiene(texto.lower(), "fase 2")
+    # La «fase 2» que esta ficha decia que no existia la publica F-140: ahora
+    # remite a ella en vez de negarla.
+    assert contiene(texto, "NO DEVENGO") and "tesoreria.devengo_corte_obra" in texto
 
 
 def test_f037_r30_la_ficha_publica_el_contraste_y_su_porque() -> None:

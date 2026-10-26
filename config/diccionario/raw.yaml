@@ -1966,7 +1966,7 @@ objetos:
 
       **Como se carga.** El job nocturno arranca `run-all --full`, asi que cada noche la tabla se **recarga entera** desde Sigrid.
 
-      **No se trae** `tex` (texto ilimitado), por la lista estandar de documentos de compras que comparte con `auxpag`.
+      **No se traen** 13 columnas de binario o texto ilimitado: la lista estandar de documentos que comparten todas las tablas de compras del ETL, la misma que en auxpag; esta tabla no tiene la mayoria de esos nombres, y excluir un nombre inexistente es inofensivo. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
     grano: Una fila por forma de cobro, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -1985,6 +1985,8 @@ objetos:
       **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `auxefc`, y se localiza con `grep -n "^| auxefc " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
 
       **Como se carga.** El job nocturno arranca `run-all --full`, asi que cada noche la tabla se **recarga entera** desde Sigrid.
+
+      **No se traen** 13 columnas de binario o texto ilimitado: la lista estandar de documentos que comparten todas las tablas de compras del ETL, la misma que en auxefp; esta tabla no tiene la mayoria de esos nombres, y excluir un nombre inexistente es inofensivo. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
     grano: Una fila por medio de cobro, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw

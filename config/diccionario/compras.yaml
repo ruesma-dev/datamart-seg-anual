@@ -213,7 +213,10 @@ objetos:
       trae el importe**: aqui no hay ninguna columna de dinero, y la frase "por
       cuanto" que esta descripcion decia antes hacia escribir
       `importe_contrato`, que no existe. El importe comprometido esta en
-      `compras.v_pbi_contrato_consumo.importe_contratado`.
+      `compras.v_pbi_contrato_consumo.importe_contratado`. Lo pactado para
+      pagarlo (forma de pago con su formula leida, retencion de garantia, dias
+      fijos de pago del proveedor) esta en
+      `tesoreria.condiciones_contrato_compra` (F-140), por `contrato_id`.
 
       **EL ESTADO (F-084, 2026-09-16) Y SU ANTIGUEDAD (F-132, 2026-10-08).**
 
@@ -2169,7 +2172,9 @@ objetos:
       confirming, compensacion de saldos, tarjeta. Es la DIMENSION, no el uso:
       dice que formas de pago existen y que significan, **no** con cual se pago
       un documento concreto. Ese cableado al contrato es F-067 y a la factura,
-      F-080.
+      F-080. La formula de plazo LEIDA (dias de cada vencimiento y de la
+      retencion) y las formas de COBRO estan en `tesoreria.plazos_forma_pago`
+      (F-140).
     grano: >-
       Una fila por forma de pago, o sea una por `forma_pago_id`: **69 el
       2026-09-10**. No se filtra ninguna,

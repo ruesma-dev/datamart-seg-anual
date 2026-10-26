@@ -77,40 +77,43 @@ INSERT INTO tesoreria_restringida.efectos (
 WITH facturas_sin_centro AS (
     -- F-140 (D10-A): las facturas de compra de los pagos SIN centro de coste.
     -- Las condiciones van en el ON: este fichero no filtra filas con WHERE.
+    -- La columna se llama `factura_id` y no `documento_id` a proposito: el
+    -- guardian de nulos del diccionario lee la PRIMERA proyeccion de cada
+    -- nombre, y la de esta CTE (sin NULLIF, por el JOIN) no es la publicada.
     SELECT DISTINCT
-        d.ide                                   AS documento_id,
-        NULLIF(d.ctride, 0)                     AS contrato_id,
+        fc.ide                                  AS factura_id,
+        NULLIF(fc.ctride, 0)                    AS contrato_id,
         ob.ide                                  AS obra_cabecera
     FROM raw.pag p
-    JOIN raw.dcf d ON d.ide = p.conide AND COALESCE(p.cenide, 0) = 0
-    LEFT JOIN raw.obr ob ON ob.ide = NULLIF(d.obride, 0)
+    JOIN raw.dcf fc ON fc.ide = p.conide AND COALESCE(p.cenide, 0) = 0
+    LEFT JOIN raw.obr ob ON ob.ide = NULLIF(fc.obride, 0)
 )
 , obras_contrato AS (
     -- La obra de los contratos de la factura: el de su cabecera y los de sus
     -- lineas (`docoriide` que es un `ctr`). Si son varias, NULL: no decide.
     SELECT
-        f.documento_id,
+        f.factura_id,
         CASE WHEN count(DISTINCT ob.ide) = 1 THEN min(ob.ide) END AS obra_id
     FROM facturas_sin_centro f
-    LEFT JOIN raw.dcfpro l ON l.docide = f.documento_id
+    LEFT JOIN raw.dcfpro l ON l.docide = f.factura_id
     JOIN raw.ctr k ON k.ide = f.contrato_id OR k.ide = l.docoriide
     JOIN raw.obr ob ON ob.ide = NULLIF(k.obride, 0)
-    GROUP BY f.documento_id
+    GROUP BY f.factura_id
 )
 , obras_lineas AS (
     -- La obra de las lineas de la factura. Si son varias, NULL: no decide.
     SELECT
-        f.documento_id,
+        f.factura_id,
         CASE WHEN count(DISTINCT ob.ide) = 1 THEN min(ob.ide) END AS obra_id
     FROM facturas_sin_centro f
-    JOIN raw.dcfpro l ON l.docide = f.documento_id
+    JOIN raw.dcfpro l ON l.docide = f.factura_id
     JOIN raw.obr ob ON ob.ide = NULLIF(l.obride, 0)
-    GROUP BY f.documento_id
+    GROUP BY f.factura_id
 )
 , obra_documento AS (
     -- La cascada, en el orden del dominio: contrato, cabecera, lineas.
     SELECT
-        f.documento_id,
+        f.factura_id,
         CASE WHEN oc.obra_id IS NOT NULL THEN oc.obra_id
              WHEN f.obra_cabecera IS NOT NULL THEN f.obra_cabecera
              WHEN ol.obra_id IS NOT NULL THEN ol.obra_id END AS obra_id,
@@ -118,8 +121,8 @@ WITH facturas_sin_centro AS (
              WHEN f.obra_cabecera IS NOT NULL THEN 'FACTURA_CABECERA'
              WHEN ol.obra_id IS NOT NULL THEN 'FACTURA_LINEAS' END AS obra_via
     FROM facturas_sin_centro f
-    LEFT JOIN obras_contrato oc ON oc.documento_id = f.documento_id
-    LEFT JOIN obras_lineas   ol ON ol.documento_id = f.documento_id
+    LEFT JOIN obras_contrato oc ON oc.factura_id = f.factura_id
+    LEFT JOIN obras_lineas   ol ON ol.factura_id = f.factura_id
 )
 , efectos AS (
     -- -----------------------------------------------------------------------
@@ -194,7 +197,7 @@ WITH facturas_sin_centro AS (
     LEFT JOIN raw.rpa    r   ON r.ide   = NULLIF(p.remide, 0)
     LEFT JOIN raw.con    rc  ON rc.ide  = r.ide
     -- F-140 (D10-A): la cascada, solo si el efecto NO tiene centro.
-    LEFT JOIN obra_documento od ON od.documento_id = NULLIF(p.conide, 0)
+    LEFT JOIN obra_documento od ON od.factura_id = NULLIF(p.conide, 0)
                                AND COALESCE(p.cenide, 0) = 0
     LEFT JOIN raw.con    obc ON obc.ide = od.obra_id
 

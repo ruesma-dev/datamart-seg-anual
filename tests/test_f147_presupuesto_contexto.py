@@ -39,6 +39,12 @@ from tests.test_f006_formato import _dicc, _ficha, _regla
 #: fórmula de R17. Solo baja (trinquete: R19 falla si sobra más de
 #: `HOLGURA_TRINQUETE`). Historia, de la más reciente a la más antigua:
 #:
+#: * 30.873 · 2026-10-25, F-140 (diccionario v62), SUBIDO con motivo: los
+#:   ingredientes de la caja. Reglas 7.431 (+325: `R-CAJA-HIPOTESIS`, bloqueante,
+#:   con resumen: sin ella el agente da una caja sin declarar sus hipotesis),
+#:   enrutado 15.000 (+1.099: nueve fichas recomendadas nuevas de `tesoreria`,
+#:   dos preguntas cada una, que son las que enrutan «que caja necesitara la
+#:   obra X»), bloques 8.442 (-9). La v61 medía 29.458.
 #: * 29.504 · 2026-10-22, F-147 T12-T15 (diccionario v59): reglas 7.107 (20
 #:   publicadas; `R-PERFILES` entera), enrutado 13.901 (114 fichas, 2 preguntas
 #:   cada una como mucho), bloques 8.496 (`esquemas` 5.931). Antes de F-147,
@@ -46,7 +52,7 @@ from tests.test_f006_formato import _dicc, _ficha, _regla
 #:   todas las preguntas): 78.057.
 #: * 29.787 · 2026-10-22, F-147 T5: PROVISIONAL, la medida de T2 sobre la v58
 #:   (sin resúmenes todavía: reglas 2.233, enrutado 13.886, bloques 13.668).
-PRESUPUESTO_MAX = 29_504
+PRESUPUESTO_MAX = 30_873
 
 
 def _medir(dicc) -> PresupuestoContexto:

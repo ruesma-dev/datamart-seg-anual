@@ -13,7 +13,23 @@
 
 - Decisiones D1-D19 cerradas por el humano el 2026-10-25: todas A, D10 incluida (cascada con
   `obra_via`). Rigor `estandar`. Diccionario v61 -> v62. Informe: `progress/impl_F-140.md`.
-- Tarea en curso: T1 (dominio: formula y partida).
+- Hechas T1-T12 (commits `F-140 T1`..`F-140 T12`). En curso: T13-T14 (contraste y mutacion).
+- Diccionario del arbol tras T11 (v62): **248 objetos, 2143 columnas, 122 de consumo**, 22
+  reglas en el YAML (21 publicadas). Presupuesto de F-147 SUBIDO a 30.873 con su motivo
+  (+325 de `R-CAJA-HIPOTESIS`, +1.099 de enrutado de las nueve fichas recomendadas).
+- (6) La CTE de T6 publica `factura_id`, no `documento_id`, y su alias de `raw.dcf` es `fc`:
+  el guardian de nulos del diccionario (`test_f006_fichas`) leia la primera proyeccion de
+  `documento_id`/`codigo_documento` del fichero y acusaba a la ficha de la restringida.
+- Desviaciones y decisiones de implementacion (justificadas en `progress/impl_F-140.md`):
+  (1) `07` usa tablas temporales `ON COMMIT DROP` con `ANALYZE` (sin estadisticas, 875 s en solo
+  lectura); (2) la carga del YAML necesita un metodo nuevo del cliente, `cargar_hipotesis_caja`, y
+  su SQL en `infrastructure/postgres/hipotesis_caja_sql.py` (fuera de la lista de ficheros);
+  (3) SIGRID de H09 solo con formula de UN vencimiento, y de H09-H11 solo si TODOS los contratos
+  de la obra dan valor y el mismo; (4) tres tests propios ajustados al escribir 07 (`\binterval\b`,
+  `ON COMMIT DROP`, `to_regclass`); (5) `main.py` no se toca: su docstring de `build-tesoreria`
+  sigue citando 4 SQL.
+- Contraste de 07 en solo lectura (logica como CTE): 21+21 obras, restante 113,98/115,42 M EUR,
+  pendiente 133,20/132,37, guarda de la suma sin fallos, 0 partidas sin categoria.
 - Calibracion de solo lectura (2026-10-25, Azure): el universo de (obra, concepto) es el de
   CUALQUIER mes planificado posterior al ultimo cierre real, incluidas las obras sin real (1 de
   coste y 2 de venta): 21 y 21, 113,98 y 115,43 M EUR, como `progress/spec_F-140.md` §2. Plan

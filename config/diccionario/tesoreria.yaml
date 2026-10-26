@@ -12,6 +12,15 @@
 #
 # Las cifras son de la nocturna del 2026-10-13, leidas en solo lectura; aqui
 # solo hay recuentos y agregados, ni nombres ni importes de nadie.
+#
+# F-140 (2026-10-25) anade los INGREDIENTES de la proyeccion de caja: lo
+# pactado (`plazos_forma_pago`, `condiciones_contrato_compra`,
+# `condiciones_contrato_cliente`), el devengo pendiente descontado por partida
+# (`devengo_pendiente_partida`, `devengo_pendiente_obra_mes`,
+# `devengo_corte_obra`) y las hipotesis para pasarlo a caja (`hipotesis_caja`,
+# `hipotesis_caja_manual`, `hipotesis_caja_obra`). No hay caja proyectada: la
+# hace quien consulta, declarando las hipotesis (`R-CAJA-HIPOTESIS`). Y la
+# obra de los pagos sin centro sale de su factura (`obra_via`, D10-A).
 
 version: 1
 esquema: tesoreria
@@ -74,11 +83,14 @@ objetos:
       (19,9 M EUR) podrian no ser fantasma (F-094 vio 13,8 M EUR de retencion
       de cliente en la contabilidad); no se ha resuelto.
 
-      **ES CAJA Y CARTERA, NO DEVENGO.** La fase 2 -el devengo pendiente de
-      la obra, los plazos pactados, la retencion de contrato- NO existe:
-      convertir planificacion en caja es una hipotesis que pone quien consulta,
-      declarandola. La obra sale SOLO del centro de coste del efecto (77,9 % de
-      los pagos, 96,6 % de la cartera viva futura); sin centro, NULL.
+      **ES CAJA Y CARTERA, NO DEVENGO** (`R-CAJA-HIPOTESIS`). Lo que la
+      obra aun no ha facturado no esta aqui: el devengo pendiente de cada obra
+      esta en `tesoreria.devengo_corte_obra` (F-140), y su frontera con esta
+      cartera, en sus columnas `cartera_viva` y `cartera_emitida_tras_cierre`,
+      para no contar dos veces lo ya emitido. Pasar devengo a caja lo hace
+      quien consulta declarando las hipotesis (`tesoreria.hipotesis_caja_obra`).
+      La obra sale del centro de coste del efecto y, en los pagos sin centro,
+      de su factura (F-140; `obra_via`).
     grano: >-
       Una fila por efecto, identificada por `efecto_id` (el `ide` de `raw.pag`
       o de `raw.cob`, unico entre los dos: es un `con.ide`). Clave primaria
@@ -259,18 +271,25 @@ objetos:
         nulo_significa: El efecto no tiene centro de coste.
       obra_id:
         significado: >-
-          Obra del efecto, SOLO por su centro de coste (`maestro.centros_coste`).
-          Ni contrato ni lineas: anadirian 6 y 112 efectos (D4 de F-037).
+          Obra del efecto. Primero la de su centro de coste
+          (`maestro.centros_coste`); un centro que NO es obra (estructura,
+          delegacion) deja el efecto sin obra. Solo en los PAGOS SIN centro,
+          desde F-140 (D10-A), la de su factura: la obra unica de sus
+          contratos, la de su cabecera o la unica de sus lineas, en ese orden
+          (`obra_via` dice cual). +113 pagos y 0,23 M EUR medidos el
+          2026-10-25: el 86,95 % de los pagos no de baja tiene obra. Los
+          cobros, solo por el centro.
         agregacion: no_sumable
         nulo_significa: >-
-          Sin centro, o con un centro que no es obra (estructura, delegacion):
-          pagos sueltos, facturas de estructura y la nomina. No hay obra que
-          buscar en otro sitio.
+          Sin centro y sin factura que la de, o con un centro que no es obra:
+          pagos sueltos, agrupaciones (`AGR`, Sigrid no guarda su vinculo),
+          facturas de estructura y la nomina. No hay obra que buscar en otro
+          sitio.
       codigo_obra:
-        significado: Codigo de la obra del centro de coste.
+        significado: Codigo de la obra del efecto (la de `obra_id`).
         nulo_significa: El efecto no tiene obra.
       nombre_obra:
-        significado: Nombre de la obra del centro de coste.
+        significado: Nombre de la obra del efecto (la de `obra_id`).
         nulo_significa: El efecto no tiene obra.
       remesa_id:
         significado: Remesa en la que va el efecto (`remide`).
@@ -297,11 +316,20 @@ objetos:
           Cierto si el efecto es PREVISTO y vencio hace mas de 2 anos, a la
           fecha del build. Deuda por depurar en Sigrid, no caja: un flujo de
           caja la excluye.
+      obra_via:
+        significado: >-
+          Por donde se asigno `obra_id` (F-140, D10-A): CENTRO (su centro de
+          coste), CONTRATO (la obra unica de los contratos de su factura),
+          FACTURA_CABECERA (la obra de la cabecera de la factura) o
+          FACTURA_LINEAS (la obra unica de sus lineas). Las tres ultimas solo
+          en pagos sin centro.
+        valores: [CENTRO, CONTRATO, FACTURA_CABECERA, FACTURA_LINEAS]
+        nulo_significa: El efecto no tiene obra.
     relaciones:
       - de: obra_id
         a: maestro.obras.obra_id
         cardinalidad: "N:1"
-        porque: La ficha de la obra del efecto (la de su centro de coste).
+        porque: La ficha de la obra del efecto (`obra_via` dice de donde sale).
       - de: centro_coste_id
         a: maestro.centros_coste.centro_coste_id
         cardinalidad: "N:1"
@@ -388,6 +416,867 @@ objetos:
     descripcion: >-
       Serie documental de un codigo de Sigrid: su prefijo alfabetico en
       mayusculas ('FR26/06051_01' da FR). Copia local de `compras.fn_serie`.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_tesoreria
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  # =========================================================================
+  # F-140 (2026-10-25): LOS INGREDIENTES DE LA PROYECCION DE CAJA
+  # =========================================================================
+
+  devengo_corte_obra:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **No disponible para el perfil restringido** (F-141, `R-PERFILES`):
+      con su login la consulta devuelve «permission denied», y eso no se rodea:
+      responde que el perfil no lo incluye.
+
+      **EL PUNTO DE PARTIDA DE CUALQUIER PROYECCION DE CAJA DE UNA OBRA**
+      (F-140): por obra y concepto (COSTE, VENTA), lo que su ULTIMA version
+      master (V) todavia espera devengar despues del ultimo mes cerrado,
+      DESCONTADO partida a partida lo ya ejecutado desde que V entro en vigor.
+      **No es caja** (`R-CAJA-HIPOTESIS`): es devengo SIN IVA. Pasarlo a caja
+      lo hace quien consulta, aplicando y DECLARANDO las hipotesis de
+      `tesoreria.hipotesis_caja_obra`.
+
+      **QUE OBRAS**: las que tienen algun mes PLANIFICADO en
+      `mart.fact_seguimiento_mensual` despues de su ultimo mes REAL: 21 en
+      coste y 21 en venta el 2026-10-25, todas con una sola version
+      pendiente. **PENDIENTE frente a PLAN RESTANTE**: el plan restante de V
+      tras el cierre es 113,98 M EUR de coste y 115,42 de venta, pero lo
+      pendiente es 133,20 y 132,37, porque las obras van retrasadas: lo
+      planificado y no ejecutado del intervalo (`retrasado`) sigue pendiente.
+      `sobre_ejecutado` es lo ejecutado POR ENCIMA de todo el plan de V, que
+      no resta de otras partidas.
+
+      **LA FRONTERA CON LA CARTERA** (`tesoreria.efectos`, del sentido del
+      concepto: COSTE es PAGO, VENTA es COBRO): `cartera_viva` es lo PREVISTO
+      no antiguo (ya emitido, CON IVA) y `cartera_emitida_tras_cierre` lo
+      emitido despues del cierre. Lo emitido es parte de lo devengado: sumar
+      devengo pendiente y cartera viva sin pensarlo cuenta dos veces lo que
+      ya se facturo despues del ultimo cierre.
+
+      **Lee `mart.fact_seguimiento_mensual`** (los meses REAL y los
+      planificados de cada obra) y se construyo despues de F-042: el duplicado
+      de filas que ese build corrigio no le alcanza.
+    grano: >-
+      Una fila por (`obra_id`, `concepto`) con algun mes planificado
+      pendiente. Clave primaria declarada.
+    clave_negocio: [obra_id, concepto]
+    paso_etl: build_tesoreria
+    refresco: nocturno
+    columnas:
+      obra_id:
+        significado: Obra (la de `mart.fact_seguimiento_mensual`).
+        agregacion: no_sumable
+      empresa_id:
+        significado: Empresa de la obra (`maestro.v_obra_fichas`).
+        agregacion: no_sumable
+      clave_obra:
+        significado: >-
+          Empresa y codigo de la obra (`1-0462`): la clave con la que se dan
+          valores por obra en `config/hipotesis_caja.yaml`.
+      concepto:
+        significado: Lado del devengo, COSTE o VENTA.
+        valores: [COSTE, VENTA]
+      version_master:
+        significado: >-
+          La version V: la del ULTIMO mes planificado pendiente en `mart`. Es
+          el plan que se proyecta (`R-VERSION-MASTER`).
+        agregacion: no_sumable
+      tipo_master:
+        significado: Tipo de la version V (`mart.master_versiones_tipadas`).
+        nulo_significa: La version no esta tipada.
+      mes_version:
+        significado: Primer dia del mes en que V entro en vigor (`version_fec_efectiva`).
+        agregacion: no_sumable
+      mes_ultimo_cierre:
+        significado: Ultimo mes con dato REAL del concepto en la obra.
+        agregacion: no_sumable
+        nulo_significa: La obra no tiene ningun mes real (aun no ha empezado).
+      primer_mes_pendiente:
+        significado: Primer mes planificado posterior al ultimo cierre.
+        agregacion: no_sumable
+      num_versiones_pendientes:
+        significado: >-
+          Cuantas versiones distintas planifican los meses pendientes en
+          `mart` (hoy 1 en todas). Mas de una: V cambio despues del cierre.
+        agregacion: no_sumable
+      num_partidas:
+        significado: Partidas con plan en V (las de `tesoreria.devengo_pendiente_partida`).
+        agregacion: suma
+      plan_desde_version:
+        significado: Plan de V desde su mes de entrada en vigor. SIN IVA.
+        unidad: EUR
+        agregacion: suma
+      plan_intervalo:
+        significado: Plan de V entre su mes y el ultimo cierre, ambos incluidos.
+        unidad: EUR
+        agregacion: suma
+      ejecutado_intervalo:
+        significado: >-
+          Lo REAL de esas partidas entre el mes de V y el ultimo cierre
+          (`importe_mes` de las filas REAL de `mart`, sumado en el intervalo).
+        unidad: EUR
+        agregacion: suma
+      plan_restante:
+        significado: >-
+          Plan de V despues del ultimo cierre: el perfil futuro.
+        unidad: EUR
+        agregacion: suma
+      pendiente:
+        significado: >-
+          Suma por partida de max(0, plan desde V - ejecutado): lo que falta
+          por devengar. Es el devengo que se convierte en caja. SIN IVA.
+        unidad: EUR
+        agregacion: suma
+      sobre_ejecutado:
+        significado: Suma por partida de lo ejecutado por encima de todo su plan de V.
+        unidad: EUR
+        agregacion: suma
+      adelantado:
+        significado: Suma por partida de max(0, ejecutado - plan del intervalo).
+        unidad: EUR
+        agregacion: suma
+      retrasado:
+        significado: Suma por partida de max(0, plan del intervalo - ejecutado).
+        unidad: EUR
+        agregacion: suma
+      ejecutado_sin_plan:
+        significado: >-
+          Lo ejecutado en el intervalo en partidas que V no planifica: no
+          tiene pendiente.
+        unidad: EUR
+        agregacion: suma
+      retraso_sin_perfil:
+        significado: >-
+          Pendiente de partidas sin plan despues del cierre: V ya no lo situa
+          en ningun mes y va entero al primer mes pendiente (D19-A).
+        unidad: EUR
+        agregacion: suma
+      real_origen_corte:
+        significado: Real a origen hasta el ultimo cierre (suma de `importe_mes` REAL).
+        unidad: EUR
+        agregacion: suma
+      plan_total:
+        significado: El plan entero de V, todos los meses.
+        unidad: EUR
+        agregacion: suma
+      cartera_viva:
+        significado: >-
+          Efectos de `tesoreria.efectos` de la obra y del sentido del
+          concepto, PREVISTOS y no antiguos: ya emitidos y por pagar o cobrar.
+          CON IVA.
+        unidad: EUR
+        agregacion: suma
+      cartera_emitida_tras_cierre:
+        significado: >-
+          Efectos no de baja emitidos despues del ultimo cierre: devengo que
+          ya se facturo y no hay que volver a convertir. CON IVA.
+        unidad: EUR
+        agregacion: suma
+    relaciones:
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: La ficha de la obra.
+    ejemplos_preguntas:
+      - Que caja necesitara la obra X los proximos seis meses
+      - Cuanto le queda por facturar y por pagar a la obra X
+
+  devengo_pendiente_obra_mes:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **No disponible para el perfil restringido** (F-141, `R-PERFILES`):
+      con su login la consulta devuelve «permission denied», y eso no se rodea:
+      responde que el perfil no lo incluye.
+
+      **EL DEVENGO PENDIENTE, MES A MES** (F-140): el `pendiente` de cada
+      partida repartido en proporcion a su plan de V en los meses posteriores
+      al cierre, agregado por obra, mes, concepto y categoria. Es el perfil
+      temporal sobre el que se aplican los plazos de cobro y pago. **No es
+      caja** (`R-CAJA-HIPOTESIS`): mes de DEVENGO y SIN IVA.
+
+      El reparto redondea al centimo y el ultimo mes de cada partida se lleva
+      el resto: la suma por obra y concepto es exactamente la de
+      `tesoreria.devengo_pendiente_partida` (lo comprueba el build). Lo
+      pendiente de una partida SIN plan futuro va al primer mes pendiente y
+      tambien a `importe_retraso_sin_perfil` (6,0 M EUR de coste y 6,1 de
+      venta el 2026-10-25): es retraso que la version ya no situa, y quien
+      proyecta decide donde ponerlo (hipotesis H19). `mes_pasado_sin_cierre`
+      marca meses ya pasados y aun sin cerrar.
+
+      **Lee `mart.fact_seguimiento_mensual`** (los meses REAL y los
+      planificados de cada obra) y se construyo despues de F-042: el duplicado
+      de filas que ese build corrigio no le alcanza.
+    grano: >-
+      Una fila por (`obra_id`, `anio_mes`, `concepto`, `categoria`) con plan
+      restante o pendiente (474 de coste y 161 de venta el 2026-10-25).
+    clave_negocio: [obra_id, anio_mes, concepto, categoria]
+    paso_etl: build_tesoreria
+    refresco: nocturno
+    columnas:
+      obra_id:
+        significado: Obra cuyo devengo pendiente se mide.
+        agregacion: no_sumable
+      empresa_id:
+        significado: Empresa de la obra.
+        agregacion: no_sumable
+      clave_obra:
+        significado: Empresa y codigo de la obra (`1-0462`).
+      anio_mes:
+        significado: Mes de DEVENGO (primer dia del mes), no de cobro ni de pago.
+        agregacion: no_sumable
+      concepto:
+        significado: Lado del devengo, COSTE o VENTA.
+        valores: [COSTE, VENTA]
+      categoria:
+        significado: Categoria de la partida (CD, CI, CP, OTRO), la de `mart`.
+        valores: [CD, CI, CP, OTRO]
+      version_master:
+        significado: La version V de la obra y concepto.
+        agregacion: no_sumable
+      mes_ultimo_cierre:
+        significado: Ultimo mes con dato REAL del concepto en la obra.
+        agregacion: no_sumable
+        nulo_significa: La obra no tiene ningun mes real.
+      importe_plan_restante:
+        significado: Plan de V en ese mes (las partidas de la categoria). SIN IVA.
+        unidad: EUR
+        agregacion: suma
+      importe_pendiente:
+        significado: >-
+          Pendiente repartido en ese mes: lo que se proyecta devengar. SIN IVA.
+        unidad: EUR
+        agregacion: suma
+      importe_retraso_sin_perfil:
+        significado: >-
+          La parte de `importe_pendiente` que viene de partidas sin plan
+          futuro (solo en el primer mes pendiente).
+        unidad: EUR
+        agregacion: suma
+      num_partidas:
+        significado: Partidas con plan o pendiente en ese mes y categoria.
+        agregacion: no_sumable
+      mes_pasado_sin_cierre:
+        significado: Cierto si el mes es anterior al mes del build y aun no esta cerrado.
+    relaciones:
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: La ficha de la obra.
+    ejemplos_preguntas:
+      - Cuanto devengara la obra X cada mes hasta que termine
+      - Perfil mensual de coste pendiente de la obra X por categoria
+
+  devengo_pendiente_partida:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **No disponible para el perfil restringido** (F-141, `R-PERFILES`):
+      con su login la consulta devuelve «permission denied», y eso no se rodea:
+      responde que el perfil no lo incluye.
+
+      **EL DEVENGO PENDIENTE DE CADA PARTIDA** (F-140): por obra, partida y
+      concepto con plan en la ultima version master (V), el plan desde V, el
+      del intervalo hasta el ultimo cierre, lo ejecutado en ese intervalo y lo
+      que falta (`pendiente`). Es el detalle de `tesoreria.devengo_corte_obra`
+      y lo que explica por que lo pendiente supera al plan restante: 913
+      partidas de coste y 322 de venta van sobre-ejecutadas, y las retrasadas
+      arrastran su retraso. **No es caja** (`R-CAJA-HIPOTESIS`): SIN IVA.
+
+      **Lee `mart.fact_seguimiento_mensual`** (los meses REAL y los
+      planificados de cada obra) y se construyo despues de F-042: el duplicado
+      de filas que ese build corrigio no le alcanza.
+    grano: >-
+      Una fila por (`obra_id`, `partida_id`, `concepto`) con plan en V
+      (20.565 de coste y 18.997 de venta el 2026-10-25). Clave primaria
+      declarada.
+    clave_negocio: [obra_id, partida_id, concepto]
+    paso_etl: build_tesoreria
+    refresco: nocturno
+    columnas:
+      obra_id:
+        significado: Obra cuyo devengo pendiente se mide.
+        agregacion: no_sumable
+      empresa_id:
+        significado: Empresa de la obra.
+        agregacion: no_sumable
+      clave_obra:
+        significado: Empresa y codigo de la obra (`1-0462`).
+      partida_id:
+        significado: Partida del presupuesto (la de `mart`).
+        agregacion: no_sumable
+      codigo_partida:
+        significado: Codigo de la partida.
+        nulo_significa: La partida no esta en la dimension de partidas.
+      concepto:
+        significado: Lado del devengo, COSTE o VENTA.
+        valores: [COSTE, VENTA]
+      categoria:
+        significado: Categoria de la partida (CD, CI, CP, OTRO).
+        valores: [CD, CI, CP, OTRO]
+        nulo_significa: La partida no esta en la dimension de partidas (hoy ninguna).
+      version_master:
+        significado: La version V de la obra y concepto.
+        agregacion: no_sumable
+      tipo_master:
+        significado: Tipo de la version V.
+        nulo_significa: La version no esta tipada.
+      mes_version:
+        significado: Mes en que V entro en vigor.
+        agregacion: no_sumable
+      mes_ultimo_cierre:
+        significado: Ultimo mes con dato REAL del concepto en la obra.
+        agregacion: no_sumable
+        nulo_significa: La obra no tiene ningun mes real.
+      plan_desde_version:
+        significado: Plan de V de la partida desde el mes de V.
+        unidad: EUR
+        agregacion: suma
+      plan_intervalo:
+        significado: Plan de V de la partida entre el mes de V y el cierre.
+        unidad: EUR
+        agregacion: suma
+      ejecutado_intervalo:
+        significado: Lo REAL de la partida entre el mes de V y el cierre.
+        unidad: EUR
+        agregacion: suma
+      plan_restante:
+        significado: Plan de V de la partida despues del cierre.
+        unidad: EUR
+        agregacion: suma
+      pendiente:
+        significado: max(0, plan desde V - ejecutado). SIN IVA.
+        unidad: EUR
+        agregacion: suma
+      sobre_ejecutado:
+        significado: max(0, ejecutado - plan desde V).
+        unidad: EUR
+        agregacion: suma
+    relaciones:
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: La ficha de la obra.
+    ejemplos_preguntas:
+      - Que partidas de la obra X tienen mas coste pendiente
+      - Que partidas de la obra X van por encima de su planificacion
+
+  hipotesis_caja:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **No disponible para el perfil restringido** (F-141, `R-PERFILES`):
+      con su login la consulta devuelve «permission denied», y eso no se rodea:
+      responde que el perfil no lo incluye.
+
+      **EL CATALOGO DE HIPOTESIS PARA PASAR DEVENGO A CAJA** (F-140): las 23
+      hipotesis (H01-H23) que hay que fijar para convertir el devengo
+      pendiente en cobros y pagos, con su valor por DEFECTO, de que dato sale
+      (`fuente_defecto`) y donde esta el dato que la alimenta
+      (`ingrediente`): plazos de pago y de cobro, retenciones, IVA y su
+      liquidacion, certificacion, que hacer con lo retrasado... **Ninguna esta
+      validada por Negocio hoy** (`validado` falso): son propuestas.
+      `R-CAJA-HIPOTESIS` obliga a declararlas TODAS, con valor y nivel. Lo
+      mantiene Control de Costes en `config/hipotesis_caja.yaml` y lo aprueba
+      el humano (D15).
+    grano: Una fila por hipotesis, identificada por `codigo` (23).
+    clave_negocio: [codigo]
+    paso_etl: build_tesoreria
+    refresco: nocturno
+    columnas:
+      codigo:
+        significado: Codigo de la hipotesis (H01 a H23).
+      sentido:
+        significado: A que lado de la caja afecta.
+        valores: [PAGO, COBRO, AMBOS]
+      descripcion:
+        significado: Que fija la hipotesis.
+      unidad:
+        significado: >-
+          Como se lee el valor: DIAS, MESES, PORCENTAJE, BOOLEANO, OPCION (una
+          de `opciones`) o MAPA_DIAS (dias por categoria).
+        valores: [DIAS, MESES, PORCENTAJE, BOOLEANO, OPCION, MAPA_DIAS]
+      valor_defecto:
+        significado: El valor por defecto, en JSON (un numero, un booleano, un texto o un mapa).
+      opciones:
+        significado: Los valores posibles de una hipotesis de unidad OPCION, en JSON.
+        nulo_significa: La hipotesis no es de unidad OPCION.
+      fuente_defecto:
+        significado: De que dato o decision sale el valor por defecto.
+      ingrediente:
+        significado: El objeto del datamart donde esta el dato que la alimenta.
+        nulo_significa: >-
+          No hay dato que la alimente: es una decision (IVA, liquidacion...).
+      validado:
+        significado: Cierto si Negocio aprobo el valor por defecto. Si es falso, hay que avisarlo.
+      fecha_validacion:
+        significado: Fecha en que Negocio valido el valor.
+        agregacion: no_sumable
+        nulo_significa: No validada.
+      admite_obra:
+        significado: Cierto si la hipotesis admite un valor distinto por obra.
+    relaciones: []
+    ejemplos_preguntas:
+      - Que hipotesis hay que fijar para proyectar la caja de una obra
+      - Que plazo de cobro se supone por defecto y de donde sale
+
+  hipotesis_caja_obra:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **No disponible para el perfil restringido** (F-141, `R-PERFILES`):
+      con su login la consulta devuelve «permission denied», y eso no se rodea:
+      responde que el perfil no lo incluye.
+
+      **EL VALOR DE CADA HIPOTESIS EN CADA OBRA** (F-140): para cada obra con
+      devengo pendiente (o con un valor manual) y cada hipotesis que admite
+      valor por obra, el valor que toca y su NIVEL. MANUAL (el de la seccion
+      `obras` del YAML) gana a SIGRID, y SIGRID al DEFECTO. SIGRID solo existe
+      para H09 (plazo de cobro), H10 (retencion) y H11 (devolucion de la
+      retencion), y solo cuando TODOS los contratos con el cliente de la obra
+      dan el mismo valor: el 2026-10-25, 16, 16 y 4 de las 21 obras. Si el
+      usuario da otro valor en la conversacion, manda el suyo, con nivel
+      USUARIO (`R-CAJA-HIPOTESIS`). **Nada se aplica aqui**: es lo que hay que
+      declarar.
+    grano: >-
+      Una fila por (`obra_id`, `codigo`), para cada hipotesis que admite
+      valor por obra (todas menos H17): 462 filas de 21 obras el 2026-10-25.
+    clave_negocio: [obra_id, codigo]
+    paso_etl: build_tesoreria
+    refresco: nocturno
+    columnas:
+      obra_id:
+        significado: Obra a la que se aplica la hipotesis.
+        agregacion: no_sumable
+      empresa_id:
+        significado: Empresa de la obra.
+        agregacion: no_sumable
+      clave_obra:
+        significado: Empresa y codigo de la obra (`1-0462`).
+      codigo:
+        significado: Codigo de la hipotesis (de `tesoreria.hipotesis_caja`).
+      valor:
+        significado: El valor que toca en la obra, en JSON.
+      nivel:
+        significado: >-
+          OBRA (dado para esta obra, por el YAML o por sus contratos) o
+          DEFECTO (el del catalogo). En la conversacion existe un tercero,
+          USUARIO, que manda sobre los dos.
+        valores: [OBRA, DEFECTO]
+      fuente:
+        significado: MANUAL (el YAML), SIGRID (los contratos con el cliente) o DEFECTO.
+        valores: [MANUAL, SIGRID, DEFECTO]
+      motivo:
+        significado: Por que la obra tiene ese valor (el del YAML o de donde se leyo).
+        nulo_significa: Valor por defecto.
+    relaciones:
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: La ficha de la obra.
+      - de: codigo
+        a: tesoreria.hipotesis_caja.codigo
+        cardinalidad: "N:1"
+        porque: La definicion de la hipotesis.
+    ejemplos_preguntas:
+      - Con que hipotesis se proyecta la caja de la obra X
+      - A cuantos dias cobra la obra X segun sus contratos
+
+  hipotesis_caja_manual:
+    tipo: tabla
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es la seccion `obras` del YAML tal cual, ya resuelta en
+      `tesoreria.hipotesis_caja_obra`, que es la que se consulta.
+    descripcion: >-
+      **No disponible para el perfil restringido** (F-141, `R-PERFILES`):
+      con su login la consulta devuelve «permission denied», y eso no se rodea:
+      responde que el perfil no lo incluye.
+
+      Los valores de hipotesis dados a mano por obra en la seccion `obras` de
+      `config/hipotesis_caja.yaml` (F-140), validados y cargados cada noche
+      por `build_tesoreria`. Vacia el 2026-10-25.
+    grano: Una fila por (`clave_obra`, `codigo`).
+    clave_negocio: [clave_obra, codigo]
+    paso_etl: build_tesoreria
+    refresco: nocturno
+    columnas:
+      clave_obra:
+        significado: Empresa y codigo de la obra (`1-0462`), como se escribe en el YAML.
+      codigo:
+        significado: Codigo de la hipotesis.
+      valor:
+        significado: El valor dado, en JSON.
+      motivo:
+        significado: Por que la obra tiene ese valor.
+      fecha:
+        significado: Fecha en que se dio el valor.
+        agregacion: no_sumable
+    relaciones: []
+    ejemplos_preguntas: []
+
+  condiciones_contrato_compra:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **No disponible para el perfil restringido** (F-141, `R-PERFILES`):
+      con su login la consulta devuelve «permission denied», y eso no se rodea:
+      responde que el perfil no lo incluye.
+
+      **LO PACTADO CON CADA PROVEEDOR** (F-140): por contrato de compra, la
+      forma de pago con su formula LEIDA (dias de cada vencimiento y de la
+      retencion), los dias fijos de pago y los meses sin pago del proveedor
+      tal cual, la retencion de garantia del contrato (recargo de clase 4 o 5,
+      en tanto por cien) y el importe base e IVA de su cabecera. 19.170
+      contratos el 2026-10-25: 19.161 con formula reconocida, 6.358 con
+      garantia, 14.657 de un proveedor con dias fijos de pago. **Es un
+      ingrediente**: ningun plazo se aplica a ninguna fecha
+      (`R-CAJA-HIPOTESIS`). El plazo de devolucion de la garantia NO esta en
+      el contrato: es la `NR` de la formula o el fin de obra (H07).
+    grano: >-
+      Una fila por contrato de compra (`contrato_id`, el de
+      `compras.contratos`). Sin los de un tercero empleado (hoy 0).
+    clave_negocio: [contrato_id]
+    paso_etl: build_tesoreria
+    refresco: nocturno
+    columnas:
+      contrato_id:
+        significado: Contrato (`ctr.ide`), el `contrato_id` de `compras.contratos`.
+        agregacion: no_sumable
+      codigo_contrato:
+        significado: Codigo del contrato en Sigrid.
+      empresa_id:
+        significado: Empresa del contrato.
+        agregacion: no_sumable
+      obra_id:
+        significado: Obra del contrato.
+        agregacion: no_sumable
+        nulo_significa: Contrato sin obra (10).
+      codigo_obra:
+        significado: Codigo de la obra.
+        nulo_significa: Contrato sin obra.
+      proveedor_id:
+        significado: Proveedor del contrato.
+        agregacion: no_sumable
+        nulo_significa: Contrato sin tercero.
+      proveedor_nombre:
+        significado: Nombre del proveedor.
+        nulo_significa: Contrato sin tercero.
+      estado_id:
+        significado: Codigo numerico del estado del contrato en Sigrid.
+        agregacion: no_sumable
+      estado:
+        significado: Nombre del estado (tipo 44 de `raw.conest`).
+        nulo_significa: Estado sin traducir (hoy ninguno).
+      importe_base:
+        significado: Importe base de la cabecera del contrato (`totbas`), SIN IVA.
+        unidad: EUR
+        agregacion: suma
+      importe_iva:
+        significado: IVA de la cabecera del contrato (`totiva`).
+        unidad: EUR
+        agregacion: suma
+      forma_pago_id:
+        significado: Forma de pago del contrato (`auxpag.ide`).
+        agregacion: no_sumable
+        nulo_significa: Contrato sin forma de pago (9).
+      forma_pago_codigo:
+        significado: Codigo de la forma de pago.
+        nulo_significa: Contrato sin forma de pago.
+      forma_pago:
+        significado: Nombre de la forma de pago.
+        nulo_significa: Contrato sin forma de pago.
+      medio_pago:
+        significado: Medio de pago de la forma (transferencia, pagare, confirming...).
+        nulo_significa: Sin forma de pago o forma sin medio.
+      plazo_formula:
+        significado: La formula de plazo de Sigrid TAL CUAL (`30 60 90`, `120 450R`).
+        nulo_significa: Contrato sin forma de pago.
+      dias_vencimientos:
+        significado: >-
+          Dias de cada vencimiento, en el orden escrito (`{30,60,90}`), desde
+          la fecha que fije la hipotesis (H02-H05). Vacio si no se reconoce.
+        nulo_significa: Contrato sin forma de pago.
+      num_vencimientos:
+        significado: Cuantos vencimientos tiene la formula.
+        agregacion: no_sumable
+        nulo_significa: Contrato sin forma de pago.
+      dias_retencion:
+        significado: Dias del efecto de retencion (la `NR` de la formula).
+        agregacion: no_sumable
+        nulo_significa: La formula no tiene retencion, o no hay formula.
+      formula_reconocida:
+        significado: >-
+          Cierto si la formula casa con su gramatica (numeros y como mucho un
+          NR). Si no, no se interpreta: sin dias ni retencion.
+        nulo_significa: Contrato sin forma de pago.
+      proveedor_dias_fijos_pago:
+        significado: Dias fijos de pago del proveedor tal cual (`15,30`).
+        nulo_significa: El proveedor no tiene dias fijos.
+      proveedor_meses_sin_pago:
+        significado: Meses en que el proveedor no cobra, tal cual (`8,12`).
+        nulo_significa: El proveedor no tiene meses sin pago.
+      retencion_garantia_porcentaje:
+        significado: Porcentaje de retencion de garantia del contrato (5 es el 5 %).
+        unidad: "%"
+        agregacion: no_sumable
+        nulo_significa: El contrato no tiene retencion de garantia.
+      retencion_garantia_concepto:
+        significado: Nombre del recargo de garantia.
+        nulo_significa: El contrato no tiene retencion de garantia.
+      retencion_garantia_clase:
+        significado: Clase del recargo (4 o 5, las de garantia).
+        agregacion: no_sumable
+        nulo_significa: El contrato no tiene retencion de garantia.
+    relaciones:
+      - de: contrato_id
+        a: compras.contratos.contrato_id
+        cardinalidad: "1:1"
+        porque: La cabecera del contrato.
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: La ficha de la obra.
+    ejemplos_preguntas:
+      - Con que plazo pagamos al proveedor Y
+      - Que retencion de garantia tienen los contratos de la obra X
+
+  condiciones_contrato_cliente:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **No disponible para el perfil restringido** (F-141, `R-PERFILES`):
+      con su login la consulta devuelve «permission denied», y eso no se rodea:
+      responde que el perfil no lo incluye.
+
+      **LO PACTADO CON CADA CLIENTE** (F-140): por contrato con el cliente
+      (`raw.obrctr`), la forma de COBRO con su formula leida, la retencion que
+      nos hace el cliente (`coegar` o, si no, el recargo del contrato), los
+      plazos de retencion y de garantia y el inicio de la garantia. 970
+      contratos de 450 obras el 2026-10-25: 705 con formula reconocida, 265 sin
+      forma de cobro, 525 con retencion. De aqui salen los valores SIGRID de
+      H09-H11 en `tesoreria.hipotesis_caja_obra`. **Es un ingrediente**:
+      ningun plazo se aplica a ninguna fecha (`R-CAJA-HIPOTESIS`).
+    grano: Una fila por contrato con el cliente (`contrato_cliente_id`).
+    clave_negocio: [contrato_cliente_id]
+    paso_etl: build_tesoreria
+    refresco: nocturno
+    columnas:
+      contrato_cliente_id:
+        significado: Contrato con el cliente (`obrctr.ide`).
+        agregacion: no_sumable
+      codigo_contrato:
+        significado: Codigo del contrato con el cliente.
+      descripcion:
+        significado: Descripcion del contrato.
+      empresa_id:
+        significado: Empresa de la obra del contrato.
+        agregacion: no_sumable
+      obra_id:
+        significado: Obra del contrato.
+        agregacion: no_sumable
+      codigo_obra:
+        significado: Codigo de la obra.
+      cliente_id:
+        significado: Cliente del contrato.
+        agregacion: no_sumable
+        nulo_significa: Contrato sin cliente.
+      cliente_nombre:
+        significado: Nombre del cliente.
+        nulo_significa: Contrato sin cliente.
+      forma_cobro_id:
+        significado: Forma de cobro (`auxcob.ide`).
+        agregacion: no_sumable
+        nulo_significa: Contrato sin forma de cobro (265).
+      forma_cobro_codigo:
+        significado: Codigo de la forma de cobro.
+        nulo_significa: Contrato sin forma de cobro.
+      forma_cobro:
+        significado: Nombre de la forma de cobro.
+        nulo_significa: Contrato sin forma de cobro.
+      medio_cobro:
+        significado: Medio de cobro (`auxefc`).
+        nulo_significa: Sin forma de cobro o forma sin medio.
+      plazo_formula:
+        significado: La formula de plazo de Sigrid TAL CUAL.
+        nulo_significa: Contrato sin forma de cobro.
+      dias_vencimientos:
+        significado: Dias de cada vencimiento, en el orden escrito. Vacio si no se reconoce.
+        nulo_significa: Contrato sin forma de cobro.
+      num_vencimientos:
+        significado: Cuantos vencimientos tiene la formula.
+        agregacion: no_sumable
+        nulo_significa: Contrato sin forma de cobro.
+      dias_retencion:
+        significado: Dias del efecto de retencion (la `NR` de la formula).
+        agregacion: no_sumable
+        nulo_significa: La formula no tiene retencion, o no hay formula.
+      formula_reconocida:
+        significado: Cierto si la formula casa con su gramatica.
+        nulo_significa: Contrato sin forma de cobro.
+      retencion_porcentaje:
+        significado: >-
+          Retencion que nos hace el cliente, en tanto por cien: `coegar` y, si
+          no tiene, el porcentaje del recargo del contrato.
+        unidad: "%"
+        agregacion: no_sumable
+        nulo_significa: El contrato no tiene retencion.
+      retencion_fuente:
+        significado: De donde sale el porcentaje.
+        valores: [COEGAR, RECARGO]
+        nulo_significa: El contrato no tiene retencion.
+      retencion_concepto:
+        significado: Nombre del recargo de retencion del contrato.
+        nulo_significa: El contrato no tiene recargo de retencion.
+      plazo_retencion_meses:
+        significado: Plazo de retencion del contrato, en meses (`plaret`).
+        agregacion: no_sumable
+        nulo_significa: Sin plazo (0 en Sigrid).
+      plazo_garantia_meses:
+        significado: Plazo de garantia del contrato, en meses (`plagar`).
+        agregacion: no_sumable
+        nulo_significa: Sin plazo (0 en Sigrid).
+      fecha_inicio_garantia:
+        significado: Inicio de la garantia (`fecinigar`).
+        agregacion: no_sumable
+        nulo_significa: Sin fecha de inicio de garantia.
+    relaciones:
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: La ficha de la obra.
+    ejemplos_preguntas:
+      - A cuantos dias nos paga el cliente de la obra X
+      - Que retencion nos hace el cliente de la obra X y cuando la devuelve
+
+  plazos_forma_pago:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **No disponible para el perfil restringido** (F-141, `R-PERFILES`):
+      con su login la consulta devuelve «permission denied», y eso no se rodea:
+      responde que el perfil no lo incluye.
+
+      **LAS FORMAS DE PAGO Y DE COBRO CON SU FORMULA LEIDA** (F-140): las 70
+      de pago (`auxpag`) y las 52 de cobro (`auxcob`), con la formula de plazo
+      de Sigrid tal cual y leida: dias de cada vencimiento en el orden escrito
+      y dias del efecto de retencion (`NR`). Las 122 se reconocen
+      (2026-10-25). Las dadas de baja tambien estan, con su `fecha_baja`. Es
+      el catalogo; lo pactado en cada contrato esta en
+      `tesoreria.condiciones_contrato_compra` y
+      `tesoreria.condiciones_contrato_cliente`.
+    grano: >-
+      Una fila por (`sentido`, `forma_id`): cada catalogo tiene su numeracion.
+    clave_negocio: [sentido, forma_id]
+    paso_etl: build_tesoreria
+    refresco: nocturno
+    columnas:
+      sentido:
+        significado: PAGO (forma de pago) o COBRO (forma de cobro).
+        valores: [PAGO, COBRO]
+      forma_id:
+        significado: Identificador de la forma en su catalogo.
+        agregacion: no_sumable
+      codigo:
+        significado: Codigo de la forma (`CF60`).
+      nombre:
+        significado: Nombre de la forma.
+      medio_id:
+        significado: Medio de pago o de cobro de la forma.
+        agregacion: no_sumable
+        nulo_significa: La forma no tiene medio.
+      medio:
+        significado: Nombre del medio (transferencia, pagare, confirming, recibo...).
+        nulo_significa: La forma no tiene medio.
+      plazo_formula:
+        significado: >-
+          La formula de plazo de Sigrid TAL CUAL (`30 60 90`, `120 450R`); cadena
+          vacia si la forma no tiene formula (y entonces no se reconoce).
+      dias_vencimientos:
+        significado: Dias de cada vencimiento, en el orden escrito. Vacio si no se reconoce.
+      num_vencimientos:
+        significado: Cuantos vencimientos tiene la formula.
+        agregacion: no_sumable
+      dias_retencion:
+        significado: Dias del efecto de retencion (la `NR`).
+        agregacion: no_sumable
+        nulo_significa: La formula no tiene retencion.
+      formula_reconocida:
+        significado: Cierto si la formula casa con su gramatica; si no, no se interpreta.
+      fecha_baja:
+        significado: Fecha de baja de la forma en Sigrid.
+        agregacion: no_sumable
+        nulo_significa: La forma esta en uso.
+    relaciones: []
+    ejemplos_preguntas:
+      - Que significa la forma de pago CF60
+      - Que formas de cobro tienen retencion y a cuantos dias
+
+  fn_plazo_reconocido:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de tesoreria: su resultado ya esta en la
+      columna `formula_reconocida`.
+    descripcion: >-
+      Cierto si una formula de plazo de Sigrid casa con su gramatica: tokens
+      N (dias de un vencimiento) y como mucho un NR (dias de la retencion).
+      Vacia, nula, con un token ajeno o con dos NR: falso (F-140).
+    grano: null
+    clave_negocio: []
+    paso_etl: build_tesoreria
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_plazo_dias:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de tesoreria: su resultado ya esta en la
+      columna `dias_vencimientos`.
+    descripcion: >-
+      Los dias de cada vencimiento de una formula de plazo, en el orden
+      escrito (`30 60 90` da {30,60,90}); vacio si la formula no se reconoce
+      (F-140).
+    grano: null
+    clave_negocio: []
+    paso_etl: build_tesoreria
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_plazo_dias_retencion:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de tesoreria: su resultado ya esta en la
+      columna `dias_retencion`.
+    descripcion: >-
+      Los dias del efecto de retencion de una formula de plazo (`120 450R` da
+      450); nulo si no tiene retencion o no se reconoce (F-140).
     grano: null
     clave_negocio: []
     paso_etl: build_tesoreria

@@ -493,7 +493,7 @@ def test_f140_r17_el_case_lleva_las_vias_del_dominio_en_su_orden() -> None:
 def test_f140_r17_el_centro_manda_y_sin_obra_corta_la_cascada() -> None:
     pago = _rama_efectos("PAGO")
     assert (
-        "LEFT JOIN obra_documento od ON od.documento_id = NULLIF(p.conide, 0) "
+        "LEFT JOIN obra_documento od ON od.factura_id = NULLIF(p.conide, 0) "
         "AND COALESCE(p.cenide, 0) = 0"
     ) in pago, "solo sin centro se mira el documento"
     assert "COALESCE(cc.obra_id, od.obra_id) AS obra_id" in pago
