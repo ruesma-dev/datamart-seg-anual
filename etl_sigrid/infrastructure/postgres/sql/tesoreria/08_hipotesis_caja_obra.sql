@@ -4,8 +4,11 @@
 -- CADA HIPOTESIS EN CADA OBRA (R3, R5, D14-A, D18-A)
 --
 -- GRANO: una fila por (obra, codigo) para las obras con devengo pendiente
--- (`tesoreria.devengo_corte_obra`) y las que tienen algun valor MANUAL, y los
--- codigos del catalogo que admiten valor por obra (`admite_obra`).
+-- (`tesoreria.devengo_corte_obra`) y las que tienen algun valor MANUAL, y TODOS
+-- los codigos del catalogo (las 23): `R-CAJA-HIPOTESIS` manda declararlas todas
+-- desde esta tabla (P1-a del review de F-140). La que no admite valor por obra
+-- (`admite_obra` falso, hoy H17) sale siempre con su valor por DEFECTO: ni el
+-- YAML ni Sigrid le dan valor de obra (los dos LEFT JOIN lo exigen).
 --
 -- EL VALOR, en el orden de `resolver_hipotesis` (`domain/proyeccion_caja.py`):
 --   1. MANUAL: el de la seccion `obras` de `config/hipotesis_caja.yaml`, que
@@ -64,7 +67,8 @@ FROM (
        OR fo.clave_obra IN (SELECT x.clave_obra FROM tesoreria.hipotesis_caja_manual x)
 ) o
 CROSS JOIN tesoreria.hipotesis_caja h
-LEFT JOIN tesoreria.hipotesis_caja_manual m ON m.clave_obra = o.clave_obra AND m.codigo = h.codigo
+LEFT JOIN tesoreria.hipotesis_caja_manual m
+       ON m.clave_obra = o.clave_obra AND m.codigo = h.codigo AND h.admite_obra
 LEFT JOIN (
     -- D18-A: un valor por obra solo si todos sus contratos dan el mismo.
     SELECT c.obra_id, 'H09'::VARCHAR(3) AS codigo,
@@ -92,13 +96,18 @@ LEFT JOIN (
            CASE WHEN count(*) = count(c.valor) AND count(DISTINCT c.valor) = 1 THEN to_jsonb(min(c.valor)) END AS valor,
            'Unico en los contratos con el cliente (plazo de retencion o de garantia)' AS motivo
     FROM (
-        SELECT k.obra_id, COALESCE(k.plazo_retencion_meses, k.plazo_garantia_meses) AS valor
-        FROM tesoreria.condiciones_contrato_cliente k
-        WHERE k.obra_id IS NOT NULL
+        -- La unidad de H11 es MESES ENTEROS: el plazo sale como entero, y uno
+        -- con decimales no es un valor (cuenta como contrato sin valor).
+        SELECT x.obra_id,
+               CASE WHEN x.meses = trunc(x.meses) THEN x.meses::INTEGER END AS valor
+        FROM (
+            SELECT k.obra_id, COALESCE(k.plazo_retencion_meses, k.plazo_garantia_meses) AS meses
+            FROM tesoreria.condiciones_contrato_cliente k
+            WHERE k.obra_id IS NOT NULL
+        ) x
     ) c
     GROUP BY c.obra_id
-) s ON s.obra_id = o.obra_id AND s.codigo = h.codigo
-WHERE h.admite_obra;
+) s ON s.obra_id = o.obra_id AND s.codigo = h.codigo AND h.admite_obra;
 
 COMMENT ON TABLE tesoreria.hipotesis_caja_obra IS
-'F-140. El valor de cada hipotesis de caja (catalogo tesoreria.hipotesis_caja) en cada obra con devengo pendiente o con valor manual: MANUAL (seccion obras del YAML), si no SIGRID (H09-H11, solo si todos los contratos con el cliente de la obra dan el mismo valor), si no DEFECTO. nivel OBRA o DEFECTO. Nada se aplica: es el valor que quien consulta debe declarar (R-CAJA-HIPOTESIS). Clave: obra_id, codigo.';
+'F-140. El valor de las 23 hipotesis de caja (catalogo tesoreria.hipotesis_caja; la que no admite valor por obra, siempre DEFECTO) en cada obra con devengo pendiente o con valor manual: MANUAL (seccion obras del YAML), si no SIGRID (H09-H11, solo si todos los contratos con el cliente de la obra dan el mismo valor), si no DEFECTO. nivel OBRA o DEFECTO. Nada se aplica: es el valor que quien consulta debe declarar (R-CAJA-HIPOTESIS). Clave: obra_id, codigo.';

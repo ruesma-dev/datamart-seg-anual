@@ -213,3 +213,10 @@ def test_f140_docs_azure_apps() -> None:
     texto = DOC_AZURE_APPS.read_text(encoding="utf-8")
     for dato in (*DATOS_DOCUMENTOS, "`auxefc`", "Control de Costes"):
         assert dato in texto, f"azure-apps no dice «{dato}»"
+
+
+def test_f140_r22_p1a_la_ficha_de_hipotesis_por_obra_dice_las_23() -> None:
+    """P1-a del review: la tabla trae las 23 del catálogo por obra, H17 a DEFECTO."""
+    ficha = _fichas()["hipotesis_caja_obra"]
+    assert "las 23 hipotesis del catalogo" in _plano(ficha["grano"])
+    assert "H17" in _plano(ficha["descripcion"]) and "DEFECTO" in _plano(ficha["descripcion"])

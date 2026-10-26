@@ -779,7 +779,28 @@ def test_f140_r5_el_universo_obras_con_devengo_o_con_valor_manual() -> None:
     assert "fo.obra_id IN (SELECT c.obra_id FROM tesoreria.devengo_corte_obra c)" in texto
     assert "OR fo.clave_obra IN (SELECT x.clave_obra FROM tesoreria.hipotesis_caja_manual x)" in texto
     assert "CROSS JOIN tesoreria.hipotesis_caja h" in texto
-    assert texto.rstrip().endswith("WHERE h.admite_obra;"), "solo las que admiten valor por obra"
+
+
+def test_f140_r5_p1a_se_publican_las_23_y_la_que_no_admite_obra_va_a_defecto() -> None:
+    """P1-a del review (decisión del humano, 2026-10-26): `R-CAJA-HIPOTESIS`
+    manda declarar TODAS las hipótesis desde `hipotesis_caja_obra`, así que la
+    tabla publica las 23 del catálogo por obra. `admite_obra` ya no filtra
+    filas: solo impide que el YAML o Sigrid den valor de obra (H17 = DEFECTO)."""
+    from etl_sigrid.infrastructure.config.hipotesis_caja_yaml import cargar_hipotesis_caja
+
+    catalogo = cargar_hipotesis_caja().catalogo
+    assert len(catalogo) == 23
+    texto = _hipotesis_obra()
+    select = texto[texto.index("INSERT INTO tesoreria.hipotesis_caja_obra"):]
+    assert "WHERE h.admite_obra" not in select, "ningún filtro deja fuera hipótesis del catálogo"
+    assert not re.search(r"\bh\.codigo\s*(=|IN|<>)", select), "ni por código"
+    assert (
+        "ON m.clave_obra = o.clave_obra AND m.codigo = h.codigo AND h.admite_obra"
+    ) in select, "el YAML no da valor de obra a la que no lo admite"
+    assert ") s ON s.obra_id = o.obra_id AND s.codigo = h.codigo AND h.admite_obra;" in select
+    # Sin manual ni Sigrid, el CASE cae al DEFECTO: lo mismo que dice el dominio.
+    assert dom.resolver_hipotesis("d", None, None)[1:] == ("DEFECTO", "DEFECTO")
+    assert [h.codigo for h in catalogo if not h.admite_obra] == ["H17"]
 
 
 def test_f140_r5_d18_sigrid_solo_h09_h10_h11() -> None:
@@ -805,4 +826,7 @@ def test_f140_r5_d18_de_donde_sale_cada_valor_sigrid() -> None:
         "THEN k.dias_vencimientos[1] END AS valor"
     ) in texto, "H09: un plazo único; varios vencimientos no son un valor"
     assert "k.retencion_porcentaje AS valor" in texto, "H10"
-    assert "COALESCE(k.plazo_retencion_meses, k.plazo_garantia_meses) AS valor" in texto, "H11"
+    assert "COALESCE(k.plazo_retencion_meses, k.plazo_garantia_meses) AS meses" in texto, "H11"
+    assert (
+        "CASE WHEN x.meses = trunc(x.meses) THEN x.meses::INTEGER END AS valor"
+    ) in texto, "H11 en MESES ENTEROS, como exige el catálogo (no `12.00`)"

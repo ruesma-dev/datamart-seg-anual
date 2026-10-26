@@ -842,8 +842,10 @@ objetos:
       responde que el perfil no lo incluye.
 
       **EL VALOR DE CADA HIPOTESIS EN CADA OBRA** (F-140): para cada obra con
-      devengo pendiente (o con un valor manual) y cada hipotesis que admite
-      valor por obra, el valor que toca y su NIVEL. MANUAL (el de la seccion
+      devengo pendiente (o con un valor manual), las 23 hipotesis del catalogo
+      con el valor que toca y su NIVEL: es la lista entera que hay que
+      declarar. La que no admite valor por obra (H17) va siempre por DEFECTO.
+      MANUAL (el de la seccion
       `obras` del YAML) gana a SIGRID, y SIGRID al DEFECTO. SIGRID solo existe
       para H09 (plazo de cobro), H10 (retencion) y H11 (devolucion de la
       retencion), y solo cuando TODOS los contratos con el cliente de la obra
@@ -852,8 +854,8 @@ objetos:
       USUARIO (`R-CAJA-HIPOTESIS`). **Nada se aplica aqui**: es lo que hay que
       declarar.
     grano: >-
-      Una fila por (`obra_id`, `codigo`), para cada hipotesis que admite
-      valor por obra (todas menos H17): 462 filas de 21 obras el 2026-10-25.
+      Una fila por (`obra_id`, `codigo`): las 23 hipotesis del catalogo en
+      cada obra, 483 filas de 21 obras el 2026-10-25.
     clave_negocio: [obra_id, codigo]
     paso_etl: build_tesoreria
     refresco: nocturno
