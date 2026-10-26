@@ -116,10 +116,15 @@ quien consulta, declarando sus hipótesis (regla dura `R-CAJA-HIPOTESIS`).
   (`LECTURAS_PARA_REANUDAR`).
 - **Las hipótesis**: las 23 (H01-H23) viven en `config/hipotesis_caja.yaml`, que
   mantiene Control de Costes y aprueba el humano; `build_tesoreria` lo valida
-  (`infrastructure/config/hipotesis_caja_yaml.py`) y, si tiene errores, falla
-  sin escribir. Se publican en `tesoreria.hipotesis_caja` (catálogo, todas
+  (`infrastructure/config/hipotesis_caja_yaml.py`) justo antes de cargarlo y,
+  si tiene errores, el paso queda FAILED con la lista: lo de `01`-`07` (cartera,
+  condiciones y devengo) ya está escrito con los datos de hoy, y lo que NO se
+  escribe son las tres tablas de hipótesis, que se quedan como estaban (si el
+  fallo es una obra del YAML que no existe, la guarda de `08` salta con el
+  catálogo y la sección manual ya cargados y `hipotesis_caja_obra` es la de
+  ayer). Se publican en `tesoreria.hipotesis_caja` (catálogo, todas
   `validado` falso hoy), `tesoreria.hipotesis_caja_manual` (la sección `obras`)
-  y `tesoreria.hipotesis_caja_obra` (el valor por obra con su nivel: MANUAL >
+  y `tesoreria.hipotesis_caja_obra` (las 23 en cada obra, con su nivel: MANUAL >
   SIGRID > DEFECTO; SIGRID solo para H09-H11, de los contratos con el cliente).
 - Ingesta: `auxcob` y `auxefc` entran a `raw` (78 tablas).
 
