@@ -206,6 +206,15 @@ def test_f140_r2_una_fila_que_no_es_un_mapa() -> None:
     assert errores and "fila 1" in errores[0]
 
 
+@pytest.mark.parametrize("codigo", ["", 9, ["H01"]])
+def test_f140_r2_sin_codigo_legible_el_error_dice_la_fila(codigo) -> None:
+    """Superviviente de la campaña de mutación de F-140 (`and` -> `or` en la
+    etiqueta): con un código vacío o que no es texto, el error se señala por el
+    número de fila, nunca por el valor ilegible."""
+    errores = validar_catalogo([_fila(codigo=codigo)])
+    assert errores and all(e.startswith("fila 1: ") for e in errores), errores
+
+
 def test_f140_r2_los_errores_dicen_el_codigo() -> None:
     errores = validar_catalogo([_fila(codigo="H07", unidad="HORAS")])
     assert errores and all("H07" in e for e in errores), errores
