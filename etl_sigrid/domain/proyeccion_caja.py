@@ -22,7 +22,7 @@ vencimientos; `120 450R`, uno a 120 días y la retención a 450. Lo que no casa
 con esa gramática NO se interpreta: falla cerrado (R8).
 
 **El pendiente de una partida** (R12, D3-A): máx(0, plan de la versión V desde
-su mes − ejecutado real en el intervalo [mes de V, último cierre]). Lo
+su mes - ejecutado real en el intervalo [mes de V, último cierre]). Lo
 ejecutado de más es `sobre_ejecutado` y no resta a otras partidas.
 
 **El reparto en el tiempo** (R14, D19-A): el pendiente de la partida, en
@@ -107,8 +107,8 @@ def pendiente_partida(
 ) -> tuple[Decimal, Decimal]:
     """`(pendiente, sobre_ejecutado)` de una partida (R12).
 
-    `pendiente = máx(0, plan − ejecutado)` y `sobre_ejecutado = máx(0,
-    ejecutado − plan)`: nunca los dos a la vez, y su diferencia es la del plan
+    `pendiente = máx(0, plan - ejecutado)` y `sobre_ejecutado = máx(0,
+    ejecutado - plan)`: nunca los dos a la vez, y su diferencia es la del plan
     y lo ejecutado.
     """
     diferencia = plan_desde_version - ejecutado_intervalo
@@ -131,7 +131,7 @@ def repartir_pendiente(
     a cero no son perfil (la cola a cero no es plan, criterio de F-110). Si el
     perfil queda vacío o su suma no es positiva, todo va a `primer_mes` con
     `es_retraso` cierto: es lo planificado y no ejecutado que la versión ya no
-    sitúa en ningún mes futuro. Si no, cada mes recibe `pendiente × plan_mes /
+    sitúa en ningún mes futuro. Si no, cada mes recibe `pendiente * plan_mes /
     plan_total` redondeado al céntimo y el ÚLTIMO mes, el resto: la suma
     iguala el pendiente exactamente. Sin pendiente, no hay reparto.
 

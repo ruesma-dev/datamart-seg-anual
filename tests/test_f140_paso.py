@@ -31,8 +31,8 @@ RUTA_SETUP = DIR_SQL / "00_setup.sql"
 
 def _columnas_setup(tabla: str) -> list[str]:
     texto = re.sub(r"\s+", " ", "\n".join(
-        l for l in RUTA_SETUP.read_text(encoding="utf-8").splitlines()
-        if not l.lstrip().startswith("--")
+        linea for linea in RUTA_SETUP.read_text(encoding="utf-8").splitlines()
+        if not linea.lstrip().startswith("--")
     ))
     m = re.search(rf"CREATE TABLE IF NOT EXISTS {re.escape(tabla)} \((.*?)\);", texto)
     assert m
@@ -77,7 +77,7 @@ def test_f140_r4_una_fila_por_hipotesis_del_catalogo_real() -> None:
     filas = hsql.filas_catalogo(leidas.catalogo)
     assert [f[0] for f in filas] == [h.codigo for h in leidas.catalogo]
     assert len(filas) == 23
-    for fila, h in zip(filas, leidas.catalogo):
+    for fila, h in zip(filas, leidas.catalogo, strict=True):
         assert len(fila) == len(_columnas_setup("tesoreria.hipotesis_caja"))
         assert isinstance(fila[4], Json) and fila[4].obj == h.valor_defecto
         assert (fila[5] is None) == (not h.opciones)
