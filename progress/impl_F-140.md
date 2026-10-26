@@ -80,7 +80,7 @@ están en Azure (T15) y viajaron leídos de Sigrid como `VALUES`; las funciones,
 | 06 `condiciones_contrato_cliente` | 970 contratos (PK única), 450 obras, 705 reconocidos, 265 sin forma, 500 COEGAR + 25 RECARGO, 0 sin empresa |
 | 07 `devengo_*` | COSTE 21 obras, 20.565 partidas, restante 113,98, pendiente **133,20** M EUR; VENTA 21, 18.997, 115,42, **132,37**. Guarda de la suma 0 fallos, 0 sin categoría, 0 PK duplicadas |
 | 07 frontera | cartera viva 36,44 (coste) / 21,31 (venta) M EUR; emitida tras cierre 0,89 / 0,00 |
-| 08 `hipotesis_caja_obra` | 462 filas = 21 obras x 22 hipótesis, 0 PK duplicadas, 0 sin clave. SIGRID: H09 16 obras (0/30/60 días), H10 16 (2,5/3/5 %), H11 4 (12/3/5 meses) |
+| 08 `hipotesis_caja_obra` | Tras P1-a (2026-10-26): **483 filas = 21 obras x 23 hipótesis** (antes 462, sin H17), 0 PK duplicadas, 0 sin clave. SIGRID: H09 16 obras (0/30/60 días), H10 16 (2,5/3/5 %), H11 4 (12/3/5 meses) |
 | T6 cascada | +4 CONTRATO, +107 FACTURA_CABECERA, +2 FACTURA_LINEAS; pagos no de baja con obra 86,87 % -> 86,95 %; 17.152 siguen sin obra |
 
 Detalle de 07 (adelantado/retrasado, sobre-ejecutado, sin perfil): `progress/current.md`.
@@ -138,6 +138,32 @@ E       KeyError: 'hipotesis_caja_obra'
 «tesoreria.devengo_corte_obra»` (`3 failed, 40 passed`).
 
 En verde tras cada tarea (`git log`: un commit por tarea con su verificación).
+
+## Review pasada 1 (CHANGES_REQUESTED) · correcciones (2026-10-26)
+
+Decisiones del humano: **P1 = (a)**; P2 (venta con y sin coeficientes) = feature aparte, no se
+toca aquí. Un commit por cambio:
+
+| Commit | Cambio |
+|---|---|
+| `e4ea3b3` | P1-a: `08` publica las 23 hipótesis por obra; `admite_obra` ya no filtra filas, va en los dos `LEFT JOIN` (H17 siempre DEFECTO). H11 de SIGRID en meses ENTEROS (`x.meses::INTEGER` si no tiene decimales; con decimales, no es valor). Ficha de `hipotesis_caja_obra` (las 23, 483 filas) y tests nuevos: `test_f140_r5_p1a_se_publican_las_23_y_la_que_no_admite_obra_va_a_defecto`, `test_f140_r22_p1a_la_ficha_de_hipotesis_por_obra_dice_las_23` |
+| `2e555c5` | Los 6 avisos nuevos de ruff (4 RUF002 en `proyeccion_caja.py`, E741 y B905 en `test_f140_paso.py`) |
+| `51459f9` | `current.md`: las MANUAL de T15 y T16 con su comando exacto, en orden (pasos 0-10) |
+| `a2e349b` | `features.json`: `notes` al día (D1-D19 cerradas en A); `python -I harness/backlog.py` sin cambios en `BACKLOG.md` |
+| `9826318` | `ARCHITECTURE.md`: si el YAML no valida, 01-07 ya están escritos; lo que no se escribe son las tablas de hipótesis |
+| azure-apps `995e369` | La fila «MCP y Power BI» de `tesoreria` (el MCP ya la ve) y el mismo matiz del YAML (local, sin push) |
+
+**RED de P1-a y H11** (`pytest tests/test_f140_sql.py -k "p1a or d18_de_donde"` con el `08`
+anterior, guardado con `git stash`):
+```
+E       AssertionError: ningún filtro deja fuera hipótesis del catálogo
+E           h.codigo WHERE h.admite_obra;
+E       AssertionError: H11
+```
+Con el `08` nuevo, `2 passed`. **Presupuesto de F-147 remedido**: 30.873 (reglas 7.431, enrutado
+15.000, bloques 8.442), igual que antes; el `resumen` de `R-CAJA-HIPOTESIS` no cambia.
+**Contraste de solo lectura de `08` repetido** (Azure y Sigrid, mismo método que T13): 483 filas,
+21 obras, 23 códigos, 0 PK duplicadas; SIGRID igual (H11 = 12/3/5 meses).
 
 ## Fuera del alcance y pendiente
 
