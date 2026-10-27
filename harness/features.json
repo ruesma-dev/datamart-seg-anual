@@ -225,7 +225,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 54,
+      "priority": 56,
       "branch": "feature/F-017-cierre-costes-indirectos"
     },
     {
@@ -237,7 +237,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 58,
+      "priority": 60,
       "branch": "feature/F-018-validacion-cierre-mensual"
     },
     {
@@ -249,7 +249,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 64,
+      "priority": 66,
       "branch": "feature/F-002-plan-vigente"
     },
     {
@@ -268,7 +268,7 @@
       ],
       "status": "pending",
       "sdd": false,
-      "priority": 66,
+      "priority": 68,
       "branch": "feature/F-012-auditoria-costes-azure"
     },
     {
@@ -293,7 +293,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 67,
+      "priority": 69,
       "branch": "feature/F-013-carga-excels-aux"
     },
     {
@@ -305,7 +305,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 68,
+      "priority": 70,
       "branch": "feature/F-010-carga-excels-auxiliares"
     },
     {
@@ -317,7 +317,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 69,
+      "priority": 71,
       "branch": "feature/F-007-disparo-manual-web"
     },
     {
@@ -330,7 +330,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 55,
+      "priority": 57,
       "branch": "feature/F-022-desempate-obrfasamb"
     },
     {
@@ -380,7 +380,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 59,
+      "priority": 61,
       "branch": "feature/F-028-puerta-stg-distingue-fallo"
     },
     {
@@ -404,7 +404,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 49,
+      "priority": 51,
       "branch": "feature/F-029-mutacion-fiable"
     },
     {
@@ -421,7 +421,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 56,
+      "priority": 58,
       "branch": "feature/F-030-reglas-negocio-compartidas"
     },
     {
@@ -439,7 +439,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 51,
+      "priority": 53,
       "branch": "feature/F-031-alerta-no-se-resuelve"
     },
     {
@@ -456,7 +456,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 70,
+      "priority": 72,
       "branch": "feature/F-032-limpieza-secretos-y-puesto"
     },
     {
@@ -473,7 +473,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 60,
+      "priority": 62,
       "branch": "feature/F-033-azure-apps-al-dia"
     },
     {
@@ -490,7 +490,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 62,
+      "priority": 64,
       "branch": "feature/F-026-rbac-propagacion"
     },
     {
@@ -546,7 +546,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 23,
+      "priority": 25,
       "branch": "feature/F-036-oficios"
     },
     {
@@ -602,21 +602,27 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 43,
+      "priority": 45,
       "branch": "feature/F-039-vistas-puente"
     },
     {
       "id": "F-040",
       "title": "El lado de ingresos: ventas, certificaciones y clientes",
-      "description": "Nacida el 2026-08-20 del analisis de dominio de F-006. Es el hueco caro y estructural del datamart: el lado del dinero que entra esta practicamente ausente, y sin el no hay flujo de caja completo ni analisis de cliente. Tres bloques. (1) VENTAS: dvf y dvfpro -facturas de venta y sus lineas, que llevan paride- no se ingieren; hay un config/tables_sigrid_venta_snippet.yaml preparado y sin integrar desde hace tiempo. Su ausencia deja ademas muerta la vista retenciones.v_src_lineas_venta, que existe vacia por diseno, y por eso las retenciones de cliente no tienen respaldo de atribucion a obra ni CIF. (2) CERTIFICACIONES a cliente: cer, cerpro -lineas con paride- y obrcer -con prorea, cerobr, cerrev, ceraac- son el eslabon que falta entre la produccion y el cobro; hoy tenemos la produccion como importe y el efecto de cobro, pero nada en medio. (3) CLIENTES: la tabla cli no se ingiere. Solo conocemos el nombre del cliente via con.res desde obr.entide, asi que no se puede responder ni quienes son nuestros diez mayores clientes ni nada que exija su CIF o su clasificacion. Depende de la capacidad del ETL: son tablas grandes y F-035 esta midiendo el tiempo de carga; la spec debe estimar el impacto en la ventana nocturna antes de comprometerse.",
+      "description": "Nacida el 2026-08-20 del analisis de dominio de F-006. Es el hueco caro y estructural del datamart: el lado del dinero que entra esta practicamente ausente, y sin el no hay flujo de caja completo ni analisis de cliente. Tres bloques. (1) VENTAS: dvf y dvfpro -facturas de venta y sus lineas, que llevan paride- no se ingieren; hay un config/tables_sigrid_venta_snippet.yaml preparado y sin integrar desde hace tiempo. Su ausencia deja ademas muerta la vista retenciones.v_src_lineas_venta, que existe vacia por diseno, y por eso las retenciones de cliente no tienen respaldo de atribucion a obra ni CIF. (2) CERTIFICACIONES a cliente: cer, cerpro -lineas con paride- y obrcer -con prorea, cerobr, cerrev, ceraac- son el eslabon que falta entre la produccion y el cobro; hoy tenemos la produccion como importe y el efecto de cobro, pero nada en medio. (3) CLIENTES: la tabla cli no se ingiere. Solo conocemos el nombre del cliente via con.res desde obr.entide, asi que no se puede responder ni quienes son nuestros diez mayores clientes ni nada que exija su CIF o su clasificacion. Depende de la capacidad del ETL: son tablas grandes y F-035 esta midiendo el tiempo de carga; la spec debe estimar el impacto en la ventana nocturna antes de comprometerse. ================ PEDIDA POR JUAN ROMERO (Dir. Admon y Control de Costes) por correo, recordado el 2026-10-27, y subida por el humano ese día de la prioridad 46 a la 5, justo detrás de F-054. Lo que pide, en sus palabras: (a) «Certificaciones a cliente: el documento de certificación (número, mes, a origen / a cuenta, estado)»; (b) «Facturas de venta: cabecera y líneas. La tabla de líneas de venta de Sigrid (dvfpro) no se está cargando, y por eso la retención de garantía de las facturas de venta sale siempre vacía»; (c) «Enlace certificación – factura – cobro, para poder seguir una certificación hasta que se cobra». La cuarta petición del mismo correo (forma de pago por defecto de la ficha del proveedor) va aparte, en F-152. MEDIDO EL 2026-10-27 en solo lectura (21 obras con devengo pendiente de F-140): `cer` y `dvf` se enlazan con la obra por `cenide` (= `obr.cenide`), llevan `totbas`/`totiva`/`fecdoc`, y su IVA efectivo coincide con el `obr.ivaide` de la ficha de la obra (21 % en 0690, 0697 y 0699; 0 % en las otras 16 con facturas, ninguna al 10 %); `obrcer` no tiene filas en esas 21 obras. Es la fuente de verdad del IVA de venta para la caja (H12 de `tesoreria.hipotesis_caja`), y `cer.feccob` («fecha de cobro, 0 pendiente») es un candidato al enlace con el cobro que la spec debe medir.",
       "acceptance": [
-        "Definida en detalle por specs/F-040-ingresos/ (sdd=true)"
+        "Definida en detalle por specs/F-040-ingresos/ (sdd=true)",
+        "Publicado el DOCUMENTO de certificación a cliente por obra: número, mes, a origen / a cuenta y estado, con su ficha (petición de Juan Romero, 2026-10-27)",
+        "Publicadas las facturas de venta, cabecera (`dvf`) y líneas (`dvfpro`), con su IVA y sus retenciones; `retenciones.v_src_lineas_venta` deja de estar vacía y la retención de garantía de venta sale informada",
+        "Se puede seguir una certificación hasta su cobro: certificación -> factura de venta -> efecto de cobro (`tesoreria.efectos`), con la cobertura del enlace medida y declarada",
+        "Contraste por obra de la venta producida con coeficientes frente a lo certificado a origen (sugerencia de Juan Romero, 27-10: el ámbito certificación «no es referente para la fase 0, pero sí arroja datos buenos en la certificación fase n»), y los conceptos certificados FUERA del coeficiente (revisión de precios, contradictorios) identificados",
+        "La spec estima el impacto en la ventana nocturna antes de comprometerse"
       ],
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 46,
-      "branch": "feature/F-040-ingresos"
+      "priority": 2,
+      "branch": "feature/F-040-ingresos",
+      "notes": "2026-10-27: prioridad 46 -> 5 por orden del humano, tras el correo de Juan Romero; criterios de aceptación ampliados con sus tres peticiones. 2026-10-27: prioridad 5 -> 2 por orden del humano (tras F-150 van F-040 y F-104). 2026-10-27: añadido el contraste venta con coeficientes frente a certificado y los conceptos fuera de coeficiente (revisión de precios), que F-150 deja fuera y declara como aviso. Medido: el IVA del contrato (`obrctr.ivaide`) coincide con el de `cer` y `dvf` por `ctride` en todos los contratos."
     },
     {
       "id": "F-041",
@@ -633,7 +639,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "critico",
-      "priority": 40,
+      "priority": 42,
       "branch": "feature/F-041-mutacion-fiable"
     },
     {
@@ -666,7 +672,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 41,
+      "priority": 43,
       "branch": "feature/F-043-secreto-versionado"
     },
     {
@@ -698,7 +704,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 42,
+      "priority": 44,
       "branch": "feature/F-046-contraste-desgloses"
     },
     {
@@ -729,7 +735,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 45,
+      "priority": 47,
       "branch": "feature/F-048-guardian-secretos-poroso"
     },
     {
@@ -745,7 +751,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 47,
+      "priority": 49,
       "branch": "feature/F-049-sello-pendiente-mutacion"
     },
     {
@@ -761,7 +767,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 52,
+      "priority": 54,
       "branch": "feature/F-050-fases-duplicadas-sigrid"
     },
     {
@@ -797,7 +803,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 50,
+      "priority": 52,
       "branch": "feature/F-053-desempate-obras-duplicadas"
     },
     {
@@ -816,8 +822,9 @@
       "status": "pending",
       "sdd": true,
       "rigor": "documental",
-      "priority": 4,
-      "branch": "feature/F-054-conocimiento-de-negocio"
+      "priority": 5,
+      "branch": "feature/F-054-conocimiento-de-negocio",
+      "notes": "2026-10-27: prioridad 4 -> 5 por orden del humano (tras F-150 van F-040 y F-104)."
     },
     {
       "id": "F-055",
@@ -834,7 +841,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 20,
+      "priority": 22,
       "branch": "feature/F-055-mundo-proveedor"
     },
     {
@@ -884,7 +891,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 44,
+      "priority": 46,
       "branch": "feature/F-058-estados-financieros"
     },
     {
@@ -897,7 +904,7 @@
         "Resuelto y escrito como se identifica al mismo tercero entre empresas distintas, que tienen subcuentas distintas",
         "Documentado en el diccionario que significa 'posicion' y 'pendiente' aqui, para que el MCP no lo confunda con lo que publica compras"
       ],
-      "priority": 53,
+      "priority": 55,
       "rigor": "estandar",
       "branch": "feature/F-060-posicion-terceros",
       "status": "pending",
@@ -914,7 +921,7 @@
         "Contrastado contra el coste de personal que hoy publica el seguimiento, con las diferencias explicadas",
         "Publicados los movimientos y el saldo de las cuentas analiticas de contrapartida de los recursos (peticion de Juan Romero del 24-09), con lo que queda por repartir a obra, y medido y declarado si el asiento de nominas entra o no en esas cuentas"
       ],
-      "priority": 57,
+      "priority": 59,
       "rigor": "critico",
       "branch": "feature/F-061-coste-personal-obra",
       "status": "pending",
@@ -930,7 +937,7 @@
         "Validado por Administracion contra al menos una declaracion real ya presentada",
         "Documentado que este objeto NO sustituye a la declaracion oficial y para que sirve exactamente"
       ],
-      "priority": 61,
+      "priority": 63,
       "rigor": "estandar",
       "branch": "feature/F-062-impuestos",
       "status": "pending",
@@ -946,7 +953,7 @@
         "Contrastado contra el total que la analitica reparte como GENERALES, con la diferencia cuantificada por ano Y EXPLICADA: que parte es gasto no repartido, que parte es diferencia de criterio y que parte no cuadra",
         "NO se cambia el criterio de reparto en esta feature. Si la diferencia sugiere que deberia cambiarse, se lleva a Negocio como propuesta con el numero delante"
       ],
-      "priority": 63,
+      "priority": 65,
       "rigor": "critico",
       "branch": "feature/F-063-generales-reparto",
       "status": "pending",
@@ -963,7 +970,7 @@
         "Distinguidos los apuntes manuales de los generados por documento, con su volumen",
         "El aviso que se pasa a F-058 dice que parte del gasto NO DEBE atribuirse a obra por ser estructura, y que parte falta por error"
       ],
-      "priority": 65,
+      "priority": 67,
       "rigor": "estandar",
       "branch": "feature/F-064-control-interno-contable",
       "status": "pending",
@@ -983,7 +990,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 38,
+      "priority": 40,
       "branch": "feature/F-065-creditos-cpu-tras-la-ventana"
     },
     {
@@ -1059,7 +1066,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 39,
+      "priority": 41,
       "branch": "feature/F-069-mejoras-arnes-review-f066"
     },
     {
@@ -1077,7 +1084,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 31,
+      "priority": 33,
       "branch": "feature/F-070-auditoria-calidad-diccionario"
     },
     {
@@ -1153,7 +1160,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 36,
+      "priority": 38,
       "branch": "feature/F-075-alcance-de-las-puertas"
     },
     {
@@ -1173,7 +1180,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 30,
+      "priority": 32,
       "branch": "feature/F-076-ambitos-certificacion"
     },
     {
@@ -1188,7 +1195,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 33,
+      "priority": 35,
       "branch": "feature/F-077-flag-reconstruir-todo-sin-test"
     },
     {
@@ -1285,7 +1292,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 34,
+      "priority": 36,
       "branch": "feature/F-082-supervivientes-f025"
     },
     {
@@ -1366,7 +1373,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "critico",
-      "priority": 32,
+      "priority": 34,
       "branch": "feature/F-087-rol-propio-de-power-bi"
     },
     {
@@ -1385,7 +1392,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 35,
+      "priority": 37,
       "branch": "feature/F-088-guardian-de-recuentos-y-la-guarda-que-falta"
     },
     {
@@ -1404,7 +1411,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 28,
+      "priority": 30,
       "branch": "feature/F-089-el-mcp-cachea-el-diccionario"
     },
     {
@@ -1443,7 +1450,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 29,
+      "priority": 31,
       "branch": "feature/F-091-factura-asiento"
     },
     {
@@ -1466,7 +1473,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 8,
+      "priority": 10,
       "branch": "feature/F-092-productos-y-centro-de-coste"
     },
     {
@@ -1483,7 +1490,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 27,
+      "priority": 29,
       "branch": "feature/F-093-obra-de-cabecera"
     },
     {
@@ -1531,7 +1538,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 21,
+      "priority": 23,
       "branch": "feature/F-096-plan-mensual-sin-tope"
     },
     {
@@ -1563,13 +1570,13 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 24,
+      "priority": 26,
       "branch": "feature/F-098-fases-por-ambito-y-controles"
     },
     {
       "id": "F-099",
       "title": "Los contratos de obra con el cliente (expedientes): importe adjudicado, coeficientes por separado, fechas y las partidas que cuelgan de cada uno",
-      "description": "Pedida por **Juan Romero** (Dir. Admon y Control de Costes) por correo el 2026-09-22, «Datamart: publicar los contratos de obra (expedientes) con importe adjudicado y coeficientes». Sus palabras: «Ahora solo estan los contratos de compra a proveedores. De los contratos de obra lo unico que llega son las fechas, agregadas en la cabecera de la obra, y el importe oficial de venta con los coeficientes ya aplicados, pero sin saber cuales.» LO QUE PIDE, por cada expediente: obra, codigo y descripcion del expediente, y cliente; importe adjudicado; los coeficientes que se le aplican (GG, BI, baja, revision de precios u otros) POR SEPARADO; fechas; y que partidas o unidades cuelgan de cada expediente. PARA QUE: «certificar con los criterios del cliente: a veces quiere ciertas unidades con unos coeficientes, otras con coeficientes distintos, y otras sin coeficientes (por ejemplo, por temas de ICIO). Con estos datos podre revisar que cada unidad se certifica con el coeficiente que le corresponde.» ================ LO QUE YA SE SABE, sin medir todavia para esta feature: el contrato de la obra con el cliente es `obrctr`, que YA se ingiere (966 filas, 448 obras, 165 con mas de un contrato; medido el 2026-09-22 en la exploracion de retenciones) y de el `cierre` toma hoy solo fechas agregadas con MAX (`cierre...cabecera`). `stg.presupuesto` publica `importe` (sin coeficientes, venta de gestion) e `importe_oficial` (con coeficientes, venta oficial), segun decidio el humano para el cierre de gestion; lo que no se publica es QUE coeficientes y de que expediente. Hay que localizar en Sigrid (azure-apps/sigrid_tablas.md) donde viven los coeficientes y el enlace partida -> expediente, y si se ingieren. ENLAZA con F-076 (la certificacion al cliente, ambitos VEN y CER_PEC, no modelada) y con F-095 (usa `obrctr` para el plazo de retencion y el inicio de garantia: una sola lectura de `obrctr`, no dos). ================ ENTRADAS DE F-109 (2026-09-25/26): el enlace partida -> contrato/expediente va por `partida_id` (en 812 pares el mismo codigo de partida existe una vez por contrato, en capitulos distintos); `obrparpar.expide` vale -3 o -4 en 5.258 partidas, centinelas sin significado documentado que hay que explicar; y `raw.obrctrexp` (expedientes) NO se ingiere todavia.",
+      "description": "Pedida por **Juan Romero** (Dir. Admon y Control de Costes) por correo el 2026-09-22, «Datamart: publicar los contratos de obra (expedientes) con importe adjudicado y coeficientes». Sus palabras: «Ahora solo estan los contratos de compra a proveedores. De los contratos de obra lo unico que llega son las fechas, agregadas en la cabecera de la obra, y el importe oficial de venta con los coeficientes ya aplicados, pero sin saber cuales.» LO QUE PIDE, por cada expediente: obra, codigo y descripcion del expediente, y cliente; importe adjudicado; los coeficientes que se le aplican (GG, BI, baja, revision de precios u otros) POR SEPARADO; fechas; y que partidas o unidades cuelgan de cada expediente. PARA QUE: «certificar con los criterios del cliente: a veces quiere ciertas unidades con unos coeficientes, otras con coeficientes distintos, y otras sin coeficientes (por ejemplo, por temas de ICIO). Con estos datos podre revisar que cada unidad se certifica con el coeficiente que le corresponde.» ================ LO QUE YA SE SABE, sin medir todavia para esta feature: el contrato de la obra con el cliente es `obrctr`, que YA se ingiere (966 filas, 448 obras, 165 con mas de un contrato; medido el 2026-09-22 en la exploracion de retenciones) y de el `cierre` toma hoy solo fechas agregadas con MAX (`cierre...cabecera`). `stg.presupuesto` publica `importe` (sin coeficientes, venta de gestion) e `importe_oficial` (con coeficientes, venta oficial), segun decidio el humano para el cierre de gestion; lo que no se publica es QUE coeficientes y de que expediente. Hay que localizar en Sigrid (azure-apps/sigrid_tablas.md) donde viven los coeficientes y el enlace partida -> expediente, y si se ingieren. ENLAZA con F-076 (la certificacion al cliente, ambitos VEN y CER_PEC, no modelada) y con F-095 (usa `obrctr` para el plazo de retencion y el inicio de garantia: una sola lectura de `obrctr`, no dos). ================ ENTRADAS DE F-109 (2026-09-25/26): el enlace partida -> contrato/expediente va por `partida_id` (en 812 pares el mismo codigo de partida existe una vez por contrato, en capitulos distintos); `obrparpar.expide` vale -3 o -4 en 5.258 partidas, centinelas sin significado documentado que hay que explicar; y `raw.obrctrexp` (expedientes) NO se ingiere todavia. ================ 2026-10-27: Juan Romero confirma por correo (docs/referencia/06_correos_coeficientes_iva_caja.md) que «todas las partidas tienen alimentado su contrato, y cada contrato tiene sus coeficientes», desglosados (también el de baja en obra pública). MEDIDO ese día: el enlace partida -> contrato es `raw.obrparpar.ctride` (96-100 % del pendiente de venta en 19 de 21 obras) y el desglose está en `raw.obrctr.coestr` (`COEF_RECGG|Gastos Generales|13|| COEF_RECBI|Beneficio Industrial|6||`), que SE SUMAN (1,19). F-150 toma de ahí el coeficiente, el IVA y la retención de cada partida y publica el desglose en `tesoreria.condiciones_contrato_cliente`; a F-099 le queda el resto: los expedientes (`obrctrexp`), importe adjudicado, fechas y la publicación del contrato como objeto propio de consulta.",
       "acceptance": [
         "Localizados y medidos en Sigrid los expedientes, sus coeficientes y el enlace partida -> expediente, con su cobertura",
         "Publicados los expedientes por obra con cliente, importe adjudicado, fechas y cada coeficiente por separado, con su ficha del diccionario",
@@ -1579,8 +1586,9 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 26,
-      "branch": "feature/F-099-expedientes-obra"
+      "priority": 28,
+      "branch": "feature/F-099-expedientes-obra",
+      "notes": "2026-10-27: la parte de coeficientes por partida pasa a F-150 si el humano confirma su rediseño."
     },
     {
       "id": "F-101",
@@ -1629,8 +1637,9 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 19,
-      "branch": "feature/F-104-retenciones-cliente"
+      "priority": 3,
+      "branch": "feature/F-104-retenciones-cliente",
+      "notes": "2026-10-27: prioridad 21 -> 3 por orden del humano (tras F-150 van F-040 y F-104)."
     },
     {
       "id": "F-105",
@@ -1646,7 +1655,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 25,
+      "priority": 27,
       "branch": "feature/F-105-log-sigrid-usuarios"
     },
     {
@@ -1662,7 +1671,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 18,
+      "priority": 20,
       "branch": "feature/F-106-obras-por-empresa"
     },
     {
@@ -1743,7 +1752,7 @@
       "status": "spec_ready",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 15,
+      "priority": 17,
       "branch": "feature/F-111-nombres-partida-por-ancestro"
     },
     {
@@ -1791,7 +1800,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 17,
+      "priority": 19,
       "branch": "feature/F-114-avisos-mcp-rescatados"
     },
     {
@@ -1809,7 +1818,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 73,
+      "priority": 75,
       "branch": "feature/F-117-obras-ciegas-en-master"
     },
     {
@@ -1841,7 +1850,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 37,
+      "priority": 39,
       "branch": "feature/F-119-cartera-de-obra"
     },
     {
@@ -1856,7 +1865,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 71,
+      "priority": 73,
       "branch": "feature/F-115-tiemod-inexistente"
     },
     {
@@ -1871,7 +1880,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 72,
+      "priority": 74,
       "branch": "feature/F-116-ingesta-descompuestos-error-por-version"
     },
     {
@@ -1904,7 +1913,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 16,
+      "priority": 18,
       "branch": "feature/F-121-recurso-principal-auxiliar"
     },
     {
@@ -1919,7 +1928,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 22,
+      "priority": 24,
       "branch": "feature/F-122-lineas-sin-rendimiento"
     },
     {
@@ -1957,7 +1966,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 9,
+      "priority": 11,
       "branch": "feature/F-126-analitica-lineas-compra"
     },
     {
@@ -1978,7 +1987,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 7,
+      "priority": 9,
       "branch": "feature/F-127-mayor-analitico"
     },
     {
@@ -2018,7 +2027,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 6,
+      "priority": 8,
       "branch": "feature/F-129-objetivo-contra-oferta-referencia"
     },
     {
@@ -2034,7 +2043,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 11,
+      "priority": 13,
       "branch": "feature/F-130-condiciones-y-texto-oferta"
     },
     {
@@ -2050,7 +2059,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 10,
+      "priority": 12,
       "branch": "feature/F-131-cantidades-dpc"
     },
     {
@@ -2086,7 +2095,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 13,
+      "priority": 15,
       "branch": "feature/F-133-procesos-albaranes"
     },
     {
@@ -2105,7 +2114,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 14,
+      "priority": 16,
       "branch": "feature/F-134-empleado-alta-documento"
     },
     {
@@ -2158,7 +2167,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 12,
+      "priority": 14,
       "branch": "feature/F-137-ordenes-infra-patrones-buenos"
     },
     {
@@ -2264,7 +2273,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 75,
+      "priority": 77,
       "branch": "feature/F-143-tipo-contrato-compra"
     },
     {
@@ -2386,12 +2395,12 @@
         "Albaranes sin facturar (N8): H20 fecha la factura a fin del mes del albarán, H27 (6 meses) aparta y declara lo más antiguo, y la `fuente_defecto` de H20 lleva la cifra buena (56,9 M EUR en las 21 obras)",
         "`bash harness/init.sh` en verde y APROBADO del reviewer; despliegue MANUAL en `progress/current.md`"
       ],
-      "status": "spec_ready",
+      "status": "blocked",
       "sdd": true,
       "rigor": "estandar",
       "priority": 1,
       "branch": "feature/F-150-receta-caja",
-      "notes": "2026-10-26: registrada por orden del humano. Depende de F-140 desplegada. Absorbe la P2 de la review de F-140 (venta con coeficientes). Nota de la medición: el master de certificación es el ámbito 9 (MASTER CERTIFICACION). 2026-10-27: spec cerrada (`specs/F-150-receta-caja/`, informe `progress/spec_F-150.md`). El humano cerró D1-D10 en la opción A; D8 (contraste de H12 y 10 % de vivienda por obra, MANUAL de Control de Costes) y D9 (H10 por peso del adjudicado) entran en el alcance. T11 (solo lectura) va antes de T9: si el contraste de H12 no discrimina, PARADA y nueva propuesta. 2026-10-27 (tarde): SPEC REHECHA tras el correo de Juan Romero (venta sin coeficientes, cada contrato con los suyos; IVA fiable en la ficha y por contrato, con tipos mezclados; liquidación e IVA soportado con AdP) y las mediciones del líder: decisiones NUEVAS N1-N5 (`design.md` §9) que sustituyen a D2, D8 y D9, PENDIENTES de la PARADA 1. N1 coeficiente del contrato (`obrctr.coestr`, enlace `obrparpar.ctride`) > master 9 > master 11; N2 IVA del contrato (catálogo `iva` a ingerir) y H12 = MANUAL > ficha de la obra > 21 % para la base sin él; N3 retención del contrato y H10 de F-140 para el resto (fuera la regla del peso e `importe_adjudicado`); N4 la obra-mes con IVA y retención sumados; N5 avisos. Fuera el contraste de H12 con lo cobrado y la excepción de `R-VENTA-COEFICIENTES`. Toca a F-099: le adelanta el desglose por contrato. Mismo día, decisiones del humano incorporadas: H26 (opción A, venta ejecutada pendiente de facturar; cabecera de `dvf`, enlace `dvf.cenide = obr.cenide`; líneas y certificaciones siguen en F-040), H24/H25 = fraccionamiento, H14 por defecto MENSUAL (día 20 del mes siguiente, lo confirma AdP), H21 declarado como riesgo (doble resta de certificaciones facturadas tras el cierre; hoy 0; F-040) y N7 (H13 por contrato de compra) recomendada pero aplazada como siguiente paso. Y N8 (albaranes sin facturar, medido por el líder): H20 a fin del mes del albarán (93 % de las facturas del mismo mes) y H27 nueva (antigüedad máxima, 6 meses, como H17): 27 hipótesis; los 8,23 M EUR de F-140 venían de `compras.fact_compras_linea`, lo bueno es 56,9 M EUR de `compras.v_pbi_albaranes_sin_facturar`."
+      "notes": "2026-10-26: registrada por orden del humano. Depende de F-140 desplegada. Absorbe la P2 de la review de F-140 (venta con coeficientes). Nota de la medición: el master de certificación es el ámbito 9 (MASTER CERTIFICACION). 2026-10-27: spec cerrada (`specs/F-150-receta-caja/`, informe `progress/spec_F-150.md`). El humano cerró D1-D10 en la opción A; D8 (contraste de H12 y 10 % de vivienda por obra, MANUAL de Control de Costes) y D9 (H10 por peso del adjudicado) entran en el alcance. T11 (solo lectura) va antes de T9: si el contraste de H12 no discrimina, PARADA y nueva propuesta. 2026-10-27 (tarde): SPEC REHECHA tras el correo de Juan Romero (venta sin coeficientes, cada contrato con los suyos; IVA fiable en la ficha y por contrato, con tipos mezclados; liquidación e IVA soportado con AdP) y las mediciones del líder: decisiones NUEVAS N1-N5 (`design.md` §9) que sustituyen a D2, D8 y D9, PENDIENTES de la PARADA 1. N1 coeficiente del contrato (`obrctr.coestr`, enlace `obrparpar.ctride`) > master 9 > master 11; N2 IVA del contrato (catálogo `iva` a ingerir) y H12 = MANUAL > ficha de la obra > 21 % para la base sin él; N3 retención del contrato y H10 de F-140 para el resto (fuera la regla del peso e `importe_adjudicado`); N4 la obra-mes con IVA y retención sumados; N5 avisos. Fuera el contraste de H12 con lo cobrado y la excepción de `R-VENTA-COEFICIENTES`. Toca a F-099: le adelanta el desglose por contrato. Mismo día, decisiones del humano incorporadas: H26 (opción A, venta ejecutada pendiente de facturar; cabecera de `dvf`, enlace `dvf.cenide = obr.cenide`; líneas y certificaciones siguen en F-040), H24/H25 = fraccionamiento, H14 por defecto MENSUAL (día 20 del mes siguiente, lo confirma AdP), H21 declarado como riesgo (doble resta de certificaciones facturadas tras el cierre; hoy 0; F-040) y N7 (H13 por contrato de compra) recomendada pero aplazada como siguiente paso. Y N8 (albaranes sin facturar, medido por el líder): H20 a fin del mes del albarán (93 % de las facturas del mismo mes) y H27 nueva (antigüedad máxima, 6 meses, como H17): 27 hipótesis; los 8,23 M EUR de F-140 venían de `compras.fact_compras_linea`, lo bueno es 56,9 M EUR de `compras.v_pbi_albaranes_sin_facturar`. [Nota de main, mismo día] REDISEÑO tras la respuesta de Juan Romero (docs/referencia/06_correos_coeficientes_iva_caja.md) y lo medido ese día: coeficiente, IVA y retención del cliente se toman del CONTRATO de cada partida (`obrparpar.ctride` -> `obrctr`: `coestr`, `ivaide`, `coegar`), con el master de certificación / venta y la ficha de la obra de respaldo. El coeficiente del contrato coincide con el del master salvo en 6 partidas; el IVA del contrato coincide al 100 % con el efectivo de `cer` y `dvf`, también en los contratos mezclados (casetas Levitt 0696, acometidas 0686, catas 0678). Sustituye D8 (fuera el contraste con lo cobrado y la excepción de R29) y D9. Spec en revisión por el spec-author; vuelve a PARADA 1 antes del implementer. 2026-10-27 (noche): PARADA de T11 (R29) del implementer, en solo lectura antes de escribir código: el hueco neto de H26 sale 14,30 M EUR (-9,5 % frente a 15,8) y la gramática de `coestr` de R7 no casa con el dato (una línea por concepto separadas por salto de línea, 5 campos `CODIGO|etiqueta|valor||base`; `RET*` y la baja `COEF_DESADJ` en cascada dentro de `coestr`). Detalle y decisiones pedidas en `progress/impl_F-150.md`."
     },
     {
       "id": "F-151",
@@ -2406,9 +2415,25 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 2,
+      "priority": 4,
       "branch": "feature/F-151-funcion-caja-proyectada",
-      "notes": "2026-10-26: registrada por orden del humano. Depende de F-150."
+      "notes": "2026-10-26: registrada por orden del humano. Depende de F-150. 2026-10-27: prioridad 2 -> 4 por orden del humano (tras F-150 van F-040 y F-104)."
+    },
+    {
+      "id": "F-152",
+      "title": "La forma de pago por defecto de la ficha del proveedor (`prv.pagide` -> `auxpag`), junto a los días fijos y los meses sin pago que ya se publican",
+      "description": "Pedida por Juan Romero (Dir. Admon y Control de Costes) en su correo recordado el 2026-10-27: «Forma de pago genérica de la ficha del proveedor. Ya están publicados los días fijos de pago y los meses sin pago, pero falta la forma de pago por defecto de la ficha». LO QUE YA HAY: F-140 publica en `tesoreria.condiciones_contrato_compra` los días fijos (`prv.pagdia`) y los meses sin pago (`prv.pagmes`) del proveedor de cada CONTRATO, y la forma de pago del contrato (`ctr.pagide`) con sus plazos en `tesoreria.plazos_forma_pago` (de `auxpag`). LO QUE FALTA: la forma de pago de la FICHA del proveedor, `prv.pagide` («Con.Pago», índice a `auxpag`). `raw.prv` y `raw.auxpag` ya se ingieren enteras: no hace falta tocar la ingesta. Publicarla por proveedor (no solo por contrato), con su descripción y sus plazos, para poder responder qué forma de pago tiene un proveedor aunque no haya contrato y si la del contrato coincide con la de su ficha. Útil también para la caja (H02, pagos sin contrato), sin cambiar ninguna hipótesis en esta feature.",
+      "acceptance": [
+        "Publicada por proveedor la forma de pago de su ficha (`prv.pagide`), con su descripción y el enlace a `tesoreria.plazos_forma_pago`, junto a los días fijos y los meses sin pago, con ficha en el diccionario",
+        "Medida y declarada la cobertura: cuántos proveedores la tienen informada y en cuántos contratos difiere de la forma de pago del contrato",
+        "Ningún objeto publicado cambia de valor; `bash harness/init.sh` en verde y APROBADO del reviewer; despliegue MANUAL en `progress/current.md`"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 6,
+      "branch": "feature/F-152-forma-pago-ficha-proveedor",
+      "notes": "2026-10-27: registrada por orden del humano a partir del correo de Juan Romero, en la prioridad 6, justo detrás de F-040."
     }
   ]
 }

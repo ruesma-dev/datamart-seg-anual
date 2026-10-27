@@ -9,6 +9,22 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-27 (noche) · F-150 · `blocked` · PARADA de T11 (R29) · rama `feature/F-150-receta-caja`
+
+- El humano confirmó N1-N8 (PARADA 1). El implementer adelantó la verificación de SOLO LECTURA
+  de T11 antes de escribir código y PARÓ: (1) el hueco neto de H26 sale **14,30 M EUR (−9,5 %**
+  frente a 15,8; R29 para si > 5 %); con lo real sin coeficiente a 1, 15,26 (−3,4 %);
+  (2) la gramática de `coestr` de R7 no casa con el dato: una LÍNEA por concepto (`\r\n`), cinco
+  campos `CODIGO|etiqueta|valor||base`; con R7, 1.071 partidas (6,85 M EUR) de las 21 obras
+  quedan sin reconocer, y en otros contratos hay retenciones `RET*` y la baja `COEF_DESADJ` (en
+  cascada sobre el subtotal de contrata) dentro de `coestr`.
+- Casa con §8: 0 partidas con contrato de otra obra; coeficiente contrato ≠ master > 0,005 con
+  pendiente: 5 (≤ 6); IVA y retención del contrato ≥ 96 % en 19 obras; albaranes 56,88 M EUR
+  (>6 meses 22,88). Merge de `main` hecho (conflictos de `features.json` con ambos lados;
+  `BACKLOG.md` regenerado). Sin código escrito.
+- **Para decidir (humano)**: la gramática de `coestr` (`RET*`, `COEF_DESADJ`, vacío = factor 1 o
+  sin dato) y qué hace el hueco con lo real sin coeficiente. Detalle: `progress/impl_F-150.md`.
+
 ## 2026-10-27 (tarde) · F-150 · SPEC REHECHA (`spec_ready`, PARADA 1 pendiente) · rama `feature/F-150-receta-caja`
 
 - Tras el correo de Juan Romero (27-10) y lo medido por el líder en solo lectura, la spec cambia
