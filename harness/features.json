@@ -619,9 +619,9 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 5,
+      "priority": 2,
       "branch": "feature/F-040-ingresos",
-      "notes": "2026-10-27: prioridad 46 -> 5 por orden del humano, tras el correo de Juan Romero; criterios de aceptación ampliados con sus tres peticiones."
+      "notes": "2026-10-27: prioridad 46 -> 5 por orden del humano, tras el correo de Juan Romero; criterios de aceptación ampliados con sus tres peticiones. 2026-10-27: prioridad 5 -> 2 por orden del humano (tras F-150 van F-040 y F-104)."
     },
     {
       "id": "F-041",
@@ -821,8 +821,9 @@
       "status": "pending",
       "sdd": true,
       "rigor": "documental",
-      "priority": 4,
-      "branch": "feature/F-054-conocimiento-de-negocio"
+      "priority": 5,
+      "branch": "feature/F-054-conocimiento-de-negocio",
+      "notes": "2026-10-27: prioridad 4 -> 5 por orden del humano (tras F-150 van F-040 y F-104)."
     },
     {
       "id": "F-055",
@@ -1634,8 +1635,9 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 21,
-      "branch": "feature/F-104-retenciones-cliente"
+      "priority": 3,
+      "branch": "feature/F-104-retenciones-cliente",
+      "notes": "2026-10-27: prioridad 21 -> 3 por orden del humano (tras F-150 van F-040 y F-104)."
     },
     {
       "id": "F-105",
@@ -2407,9 +2409,9 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 2,
+      "priority": 4,
       "branch": "feature/F-151-funcion-caja-proyectada",
-      "notes": "2026-10-26: registrada por orden del humano. Depende de F-150."
+      "notes": "2026-10-26: registrada por orden del humano. Depende de F-150. 2026-10-27: prioridad 2 -> 4 por orden del humano (tras F-150 van F-040 y F-104)."
     },
     {
       "id": "F-152",
