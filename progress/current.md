@@ -9,7 +9,31 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-27 · F-150 · SPEC CERRADA (`spec_ready`) · rama `feature/F-150-receta-caja`
+## 2026-10-27 (tarde) · F-150 · SPEC REHECHA (`spec_ready`, PARADA 1 pendiente) · rama `feature/F-150-receta-caja`
+
+- Tras el correo de Juan Romero (27-10) y lo medido por el líder en solo lectura, la spec cambia
+  de fuente: coeficiente, IVA y retención salen del CONTRATO de cada partida
+  (`raw.obrparpar.ctride` -> `raw.obrctr`). Decisiones NUEVAS N1-N7 en `design.md` §9, que
+  sustituyen a D2, D8 y D9; D1, D3-D7 y D10 siguen cerradas. Detalle y mapa de requisitos viejos -> nuevos: `progress/spec_F-150.md` §8.
+- **Para validar el humano (PARADA 1)**: N1 (contrato > master 9 > master 11), N2 (IVA del
+  contrato; H12 = MANUAL > ficha de la obra > 21 % solo para la base sin él; ingerir el catálogo
+  `iva`; el MANUAL NO pisa el contrato), N3 (retención del contrato; H10 de F-140 para el resto;
+  fuera la regla del peso), N4 (obra-mes con IVA y retención ya sumados más la base sin dato),
+  N5 (avisos: revisión de precios a F-040; H13/H14 con AdP), N6 (hueco de H26 por contrato y
+  no solo por obra; `include_columns` en vez de `dvf` entera), N7 (H13 por contrato, aplazada) y
+  N8 (H20 a fin del mes del albarán; H27 nueva, 6 meses, aparta y declara lo antiguo: 27
+  hipótesis; la cifra buena de H20 es 56,9 M EUR, no los 8,23 de F-140).
+- **Añadido el mismo día por orden del humano** (vía líder): H26 venta ejecutada pendiente de
+  facturar (N6: hueco por contrato en `devengo_corte_obra`, cabecera de `dvf` con un
+  `include_columns` nuevo en la ingesta), H24/H25 = fraccionamiento, H14 `MENSUAL`, H21 como
+  riesgo (remite a F-040) y N7 (H13 por contrato de compra) recomendada pero aplazada: el devengo
+  de coste no va por contrato de compra. requirements 146/150, design 250/250, tasks T1-T16.
+- **Sale del alcance**: el contraste de H12 con lo cobrado, la excepción de
+  `R-VENTA-COEFICIENTES`, `importe_adjudicado` y la lista MANUAL de obras de vivienda (ya no hace
+  falta: el IVA del contrato es fiable). **Para el líder**: anotar en F-099 que F-150 le adelanta
+  el desglose de coeficientes por contrato y el enlace partida -> contrato.
+
+### Antes (spec cerrada con D1-D10, 27-10 mañana; sustituida)
 
 - El humano cerró D1-D10 en la opción A (`design.md` §9). D9 (H10 por peso del adjudicado) y D8
   (contraste de H12 en el paso 6 de la receta, `contraste_iva_venta`, excepción acotada en

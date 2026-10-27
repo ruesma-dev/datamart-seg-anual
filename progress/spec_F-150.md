@@ -1,7 +1,7 @@
 <!-- progress/spec_F-150.md -->
 # F-150 · Informe del spec-author (la receta de la caja, fase 1)
 
-Fecha: 2026-10-26. Rama `feature/F-150-receta-caja` desde `main` (`6681de8`). Spec en
+Fecha: 2026-10-26; **rehecha el 2026-10-27 por la tarde (§8)**: §6 y §7 quedan como historia. Rama `feature/F-150-receta-caja` desde `main` (`6681de8`). Spec en
 `specs/F-150-receta-caja/`; decisiones abiertas D1-D10 en su `design.md` §9. Rama re-apuntada a `main` `d3b412a` (el 27-10 `main` ganó dos commits de `progress/`; la rama aún no tenía commits).
 
 Todo es de SOLO LECTURA: Azure con `main._get_pg()`, `_bootstrap_done = True` y
@@ -111,7 +111,7 @@ cada ficha recomendada. El resumen propuesto en `design.md` §7 mide 223 (−7).
 - **H15.** Contratos con varios vencimientos: 0 con el cliente, 6 de compra (§3). «No aplica» es
   correcto casi siempre (D10).
 
-## 7. Cierre de la spec (2026-10-27)
+## 7. Cierre de la spec (2026-10-27, mañana) · SUSTITUIDO por §8
 
 El humano pasó la PARADA 1 y cerró D1-D10 en la opción A (`design.md` §9, «Decisiones
 cerradas»). D9 y D8 entran en el alcance:
@@ -144,3 +144,86 @@ sin medir si los apuntes de IVA llevan obra.
 
 Tamaños: requirements 149/150, design 247/250, tasks T1-T16. F-150 a `spec_ready`; backlog
 regenerado; `bash harness/init.sh` en verde (ver el commit).
+
+## 8. La spec rehecha (2026-10-27, tarde): el contrato de cada partida
+
+**Por qué.** Juan Romero (Dir. Admon y Control de Costes) contestó el 27-10 (transcripción
+prevista en `docs/referencia/06_correos_coeficientes_iva_caja.md`, aún no en `main` ni en esta
+rama: el resumen vino en el encargo del líder). Lo que cambia el diseño: en VENTA se trabaja sin
+coeficientes y «cada contrato tiene sus coeficientes» (13 % GG + 6 % BI lo normal; baja en obra
+pública; órdenes de cambio y contradictorios con otros, incluso dentro de un capítulo; la
+revisión de precios, a menudo fuera); el master de certificación (9) «no es un referente» en fase
+0; el IVA de la ficha es fiable, pero hay tipos mezclados en una obra; la liquidación del IVA y
+el IVA soportado son de AdP.
+
+**Lo medido por el líder** (solo lectura, 21 obras con devengo; scripts `coef_contrato.py` e
+`iva_contrato.py` en su scratchpad; este spec-author NO ha leído Azure ni Sigrid):
+
+| Hecho | Medido |
+|---|---|
+| Enlace partida -> contrato | `raw.obrparpar.ctride` -> `raw.obrctr.ide` (ya ingerido): 96-100 % del pendiente de venta en 19 obras; 0608 y 0715, ninguna partida con contrato |
+| Coeficiente del contrato | 1 + Σ porcentajes de `raw.obrctr.coestr` (formas abajo); se SUMAN, no se multiplican |
+| Contra el master (11, versión V) | ponderado por obra, igual a 4 decimales; 6 partidas difieren > 0,005 (0676-B 1, 0696 3, 0697 1, 0724 1) |
+| IVA del contrato | `obrctr.ivaide` -> catálogo `iva` de Sigrid (`iva` en fracción, NO ingerido): igual al IVA efectivo de `cer` y `dvf` por `ctride` en TODOS los contratos, también los mixtos (0678 CONT_CATAS 21 %, 0686 ACOMETIDAS 21 %, seis casetas de la 0696 al 21 % frente a sus principales al 0 %) |
+| IVA de la ficha | `obr.ivaide` coincide a nivel obra; `obrctr.tex` (no ingerido) dice «INVERSION SUJETO PASIVO» en 6 contratos principales |
+| Retención del cliente | `obrctr.coegar` por contrato: 5 % casi siempre; 3 % en 0713, 2,5 % en 0723 |
+
+Formas de `coestr` vistas: `COEF_RECGG|Gastos Generales|13|| COEF_RECBI|Beneficio Industrial|6||`,
+una con `TOTAL EJECUCION CONTRATA` y `Gastos Generales+Beneficio Industrial|23.79`.
+
+**Decisiones nuevas (PARADA 1 pendiente; `design.md` §9; N6 y N7 abajo)**: N1 coeficiente: contrato, si no
+master 9, si no master 11 (sustituye a D2); N2 IVA del contrato y H12 = MANUAL > ficha > 21 % solo para la
+base sin él (sustituye a D8; fuera contraste, excepción de `R-VENTA-COEFICIENTES`, R32 y T16
+viejas); N3 retención del contrato y H10 de F-140 para el resto (sustituye a D9; fuera
+`importe_adjudicado`); N4 la obra-mes lleva `importe_iva_contrato`, `importe_retencion_contrato`
+y las bases `SIN`; N5 avisos (revisión de precios a F-040; H13/H14 con AdP). H09 sigue por obra.
+
+**Decisión de diseño propia, a validar dentro de N2**: el valor MANUAL de Control de Costes para
+H12 NO pisa el IVA del contrato de la partida, solo cubre la base sin él (aplanar una obra mixta
+rompería las casetas al 21 % de la 0696). Igual con H10. Así el SQL no aplica ninguna hipótesis
+(R13): el contrato es dato; H10 y H12, hipótesis que la IA aplica a la base `SIN`.
+
+**Decisiones del humano añadidas el mismo día (vía líder)**: H26 «venta ejecutada pendiente de
+facturar» (opción A; medido por el líder: real a origen × coeficiente 134,7 M EUR, facturado a
+origen `dvf.totbas` 119,0, hueco 15,8 M EUR, 0676-B 5,2 y 0696 3,0; negativo en alguna obra por
+facturar por delante): solo la CABECERA de `dvf` (enlace `dvf.cenide = obr.cenide`), mínimo 0 y lo
+negativo declarado; líneas, certificaciones y casado por mes, F-040. H24/H25 son el
+FRACCIONAMIENTO de cada pago y cobro. H14 por defecto MENSUAL (día 20 del mes siguiente; AdP). H21
+casa por fecha de emisión y puede restar dos veces una certificación de un mes cerrado facturada
+después: hoy 0 en cobros, se declara como riesgo y va a F-040. H13 por contrato de compra: N7,
+recomendada pero aplazada (el devengo de coste no va por contrato de compra; falta ese enlace).
+
+**Albaranes sin facturar (N8, medido por el líder el 27-10, solo lectura)**: sobre 239 M EUR
+facturados con albarán de origen (`compras.factura_lineas.albaran_id`, albaranes 2024-01 a
+2026-06, el 85 % de lo facturado), la factura del proveedor lleva fecha del MISMO mes que el
+albarán en el 93 % (7 % el siguiente; proformas 94/6); el alta en Sigrid, 64 % el mismo mes, 35 %
+el siguiente. Pendiente hoy en las 21 obras (`compras.v_pbi_albaranes_sin_facturar`): 56,9 M EUR
+(≤1 mes 9,3; 1-2 meses 5,8; 2-6 meses 18,9; 6-12 meses 14,5; >12 meses 8,4; la 0696, 10,1, de
+ellos 5,2 de más de 6 meses). En toda la base, 201,8 M EUR de más de 12 meses: sobre todo albarán
+sin enlazar con su factura (`docoritip` cubre el 32,5 % de las líneas), no deuda. **De dónde salían
+los 8,23 M EUR de H20**: de `progress/spec_F-140.md` §6, medidos sobre
+`compras.fact_compras_linea.importe_pendiente_facturar` (otro objeto: la línea de albarán vista
+desde el hecho de compras, con su propio universo), no sobre la vista de albaranes sin facturar;
+no reproduzco aquí el porqué exacto de la diferencia (no leo Azure): T11 lo contrasta. Diseño: H20
+`FIN_MES_ALBARAN` (la factura a fin del mes del albarán y el plazo desde ahí) y H27 nueva
+(`MESES`, 6: lo más antiguo se excluye y se declara, como H17; más simple que una segunda unidad
+en H20).
+
+**Decisiones de diseño propias de este añadido (en N6)**: el hueco se calcula por contrato dentro
+de la obra (partidas por su contrato, facturas por `dvf.ctride`, un grupo sin contrato) para dar
+el IVA y la retención de cada contrato; y la ingesta gana `include_columns` (lista blanca) porque
+el ingestor solo sabía excluir y `dvf` tiene ~330 columnas en `sigrid_tablas.md`.
+
+**Requisitos.** La spec se renumeró entera (R1-R32, en lista): no hay correspondencia uno a uno
+con la del 27-10 por la mañana, que queda en el historial de git (`3e19f39`). Retirados: H10 por
+peso, contraste de H12 y su excepción, lista de vivienda. Tareas: T1-T2 ingesta (`include_columns`,
+`iva`, `dvf`), T5 dominio del contrato y del hueco, T10 H12 SIGRID, T11 verificación en solo
+lectura de N1-N3 y del hueco ANTES de la receta (T12), con PARADA (R29).
+
+**Sin medir, y por qué**: la gramática de `coestr` solo se conoce por las tres formas citadas; T11
+lista las reales con el parser del dominio y R29 para si el contraste se aparta de lo medido. Las
+columnas de `iva` y `dvf` salen de `azure-apps/sigrid_tablas.md`; T1 las mide en Sigrid (y `cla`
+de `dvf`: si hay anuladas, el hueco cambia).
+
+Tamaños: requirements 146/150, design 250/250, tasks T1-T16. F-150 en `spec_ready` (acceptance y
+`notes` al día); backlog regenerado por `bash harness/init.sh` (ver el commit).
