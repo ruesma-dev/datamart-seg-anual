@@ -2380,14 +2380,16 @@
         "La receta ordenada está en la ficha de `tesoreria.hipotesis_caja` y `R-CAJA-HIPOTESIS` remite a ella; el presupuesto de F-147 no sube o sube con su motivo medido",
         "`coeficiente_venta` por partida publicado, con su fuente (ámbito 9 o 11) y un contraste de solo lectura frente a lo medido el 2026-10-26",
         "Las hipótesis de desfase y plazo admiten un reparto en varios meses con inicio diferido, con defecto y valor por obra, y tests",
+        "H10 SIGRID por peso (D9): el valor único de los contratos con retención cuando pesan al menos el 50 % del adjudicado, con `importe_adjudicado` publicado en `tesoreria.condiciones_contrato_cliente`",
+        "Contraste de H12 (D8): el paso 6 de la receta y `contraste_iva_venta` con sus umbrales, medido en solo lectura en las 21 obras; el 10 % de la vivienda lo fija Control de Costes por obra en el YAML (MANUAL)",
         "`bash harness/init.sh` en verde y APROBADO del reviewer; despliegue MANUAL en `progress/current.md`"
       ],
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "rigor": "estandar",
       "priority": 1,
       "branch": "feature/F-150-receta-caja",
-      "notes": "2026-10-26: registrada por orden del humano. Depende de F-140 desplegada. Absorbe la P2 de la review de F-140 (venta con coeficientes). Nota de la medición: el master de certificación es el ámbito 9 (MASTER CERTIFICACION)."
+      "notes": "2026-10-26: registrada por orden del humano. Depende de F-140 desplegada. Absorbe la P2 de la review de F-140 (venta con coeficientes). Nota de la medición: el master de certificación es el ámbito 9 (MASTER CERTIFICACION). 2026-10-27: spec cerrada (`specs/F-150-receta-caja/`, informe `progress/spec_F-150.md`). El humano cerró D1-D10 en la opción A; D8 (contraste de H12 y 10 % de vivienda por obra, MANUAL de Control de Costes) y D9 (H10 por peso del adjudicado) entran en el alcance. T11 (solo lectura) va antes de T9: si el contraste de H12 no discrimina, PARADA y nueva propuesta."
     },
     {
       "id": "F-151",

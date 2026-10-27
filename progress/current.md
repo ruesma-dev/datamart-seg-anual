@@ -9,6 +9,38 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-27 · F-150 · SPEC CERRADA (`spec_ready`) · rama `feature/F-150-receta-caja`
+
+- El humano cerró D1-D10 en la opción A (`design.md` §9). D9 (H10 por peso del adjudicado) y D8
+  (contraste de H12 en el paso 6 de la receta, `contraste_iva_venta`, excepción acotada en
+  `R-VENTA-COEFICIENTES`, 10 % de vivienda por obra MANUAL de Control de Costes, T16) entran.
+  requirements 149/150, design 247/250, tasks T1-T16. Detalle: `progress/spec_F-150.md` §7.
+- **Para el humano**: el contraste de H12 NO está medido (la lectura fue denegada en la sesión
+  del spec-author): T11 lo mide antes de T9 y R32 manda PARAR si no discrimina. La excepción en
+  `R-VENTA-COEFICIENTES` es consecuencia de cruzar cobro con venta producida; alternativa sin
+  tocar la regla: IVA repercutido frente a ventas en `contabilidad.mayor` (sin medir).
+- **Pendiente MANUAL**: la lista de obras de vivienda (H12 = 10) de Control de Costes.
+
+### Antes (spec escrita, 27-10)
+
+- Spec en `specs/F-150-receta-caja/` (requirements 122/150, design 246/250, tasks T1-T15).
+  Mediciones de solo lectura en `progress/spec_F-150.md`. La rama nació de `main` `6681de8` y
+  se re-apuntó a `d3b412a` (los dos commits de `progress/` de R19/R25) antes de tener commits.
+- Lo medido: en las 18.997 partidas VENTA pendientes, el coeficiente del 9 y del 11 en la misma
+  versión V coinciden salvo en 238 partidas que pesan 0,02 M EUR; el 9 no tiene 93 (0,79 M EUR);
+  el pendiente pasa de 132,37 a 143,20 M EUR con coeficientes (+8,2 %); 5 de las 21 obras
+  mezclan partidas a 1,000 y a 1,19-1,26. El 9 no está en `stg.plan_mensual` ni tipado.
+  Sigrid casi no usa formas con varios vencimientos (6 contratos de compra, 0 de cliente).
+- Decisiones que estaban abiertas (ya cerradas, arriba):
+  D1 la receta en la ficha choca con `CONVENTIONS.md` («un procedimiento de negocio no entra en
+  el diccionario»): se propone una excepción acotada; D2 el 9 da solo el coeficiente (11 de
+  respaldo), el importe a certificar sería F-040; D3 el 9 en la misma versión V; D4 el agregado
+  obra-mes lleva el importe con coeficientes y el cociente; D5 unidad `PERFIL_MESES`: H03/H08 a
+  perfil y nuevas H24/H25 (25 hipótesis); D6 fallar si una partida de venta pendiente no tiene
+  coeficiente; D7 resumen nuevo de `R-CAJA-HIPOTESIS` (223 caracteres, F-147 baja 9).
+  De R25 de F-140: D8 H12 (vivienda al 10 %) fuera, por YAML; **D9 H10 por peso de los contratos
+  con retención: AMPLÍA el alcance** (3 obras, pesan 99,5-100 %); D10 H15 se queda.
+
 ## 2026-10-26 · F-140 · CERRADA (`done`, APROBADO pasada 2, `5bd69c8`) · merge `9b91165` · DESPLEGADA
 
 - Orden del humano (26-10). Imagen `r20261026-2111` desde un worktree limpio de `main`; el job
