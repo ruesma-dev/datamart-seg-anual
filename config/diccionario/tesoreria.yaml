@@ -581,6 +581,71 @@ objetos:
           ya se facturo y no hay que volver a convertir. CON IVA.
         unidad: EUR
         agregacion: suma
+      venta_real_origen_con_coeficientes:
+        significado: >-
+          Venta real a origen hasta el ultimo cierre, partida a partida por su
+          coeficiente de venta; la de partidas sin ninguno, por el coeficiente
+          medio de la obra (`venta_real_media_obra`). SIN IVA (F-150, H26).
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: COSTE.
+      venta_real_media_obra:
+        significado: >-
+          La parte de `venta_real_origen_con_coeficientes` de partidas sin
+          coeficiente propio, valorada con la media ponderada de la obra
+          (MEDIA_OBRA). Se declara: no es el coeficiente de ninguna partida.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: COSTE.
+      facturado_origen:
+        significado: >-
+          Lo facturado al cliente a origen: suma de la base de sus facturas de
+          venta (`raw.dvf.totbas`), rectificativas incluidas. SIN IVA.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: COSTE.
+      venta_pendiente_facturar:
+        significado: >-
+          El hueco de facturacion de H26, NETO POR OBRA: max(0, venta real con
+          coeficientes - facturado). Ejecutado y sin facturar: tambien se cobra.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: COSTE.
+      facturado_por_delante:
+        significado: >-
+          max(0, facturado - venta real con coeficientes): lo facturado por
+          delante de lo ejecutado. NO se cobra otra vez.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: COSTE.
+      iva_pendiente_facturar_contrato:
+        significado: >-
+          IVA del hueco: repartido por el peso de cada contrato en la venta
+          real con coeficientes de la obra, por su IVA.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: COSTE.
+      base_pendiente_facturar_sin_iva_contrato:
+        significado: >-
+          La parte del hueco de contratos (o partidas sin contrato) sin IVA: la
+          base sobre la que se aplica H12.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: COSTE.
+      retencion_pendiente_facturar_contrato:
+        significado: >-
+          Retencion del hueco: repartida por el peso de cada contrato, por su
+          retencion.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: COSTE.
+      base_pendiente_facturar_sin_retencion_contrato:
+        significado: >-
+          La parte del hueco sin retencion de contrato: la base sobre la que se
+          aplica H10.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: COSTE.
     relaciones:
       - de: obra_id
         a: maestro.obras.obra_id
@@ -668,6 +733,48 @@ objetos:
         agregacion: no_sumable
       mes_pasado_sin_cierre:
         significado: Cierto si el mes es anterior al mes del build y aun no esta cerrado.
+      importe_pendiente_con_coeficientes:
+        significado: >-
+          El pendiente con coeficientes de cada partida repartido en ese mes con
+          el mismo perfil que `importe_pendiente`. SIN IVA. Lleva coeficientes:
+          no se suma ni se compara con el coste ni con la venta sin ellos.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: COSTE.
+      coeficiente_venta:
+        significado: >-
+          Cociente `importe_pendiente_con_coeficientes / importe_pendiente`, 6
+          decimales: el coeficiente medio de ese mes, solo para leer.
+        agregacion: no_sumable
+        nulo_significa: COSTE, o `importe_pendiente` es 0.
+      importe_iva_contrato:
+        significado: >-
+          IVA del contrato de cada partida sobre su parte con coeficientes,
+          sumado y redondeado al final. Solo partidas con IVA en su contrato.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: COSTE.
+      base_sin_iva_contrato:
+        significado: >-
+          Parte con coeficientes de las partidas SIN IVA en su contrato: es la
+          base sobre la que se aplica H12.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: COSTE.
+      importe_retencion_contrato:
+        significado: >-
+          Retencion del contrato de cada partida sobre su parte con
+          coeficientes (base sin IVA), sumada y redondeada al final.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: COSTE.
+      base_sin_retencion_contrato:
+        significado: >-
+          Parte con coeficientes de las partidas SIN retencion en su contrato:
+          es la base sobre la que se aplica H10.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: COSTE.
     relaciones:
       - de: obra_id
         a: maestro.obras.obra_id
@@ -763,6 +870,57 @@ objetos:
         significado: max(0, ejecutado - plan desde V).
         unidad: EUR
         agregacion: suma
+      contrato_cliente_id:
+        significado: >-
+          El contrato con el cliente de la partida (`obrparpar.ctride`), solo si
+          es de la misma obra (F-150).
+        agregacion: no_sumable
+        nulo_significa: COSTE, o partida de venta sin contrato.
+      coeficiente_venta:
+        significado: >-
+          El coeficiente de venta de la partida: el de su contrato si lo tiene;
+          si no, el del master de V (certificacion, ambito 9; si no, venta,
+          ambito 11). Nunca un coeficiente medio de obra.
+        agregacion: no_sumable
+        nulo_significa: COSTE.
+      fuente_coeficiente:
+        significado: De donde sale `coeficiente_venta`.
+        valores: [CONTRATO, MASTER_CERT, MASTER_VENTA, SIN]
+        nulo_significa: COSTE.
+      coeficiente_master:
+        significado: >-
+          El coeficiente del master de V (`importe_oficial / importe`, ambito 9
+          y si no 11), aunque mande el contrato: para comparar los dos.
+        agregacion: no_sumable
+        nulo_significa: COSTE, o la partida no tiene importe en el master.
+      pendiente_con_coeficientes:
+        significado: >-
+          ROUND(pendiente x coeficiente_venta, 2): lo pendiente tal como se
+          factura al cliente. SIN IVA. Lleva coeficientes: no se suma ni se
+          compara con el coste, lo ejecutado ni la venta sin ellos.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: COSTE.
+      iva_porcentaje:
+        significado: El IVA del contrato de la partida, en tanto por cien.
+        unidad: "%"
+        agregacion: no_sumable
+        nulo_significa: COSTE, o su contrato no lo tiene (`fuente_iva` SIN).
+      fuente_iva:
+        significado: CONTRATO si la partida tiene IVA de su contrato; SIN si no (lo cubre H12).
+        valores: [CONTRATO, SIN]
+        nulo_significa: COSTE.
+      retencion_porcentaje:
+        significado: >-
+          La retencion del contrato de la partida, en tanto por cien (la de
+          `condiciones_contrato_cliente.retencion_porcentaje`).
+        unidad: "%"
+        agregacion: no_sumable
+        nulo_significa: COSTE, o su contrato no la tiene (`fuente_retencion` SIN).
+      fuente_retencion:
+        significado: CONTRATO si la partida tiene retencion de su contrato; SIN si no (lo cubre H10).
+        valores: [CONTRATO, SIN]
+        nulo_significa: COSTE.
     relaciones:
       - de: obra_id
         a: maestro.obras.obra_id
@@ -1164,6 +1322,72 @@ objetos:
         significado: Inicio de la garantia (`fecinigar`).
         agregacion: no_sumable
         nulo_significa: Sin fecha de inicio de garantia.
+      coeficientes_texto:
+        significado: >-
+          Los coeficientes del contrato tal cual estan en Sigrid (`coestr`): una
+          linea por concepto, `CODIGO|etiqueta|valor||base` (F-150).
+        nulo_significa: El contrato no tiene coeficientes en Sigrid.
+      coeficientes_reconocidos:
+        significado: >-
+          Cierto si `coeficientes_texto` se entiende entero: todos sus codigos
+          conocidos y sus valores numeros. Falso si esta vacio, es nulo o trae
+          algo desconocido; entonces sus partidas toman el coeficiente del
+          master (F-150).
+      coeficiente_gg:
+        significado: >-
+          Gastos generales del contrato, en puntos (`COEF_RECGG`, tambien la
+          forma combinada «Gastos Generales+Beneficio Industrial»).
+        unidad: "%"
+        agregacion: no_sumable
+        nulo_significa: No los declara, o `coestr` no se reconoce.
+      coeficiente_bi:
+        significado: Beneficio industrial del contrato, en puntos (`COEF_RECBI`).
+        unidad: "%"
+        agregacion: no_sumable
+        nulo_significa: No lo declara, o `coestr` no se reconoce.
+      coeficiente_otros:
+        significado: >-
+          Control de calidad y seguridad y salud (`COEF_RECCC`, `COEF_RECSYS`),
+          sumados, en puntos.
+        unidad: "%"
+        agregacion: no_sumable
+        nulo_significa: No los declara, o `coestr` no se reconoce.
+      coeficiente_baja:
+        significado: >-
+          Baja de adjudicacion (`COEF_DESADJ`), en puntos y negativa. Va en
+          CASCADA sobre el subtotal de contrata, no sumada a GG y BI.
+        unidad: "%"
+        agregacion: no_sumable
+        nulo_significa: No la declara, o `coestr` no se reconoce.
+      retencion_coestr:
+        significado: >-
+          La retencion declarada DENTRO de `coestr` (`RETN`, `RETESP`, `RETNT`),
+          en tanto por cien. NO es un coeficiente: es un dato aparte de
+          `retencion_porcentaje`.
+        unidad: "%"
+        agregacion: no_sumable
+        nulo_significa: No la declara en `coestr`, o `coestr` no se reconoce.
+      coeficiente_contrato:
+        significado: >-
+          El coeficiente de venta del contrato, a 6 decimales: (1 + (gg + bi +
+          otros) / 100) x (1 + baja / 100). GG 13 y BI 6 dan 1,19; con una baja
+          del 12,77 %, 1,038. Manda sobre el del master en
+          `devengo_pendiente_partida`.
+        agregacion: no_sumable
+        nulo_significa: >-
+          Sin coeficientes reconocidos (o solo una retencion): sus partidas
+          toman el del master.
+      iva_id:
+        significado: El tipo de IVA del contrato (`ivaide`, del catalogo `raw.iva`).
+        agregacion: no_sumable
+        nulo_significa: El contrato no tiene tipo de IVA.
+      iva_porcentaje:
+        significado: >-
+          El IVA del contrato en tanto por cien, 4 decimales. 0 es inversion del
+          sujeto pasivo: un valor, no la falta de el.
+        unidad: "%"
+        agregacion: no_sumable
+        nulo_significa: Sin tipo de IVA, o sin fila en el catalogo.
     relaciones:
       - de: obra_id
         a: maestro.obras.obra_id
@@ -1285,6 +1509,44 @@ objetos:
     descripcion: >-
       Los dias del efecto de retencion de una formula de plazo (`120 450R` da
       450); nulo si no tiene retencion o no se reconoce (F-140).
+    grano: null
+    clave_negocio: []
+    paso_etl: build_tesoreria
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_coeficientes:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de tesoreria: su resultado ya esta en las
+      columnas `coeficiente_*` y `retencion_coestr` de
+      `condiciones_contrato_cliente`.
+    descripcion: >-
+      Los coeficientes de `coestr` de un contrato con el cliente, en puntos:
+      {gg, bi, otros, baja, retencion}. Una linea por concepto, leida por
+      codigo; nula entera si algo no se entiende, o si esta vacio (F-150).
+    grano: null
+    clave_negocio: []
+    paso_etl: build_tesoreria
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_coeficientes_reconocidos:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de tesoreria: su resultado ya esta en la
+      columna `coeficientes_reconocidos`.
+    descripcion: >-
+      Cierto si el `coestr` de un contrato con el cliente se entiende entero:
+      codigos conocidos y valores numericos (F-150).
     grano: null
     clave_negocio: []
     paso_etl: build_tesoreria

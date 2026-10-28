@@ -259,7 +259,9 @@ infraestructura.
 > venta, 9 de sus 151 columnas por la lista blanca `include_columns`): son 80
 > tablas. Entre F-138 y esta, F-140, F-128 y otras sumaron objetos sin
 > enmienda propia (el guardián solo busca la cifra, y el 248 se lo daba el
-> «1248» de la enmienda de F-056). El inventario pasa a **250 objetos**.
+> «1248» de la enmienda de F-056). Entran tambien dos funciones de `tesoreria`,
+> `fn_coeficientes` y `fn_coeficientes_reconocidos` (los coeficientes del
+> contrato con el cliente). El inventario pasa a **252 objetos**.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,
