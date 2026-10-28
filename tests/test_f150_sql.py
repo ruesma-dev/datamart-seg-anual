@@ -181,3 +181,66 @@ def test_f150_r27_unidad_ensanchada_en_create_y_en_alter() -> None:
     assert "unidad VARCHAR(20) NOT NULL" in texto
     assert "ALTER TABLE tesoreria.hipotesis_caja ALTER COLUMN unidad TYPE VARCHAR(20);" in texto
     assert max(len(u) for u in dom.UNIDADES) <= 20
+
+
+# ===========================================================================
+# 06 · los coeficientes y el IVA del contrato con el cliente (R8, R18)
+# ===========================================================================
+
+
+def _insert(ruta: Path, tabla: str) -> tuple[list[str], str]:
+    compacto = _sin_comment_on(ruta)
+    m = re.search(rf"INSERT INTO {re.escape(tabla)} \((.*?)\) (SELECT .*?);", compacto)
+    assert m, f"falta el INSERT de {tabla}"
+    return [c.strip() for c in m.group(1).split(",")], m.group(2)
+
+
+def test_f150_r8_06_publica_coestr_tal_cual_y_lo_lee_una_vez() -> None:
+    columnas, select = _insert(RUTA_CLIENTE, "tesoreria.condiciones_contrato_cliente")
+    assert columnas[-10:] == list(COLUMNAS_NUEVAS["tesoreria.condiciones_contrato_cliente"])
+    assert "o.coestr AS coeficientes_texto" in select
+    assert "tesoreria.fn_coeficientes_reconocidos(o.coestr) AS coeficientes_reconocidos" in select
+    assert "CROSS JOIN LATERAL (SELECT tesoreria.fn_coeficientes(o.coestr) AS c) AS k" in select
+    assert select.count("tesoreria.fn_coeficientes(") == 1, "una sola lectura por contrato"
+
+
+def test_f150_r8_06_cada_clase_en_su_posicion_del_array() -> None:
+    _cols, select = _insert(RUTA_CLIENTE, "tesoreria.condiciones_contrato_cliente")
+    for n, columna in enumerate(("coeficiente_gg", "coeficiente_bi", "coeficiente_otros",
+                                 "coeficiente_baja", "retencion_coestr"), start=1):
+        assert f"k.c[{n}] AS {columna}" in select, columna
+
+
+def test_f150_r8_06_el_factor_es_el_del_dominio_en_cascada() -> None:
+    """Mismo cálculo que `factor_coeficientes`: GG+BI+otros sumados, la baja en cascada, a 6."""
+    _cols, select = _insert(RUTA_CLIENTE, "tesoreria.condiciones_contrato_cliente")
+    assert (
+        "CASE WHEN k.c[1] IS NOT NULL OR k.c[2] IS NOT NULL OR k.c[3] IS NOT NULL "
+        "OR k.c[4] IS NOT NULL THEN ROUND((1 + (COALESCE(k.c[1], 0) + COALESCE(k.c[2], 0) "
+        "+ COALESCE(k.c[3], 0)) / 100) * (1 + COALESCE(k.c[4], 0) / 100), 6) "
+        "END AS coeficiente_contrato"
+    ) in select
+    assert "k.c[5]) / 100" not in select and "COALESCE(k.c[5]" not in select, (
+        "la retención no entra en el factor"
+    )
+
+
+def test_f150_r18_06_el_iva_del_catalogo_en_tanto_por_cien() -> None:
+    _cols, select = _insert(RUTA_CLIENTE, "tesoreria.condiciones_contrato_cliente")
+    assert "NULLIF(o.ivaide, 0) AS iva_id" in select
+    assert "ROUND((i.iva * 100)::NUMERIC, 4) AS iva_porcentaje" in select
+    assert select.endswith("LEFT JOIN raw.iva i ON i.ide = NULLIF(o.ivaide, 0)")
+
+
+def test_f150_r8_06_el_comment_dice_coeficientes_e_iva() -> None:
+    m = re.search(r"COMMENT ON TABLE tesoreria\.condiciones_contrato_cliente IS '(.*?)';",
+                  _ejecutable(RUTA_CLIENTE))
+    assert m
+    for trozo in ("F-150", "coestr", "coeficiente_contrato", "cascada", "IVA", "raw.iva"):
+        assert trozo in m.group(1), trozo
+
+
+def test_f150_r8_06_lee_raw_iva() -> None:
+    assert "-- Lee de: raw.obrctr, raw.con, raw.auxcob, raw.auxefc, raw.rec, raw.iva." in _sql(
+        RUTA_CLIENTE
+    )
