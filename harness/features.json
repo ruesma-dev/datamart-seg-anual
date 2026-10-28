@@ -225,7 +225,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 56,
+      "priority": 57,
       "branch": "feature/F-017-cierre-costes-indirectos"
     },
     {
@@ -237,7 +237,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 60,
+      "priority": 61,
       "branch": "feature/F-018-validacion-cierre-mensual"
     },
     {
@@ -249,7 +249,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 66,
+      "priority": 67,
       "branch": "feature/F-002-plan-vigente"
     },
     {
@@ -268,7 +268,7 @@
       ],
       "status": "pending",
       "sdd": false,
-      "priority": 68,
+      "priority": 69,
       "branch": "feature/F-012-auditoria-costes-azure"
     },
     {
@@ -293,7 +293,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 69,
+      "priority": 70,
       "branch": "feature/F-013-carga-excels-aux"
     },
     {
@@ -305,7 +305,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 70,
+      "priority": 71,
       "branch": "feature/F-010-carga-excels-auxiliares"
     },
     {
@@ -317,7 +317,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 71,
+      "priority": 72,
       "branch": "feature/F-007-disparo-manual-web"
     },
     {
@@ -330,7 +330,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 57,
+      "priority": 58,
       "branch": "feature/F-022-desempate-obrfasamb"
     },
     {
@@ -380,7 +380,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 61,
+      "priority": 62,
       "branch": "feature/F-028-puerta-stg-distingue-fallo"
     },
     {
@@ -404,7 +404,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 51,
+      "priority": 52,
       "branch": "feature/F-029-mutacion-fiable"
     },
     {
@@ -421,7 +421,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 58,
+      "priority": 59,
       "branch": "feature/F-030-reglas-negocio-compartidas"
     },
     {
@@ -439,7 +439,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 53,
+      "priority": 54,
       "branch": "feature/F-031-alerta-no-se-resuelve"
     },
     {
@@ -456,7 +456,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 72,
+      "priority": 73,
       "branch": "feature/F-032-limpieza-secretos-y-puesto"
     },
     {
@@ -473,7 +473,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 62,
+      "priority": 63,
       "branch": "feature/F-033-azure-apps-al-dia"
     },
     {
@@ -490,7 +490,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 64,
+      "priority": 65,
       "branch": "feature/F-026-rbac-propagacion"
     },
     {
@@ -546,7 +546,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 25,
+      "priority": 26,
       "branch": "feature/F-036-oficios"
     },
     {
@@ -602,7 +602,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 45,
+      "priority": 46,
       "branch": "feature/F-039-vistas-puente"
     },
     {
@@ -639,7 +639,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "critico",
-      "priority": 42,
+      "priority": 43,
       "branch": "feature/F-041-mutacion-fiable"
     },
     {
@@ -672,7 +672,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 43,
+      "priority": 44,
       "branch": "feature/F-043-secreto-versionado"
     },
     {
@@ -704,7 +704,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 44,
+      "priority": 45,
       "branch": "feature/F-046-contraste-desgloses"
     },
     {
@@ -735,7 +735,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 47,
+      "priority": 48,
       "branch": "feature/F-048-guardian-secretos-poroso"
     },
     {
@@ -751,7 +751,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 49,
+      "priority": 50,
       "branch": "feature/F-049-sello-pendiente-mutacion"
     },
     {
@@ -767,7 +767,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 54,
+      "priority": 55,
       "branch": "feature/F-050-fases-duplicadas-sigrid"
     },
     {
@@ -803,7 +803,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 52,
+      "priority": 53,
       "branch": "feature/F-053-desempate-obras-duplicadas"
     },
     {
@@ -822,7 +822,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "documental",
-      "priority": 5,
+      "priority": 6,
       "branch": "feature/F-054-conocimiento-de-negocio",
       "notes": "2026-10-27: prioridad 4 -> 5 por orden del humano (tras F-150 van F-040 y F-104)."
     },
@@ -841,7 +841,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 22,
+      "priority": 23,
       "branch": "feature/F-055-mundo-proveedor"
     },
     {
@@ -891,7 +891,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 46,
+      "priority": 47,
       "branch": "feature/F-058-estados-financieros"
     },
     {
@@ -904,7 +904,7 @@
         "Resuelto y escrito como se identifica al mismo tercero entre empresas distintas, que tienen subcuentas distintas",
         "Documentado en el diccionario que significa 'posicion' y 'pendiente' aqui, para que el MCP no lo confunda con lo que publica compras"
       ],
-      "priority": 55,
+      "priority": 56,
       "rigor": "estandar",
       "branch": "feature/F-060-posicion-terceros",
       "status": "pending",
@@ -921,7 +921,7 @@
         "Contrastado contra el coste de personal que hoy publica el seguimiento, con las diferencias explicadas",
         "Publicados los movimientos y el saldo de las cuentas analiticas de contrapartida de los recursos (peticion de Juan Romero del 24-09), con lo que queda por repartir a obra, y medido y declarado si el asiento de nominas entra o no en esas cuentas"
       ],
-      "priority": 59,
+      "priority": 60,
       "rigor": "critico",
       "branch": "feature/F-061-coste-personal-obra",
       "status": "pending",
@@ -937,7 +937,7 @@
         "Validado por Administracion contra al menos una declaracion real ya presentada",
         "Documentado que este objeto NO sustituye a la declaracion oficial y para que sirve exactamente"
       ],
-      "priority": 63,
+      "priority": 64,
       "rigor": "estandar",
       "branch": "feature/F-062-impuestos",
       "status": "pending",
@@ -953,7 +953,7 @@
         "Contrastado contra el total que la analitica reparte como GENERALES, con la diferencia cuantificada por ano Y EXPLICADA: que parte es gasto no repartido, que parte es diferencia de criterio y que parte no cuadra",
         "NO se cambia el criterio de reparto en esta feature. Si la diferencia sugiere que deberia cambiarse, se lleva a Negocio como propuesta con el numero delante"
       ],
-      "priority": 65,
+      "priority": 66,
       "rigor": "critico",
       "branch": "feature/F-063-generales-reparto",
       "status": "pending",
@@ -970,7 +970,7 @@
         "Distinguidos los apuntes manuales de los generados por documento, con su volumen",
         "El aviso que se pasa a F-058 dice que parte del gasto NO DEBE atribuirse a obra por ser estructura, y que parte falta por error"
       ],
-      "priority": 67,
+      "priority": 68,
       "rigor": "estandar",
       "branch": "feature/F-064-control-interno-contable",
       "status": "pending",
@@ -990,7 +990,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 40,
+      "priority": 41,
       "branch": "feature/F-065-creditos-cpu-tras-la-ventana"
     },
     {
@@ -1066,7 +1066,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 41,
+      "priority": 42,
       "branch": "feature/F-069-mejoras-arnes-review-f066"
     },
     {
@@ -1084,7 +1084,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 33,
+      "priority": 34,
       "branch": "feature/F-070-auditoria-calidad-diccionario"
     },
     {
@@ -1160,7 +1160,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 38,
+      "priority": 39,
       "branch": "feature/F-075-alcance-de-las-puertas"
     },
     {
@@ -1180,7 +1180,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 32,
+      "priority": 33,
       "branch": "feature/F-076-ambitos-certificacion"
     },
     {
@@ -1195,7 +1195,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 35,
+      "priority": 36,
       "branch": "feature/F-077-flag-reconstruir-todo-sin-test"
     },
     {
@@ -1292,7 +1292,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 36,
+      "priority": 37,
       "branch": "feature/F-082-supervivientes-f025"
     },
     {
@@ -1373,7 +1373,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "critico",
-      "priority": 34,
+      "priority": 35,
       "branch": "feature/F-087-rol-propio-de-power-bi"
     },
     {
@@ -1392,7 +1392,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 37,
+      "priority": 38,
       "branch": "feature/F-088-guardian-de-recuentos-y-la-guarda-que-falta"
     },
     {
@@ -1411,7 +1411,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 30,
+      "priority": 31,
       "branch": "feature/F-089-el-mcp-cachea-el-diccionario"
     },
     {
@@ -1450,7 +1450,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 31,
+      "priority": 32,
       "branch": "feature/F-091-factura-asiento"
     },
     {
@@ -1473,7 +1473,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 10,
+      "priority": 11,
       "branch": "feature/F-092-productos-y-centro-de-coste"
     },
     {
@@ -1490,7 +1490,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 29,
+      "priority": 30,
       "branch": "feature/F-093-obra-de-cabecera"
     },
     {
@@ -1538,7 +1538,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 23,
+      "priority": 24,
       "branch": "feature/F-096-plan-mensual-sin-tope"
     },
     {
@@ -1570,7 +1570,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 26,
+      "priority": 27,
       "branch": "feature/F-098-fases-por-ambito-y-controles"
     },
     {
@@ -1586,7 +1586,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 28,
+      "priority": 29,
       "branch": "feature/F-099-expedientes-obra",
       "notes": "2026-10-27: la parte de coeficientes por partida pasa a F-150 si el humano confirma su rediseño."
     },
@@ -1655,7 +1655,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 27,
+      "priority": 28,
       "branch": "feature/F-105-log-sigrid-usuarios"
     },
     {
@@ -1671,7 +1671,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 20,
+      "priority": 21,
       "branch": "feature/F-106-obras-por-empresa"
     },
     {
@@ -1752,7 +1752,7 @@
       "status": "spec_ready",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 17,
+      "priority": 18,
       "branch": "feature/F-111-nombres-partida-por-ancestro"
     },
     {
@@ -1800,7 +1800,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 19,
+      "priority": 20,
       "branch": "feature/F-114-avisos-mcp-rescatados"
     },
     {
@@ -1818,7 +1818,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 75,
+      "priority": 76,
       "branch": "feature/F-117-obras-ciegas-en-master"
     },
     {
@@ -1850,7 +1850,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 39,
+      "priority": 40,
       "branch": "feature/F-119-cartera-de-obra"
     },
     {
@@ -1865,7 +1865,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 73,
+      "priority": 74,
       "branch": "feature/F-115-tiemod-inexistente"
     },
     {
@@ -1880,7 +1880,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 74,
+      "priority": 75,
       "branch": "feature/F-116-ingesta-descompuestos-error-por-version"
     },
     {
@@ -1913,7 +1913,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 18,
+      "priority": 19,
       "branch": "feature/F-121-recurso-principal-auxiliar"
     },
     {
@@ -1928,7 +1928,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 24,
+      "priority": 25,
       "branch": "feature/F-122-lineas-sin-rendimiento"
     },
     {
@@ -1966,7 +1966,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 11,
+      "priority": 12,
       "branch": "feature/F-126-analitica-lineas-compra"
     },
     {
@@ -1987,7 +1987,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 9,
+      "priority": 10,
       "branch": "feature/F-127-mayor-analitico"
     },
     {
@@ -2027,7 +2027,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 8,
+      "priority": 9,
       "branch": "feature/F-129-objetivo-contra-oferta-referencia"
     },
     {
@@ -2043,7 +2043,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 13,
+      "priority": 14,
       "branch": "feature/F-130-condiciones-y-texto-oferta"
     },
     {
@@ -2059,7 +2059,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 12,
+      "priority": 13,
       "branch": "feature/F-131-cantidades-dpc"
     },
     {
@@ -2095,7 +2095,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 15,
+      "priority": 16,
       "branch": "feature/F-133-procesos-albaranes"
     },
     {
@@ -2114,7 +2114,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 16,
+      "priority": 17,
       "branch": "feature/F-134-empleado-alta-documento"
     },
     {
@@ -2167,7 +2167,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 14,
+      "priority": 15,
       "branch": "feature/F-137-ordenes-infra-patrones-buenos"
     },
     {
@@ -2273,7 +2273,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 77,
+      "priority": 78,
       "branch": "feature/F-143-tipo-contrato-compra"
     },
     {
@@ -2411,7 +2411,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 4,
+      "priority": 5,
       "branch": "feature/F-151-funcion-caja-proyectada",
       "notes": "2026-10-26: registrada por orden del humano. Depende de F-150. 2026-10-27: prioridad 2 -> 4 por orden del humano (tras F-150 van F-040 y F-104)."
     },
@@ -2427,9 +2427,23 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 6,
+      "priority": 7,
       "branch": "feature/F-152-forma-pago-ficha-proveedor",
       "notes": "2026-10-27: registrada por orden del humano a partir del correo de Juan Romero, en la prioridad 6, justo detrás de F-040."
+    },
+    {
+      "id": "F-153",
+      "title": "El estado de cada albarán (con proformas y notas): `estado` en `compras.albaranes` y los albaranes en `compras.v_estado_documentos`",
+      "description": "Pedida por el humano el 2026-10-28: «está publicada la tabla del catálogo de estados pero no sé el estado por albarán». LO QUE YA HAY: `maestro.estados_documento` publica el catálogo entero de Sigrid (193 parejas tipo-estado, 29 tipos) y `compras.fn_estado_documento` lo traduce por la PAREJA (tipo de documento, estado), nunca solo por el número. Contratos (44), facturas (15) y comparativos (46) ya publican `estado_id`, `estado_codigo` y `estado`, y `compras.v_estado_documentos` da el estado actual con `en_estado_desde` y `dias_en_estado` de esos tres tipos. LO QUE FALTA: `compras.albaranes` (tipo 14, con proformas y notas) no publica su estado, y `v_estado_documentos` no incluye albaranes. Publicar `estado_id`, `estado_codigo` y `estado` en `compras.albaranes`, traducido con `fn_estado_documento(14, con.est)` como las facturas, y añadir los albaranes a `v_estado_documentos`. Medir qué estados del catálogo del tipo 14 se usan, cuántos albaranes caen fuera de catálogo y cómo se reparte por serie (albarán, proforma, nota). RELACIÓN: F-133 (procesos de los albaranes en `compras.documento_procesos`) da el historial de pasos; esta da el estado actual. Si `en_estado_desde` de un albarán necesita los procesos de F-133, se publica el estado sin esa fecha y se declara, sin esperar a F-133.",
+      "acceptance": [
+        "`compras.albaranes` publica `estado_id`, `estado_codigo` y `estado` traducidos por la pareja (14, estado) con `compras.fn_estado_documento`, con ficha en el diccionario",
+        "`compras.v_estado_documentos` incluye los albaranes (tipo 14) con su estado actual; `en_estado_desde` y `dias_en_estado` donde haya dato, y declarado donde no",
+        "Medidos y declarados en la ficha: estados del tipo 14 en uso, albaranes fuera de catálogo y reparto por tipo de documento (albarán, proforma, nota)",
+        "Tests de humo del SQL nuevo; `bash harness/init.sh` en verde"
+      ],
+      "priority": 4,
+      "status": "pending",
+      "sdd": true
     }
   ]
 }
