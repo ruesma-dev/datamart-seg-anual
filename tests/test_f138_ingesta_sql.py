@@ -117,8 +117,8 @@ def test_f138_r3_la_43_tampoco_en_el_sql() -> None:
 
 
 def test_f138_r2_el_censo_pasa_a_76() -> None:
-    assert len(_tablas()) == 78  # +2 de F-140 (`auxcob`, `auxefc`)
-    assert len(_lista_tablas()) == 78, "tabla declarada dos veces"
+    assert len(_tablas()) == 80  # +2 de F-140 (`auxcob`, `auxefc`), +2 de F-150 (`iva`, `dvf`)
+    assert len(_lista_tablas()) == 80, "tabla declarada dos veces"
     assert {"conala", "auxala"} <= set(_tablas())
 
 

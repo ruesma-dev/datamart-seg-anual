@@ -229,8 +229,9 @@ def test_f140_r21_las_formas_de_cobro_entran_como_las_de_pago(tabla: str) -> Non
 
 def test_f140_r21_el_censo_pasa_a_78() -> None:
     nombres = [t["source_table"] for t in _tablas_ingesta()]
-    assert len(nombres) == 78
-    assert len(set(nombres)) == 78, "tabla declarada dos veces"
+    # +2 de F-150 (`iva`, `dvf`): lo que fija este test es que las de F-140 siguen contadas
+    assert len(nombres) == 80
+    assert len(set(nombres)) == 80, "tabla declarada dos veces"
 
 
 def test_f140_r21_el_comentario_dice_cifras_y_para_que() -> None:

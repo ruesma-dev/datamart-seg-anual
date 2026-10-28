@@ -541,9 +541,9 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
   Azure. Hoy **lee y valida, no carga** a `aux.*`: las tablas destino y el
   esquema de los libros no están definidos todavía.
 
-### Qué se copia de Sigrid: 78 tablas, y qué NO está ahí (F-066, F-074, F-080, F-102, F-107, F-095, F-085, F-090, F-138, F-140)
+### Qué se copia de Sigrid: 80 tablas, y qué NO está ahí (F-066, F-074, F-080, F-102, F-107, F-095, F-085, F-090, F-138, F-140, F-150)
 
-`config/tables_sigrid.yaml` declara **78 tablas**: eran 31, F-066 las dejó en 56
+`config/tables_sigrid.yaml` declara **80 tablas**: eran 31, F-066 las dejó en 56
 el 2026-09-06, F-074 sumó nueve más el 2026-09-09, F-080 otras tres el
 2026-09-11 —`auxnap`, `auxban` y `rpa`, el bloque de pago del efecto y las
 remesas—, F-102 una el 2026-09-23 —`auxemp`, las 38 empresas del grupo, que da
@@ -574,7 +574,11 @@ lectura sobre `con`, medio minuto de la ventana nocturna). F-140 suma las dos
 últimas el 2026-10-25, `auxcob` (las 52 formas de COBRO, a donde apunta
 `obrctr.pagide`) y `auxefc` (sus 8 medios): la pareja de `auxpag`/`auxefp` en el
 lado del cliente, enteras y con `tiemod`, para leer la fórmula de plazo del
-contrato con el cliente (`tesoreria.plazos_forma_pago`).
+contrato con el cliente (`tesoreria.plazos_forma_pago`). F-150 suma las dos
+últimas el 2026-10-28, `iva` (el catálogo de tipos de IVA, entero) y `dvf` (las
+facturas de venta), de la que **solo se traen 9 de sus 151 columnas** —la
+cabecera— con la lista blanca `include_columns` del ingestor: lo facturado
+al cliente que necesita el hueco de facturación de H26.
 Las 25 que entraron el primer día vienen en tres grupos, y ninguna se supuso: todo lo
 que sigue se midió contra Sigrid ese día por `sigrid-api` en solo lectura.
 

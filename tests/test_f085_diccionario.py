@@ -197,7 +197,7 @@ def test_f085_r27_version_recuento_y_pendientes() -> None:
     glob = _yaml("00_global.yaml")
     assert int(glob["version"]) >= 45, "F-085 sube la versión del diccionario"
     texto = (DIR_DICCIONARIO / "00_global.yaml").read_text(encoding="utf-8")
-    assert "las 78 tablas" in texto  # +2 de F-090, +2 de F-138, +2 de F-140
+    assert "las 80 tablas" in texto  # +2 de F-090, +2 de F-138, +2 de F-140, +2 de F-150
     assert "version 45 (F-085" in texto
     assert glob["pendientes"] == []
 
@@ -210,7 +210,7 @@ def test_f085_r27_la_regla_de_con_declara_los_campos_propios_nuevos() -> None:
 
 def test_f085_r25_raw_yaml_cuenta_72() -> None:
     texto = (DIR_DICCIONARIO / "raw.yaml").read_text(encoding="utf-8")
-    assert "Son 78 tablas" in texto  # +2 de F-090, +2 de F-138, +2 de F-140
+    assert "Son 80 tablas" in texto  # +2 de F-090, +2 de F-138, +2 de F-140, +2 de F-150
 
 
 # ===========================================================================
@@ -220,7 +220,7 @@ def test_f085_r25_raw_yaml_cuenta_72() -> None:
 
 def test_f085_r28_arquitectura() -> None:
     texto = DOC_ARQUITECTURA.read_text(encoding="utf-8")
-    for dato in ("78 tablas", "F-085", "`usu`", "compras.documento_procesos",
+    for dato in ("80 tablas", "F-085", "`usu`", "compras.documento_procesos",
                  "personal.usuarios_sigrid"):
         assert dato in texto, f"ARCHITECTURE.md no dice «{dato}»"
     assert "No hay histórico de cambios de estado" not in texto
@@ -231,7 +231,7 @@ def test_f085_r28_azure_apps() -> None:
     if not DOC_AZURE_APPS.exists():
         pytest.skip("azure-apps no esta junto a este repositorio")
     texto = DOC_AZURE_APPS.read_text(encoding="utf-8")
-    for dato in ("78 tablas", "F-085", "`usu`", "compras.documento_procesos",
+    for dato in ("80 tablas", "F-085", "`usu`", "compras.documento_procesos",
                  "personal.usuarios_sigrid"):
         assert dato in texto, f"azure-apps no dice «{dato}»"
     assert "**filtrada** a `asiide <> 0`)" not in texto
