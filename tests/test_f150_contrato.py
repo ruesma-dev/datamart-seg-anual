@@ -121,6 +121,15 @@ def test_f150_r7_solo_bi_con_otra_etiqueta() -> None:
     assert factor_coeficientes(c) == D("1.07")
 
 
+def test_f150_r7_una_linea_de_solo_tres_campos_se_lee_como_el_sql() -> None:
+    """`CODIGO|etiqueta|valor`, sin `||base`: el valor es el campo 3, igual que
+    `split_part(t, '|', 3)` de `fn_coeficientes`. Superviviente de la campaña
+    de mutación (`len(campos) > 2` -> `> 3`): ningún caso tenía tres campos justos."""
+    c = leer_coeficientes_contrato("COEF_RECGG|Gastos Generales|13\r\nCOEF_RECBI|Beneficio|6")
+    assert c == CoeficientesContrato(D("13"), D("6"), None, None, None, True)
+    assert factor_coeficientes(c) == D("1.19")
+
+
 def test_f150_r7_dos_lineas_de_la_misma_clase_se_suman() -> None:
     c = leer_coeficientes_contrato("RETN|a|5||\nRETESP|b|2.5||\n")
     assert c.retencion == D("7.5")

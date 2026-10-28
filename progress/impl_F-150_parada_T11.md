@@ -1,5 +1,5 @@
-<!-- progress/impl_F-150.md -->
-# F-150 · Informe del implementer · PARADA T11 (R29)
+<!-- progress/impl_F-150_parada_T11.md -->
+# F-150 · Informe del implementer · PARADA T11 (R29) del 2026-10-27 (histórico; lo citan la spec como `impl_F-150.md` §1-§3)
 
 Fecha: 2026-10-27 (tarde). Rama `feature/F-150-receta-caja`. **Estado: `blocked` por PARADA de
 T11 (R29)**: la verificación en solo lectura se apartó de lo medido en `progress/spec_F-150.md`
