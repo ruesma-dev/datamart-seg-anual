@@ -1,44 +1,46 @@
 <!-- progress/review_F-150.md -->
-Revisión completa (pasada 1) · `git diff main...HEAD` (merge-base `a80bb1b`) · HEAD `6efddfe`
+Revisión incremental desde 6efddfe (pasada 2) · `git diff 6efddfe..7eed62e` · HEAD `7eed62e`
 
 # F-150 · Review · la receta de la caja (fase 1)
 
-**Veredicto: RECHAZADO (CHANGES_REQUESTED)**, por UN solo punto de papeleo de C4: las
-verificaciones MANUAL de T15 no están en `progress/current.md` con su comando exacto. El código,
-el SQL, la ingesta, el diccionario, `azure-apps` y la campaña de mutación están bien y verificados
-(ver abajo). Lo aprobado aquí vale para la pasada 2, que solo tiene que mirar el delta.
+**Veredicto: APROBADO.** La pasada 1 (sobre `6efddfe`) solo rechazó C4: las verificaciones MANUAL
+de T15 no tenían su comando exacto. Está corregido. Lo demás ya quedó aprobado en la pasada 1, que
+sigue debajo.
 
 **Nivel de rigor:** `estandar`, declarado en `features.json`. Exige fase RED en los requisitos
-centrales, cobertura de lo cambiado ≥ 80 % y campaña de mutación con los supervivientes analizados.
+centrales, cobertura de lo cambiado ≥ 80 % y mutación con los supervivientes analizados.
 
-## Cambios requeridos
+## Pasada 2 · el delta
 
-1. **`progress/current.md`, sección «2026-10-28 · F-150» (líneas 12-22)** (C4, «MANUAL con su
-   comando exacto»): hoy es una línea («imagen, `ingest` de `iva` y `dvf`, build,
-   `publicar-diccionario` v63, reiniciar `mcp-bbdd`, R30 y R31»), y `impl_F-150.md` §6 tampoco trae
-   comandos. Hay que listar T15 en orden y con su orden exacta, como la sección de F-140 del mismo
-   fichero (líneas 104-127; F-140 se rechazó en su pasada 1 por esto mismo). Como mínimo:
-   - el tag de vuelta atrás (`r20261026-2111`), el build de la imagen, `infra/85_update_job.ps1
-     -Tag <nuevo>` y la comprobación de que el job corre ESA imagen;
-   - `python main.py ingest --table iva --full` y `--table dvf --full` ANTES de
-     `python main.py build-tesoreria`, con su duración;
-   - las consultas de R30, escritas (18.997 partidas, ~132,4 / ~143,3 M EUR, fuentes, IVA y
-     retención ≥ 96 % en 19 obras, hueco ~15,69);
-   - `publicar-diccionario` solo con la imagen ya en el job; `check-diccionario`,
-     `check-declarados` y `check-unicidad`; reinicio de `mcp-bbdd`;
-   - R31 en una conversación nueva (una obra a 1,19 y otra mixta).
+- **`progress/current.md`**, subsección «F-150 · Despliegue MANUAL, T15». Diez pasos en orden,
+  cada uno con su comando:
+  - vuelta atrás `85_update_job.ps1 -Tag r20261026-2111`;
+  - `70_build_image.ps1`;
+  - cambio del job, comprobado con `az containerapp job show`;
+  - `ingest --table iva --full` y `--table dvf --full` ANTES de `build-tesoreria`, con su duración
+    sacada de `_meta.etl_runs`;
+  - las siete consultas de R30, escritas y con su cifra esperada;
+  - `publicar-diccionario` solo con la imagen ya en el job;
+  - `check-diccionario`, `check-declarados` y `check-unicidad --timeout 300`;
+  - el reinicio de `mcp-bbdd` con `az`;
+  - R31 con la 0713 (a 1,19) y la 0696 (mixta).
 
-   Sin secretos: el host va como `<host>`.
+  Todo lo que nombran existe: los scripts `infra/70`/`85`, las opciones de `main.py`
+  (`--table`, `--full`, `--timeout`), las columnas `hipotesis_caja_obra.fuente` y `etl_runs.step`
+  / `started_at` / `finished_at`, y los nombres de recurso, que ya están en `infra/env/dev.json`.
+  Sin secretos: el host va como `<host>` y el usuario como `<usuario>`. `impl_F-150.md` §6 remite
+  a esa subsección. **C4 MANUAL: `[x]`.**
+- **Los tres no bloqueantes, resueltos:**
+  - `impl_F-150.md` §1 ya no da `hipotesis_caja_yaml.py` por modificado;
+  - `proyeccion_caja.py:498` lleva el comentario de la guarda contra NaN. Es solo un comentario y
+    no cambia el AST ni el alcance de la mutación;
+  - `BACKLOG.md` es un fichero generado y se regenera al integrar.
+- **Lo aprobado sigue valiendo:** el delta no cambia ninguna firma, ningún SQL ni ningún dato.
+  Los tests afectados se han ejecutado (`test_f150_{perfil,contrato,receta,coeficiente,hueco}`,
+  `test_f140_{hipotesis,paso}`): 330 passed.
+- **`init.sh` entero sobre `7eed62e`:** verde, «ENTORNO LISTO», 9.645 passed / 266 skipped (6.024 s); cobertura 100 % (143/143); tamaño OK.
 
-**Recomendaciones que no bloquean:**
-
-- `impl_F-150.md` §1 pone `infrastructure/config/hipotesis_caja_yaml.py` entre los ficheros de
-  producción, pero no está en el diff (no hacía falta tocarlo).
-- `proyeccion_caja.py:498`, `par[1] == par[1]`: es una guarda contra NaN sin comentario que lo
-  explique. Una línea que lo diga evita que alguien la tome por un error.
-- Al integrar, `BACKLOG.md` choca con `main` (`7aabb13`). Es un fichero generado: se regenera.
-
-## Cómo se ha verificado (solo lectura; ni Azure ni Sigrid se escriben)
+## Pasada 1 (sobre `6efddfe`) · lo que se verificó
 
 - **`bash harness/init.sh` en esta pasada:** **verde**, exit 0, «ENTORNO LISTO»: 9.645 passed, 266 skipped (5.817 s); cobertura `[OK]` 100 % (143/143); tamaño OK.
 - **SQL ejecutado de verdad:** el `sandbox_f150.py` del implementer, vuelto a correr sobre un
@@ -114,7 +116,7 @@ centrales, cobertura de lo cambiado ≥ 80 % y campaña de mutación con los sup
     real con `importe_mes` y tope en el cierre (la misma fuente que `real_origen_corte` de F-140).
 - **C3 bis:** N/A, porque no toca `docs/referencia/`.
 - **C4:** `[x]` trazabilidad (tabla de abajo) · `[x]` sin red ni BBDD · **`[ ]` MANUAL con su
-  comando exacto en `current.md`** (cambio 1) · `[x]` dobles: comprobación automática en `init.sh`.
+  comando exacto en `current.md`** (pasada 1); `[x]` en la pasada 2 · `[x]` dobles: comprobación automática en `init.sh`.
 - **C4 bis:** `[x]` rigor declarado · `[x]` fase RED con salida real (`impl_F-150.md` §5: R1-R5,
   R7, R9, R12, R14, R15, R17, R20-R23, R25, R32) · `[x]` cobertura `[OK]` 100 % (143/143) · `[x]` mutación
   verificada · `[x]` «Evidencias» con los cuatro números y los 2 workers.
@@ -130,10 +132,8 @@ centrales, cobertura de lo cambiado ≥ 80 % y campaña de mutación con los sup
 | R2-R6, R15, R32 | `diccionario` r2, r3 (2), r4, r5, r6 (2), r15, r32 (2) |
 | R7, R9, R18, R22 | `contrato` r7 (17), r18; `coeficiente` r9 (10); `hueco` r22 (11) |
 | R8, R10-R14, R19-R21, R23 | `sql` r8 (9), r10-r13 (2-3 cada uno), r14 (7), r19, r20 (2), r21 (4), r23 (7) |
-| R16, R17 · R29 · R30-R31 | `ingesta` r16 (5), r17 (6) · MANUAL hecho (§4, 15,60 en 15,50-15,75) · MANUAL T15 (cambio 1) |
+| R16, R17 · R29 · R30-R31 | `ingesta` r16 (5), r17 (6) · MANUAL hecho (§4, 15,60 en 15,50-15,75) · MANUAL T15, con comandos en `current.md` |
 
 ## Automejora (propuesta, no aplicada)
 
-Sumar a `.claude/agents/implementer.md` (y a `arnes-base`): «las verificaciones MANUAL van a
-`current.md` CON su comando exacto, no como resumen». Es el segundo rechazo por esto (F-140 en su
-pasada 1 y F-150).
+En `implementer.md` (y `arnes-base`): «MANUAL a `current.md` CON su comando exacto». Es el segundo rechazo por esto (F-140 y F-150).
