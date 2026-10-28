@@ -27,6 +27,7 @@ movido tal cual a `progress/impl_F-150_parada_T11.md`.
 | T13 | `886c9da` | `CONVENTIONS.md` (excepción acotada D1), `ARCHITECTURE.md` (la receta), `CLAUDE.md` (mapa, 27); `azure-apps` commit local `044beef` |
 | — | `e85a3d8` | Los cuatro huecos que destapó la línea base de la campaña (§2, D-5) |
 | T14 | `db6553a` | Campaña de mutación (`progress/mutacion_F-150.md`) y el test que cierra su superviviente |
+| T11, T12 | `0be8eab`, `425b5e2` | R29 relativo al día (humano); la receta en la ficha, `R-CAJA-HIPOTESIS`, `R-VENTA-COEFICIENTES`, fichas a 27, v63 |
 
 Ficheros de producción: `etl_sigrid/domain/entities.py`, `domain/proyeccion_caja.py`,
 `application/steps/ingest_raw_step.py`, `infrastructure/config/hipotesis_caja_yaml.py`,
@@ -200,11 +201,11 @@ El review (reviewer contra `CHECKPOINTS.md`) y T15 (MANUAL, humano). Nada de des
 
 | Evidencia | Valor real |
 |---|---|
-| `bash harness/init.sh` (sobre `db6553a`, 2026-10-28) | **verde**, código 0, «ENTORNO LISTO»: 9.638 passed, 266 skipped, 2.504 warnings |
-| Tiempo de la suite | 4.013,93 s (1:06:53), con medición de cobertura |
-| Tests de F-150 (`tests/test_f150_*.py`) | 274 passed en 5,23 s; con los de F-140 y `test_f066`: 1.015 passed |
+| `bash harness/init.sh` T16 (sobre `8500c37`, con T12) | **verde**, código 0, «ENTORNO LISTO»: 9.645 passed, 266 skipped, 2.504 warnings (antes, sobre `db6553a`: 9.638) |
+| Tiempo de la suite | 4.832,65 s (1:20:32), con medición de cobertura |
+| Tests de F-150 (`tests/test_f150_*.py`) | 281 (los 7 de T12 incluidos); familias del diccionario (F-006, F-14x, F-150): verdes |
 | Cobertura de las líneas cambiadas | `PUERTA COBERTURA`: **100,0 %** (143/143, umbral 80 %, `estandar`) |
-| Tamaño | `PUERTA TAMAÑO`: requirements 148/150, design 249/250, impl 174/220 (antes de §4 y esta tabla) |
+| Tamaño | `PUERTA TAMAÑO`: requirements 148/150, design 249/250, impl 215/220 |
 | Mutación (`python -m harness.mutacion --feature F-150 --workers 2 --timeout 2400`) | 95 generados, 20 evaluados (muestreo `estandar`, semilla 20260820): 17 muertos, 1 superviviente, 2 timeouts; tras reevaluar en serie, **19 muertos y 1 superviviente, cerrado con un test** (`progress/mutacion_F-150.md`, 15.325,8 s) |
 | Verificación semántica del SQL | 66 comprobaciones en Postgres 16 desechable, 0 fallos (§3) |
 | `ruff` | sin avisos nuevos en los ficheros de F-150 (el único, `UP042` de `StepStatus`, es previo) |
