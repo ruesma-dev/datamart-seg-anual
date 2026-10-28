@@ -3,11 +3,13 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **141 features**, 73 abiertas (0 en curso, 1 con la spec lista, 0 bloqueadas y 72 en backlog) y 68 terminadas.
+Resumen: **141 features**, 73 abiertas (1 en curso, 1 con la spec lista, 0 bloqueadas y 71 en backlog) y 68 terminadas.
 
 ## En curso
 
-_Ninguna feature en curso._
+| # | Feature | Prioridad | Rigor | Rama |
+|---|---|---|---|---|
+| F-150 | La receta de la caja (fase 1): el procedimiento de devengo a caja en el diccionario, el coeficiente de venta por partida y los reparto en varios meses | 1 | estandar | `feature/F-150-receta-caja` |
 
 ## Spec lista
 
@@ -23,7 +25,6 @@ _Ninguna feature bloqueada._
 
 | # | Feature | Prioridad | Rigor | Rama |
 |---|---|---|---|---|
-| F-150 | La receta de la caja (fase 1): el procedimiento de devengo a caja en el diccionario, el coeficiente de venta por partida y los reparto en varios meses | 1 | estandar | `feature/F-150-receta-caja` |
 | F-040 | El lado de ingresos: ventas, certificaciones y clientes | 2 | critico | `feature/F-040-ingresos` |
 | F-104 | La retencion de CLIENTE no esta saneada: 22,16 M EUR «vivos» de los que 19,93 M tienen fecha de baja, y la contabilidad dice 13,81 M | 3 | estandar | `feature/F-104-retenciones-cliente` |
 | F-153 | El estado de cada albarán (con proformas y notas): `estado` en `compras.albaranes` y los albaranes en `compras.v_estado_documentos` | 4 |  |  |
@@ -173,7 +174,7 @@ _Ninguna feature bloqueada._
 
 ### F-150 · La receta de la caja (fase 1): el procedimiento de devengo a caja en el diccionario, el coeficiente de venta por partida y los reparto en varios meses
 
-estado **pendiente** · prioridad 1 · rigor `estandar` · SDD sí · rama `feature/F-150-receta-caja`
+estado **en curso** · prioridad 1 · rigor `estandar` · SDD sí · rama `feature/F-150-receta-caja`
 
 Pedida por el humano el 2026-10-26, nace de la P2 de la review de F-140 y de su conversación sobre cómo se construye la caja. F-140 publica los ingredientes y las 23 hipótesis, pero no el ORDEN en que se aplican: la IA improvisa la secuencia en cada conversación. QUÉ SE HACE: (1) la RECETA, el procedimiento ordenado de devengo a caja (devengo del mes, desfase a certificación o factura, venta con coeficientes, plazo de cobro o pago, retención y su devolución, IVA y su liquidación, cartera viva y emitido tras el cierre sin duplicar), publicada en la ficha de `tesoreria.hipotesis_caja` y no en el resumen de la regla, para no subir el presupuesto de F-147; `R-CAJA-HIPOTESIS` remite a ella. (2) EL COEFICIENTE DE VENTA POR PARTIDA: el devengo de VENTA de F-140 sale de `mart`, SIN coeficientes, y lo que se certifica y se cobra va CON ellos (`R-VENTA-COEFICIENTES`). El humano propone sacarlos del ámbito de CERTIFICACIÓN. Medido el 2026-10-26 (solo lectura, versión master vigente de cada obra): el master de certificación (ámbito 9) existe en 121 de 126 obras; 40 obras con coeficiente en el 9 y 41 en el venta (11), ninguna con coeficiente solo en uno; el ratio con/sin coincide por partida en 69.022 de 85.909 partidas comunes; lo normal es 1,19 en toda la obra y en 13 obras conviven partidas a 1,000 con otras a 1,19-1,26 (una obra a 0,967), así que un coeficiente medio de obra falla en las mixtas. El 9 casi no está planificado en el tiempo (planificación en 7.178 de 85.914 partidas; fecha de planificación en 199 de 3.115 versiones) y su importe difiere del de venta en 26.678 partidas (743,6 frente a 772,3 M EUR sin coeficientes): el spec-author decide si el 9 da solo el coeficiente (importe con/sin por partida, con el 11 de respaldo) o también el importe a certificar, con el perfil temporal del 11. Se publica como columna (`coeficiente_venta`) en `tesoreria.devengo_pendiente_partida` y su agregado por obra-mes. (3) REPARTO EN VARIOS MESES: tanto el cobro como el pago pueden partirse en varios meses y empezar varios meses después (p. ej. formas de pago con varios vencimientos, o una certificación cobrada en dos plazos). Hoy H03/H08 son un único desfase y H02/H09 un único plazo: el catálogo debe admitir un perfil de reparto (lista de desfase en meses y porcentaje) por sentido, con defecto y valor por obra, y la receta debe aplicarlo. FUERA: la función que calcula la caja (F-151); validar las hipótesis con Control de Costes.
 

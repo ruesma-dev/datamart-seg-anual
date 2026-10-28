@@ -707,8 +707,22 @@
 # `raw.auxcob` y `raw.auxefc`: son las 78 tablas. `tesoreria.efectos` gana
 # `obra_via` (la obra de los pagos sin centro sale de su factura, D10-A). 21
 # reglas publicadas. Presupuesto de F-147 subido con su motivo.
+#
+# version 63 (F-150, 2026-10-28): LA RECETA DE LA CAJA. Sigue sin haber caja
+# proyectada (F-151): la ficha de `tesoreria.hipotesis_caja` lleva la receta,
+# siete pasos en orden (excepcion acotada D1 de docs/CONVENTIONS.md), y cada
+# hipotesis su `paso_receta`; son 27 (H24-H27: fraccionamiento de pagos y
+# cobros, el hueco de facturacion y la antiguedad de los albaranes). La venta
+# lleva el coeficiente, el IVA y la retencion del CONTRATO de cada partida
+# (`coestr` y `raw.iva`; si no, el master 9 u 11) y el hueco de facturacion
+# por obra (`raw.dvf`): columnas nuevas en `condiciones_contrato_cliente` y las
+# tres `devengo_*`, y dos funciones (`fn_coeficientes`,
+# `fn_coeficientes_reconocidos`). Entran `raw.iva` y `raw.dvf` (solo cabecera):
+# son las 80 tablas. `R-CAJA-HIPOTESIS` remite a la receta (resumen nuevo, mas
+# corto) y `R-VENTA-COEFICIENTES` cubre las tres `devengo_*`. `dvf` entra en el
+# punto 4 de `R-SIGRID-CON`. 22 reglas en el YAML, las publicadas no cambian.
 
-version: 62
+version: 63
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -823,6 +837,9 @@ reglas:
       - cierre.fact_cierre_mensual
       - cierre.v_pbi_cierre_resumen
       - cierre.v_pbi_cierre_cabecera
+      - tesoreria.devengo_pendiente_partida
+      - tesoreria.devengo_pendiente_obra_mes
+      - tesoreria.devengo_corte_obra
     resumen: >-
       Cierres, beneficio y análisis usan la venta SIN coeficientes (`importe`,
       `final_importe`). La CON coeficientes (`importe_oficial`,
@@ -1096,12 +1113,14 @@ reglas:
       - tesoreria.efectos
       - mart.fact_seguimiento_mensual
     resumen: >-
-      No hay caja proyectada. Al pasar devengo a caja declara TODAS las
-      hipótesis de `tesoreria.hipotesis_caja_obra`, cada una con valor y nivel:
-      DEFECTO, OBRA o USUARIO (la del usuario manda). Sin IVA el devengo; no
-      repitas la cartera.
+      No hay caja proyectada: sigue la receta de la ficha de
+      `tesoreria.hipotesis_caja`, sin repetir la cartera, y declara TODAS las
+      hipótesis de `tesoreria.hipotesis_caja_obra` con valor y nivel: DEFECTO,
+      OBRA o USUARIO (manda).
     regla: >-
-      El datamart NO tiene una caja proyectada: tiene sus ingredientes. Para
+      Sigue la RECETA de la ficha de `tesoreria.hipotesis_caja`, en su orden
+      (siete pasos; cada hipotesis dice el suyo en `paso_receta`). El
+      datamart NO tiene una caja proyectada: tiene sus ingredientes. Para
       proyectar cobros y pagos parte de `tesoreria.devengo_corte_obra` y
       `tesoreria.devengo_pendiente_obra_mes` (el devengo pendiente de la ultima
       version master, ya DESCONTADO partida a partida de lo ejecutado desde
@@ -1124,7 +1143,10 @@ reglas:
       2026-10-25: el pendiente (133,20 M EUR de coste) supera en 19 M EUR al
       plan restante (113,98) porque las obras van retrasadas, y en las 21
       obras hay 36,4 M EUR de pagos ya en cartera viva: sin la frontera se
-      contarian dos veces.
+      contarian dos veces. F-150 (2026-10-28): sin un orden, la IA combinaba
+      los ingredientes distinto en cada conversacion; la receta fija el orden,
+      las hipotesis pasan a 27 y la venta se cobra con el coeficiente, el IVA
+      y la retencion del contrato de cada partida.
 
   - codigo: R-DESCOMPUESTO-ORIGEN
     titulo: Los descompuestos no se mezclan entre origenes ni entre versiones
@@ -1220,7 +1242,7 @@ reglas:
     regla: >-
       Antes de escribir cualquier consulta contra `raw`, seis cosas.
 
-      **1. `ide` es la clave de las 78 tablas.** Se llama igual en todas, es el
+      **1. `ide` es la clave de las 80 tablas.** Se llama igual en todas, es el
       indice primario y es unico. Un campo que acaba en `ide` —`conide`,
       `entide`, `obride`— es una referencia a el.
 
@@ -1236,7 +1258,7 @@ reglas:
       el campo exacto: `apu` (`apu.fec`, `apu.res`); `auxala` (`auxala.cod`, `auxala.res`); `auxban` (`auxban.res`); `auxcob` (`auxcob.cod`, `auxcob.res`); `auxefc` (`auxefc.res`); `auxefp` (`auxefp.res`); `auxemp` (`auxemp.res`); `auxhor` (`auxhor.cod`, `auxhor.res`); `auxrestip` (`auxrestip.res`); `auxmun` (`auxmun.res`); `auxnap` (`auxnap.res`); `auxobramb` (`auxobramb.cod`, `auxobramb.res`); `auxobrcla` (`auxobrcla.res`); `auxobrtip` (`auxobrtip.res`); `auxpag` (`auxpag.cod`, `auxpag.res`); `auxpro` (`auxpro.res`); `auxpronat` (`auxpronat.cod`, `auxpronat.res`); `conest` (`conest.cod`, `conest.res`); `conext` (`conext.cod`); `confir` (`confir.cod`, `confir.fec`); `ctrpro` (`ctrpro.res`); `dcapro` (`dcapro.res`); `dcfpro` (`dcfpro.res`); `dcopro` (`dcopro.res`); `dncpro` (`dncpro.fec`, `dncpro.res`); `gra` (`gra.cod`, `gra.fec`, `gra.res`); `obrfas` (`obrfas.res`); `obrfasamb` (`obrfasamb.fec`, `obrfasamb.res`); `hmores` (`hmores.fec`); `obrctr` (`obrctr.cod`, `obrctr.res`); `obrparpar` (`obrparpar.cod`, `obrparpar.res`); `prv` (`prv.cif`, `prv.raz`); `rac` (`rac.fec`, `rac.res`); `res` (`res.cif`); `usu` (`usu.cod`, `usu.res`). Ahi el valor bueno es el de la tabla, no el de
       `con`.
 
-      **4. Y hay tablas que no cuelgan de `con` en absoluto**: `auxhor`, `auxobramb`, `hmores`, `obrfas`, `obrfasamb`, `obrparpre`, `reshor`
+      **4. Y hay tablas que no cuelgan de `con` en absoluto**: `auxhor`, `auxobramb`, `dvf`, `hmores`, `obrfas`, `obrfasamb`, `obrparpre`, `reshor`
       no se unen a `raw.con` en ningun SQL de este repositorio, asi que para
       ellas el JOIN de los puntos 2 y 3 **no existe**; su nombre esta en su
       propio `res` o no esta.

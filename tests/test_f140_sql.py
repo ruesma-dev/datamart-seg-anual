@@ -84,6 +84,13 @@ def _columnas(tabla: str) -> list[str]:
         nombre = trozo.strip().split(" ")[0]
         if nombre and nombre.upper() != "PRIMARY":
             columnas.append(nombre)
+    # F-150: las columnas que llegan con `ALTER TABLE ... ADD COLUMN IF NOT
+    # EXISTS` quedan al final, en el orden del fichero.
+    for nombre in re.findall(
+        rf"ALTER TABLE {re.escape(tabla)} ADD COLUMN IF NOT EXISTS (\w+)", _ejecutable(RUTA_SETUP)
+    ):
+        if nombre not in columnas:
+            columnas.append(nombre)
     return columnas
 
 
@@ -214,6 +221,7 @@ def test_f140_setup_el_catalogo_tiene_los_campos_de_r1() -> None:
     assert _columnas("tesoreria.hipotesis_caja") == [
         "codigo", "sentido", "descripcion", "unidad", "valor_defecto", "opciones",
         "fuente_defecto", "ingrediente", "validado", "fecha_validacion", "admite_obra",
+        "paso_receta",  # F-150 (R1), con ALTER al final
     ]
     assert _columnas("tesoreria.hipotesis_caja_manual") == [
         "clave_obra", "codigo", "valor", "motivo", "fecha",
@@ -401,6 +409,12 @@ def test_f140_r6_ningun_valor_de_hipotesis_se_aplica(ruta: Path) -> None:
     texto = _sin_comment_on(ruta)
     if ruta == RUTA_HIPOTESIS_OBRA:
         sin_conteos = re.sub(r"count\(\*\)|SELECT \*", "", texto, flags=re.IGNORECASE)
+        # F-150 (R21, N2): H12 pasa el IVA de la ficha de fracción (0.21) a la
+        # unidad del catálogo (21 %). Es un cambio de unidad, no aplicar una
+        # hipótesis: es la ÚNICA cuenta que se tolera, y una sola vez.
+        unidad = "ROUND((i.iva * 100)::NUMERIC, 4)"
+        assert sin_conteos.count(unidad) == 1
+        sin_conteos = sin_conteos.replace(unidad, "")
         assert not re.search(r"[*/]|\s[+-]\s", sin_conteos), "08 no hace aritmética"
     else:
         assert "hipotesis" not in texto.lower(), f"{ruta.name} no lee hipótesis"
@@ -556,7 +570,9 @@ def test_f140_r12_r14_r15_el_orden_de_los_tres_insert() -> None:
 
 def test_f140_r13_el_unico_acceso_a_stg_filtra_obra_ambito_y_version() -> None:
     texto = _sin_to_regclass(_devengo())
-    assert re.findall(r"\bstg\.\w+", texto) == ["stg.plan_mensual"]
+    # F-150 (R10) suma la lectura de `stg.presupuesto` (el coeficiente del master),
+    # con sus tres filtros: la vigila `tests/test_f150_sql.py`.
+    assert re.findall(r"\bstg\.\w+", texto) == ["stg.plan_mensual", "stg.presupuesto"]
     assert (
         "JOIN stg.plan_mensual pm ON pm.obra_id = v.obra_id "
         "AND pm.ambito_id = v.ambito_id AND pm.version = v.version_master"
@@ -789,7 +805,7 @@ def test_f140_r5_p1a_se_publican_las_23_y_la_que_no_admite_obra_va_a_defecto() -
     from etl_sigrid.infrastructure.config.hipotesis_caja_yaml import cargar_hipotesis_caja
 
     catalogo = cargar_hipotesis_caja().catalogo
-    assert len(catalogo) == 23
+    assert len(catalogo) == 27  # F-150 suma H24-H27; el resto del test no cambia
     texto = _hipotesis_obra()
     select = texto[texto.index("INSERT INTO tesoreria.hipotesis_caja_obra"):]
     assert "WHERE h.admite_obra" not in select, "ningún filtro deja fuera hipótesis del catálogo"

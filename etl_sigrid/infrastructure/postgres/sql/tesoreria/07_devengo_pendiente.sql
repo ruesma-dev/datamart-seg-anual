@@ -40,6 +40,32 @@
 --      del cierre, del sentido del concepto (COSTE -> PAGO, VENTA -> COBRO).
 --      Los efectos van con IVA; el devengo, sin el.
 --
+-- F-150 (la receta de la caja), en VENTA y en la misma transaccion:
+--   2 bis. `_dev_real`: lo REAL a origen de cada partida de venta hasta el
+--      ultimo cierre (la misma fuente que `real_origen_corte`).
+--   2 ter. `_dev_coef`: el coeficiente del MASTER de V de cada partida, de
+--      `stg.presupuesto` filtrado por obra, ambitos 9 y 11 y version
+--      (`R-VERSION-MASTER`): certificacion (9) si tiene importe y, si no, venta
+--      (11); `ROUND(oficial / importe, 6)`, sin oficial = importe.
+--   2 quater. `_dev_contrato`: el CONTRATO con el cliente de cada partida
+--      (`raw.obrparpar.ctride`, solo si es de la misma obra) con su
+--      coeficiente, su IVA y su retencion de `condiciones_contrato_cliente`.
+--      `coeficiente_venta` = el del contrato y, si no, el del master (el orden
+--      de `coeficiente_venta` del dominio); nunca una media de la obra.
+--   4. La partida gana esas columnas y `pendiente_con_coeficientes`; guarda
+--      (D6): una partida de venta con pendiente y sin coeficiente tumba el
+--      paso, con su recuento, ANTES de vaciar nada.
+--   5. El reparto lleva tambien el pendiente con coeficientes (el mismo reparto
+--      de `repartir_pendiente`), y la obra-mes, su IVA y su retencion del
+--      contrato y las bases que no los tienen (sobre ellas, H12 y H10). La
+--      guarda de la suma mira tambien la suma con coeficientes.
+--   6 bis. `_dev_hueco`: el hueco de facturacion de H26, NETO POR OBRA (nunca
+--      por contrato): lo real a origen x su coeficiente (sin ninguno, x la
+--      media ponderada de la obra, MEDIA_OBRA) menos lo facturado
+--      (`raw.dvf.totbas` por el centro de coste de la obra, rectificativas
+--      incluidas, sin corte de fecha), con suelo 0 y lo facturado por delante
+--      aparte; su IVA y su retencion, por el peso de cada contrato.
+--
 -- Las tablas de trabajo son temporales y mueren con la transaccion. Si algo
 -- falla, quedan las tablas de ayer. Cada una lleva su `ANALYZE`: sin
 -- estadisticas el planificador las cree de una fila y cruza el perfil con las
@@ -47,8 +73,10 @@
 -- ~210 s sin bucles; el paso 1 solo, 70 s).
 --
 -- Lee de: mart.fact_seguimiento_mensual, mart.master_versiones_tipadas,
---         mart.v_pbi_dim_partida, stg.plan_mensual, maestro.v_obra_fichas,
---         tesoreria.efectos.
+--         mart.v_pbi_dim_partida, stg.plan_mensual, stg.presupuesto,
+--         maestro.v_obra_fichas, tesoreria.efectos,
+--         tesoreria.condiciones_contrato_cliente, raw.obrparpar, raw.obr,
+--         raw.dvf.
 -- Escribe en: tesoreria.devengo_pendiente_partida,
 --             tesoreria.devengo_pendiente_obra_mes,
 --             tesoreria.devengo_corte_obra.
@@ -62,8 +90,13 @@ BEGIN
        OR to_regclass('mart.v_pbi_dim_partida') IS NULL
        OR to_regclass('stg.plan_mensual') IS NULL
        OR to_regclass('maestro.v_obra_fichas') IS NULL
-       OR to_regclass('tesoreria.efectos') IS NULL THEN
-        RAISE EXCEPTION 'devengo_pendiente: falta una fuente (mart, stg, maestro o tesoreria.efectos)';
+       OR to_regclass('tesoreria.efectos') IS NULL
+       OR to_regclass('stg.presupuesto') IS NULL
+       OR to_regclass('raw.obrparpar') IS NULL
+       OR to_regclass('raw.obr') IS NULL
+       OR to_regclass('raw.dvf') IS NULL
+       OR to_regclass('tesoreria.condiciones_contrato_cliente') IS NULL THEN
+        RAISE EXCEPTION 'devengo_pendiente: falta una fuente (mart, stg, maestro, raw o tesoreria)';
     END IF;
 END $$;
 
@@ -150,13 +183,87 @@ GROUP BY v.obra_id, v.concepto, f.partida_id;
 ANALYZE _dev_ejecutado;
 
 -- ---------------------------------------------------------------------------
+-- 2 bis · lo real a origen de cada partida de venta hasta el cierre (F-150)
+-- ---------------------------------------------------------------------------
+CREATE TEMP TABLE _dev_real ON COMMIT DROP AS
+SELECT v.obra_id, f.partida_id, SUM(f.importe_mes) AS real_origen
+FROM _dev_version v
+JOIN mart.fact_seguimiento_mensual f ON f.obra_id = v.obra_id AND f.concepto = v.concepto AND f.tipo_dato = 'REAL' AND f.anio_mes <= v.mes_ultimo_cierre WHERE v.concepto = 'VENTA'
+GROUP BY v.obra_id, f.partida_id;
+ANALYZE _dev_real;
+
+-- ---------------------------------------------------------------------------
+-- 2 ter · el coeficiente del master de V por partida de venta (F-150, D3)
+-- ---------------------------------------------------------------------------
+CREATE TEMP TABLE _dev_coef ON COMMIT DROP AS
+SELECT
+    m.obra_id,
+    m.partida_id,
+    CASE WHEN m.importe_cert <> 0 THEN ROUND(COALESCE(m.oficial_cert, m.importe_cert) / m.importe_cert, 6)
+         WHEN m.importe_venta <> 0 THEN ROUND(COALESCE(m.oficial_venta, m.importe_venta) / m.importe_venta, 6)
+    END AS coeficiente_master,
+    CASE WHEN m.importe_cert <> 0 THEN 'MASTER_CERT'
+         WHEN m.importe_venta <> 0 THEN 'MASTER_VENTA'
+    END AS fuente_master
+FROM (
+    SELECT
+        pp.obra_id,
+        pp.partida_id,
+        SUM(pp.importe) FILTER (WHERE pp.ambito_id = 9) AS importe_cert,
+        SUM(pp.importe_oficial) FILTER (WHERE pp.ambito_id = 9) AS oficial_cert,
+        SUM(pp.importe) FILTER (WHERE pp.ambito_id = 11) AS importe_venta,
+        SUM(pp.importe_oficial) FILTER (WHERE pp.ambito_id = 11) AS oficial_venta
+    FROM _dev_version v
+    JOIN stg.presupuesto pp ON pp.obra_id = v.obra_id AND pp.ambito_id IN (9, 11) AND pp.fase_num = v.version_master WHERE v.concepto = 'VENTA'
+    GROUP BY pp.obra_id, pp.partida_id
+) m;
+ANALYZE _dev_coef;
+
+-- ---------------------------------------------------------------------------
+-- 2 quater · el contrato con el cliente de cada partida de venta (F-150, N1-N4)
+-- ---------------------------------------------------------------------------
+CREATE TEMP TABLE _dev_contrato ON COMMIT DROP AS
+SELECT
+    pv.obra_id,
+    pv.partida_id,
+    k.contrato_cliente_id,
+    COALESCE(k.coeficiente_contrato, m.coeficiente_master) AS coeficiente_venta,
+    CASE WHEN k.coeficiente_contrato IS NOT NULL THEN 'CONTRATO'
+         WHEN m.coeficiente_master IS NOT NULL THEN m.fuente_master
+         ELSE 'SIN'
+    END AS fuente_coeficiente,
+    m.coeficiente_master,
+    k.iva_porcentaje,
+    CASE WHEN k.iva_porcentaje IS NOT NULL THEN 'CONTRATO' ELSE 'SIN' END AS fuente_iva,
+    k.retencion_porcentaje,
+    CASE WHEN k.retencion_porcentaje IS NOT NULL THEN 'CONTRATO' ELSE 'SIN' END AS fuente_retencion
+FROM (
+    SELECT obra_id, partida_id FROM _dev_plan WHERE concepto = 'VENTA'
+    UNION
+    SELECT obra_id, partida_id FROM _dev_real
+) pv
+LEFT JOIN raw.obrparpar op ON op.ide = pv.partida_id
+LEFT JOIN tesoreria.condiciones_contrato_cliente k ON k.contrato_cliente_id = NULLIF(op.ctride, 0) AND k.obra_id = pv.obra_id
+LEFT JOIN _dev_coef m ON m.obra_id = pv.obra_id AND m.partida_id = pv.partida_id;
+ANALYZE _dev_contrato;
+
+-- ---------------------------------------------------------------------------
 -- 4 · la partida: pendiente y sobre-ejecutado
 -- ---------------------------------------------------------------------------
 CREATE TEMP TABLE _dev_partida ON COMMIT DROP AS
 SELECT
     d.*,
     GREATEST(0, d.plan_desde_version - d.ejecutado_intervalo) AS pendiente,
-    GREATEST(0, d.ejecutado_intervalo - d.plan_desde_version) AS sobre_ejecutado
+    GREATEST(0, d.ejecutado_intervalo - d.plan_desde_version) AS sobre_ejecutado,
+    c.contrato_cliente_id,
+    c.coeficiente_venta,
+    c.fuente_coeficiente,
+    c.coeficiente_master,
+    ROUND(GREATEST(0, d.plan_desde_version - d.ejecutado_intervalo) * c.coeficiente_venta, 2) AS pendiente_con_coeficientes,
+    c.iva_porcentaje,
+    c.fuente_iva,
+    c.retencion_porcentaje,
+    c.fuente_retencion
 FROM (
     SELECT
         pl.obra_id,
@@ -185,8 +292,24 @@ FROM (
     ) pl
     LEFT JOIN _dev_ejecutado e
            ON e.obra_id = pl.obra_id AND e.concepto = pl.concepto AND e.partida_id = pl.partida_id
-) d;
+) d
+LEFT JOIN _dev_contrato c ON c.obra_id = d.obra_id AND c.partida_id = d.partida_id AND d.concepto = 'VENTA';
 ANALYZE _dev_partida;
+
+-- Guarda de D6 (F-150): una partida de venta con pendiente necesita su
+-- coeficiente (del contrato o del master). Sin el, falla cerrado y con su
+-- recuento, ANTES de vaciar las tablas: no se adivina un coeficiente.
+DO $$
+DECLARE
+    n INTEGER;
+BEGIN
+    SELECT count(*) INTO n
+      FROM _dev_partida d
+     WHERE d.concepto = 'VENTA' AND d.pendiente > 0 AND d.coeficiente_venta IS NULL;
+    IF n > 0 THEN
+        RAISE EXCEPTION 'devengo_pendiente: % partidas de venta con pendiente y sin coeficiente (ni del contrato ni del master)', n;
+    END IF;
+END $$;
 
 TRUNCATE tesoreria.devengo_pendiente_partida;
 
@@ -194,7 +317,9 @@ INSERT INTO tesoreria.devengo_pendiente_partida (
     obra_id, empresa_id, clave_obra, partida_id, codigo_partida, concepto,
     categoria, version_master, tipo_master, mes_version, mes_ultimo_cierre,
     plan_desde_version, plan_intervalo, ejecutado_intervalo, plan_restante,
-    pendiente, sobre_ejecutado
+    pendiente, sobre_ejecutado, contrato_cliente_id, coeficiente_venta,
+    fuente_coeficiente, coeficiente_master, pendiente_con_coeficientes,
+    iva_porcentaje, fuente_iva, retencion_porcentaje, fuente_retencion
 )
 SELECT
     d.obra_id                AS obra_id,
@@ -213,7 +338,16 @@ SELECT
     d.ejecutado_intervalo    AS ejecutado_intervalo,
     d.plan_restante          AS plan_restante,
     d.pendiente              AS pendiente,
-    d.sobre_ejecutado        AS sobre_ejecutado
+    d.sobre_ejecutado        AS sobre_ejecutado,
+    d.contrato_cliente_id    AS contrato_cliente_id,
+    d.coeficiente_venta      AS coeficiente_venta,
+    d.fuente_coeficiente     AS fuente_coeficiente,
+    d.coeficiente_master     AS coeficiente_master,
+    d.pendiente_con_coeficientes AS pendiente_con_coeficientes,
+    d.iva_porcentaje         AS iva_porcentaje,
+    d.fuente_iva             AS fuente_iva,
+    d.retencion_porcentaje   AS retencion_porcentaje,
+    d.fuente_retencion       AS fuente_retencion
 FROM _dev_partida d
 JOIN _dev_version v ON v.obra_id = d.obra_id AND v.concepto = d.concepto
 LEFT JOIN mart.v_pbi_dim_partida dp ON dp.partida_id = d.partida_id;
@@ -236,6 +370,8 @@ WITH perfil AS (
         pr.anio_mes,
         d.pendiente,
         ROUND(d.pendiente * pr.importe_mes / d.total_perfil, 2) AS parte,
+        d.pendiente_con_coeficientes,
+        ROUND(d.pendiente_con_coeficientes * pr.importe_mes / d.total_perfil, 2) AS parte_con_coef,
         ROW_NUMBER() OVER (PARTITION BY pr.obra_id, pr.concepto, pr.partida_id ORDER BY pr.anio_mes DESC) AS desde_el_final
     FROM perfil pr
     JOIN _dev_partida d ON d.obra_id = pr.obra_id AND d.concepto = pr.concepto AND d.partida_id = pr.partida_id
@@ -248,27 +384,32 @@ WITH perfil AS (
         r.concepto,
         r.partida_id,
         r.anio_mes,
-        CASE WHEN r.desde_el_final = 1 THEN r.pendiente - (r.suma_partes - r.parte) ELSE r.parte END AS importe
+        CASE WHEN r.desde_el_final = 1 THEN r.pendiente - (r.suma_partes - r.parte) ELSE r.parte END AS importe,
+        CASE WHEN r.desde_el_final = 1 THEN r.pendiente_con_coeficientes - (r.suma_partes_con_coef - r.parte_con_coef) ELSE r.parte_con_coef END AS importe_con_coef
     FROM (
-        SELECT x.*, SUM(x.parte) OVER (PARTITION BY x.obra_id, x.concepto, x.partida_id) AS suma_partes
+        SELECT x.*,
+               SUM(x.parte) OVER (PARTITION BY x.obra_id, x.concepto, x.partida_id) AS suma_partes,
+               SUM(x.parte_con_coef) OVER (PARTITION BY x.obra_id, x.concepto, x.partida_id) AS suma_partes_con_coef
         FROM partes x
     ) r
 )
 , sin_perfil AS (
     -- D19-A: sin perfil restante, al primer mes pendiente y marcado.
-    SELECT d.obra_id, d.concepto, d.partida_id, v.primer_mes_pendiente AS anio_mes, d.pendiente AS importe, TRUE AS es_retraso
+    SELECT d.obra_id, d.concepto, d.partida_id, v.primer_mes_pendiente AS anio_mes, d.pendiente AS importe,
+           d.pendiente_con_coeficientes AS importe_con_coef, TRUE AS es_retraso
     FROM _dev_partida d
     JOIN _dev_version v ON v.obra_id = d.obra_id AND v.concepto = d.concepto
     WHERE d.pendiente > 0 AND COALESCE(d.total_perfil, 0) <= 0
 )
 SELECT pr.obra_id, pr.concepto, pr.partida_id, pr.anio_mes,
-       pr.importe_mes AS plan_restante, 0::NUMERIC AS pendiente, 0::NUMERIC AS retraso_sin_perfil
+       pr.importe_mes AS plan_restante, 0::NUMERIC AS pendiente, 0::NUMERIC AS retraso_sin_perfil,
+       NULL::NUMERIC AS importe_con_coef
 FROM perfil pr
 UNION ALL
-SELECT r.obra_id, r.concepto, r.partida_id, r.anio_mes, 0::NUMERIC, r.importe, 0::NUMERIC
+SELECT r.obra_id, r.concepto, r.partida_id, r.anio_mes, 0::NUMERIC, r.importe, 0::NUMERIC, r.importe_con_coef
 FROM repartido r
 UNION ALL
-SELECT s.obra_id, s.concepto, s.partida_id, s.anio_mes, 0::NUMERIC, s.importe, s.importe
+SELECT s.obra_id, s.concepto, s.partida_id, s.anio_mes, 0::NUMERIC, s.importe, s.importe, s.importe_con_coef
 FROM sin_perfil s;
 ANALYZE _dev_reparto;
 
@@ -278,7 +419,9 @@ INSERT INTO tesoreria.devengo_pendiente_obra_mes (
     obra_id, empresa_id, clave_obra, anio_mes, concepto, categoria,
     version_master, mes_ultimo_cierre, importe_plan_restante,
     importe_pendiente, importe_retraso_sin_perfil, num_partidas,
-    mes_pasado_sin_cierre
+    mes_pasado_sin_cierre, importe_pendiente_con_coeficientes, coeficiente_venta,
+    importe_iva_contrato, base_sin_iva_contrato, importe_retencion_contrato,
+    base_sin_retencion_contrato
 )
 SELECT
     x.obra_id                         AS obra_id,
@@ -293,7 +436,13 @@ SELECT
     x.importe_pendiente               AS importe_pendiente,
     x.importe_retraso_sin_perfil      AS importe_retraso_sin_perfil,
     x.num_partidas                    AS num_partidas,
-    x.anio_mes < date_trunc('month', CURRENT_DATE)::DATE AS mes_pasado_sin_cierre
+    x.anio_mes < date_trunc('month', CURRENT_DATE)::DATE AS mes_pasado_sin_cierre,
+    CASE WHEN x.concepto = 'VENTA' THEN COALESCE(x.importe_con_coef, 0) END AS importe_pendiente_con_coeficientes,
+    CASE WHEN x.concepto = 'VENTA' AND x.importe_pendiente <> 0 THEN ROUND(x.importe_con_coef / x.importe_pendiente, 6) END AS coeficiente_venta,
+    CASE WHEN x.concepto = 'VENTA' THEN ROUND(COALESCE(x.iva_bruto, 0) / 100, 2) END AS importe_iva_contrato,
+    CASE WHEN x.concepto = 'VENTA' THEN COALESCE(x.base_sin_iva, 0) END AS base_sin_iva_contrato,
+    CASE WHEN x.concepto = 'VENTA' THEN ROUND(COALESCE(x.retencion_bruto, 0) / 100, 2) END AS importe_retencion_contrato,
+    CASE WHEN x.concepto = 'VENTA' THEN COALESCE(x.base_sin_retencion, 0) END AS base_sin_retencion_contrato
 FROM (
     SELECT
         r.obra_id,
@@ -303,8 +452,17 @@ FROM (
         SUM(r.plan_restante) AS importe_plan_restante,
         SUM(r.pendiente) AS importe_pendiente,
         SUM(r.retraso_sin_perfil) AS importe_retraso_sin_perfil,
-        COUNT(DISTINCT r.partida_id) AS num_partidas
-    FROM _dev_reparto r
+        COUNT(DISTINCT r.partida_id) AS num_partidas,
+        SUM(r.importe_con_coef) AS importe_con_coef,
+        SUM(r.importe_con_coef * r.iva_porcentaje) FILTER (WHERE r.fuente_iva = 'CONTRATO') AS iva_bruto,
+        SUM(r.importe_con_coef) FILTER (WHERE r.fuente_iva = 'SIN') AS base_sin_iva,
+        SUM(r.importe_con_coef * r.retencion_porcentaje) FILTER (WHERE r.fuente_retencion = 'CONTRATO') AS retencion_bruto,
+        SUM(r.importe_con_coef) FILTER (WHERE r.fuente_retencion = 'SIN') AS base_sin_retencion
+    FROM (
+        SELECT rp.*, d.iva_porcentaje, d.fuente_iva, d.retencion_porcentaje, d.fuente_retencion
+        FROM _dev_reparto rp
+        JOIN _dev_partida d ON d.obra_id = rp.obra_id AND d.concepto = rp.concepto AND d.partida_id = rp.partida_id
+    ) r
     LEFT JOIN mart.v_pbi_dim_partida dp ON dp.partida_id = r.partida_id
     GROUP BY r.obra_id, r.concepto, r.anio_mes, dp.categoria
 ) x
@@ -318,20 +476,103 @@ BEGIN
     SELECT COALESCE(p.obra_id, m.obra_id) AS obra_id,
            COALESCE(p.concepto, m.concepto) AS concepto,
            p.total AS total_partida,
-           m.total AS total_mes
+           m.total AS total_mes,
+           p.total_coef AS total_coef_partida,
+           m.total_coef AS total_coef_mes
       INTO fallo
-      FROM (SELECT obra_id, concepto, SUM(pendiente) AS total
+      FROM (SELECT obra_id, concepto, SUM(pendiente) AS total,
+                   SUM(pendiente_con_coeficientes) AS total_coef
               FROM tesoreria.devengo_pendiente_partida GROUP BY obra_id, concepto) p
-      FULL JOIN (SELECT obra_id, concepto, SUM(importe_pendiente) AS total
+      FULL JOIN (SELECT obra_id, concepto, SUM(importe_pendiente) AS total,
+                        SUM(importe_pendiente_con_coeficientes) AS total_coef
                    FROM tesoreria.devengo_pendiente_obra_mes GROUP BY obra_id, concepto) m
         ON m.obra_id = p.obra_id AND m.concepto = p.concepto
      WHERE COALESCE(p.total, 0) IS DISTINCT FROM COALESCE(m.total, 0)
+        OR COALESCE(p.total_coef, 0) IS DISTINCT FROM COALESCE(m.total_coef, 0)
      LIMIT 1;
     IF FOUND THEN
-        RAISE EXCEPTION 'devengo_pendiente: el reparto de la obra % (%) suma % y la partida %',
-            fallo.obra_id, fallo.concepto, fallo.total_mes, fallo.total_partida;
+        RAISE EXCEPTION 'devengo_pendiente: el reparto de la obra % (%) suma % y la partida % (con coeficientes, % y %)',
+            fallo.obra_id, fallo.concepto, fallo.total_mes, fallo.total_partida,
+            fallo.total_coef_mes, fallo.total_coef_partida;
     END IF;
 END $$;
+
+-- ---------------------------------------------------------------------------
+-- 6 bis · el hueco de facturacion de H26, NETO POR OBRA (F-150, N6, N9)
+--
+-- Por obra de venta: lo real a origen x su coeficiente (`r`); las partidas sin
+-- ninguno, x la media ponderada de la obra (`coeficiente_medio` del dominio;
+-- sin ninguna en la obra, 1) y declaradas en `venta_real_media_obra`. Menos lo
+-- facturado (`f`), con suelo 0 por OBRA. El IVA y la retencion del hueco, por
+-- el peso de cada contrato en `r` (sin contrato o sin dato, a la base sin el).
+-- ---------------------------------------------------------------------------
+CREATE TEMP TABLE _dev_hueco ON COMMIT DROP AS
+WITH media AS (
+    SELECT r.obra_id,
+           COALESCE(ROUND(SUM(r.real_origen * c.coeficiente_venta) FILTER (WHERE c.coeficiente_venta IS NOT NULL) / NULLIF(SUM(r.real_origen) FILTER (WHERE c.coeficiente_venta IS NOT NULL), 0), 6), 1) AS coeficiente_medio
+    FROM _dev_real r
+    JOIN _dev_contrato c ON c.obra_id = r.obra_id AND c.partida_id = r.partida_id
+    GROUP BY r.obra_id
+)
+, valorado AS (
+    SELECT r.obra_id,
+           r.real_origen * COALESCE(c.coeficiente_venta, me.coeficiente_medio) AS real_con_coef,
+           CASE WHEN c.coeficiente_venta IS NULL THEN r.real_origen * me.coeficiente_medio END AS real_media,
+           c.iva_porcentaje, c.fuente_iva, c.retencion_porcentaje, c.fuente_retencion
+    FROM _dev_real r
+    JOIN _dev_contrato c ON c.obra_id = r.obra_id AND c.partida_id = r.partida_id
+    JOIN media me ON me.obra_id = r.obra_id
+)
+, real_obra AS (
+    SELECT obra_id,
+           SUM(real_con_coef) AS real_con_coef_bruto,
+           ROUND(SUM(real_con_coef), 2) AS venta_real_origen_con_coeficientes,
+           ROUND(COALESCE(SUM(real_media), 0), 2) AS venta_real_media_obra,
+           SUM(real_con_coef * iva_porcentaje) FILTER (WHERE fuente_iva = 'CONTRATO') AS iva_ponderado,
+           SUM(real_con_coef) FILTER (WHERE fuente_iva = 'SIN') AS real_sin_iva,
+           SUM(real_con_coef * retencion_porcentaje) FILTER (WHERE fuente_retencion = 'CONTRATO') AS retencion_ponderado,
+           SUM(real_con_coef) FILTER (WHERE fuente_retencion = 'SIN') AS real_sin_retencion
+    FROM valorado
+    GROUP BY obra_id
+)
+, facturado AS (
+    SELECT ob.ide AS obra_id, SUM(fv.totbas) AS facturado_origen
+    FROM raw.dvf fv JOIN raw.obr ob ON ob.cenide = fv.cenide
+    WHERE ob.ide IN (SELECT obra_id FROM _dev_version WHERE concepto = 'VENTA')
+    GROUP BY ob.ide
+)
+, h AS (
+    SELECT v.obra_id,
+           COALESCE(ro.real_con_coef_bruto, 0) AS real_con_coef_bruto,
+           COALESCE(ro.venta_real_origen_con_coeficientes, 0) AS venta_real_origen_con_coeficientes,
+           COALESCE(ro.venta_real_media_obra, 0) AS venta_real_media_obra,
+           ROUND(COALESCE(fa.facturado_origen, 0), 2) AS facturado_origen,
+           COALESCE(ro.iva_ponderado, 0) AS iva_ponderado,
+           COALESCE(ro.real_sin_iva, 0) AS real_sin_iva,
+           COALESCE(ro.retencion_ponderado, 0) AS retencion_ponderado,
+           COALESCE(ro.real_sin_retencion, 0) AS real_sin_retencion
+    FROM _dev_version v
+    LEFT JOIN real_obra ro ON ro.obra_id = v.obra_id
+    LEFT JOIN facturado fa ON fa.obra_id = v.obra_id
+    WHERE v.concepto = 'VENTA'
+)
+, neto AS (
+    SELECT
+        h.*,
+        GREATEST(0, h.venta_real_origen_con_coeficientes - h.facturado_origen) AS venta_pendiente_facturar,
+        GREATEST(0, h.facturado_origen - h.venta_real_origen_con_coeficientes) AS facturado_por_delante
+    FROM h
+)
+-- El IVA y la retencion del hueco, por el peso de cada contrato en lo real con
+-- coeficientes de la obra; sin peso (lo real a 0), todo a la base sin el.
+SELECT
+    h.*,
+    COALESCE(ROUND(h.venta_pendiente_facturar * h.iva_ponderado / 100 / NULLIF(h.real_con_coef_bruto, 0), 2), 0) AS iva_pendiente_facturar_contrato,
+    COALESCE(ROUND(h.venta_pendiente_facturar * h.real_sin_iva / NULLIF(h.real_con_coef_bruto, 0), 2), h.venta_pendiente_facturar) AS base_pendiente_facturar_sin_iva_contrato,
+    COALESCE(ROUND(h.venta_pendiente_facturar * h.retencion_ponderado / 100 / NULLIF(h.real_con_coef_bruto, 0), 2), 0) AS retencion_pendiente_facturar_contrato,
+    COALESCE(ROUND(h.venta_pendiente_facturar * h.real_sin_retencion / NULLIF(h.real_con_coef_bruto, 0), 2), h.venta_pendiente_facturar) AS base_pendiente_facturar_sin_retencion_contrato
+FROM neto h;
+ANALYZE _dev_hueco;
 
 -- ---------------------------------------------------------------------------
 -- 6 · el corte por (obra, concepto) y la frontera con la cartera
@@ -345,7 +586,11 @@ INSERT INTO tesoreria.devengo_corte_obra (
     plan_intervalo, ejecutado_intervalo, plan_restante, pendiente,
     sobre_ejecutado, adelantado, retrasado, ejecutado_sin_plan,
     retraso_sin_perfil, real_origen_corte, plan_total, cartera_viva,
-    cartera_emitida_tras_cierre
+    cartera_emitida_tras_cierre, venta_real_origen_con_coeficientes,
+    venta_real_media_obra, facturado_origen, venta_pendiente_facturar,
+    facturado_por_delante, iva_pendiente_facturar_contrato,
+    base_pendiente_facturar_sin_iva_contrato, retencion_pendiente_facturar_contrato,
+    base_pendiente_facturar_sin_retencion_contrato
 )
 SELECT
     v.obra_id                                       AS obra_id,
@@ -372,7 +617,16 @@ SELECT
     COALESCE(ro.real_origen_corte, 0)               AS real_origen_corte,
     COALESCE(s.plan_total, 0)                       AS plan_total,
     COALESCE(c.cartera_viva, 0)                     AS cartera_viva,
-    COALESCE(c.cartera_emitida_tras_cierre, 0)      AS cartera_emitida_tras_cierre
+    COALESCE(c.cartera_emitida_tras_cierre, 0)      AS cartera_emitida_tras_cierre,
+    hu.venta_real_origen_con_coeficientes           AS venta_real_origen_con_coeficientes,
+    hu.venta_real_media_obra                        AS venta_real_media_obra,
+    hu.facturado_origen                             AS facturado_origen,
+    hu.venta_pendiente_facturar                     AS venta_pendiente_facturar,
+    hu.facturado_por_delante                        AS facturado_por_delante,
+    hu.iva_pendiente_facturar_contrato              AS iva_pendiente_facturar_contrato,
+    hu.base_pendiente_facturar_sin_iva_contrato     AS base_pendiente_facturar_sin_iva_contrato,
+    hu.retencion_pendiente_facturar_contrato        AS retencion_pendiente_facturar_contrato,
+    hu.base_pendiente_facturar_sin_retencion_contrato AS base_pendiente_facturar_sin_retencion_contrato
 FROM _dev_version v
 LEFT JOIN (
     SELECT
@@ -413,13 +667,14 @@ LEFT JOIN LATERAL (
     WHERE e.obra_id = v.obra_id
       AND e.sentido = CASE v.concepto WHEN 'COSTE' THEN 'PAGO' WHEN 'VENTA' THEN 'COBRO' END
       AND e.estado_tesoreria <> 'BAJA'
-) c ON TRUE;
+) c ON TRUE
+LEFT JOIN _dev_hueco hu ON hu.obra_id = v.obra_id AND v.concepto = 'VENTA';
 
 COMMENT ON TABLE tesoreria.devengo_pendiente_partida IS
-'F-140. Por (obra, partida, concepto) con plan en la ultima version master (V): plan desde el mes de V, plan del intervalo (mes de V a ultimo cierre), ejecutado real del intervalo, plan restante tras el cierre, pendiente = max(0, plan desde V - ejecutado) y sobre_ejecutado. Devengo SIN IVA: no es caja. Clave: obra_id, partida_id, concepto.';
+'F-140. Por (obra, partida, concepto) con plan en la ultima version master (V): plan desde el mes de V, plan del intervalo (mes de V a ultimo cierre), ejecutado real del intervalo, plan restante tras el cierre, pendiente = max(0, plan desde V - ejecutado) y sobre_ejecutado. F-150, solo en VENTA: el contrato con el cliente de la partida (de la misma obra), su coeficiente de venta (el del contrato y, si no, el del master de V: certificacion 9 o venta 11; nunca una media de obra) con su fuente y el del master aparte, pendiente_con_coeficientes, y el IVA y la retencion del contrato con su fuente (CONTRATO o SIN). Devengo SIN IVA: no es caja. Clave: obra_id, partida_id, concepto.';
 
 COMMENT ON TABLE tesoreria.devengo_pendiente_obra_mes IS
-'F-140. El pendiente de cada partida repartido en proporcion a su plan restante (al centimo, el resto al ultimo mes; sin perfil, al primer mes pendiente y en importe_retraso_sin_perfil), por (obra, mes, concepto, categoria), con el plan restante de V. Suma = la de devengo_pendiente_partida. Devengo SIN IVA: no es caja. Clave: obra_id, anio_mes, concepto, categoria.';
+'F-140. El pendiente de cada partida repartido en proporcion a su plan restante (al centimo, el resto al ultimo mes; sin perfil, al primer mes pendiente y en importe_retraso_sin_perfil), por (obra, mes, concepto, categoria), con el plan restante de V. Suma = la de devengo_pendiente_partida. F-150, solo en VENTA: el pendiente con coeficientes repartido igual (y su cociente, solo para leer), el IVA y la retencion del contrato de cada partida sobre esa parte (redondeados al final) y las bases sin ellos, sobre las que van H12 y H10. Lo que lleva coeficientes no se suma con el coste ni con la venta sin ellos. Devengo SIN IVA: no es caja. Clave: obra_id, anio_mes, concepto, categoria.';
 
 COMMENT ON TABLE tesoreria.devengo_corte_obra IS
-'F-140. Por (obra, concepto): la version V, su mes, el ultimo cierre, las sumas de devengo_pendiente_partida con lo adelantado, lo retrasado, lo ejecutado sin plan de V y lo pendiente sin perfil, el real a origen hasta el cierre, el plan total de V y la frontera con tesoreria.efectos del sentido del concepto (cartera viva y emitida tras el cierre, CON IVA). Clave: obra_id, concepto.';
+'F-140. Por (obra, concepto): la version V, su mes, el ultimo cierre, las sumas de devengo_pendiente_partida con lo adelantado, lo retrasado, lo ejecutado sin plan de V y lo pendiente sin perfil, el real a origen hasta el cierre, el plan total de V y la frontera con tesoreria.efectos del sentido del concepto (cartera viva y emitida tras el cierre, CON IVA). F-150, solo en VENTA: el hueco de facturacion de H26, NETO POR OBRA: la venta real a origen con coeficientes (la de partidas sin coeficiente, con la media de la obra, declarada aparte) menos lo facturado (raw.dvf), con suelo 0, lo facturado por delante (que no se cobra) y el IVA y la retencion del hueco por el peso de cada contrato. Clave: obra_id, concepto.';

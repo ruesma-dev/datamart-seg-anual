@@ -1621,3 +1621,44 @@ tables:
     # EL CATALOGO DE TIPOS DE ALARMA («Alarmas (Clasificaciones)»): 4 filas el
     # 2026-10-14 (F-138): 01 ALARMA FACT. POR INCIDENCIAS, 02 AVISO ABONOS,
     # 03 INFORMATIVA y 04 sin nombre. Entera: es un catalogo minimo.
+
+  # F-150 (N2). EL CATALOGO DE IMPUESTOS (`iva`): a donde apuntan `obrctr.ivaide`
+  # (el IVA de cada contrato con el cliente) y `obr.ivaide` (el de la ficha de la
+  # obra). Medido contra Sigrid el 2026-10-27 (T1): 1.562 filas, 30 columnas, sin
+  # `tiemod` y sin texto pesado: entera. `iva` es el tipo en TANTO POR UNO (0,
+  # 0,04, 0,07, 0,10, 0,16, 0,21; IGIC 0,02-0,13): `sql/tesoreria/` lo publica
+  # x 100. 0 es 0 (inversion del sujeto pasivo), no «sin dato».
+
+  - source_table: iva
+    target_table: iva
+    id_column: ide
+    incremental_column: null   # medido 2026-10-27: `iva` no tiene tiemod
+    where: null
+    exclude_columns: []
+
+  # F-150 (N6). LA CABECERA DE LAS FACTURAS DE VENTA (`dvf`, propiedades de `con`
+  # tipo 11): solo para el hueco de H26 (`tesoreria.devengo_corte_obra`: lo
+  # ejecutado y aun no facturado). Medido el 2026-10-27 (T1): 15.665 filas, 151
+  # columnas, SIN `tiemod`. Es la primera tabla con LISTA BLANCA
+  # (`include_columns`, R17): de 151 columnas solo hacen falta nueve; una lista
+  # negra de 142 no la mantiene nadie. Las lineas, las certificaciones y su
+  # casado por mes son de F-040. `cla` 1024 son las rectificativas (en negativo:
+  # sumar `totbas` ya las neta); no hay marca de anulada (`estfac` = 0 en todas).
+  # `obride` existe pero no se trae: el diseno enlaza la obra por `cenide`.
+
+  - source_table: dvf
+    target_table: dvf
+    id_column: ide
+    incremental_column: null   # medido 2026-10-27: `dvf` no tiene tiemod
+    where: null
+    exclude_columns: []        # lista blanca: no se declaran las dos (R17)
+    include_columns:
+      - ide
+      - cla
+      - entide
+      - cenide
+      - ctride
+      - fecdoc
+      - totbas
+      - totiva
+      - totdoc

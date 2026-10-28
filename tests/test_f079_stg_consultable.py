@@ -111,6 +111,11 @@ GRUPO_B_FUNCIONES = (
     "tesoreria.fn_plazo_dias",
     "tesoreria.fn_plazo_dias_retencion",
     "tesoreria.fn_plazo_reconocido",
+    # F-150 (2026-10-28): las dos que leen `coestr`; su resultado ya esta en
+    # `coeficiente_gg`..`retencion_coestr`, `coeficiente_contrato` y
+    # `coeficientes_reconocidos` de `condiciones_contrato_cliente`.
+    "tesoreria.fn_coeficientes",
+    "tesoreria.fn_coeficientes_reconocidos",
     # F-097 (2026-09-28): las tres funciones locales del build de
     # `descompuestos`: el troceado del texto y las dos conversiones.
     "descompuestos.fn_fecha",

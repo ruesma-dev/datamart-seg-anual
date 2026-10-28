@@ -2,7 +2,7 @@
 #
 # Fichas del esquema `raw`: la copia de Sigrid, tabla a tabla.
 #
-# **A NIVEL DE OBJETO, NO DE COLUMNA** (DA-2 de la spec). Son 78 tablas con
+# **A NIVEL DE OBJETO, NO DE COLUMNA** (DA-2 de la spec). Son 80 tablas con
 # cientos de campos de cuatro letras cuyo diccionario completo —tipos, indices y
 # referencias— vive en `azure-apps/sigrid_tablas.md`. Cada ficha remite alli con
 # el `grep` de su bloque. Lo que SI se documenta aqui es lo que ese documento no
@@ -2344,6 +2344,44 @@ objetos:
 
       **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
     grano: Una fila por tipo de alarma, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  iva:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Catalogo de 1.562 filas: traduce el codigo de impuesto. El tipo de IVA de cada contrato con el cliente, ya en tanto por cien, esta en `tesoreria.condiciones_contrato_cliente.iva_porcentaje`, y el de cada partida de venta en `tesoreria.devengo_pendiente_partida`.
+    descripcion: >-
+      **Tipos de impuesto** (1.562 filas, 30 columnas; F-150), a donde apuntan `obrctr.ivaide` (el IVA de cada contrato con el cliente) y `obr.ivaide` (el de la ficha de la obra). La columna `iva` es el tipo en TANTO POR UNO (0, 0,04, 0,07, 0,10, 0,16, 0,21; las filas IGIC, de 0,02 a 0,13): aguas abajo se publica x 100. Un 0 es un tipo (inversion del sujeto pasivo), no la falta de dato.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `iva`, y se localiza con `grep -n "^| iva " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full`, asi que cada noche la tabla se **recarga entera** desde Sigrid. No tiene columna de ultima modificacion.
+    grano: Una fila por tipo de impuesto, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  dvf:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Solo la cabecera de las facturas de venta, para un calculo: lo facturado a origen de cada obra, ya sumado en `tesoreria.devengo_corte_obra.facturado_origen`. Las lineas, las certificaciones y su casado por mes no estan (F-040).
+    descripcion: >-
+      **Facturas de venta, solo la CABECERA** (15.665 filas el 2026-10-27; F-150): una fila por factura emitida al cliente (`con` tipo 11). Se usa para el hueco de facturacion de H26: lo ejecutado a origen con coeficientes menos lo facturado (`totbas`), neto por obra, en `tesoreria.devengo_corte_obra`. La obra sale por el centro de coste (`cenide` = `obr.cenide`). `cla` 1024 son las RECTIFICATIVAS, en negativo: sumar `totbas` ya las neta. Sigrid no marca las anuladas.
+
+      **Solo se traen 9** de sus 151 columnas, por lista blanca (`include_columns`): `ide`, `cla`, `entide` (el cliente), `cenide`, `ctride` (el contrato con el cliente, en 4.665 facturas), `fecdoc`, `totbas` (base), `totiva` (cuota) y `totdoc` (total sin retencion). Preguntar por otra aqui no devuelve nulo, devuelve "columna inexistente".
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `dvf`, y se localiza con `grep -n "^| dvf " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full`, asi que cada noche la tabla se **recarga entera** desde Sigrid. No tiene columna de ultima modificacion.
+    grano: Una factura de venta por fila, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
     refresco: nocturno

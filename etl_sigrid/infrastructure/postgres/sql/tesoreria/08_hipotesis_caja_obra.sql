@@ -5,7 +5,7 @@
 --
 -- GRANO: una fila por (obra, codigo) para las obras con devengo pendiente
 -- (`tesoreria.devengo_corte_obra`) y las que tienen algun valor MANUAL, y TODOS
--- los codigos del catalogo (las 23): `R-CAJA-HIPOTESIS` manda declararlas todas
+-- los codigos del catalogo (las 27 desde F-150): `R-CAJA-HIPOTESIS` manda declararlas todas
 -- desde esta tabla (P1-a del review de F-140). La que no admite valor por obra
 -- (`admite_obra` falso, hoy H17) sale siempre con su valor por DEFECTO: ni el
 -- YAML ni Sigrid le dan valor de obra (los dos LEFT JOIN lo exigen).
@@ -18,9 +18,15 @@
 --      valor y es el MISMO (nivel OBRA). H09, el plazo de una formula de UN
 --      solo vencimiento reconocida (varios vencimientos no son un plazo); H10,
 --      la retencion; H11, el plazo de retencion o, si no, el de garantia.
+--      F-150 (N2): H12, el tipo de IVA de la FICHA de la obra (`raw.obr.ivaide`
+--      -> `raw.iva`, x 100), una fila por obra (no hay contratos que casar).
+--      Ese IVA solo cubre las bases `sin_iva_contrato` del devengo: el del
+--      contrato ya va en `devengo_pendiente_obra_mes.importe_iva_contrato`.
 --   3. DEFECTO: el del catalogo (nivel DEFECTO).
 --
--- NO SE APLICA: este fichero no multiplica ni suma nada (R6, test). Que hacer
+-- NO SE APLICA: este fichero no multiplica ni suma nada (R6, test), salvo
+-- pasar el IVA de la ficha de fraccion (0.21) a porcentaje (21), que es la
+-- unidad del catalogo y no aplica ninguna hipotesis. Que hacer
 -- con el valor es cosa de quien consulta, y `R-CAJA-HIPOTESIS` le obliga a
 -- declararlo.
 --
@@ -29,7 +35,7 @@
 --
 -- Lee de: tesoreria.hipotesis_caja, tesoreria.hipotesis_caja_manual,
 --         tesoreria.condiciones_contrato_cliente, tesoreria.devengo_corte_obra,
---         maestro.v_obra_fichas.
+--         maestro.v_obra_fichas, raw.obr y raw.iva (H12, F-150).
 -- Escribe en: tesoreria.hipotesis_caja_obra.
 -- ============================================================================
 
@@ -107,7 +113,13 @@ LEFT JOIN (
         ) x
     ) c
     GROUP BY c.obra_id
+    UNION ALL
+    -- F-150 (N2): H12 desde la ficha de la obra; una obra, un tipo de IVA.
+    SELECT ob.ide AS obra_id, 'H12'::VARCHAR(3) AS codigo,
+           to_jsonb(ROUND((i.iva * 100)::NUMERIC, 4)) AS valor,
+           'Ficha de la obra (tipo de IVA)' AS motivo
+    FROM raw.obr ob JOIN raw.iva i ON i.ide = NULLIF(ob.ivaide, 0)
 ) s ON s.obra_id = o.obra_id AND s.codigo = h.codigo AND h.admite_obra;
 
 COMMENT ON TABLE tesoreria.hipotesis_caja_obra IS
-'F-140. El valor de las 23 hipotesis de caja (catalogo tesoreria.hipotesis_caja; la que no admite valor por obra, siempre DEFECTO) en cada obra con devengo pendiente o con valor manual: MANUAL (seccion obras del YAML), si no SIGRID (H09-H11, solo si todos los contratos con el cliente de la obra dan el mismo valor), si no DEFECTO. nivel OBRA o DEFECTO. Nada se aplica: es el valor que quien consulta debe declarar (R-CAJA-HIPOTESIS). Clave: obra_id, codigo.';
+'F-140, F-150. El valor de las 27 hipotesis de caja (catalogo tesoreria.hipotesis_caja; la que no admite valor por obra, siempre DEFECTO) en cada obra con devengo pendiente o con valor manual: MANUAL (seccion obras del YAML), si no SIGRID (H09-H11, solo si todos los contratos con el cliente de la obra dan el mismo valor; H12, el tipo de IVA de la ficha de la obra, que solo cubre las bases sin IVA del contrato), si no DEFECTO. nivel OBRA o DEFECTO. Nada se aplica: es el valor que quien consulta debe declarar (R-CAJA-HIPOTESIS). Clave: obra_id, codigo.';

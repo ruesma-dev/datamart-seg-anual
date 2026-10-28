@@ -9,6 +9,163 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-28 · F-150 · `in_progress` · T1-T14 y T16 hechas, pendiente el review · rama `feature/F-150-receta-caja`
+
+- Commits `5a3b1d2`..`425b5e2` (más el informe); `azure-apps` commit local `044beef` (sin push).
+- T11 paró por R29 (hueco 15,60 frente a 15,26-15,55) y el humano aprobó la opción (b): R29
+  relativo a los datos del día (suelo a factor 1; techo + 0,26 × la venta sin coeficiente). Con la
+  nocturna del 28-10, 15,50-15,75: pasa. Cambiado en `requirements.md`, `tasks.md` y `acceptance`.
+- T12: la receta en la ficha de `tesoreria.hipotesis_caja`, diccionario v63, presupuesto F-147
+  30.864. Mutación: 19 muertos y 1 superviviente, cerrado con test.
+- Review 1: RECHAZADO solo por C4 (T15 sin comandos); corregido abajo. Siguiente: review 2; luego
+  T15 (MANUAL, humano), en el orden de la subsección siguiente. Detalle: `progress/impl_F-150.md`.
+- Diccionario del árbol hoy: **252 objetos, 2178 columnas, 122 de consumo**, 22 reglas (v63).
+
+### F-150 · Despliegue MANUAL, T15 (tras APROBADO y merge a `main`; lo autoriza el humano)
+
+Lo hace el humano, en este orden. Lectura con `.venv/Scripts/python.exe` desde el puesto (la IP
+del puesto tiene que estar en el firewall del Postgres). Ninguno de estos pasos es de un agente.
+
+0. Tag que corre HOY el job: `r20261026-2111` (F-140; comprobado con `az` el 28-10). Vuelta atrás:
+   `powershell -NoProfile -File infra/85_update_job.ps1 -Tag r20261026-2111`. El DDL de F-150 es
+   aditivo (`ADD COLUMN IF NOT EXISTS`, dos funciones, `unidad` a `VARCHAR(20)`): la imagen vieja
+   lo ignora, no hace falta deshacerlo (el YAML de hipótesis va dentro de cada imagen: la vieja
+   carga sus 23 y deja `paso_receta` a NULL).
+1. **Imagen**: `powershell -NoProfile -File infra/70_build_image.ps1` (anotar el tag nuevo).
+2. `powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag nuevo>` y comprobar que el job
+   ya apunta a ella: `az containerapp job show -n caj-datamart-seg-dev -g rg-datamart-seg-dev
+   --query "properties.template.containers[0].image" -o tsv` → acaba en `:<tag nuevo>`.
+3. **Ingesta** de las dos tablas nuevas, una a una, ANTES de cualquier `build-tesoreria` (sin
+   ellas `06` y `07` fallan: `raw.iva` y `raw.dvf` no existen):
+   `.venv/Scripts/python.exe main.py ingest --table iva --full` (esperado ~1.562 filas) y
+   `.venv/Scripts/python.exe main.py ingest --table dvf --full` (esperado ~15.665 filas, 9
+   columnas).
+4. **Build**: `.venv/Scripts/python.exe main.py build-tesoreria`, anotando la duración total y la
+   de `devengo_pendiente` (F-140: 239,7 s y 118,9 s; F-150 añade `_dev_coef`, `_dev_contrato` y
+   `_dev_hueco`). SUCCESS en todos los sub-pasos. Si salta la guarda de D6 («partidas de venta
+   con pendiente y sin coeficiente»), PARA: hoy son 0. Duraciones: `SELECT step, status,
+   finished_at - started_at FROM _meta.etl_runs WHERE step LIKE 'build_tesoreria%' ORDER BY
+   started_at DESC LIMIT 15`.
+5. **R30**, solo lectura (`psql -X -A -c "<consulta>" $dsn`, `$dsn = "host=<host> dbname=sigrid_dm
+   user=<usuario> sslmode=require"`; cifras del 28-10, ± la variación diaria):
+   - `SELECT count(*), round(sum(pendiente)/1e6,2), round(sum(pendiente_con_coeficientes)/1e6,2)
+     FROM tesoreria.devengo_pendiente_partida WHERE concepto = 'VENTA'` → ~19.005, ~132,1, ~142,9.
+   - `SELECT fuente_coeficiente, count(*), round(sum(pendiente)/1e6,2) FROM
+     tesoreria.devengo_pendiente_partida WHERE concepto = 'VENTA' GROUP BY 1 ORDER BY 1` →
+     CONTRATO ~54,4, MASTER_CERT ~76,9, MASTER_VENTA ~0,8, SIN con pendiente 0.
+   - `SELECT clave_obra, round(100 * sum(pendiente_con_coeficientes) FILTER (WHERE fuente_iva =
+     'CONTRATO') / NULLIF(sum(pendiente_con_coeficientes), 0), 1), round(100 *
+     sum(pendiente_con_coeficientes) FILTER (WHERE fuente_retencion = 'CONTRATO') /
+     NULLIF(sum(pendiente_con_coeficientes), 0), 1) FROM tesoreria.devengo_pendiente_partida WHERE
+     concepto = 'VENTA' GROUP BY 1 ORDER BY 1` → ≥ 96 % en 19 obras; 0608 y 0715, 0.
+   - `SELECT round(sum(venta_pendiente_facturar)/1e6,2), round(sum(facturado_por_delante)/1e6,2),
+     round(sum(venta_real_origen_con_coeficientes - facturado_origen)/1e6,2),
+     round(sum(venta_real_media_obra)/1e6,2) FROM tesoreria.devengo_corte_obra WHERE concepto =
+     'VENTA'` → ~15,69, ~0,09, neto ~15,60 (dentro del rango del día de R29), ~1,07.
+   - `SELECT round(sum(importe_pendiente_con_coeficientes)/1e6,2) FROM
+     tesoreria.devengo_pendiente_obra_mes WHERE concepto = 'VENTA'` → igual que la suma de
+     `pendiente_con_coeficientes` de arriba (la guarda del build ya lo exige).
+   - `SELECT count(*), count(DISTINCT obra_id), count(DISTINCT codigo), count(*) FILTER (WHERE
+     codigo = 'H12' AND fuente = 'SIGRID') FROM tesoreria.hipotesis_caja_obra` → 567, 21, 27, ~17.
+   - `SELECT paso_receta, count(*) FROM tesoreria.hipotesis_caja GROUP BY 1 ORDER BY 1` → 27 en
+     seis pasos (COEFICIENTES no tiene ninguna).
+6. **Diccionario, SOLO con la imagen ya en el job** (paso 2 comprobado; si no, la nocturna
+   republica la v62): `.venv/Scripts/python.exe main.py publicar-diccionario` (v63, 252 objetos).
+7. `.venv/Scripts/python.exe main.py check-diccionario` → OK;
+   `.venv/Scripts/python.exe main.py check-declarados` → sin faltantes;
+   `.venv/Scripts/python.exe main.py check-unicidad --timeout 300` → sin claves duplicadas.
+8. Reiniciar el MCP (cachea el diccionario): `az containerapp show -g rg-mcp-bbdd-dev -n
+   ca-mcp-bbdd-dev --query properties.latestReadyRevisionName -o tsv` y
+   `az containerapp revision restart -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --revision <revision>
+   -o none`. `contexto_bbdd()` abre con «Versión 63».
+9. **R31**, conversación NUEVA con el MCP (sin contexto previo): «¿qué caja necesitará la obra
+   0713 los próximos seis meses?» (coeficiente 1,19) y lo mismo con la 0696 (mixta: casetas y
+   vivienda) → sigue los siete pasos de la receta en orden, cobra con `importe_pendiente_con_
+   coeficientes`, el IVA y la retención del contrato (H12/H10 solo sobre las bases sin ellos),
+   suma el hueco de H26, aparta los albaranes de más de H27 meses declarando su importe, da los
+   avisos (revisión de precios F-040; H13/H14 pendientes de AdP) y declara las 27 hipótesis con
+   valor y nivel sin pedirlo. Anotar el resultado en `progress/impl_F-150.md` §6.
+
+## 2026-10-27 (noche) · F-150 · `blocked` · PARADA de T11 (R29) · rama `feature/F-150-receta-caja`
+
+- El humano confirmó N1-N8 (PARADA 1). El implementer adelantó la verificación de SOLO LECTURA
+  de T11 antes de escribir código y PARÓ: (1) el hueco neto de H26 sale **14,30 M EUR (−9,5 %**
+  frente a 15,8; R29 para si > 5 %); con lo real sin coeficiente a 1, 15,26 (−3,4 %);
+  (2) la gramática de `coestr` de R7 no casa con el dato: una LÍNEA por concepto (`\r\n`), cinco
+  campos `CODIGO|etiqueta|valor||base`; con R7, 1.071 partidas (6,85 M EUR) de las 21 obras
+  quedan sin reconocer, y en otros contratos hay retenciones `RET*` y la baja `COEF_DESADJ` (en
+  cascada sobre el subtotal de contrata) dentro de `coestr`.
+- Casa con §8: 0 partidas con contrato de otra obra; coeficiente contrato ≠ master > 0,005 con
+  pendiente: 5 (≤ 6); IVA y retención del contrato ≥ 96 % en 19 obras; albaranes 56,88 M EUR
+  (>6 meses 22,88). Merge de `main` hecho (conflictos de `features.json` con ambos lados;
+  `BACKLOG.md` regenerado). Sin código escrito.
+- **Para decidir (humano)**: la gramática de `coestr` (`RET*`, `COEF_DESADJ`, vacío = factor 1 o
+  sin dato) y qué hace el hueco con lo real sin coeficiente. Detalle: `progress/impl_F-150.md`.
+
+## 2026-10-28 · F-150 · spec ajustada tras la PARADA de T11 (`spec_ready`)
+
+- El humano aprobó (27-10) las dos propuestas: N9 hueco de H26 NETO POR OBRA con la venta sin
+  coeficiente a la media ponderada de su obra (`MEDIA_OBRA`) y R29 recalculado (15,26-15,55 M EUR);
+  N10 gramática real de `coestr` (por líneas y por código, `RET*` aparte, `COEF_DESADJ` en
+  cascada). R7, R8, R22, R23, R29, R30, `design.md` §4/§5.1/§5.2/§5.5/§9 y T1, T5, T9, T11 al día.
+  Detalle: `progress/spec_F-150.md` §9. Siguiente: el implementer retoma desde T1.
+
+## 2026-10-27 (tarde) · F-150 · SPEC REHECHA (`spec_ready`, PARADA 1 pendiente) · rama `feature/F-150-receta-caja`
+
+- Tras el correo de Juan Romero (27-10) y lo medido por el líder en solo lectura, la spec cambia
+  de fuente: coeficiente, IVA y retención salen del CONTRATO de cada partida
+  (`raw.obrparpar.ctride` -> `raw.obrctr`). Decisiones NUEVAS N1-N7 en `design.md` §9, que
+  sustituyen a D2, D8 y D9; D1, D3-D7 y D10 siguen cerradas. Detalle y mapa de requisitos viejos -> nuevos: `progress/spec_F-150.md` §8.
+- **Para validar el humano (PARADA 1)**: N1 (contrato > master 9 > master 11), N2 (IVA del
+  contrato; H12 = MANUAL > ficha de la obra > 21 % solo para la base sin él; ingerir el catálogo
+  `iva`; el MANUAL NO pisa el contrato), N3 (retención del contrato; H10 de F-140 para el resto;
+  fuera la regla del peso), N4 (obra-mes con IVA y retención ya sumados más la base sin dato),
+  N5 (avisos: revisión de precios a F-040; H13/H14 con AdP), N6 (hueco de H26 por contrato y
+  no solo por obra; `include_columns` en vez de `dvf` entera), N7 (H13 por contrato, aplazada) y
+  N8 (H20 a fin del mes del albarán; H27 nueva, 6 meses, aparta y declara lo antiguo: 27
+  hipótesis; la cifra buena de H20 es 56,9 M EUR, no los 8,23 de F-140).
+- **Añadido el mismo día por orden del humano** (vía líder): H26 venta ejecutada pendiente de
+  facturar (N6: hueco por contrato en `devengo_corte_obra`, cabecera de `dvf` con un
+  `include_columns` nuevo en la ingesta), H24/H25 = fraccionamiento, H14 `MENSUAL`, H21 como
+  riesgo (remite a F-040) y N7 (H13 por contrato de compra) recomendada pero aplazada: el devengo
+  de coste no va por contrato de compra. requirements 146/150, design 250/250, tasks T1-T16.
+- **Sale del alcance**: el contraste de H12 con lo cobrado, la excepción de
+  `R-VENTA-COEFICIENTES`, `importe_adjudicado` y la lista MANUAL de obras de vivienda (ya no hace
+  falta: el IVA del contrato es fiable). **Para el líder**: anotar en F-099 que F-150 le adelanta
+  el desglose de coeficientes por contrato y el enlace partida -> contrato.
+
+### Antes (spec cerrada con D1-D10, 27-10 mañana; sustituida)
+
+- El humano cerró D1-D10 en la opción A (`design.md` §9). D9 (H10 por peso del adjudicado) y D8
+  (contraste de H12 en el paso 6 de la receta, `contraste_iva_venta`, excepción acotada en
+  `R-VENTA-COEFICIENTES`, 10 % de vivienda por obra MANUAL de Control de Costes, T16) entran.
+  requirements 149/150, design 247/250, tasks T1-T16. Detalle: `progress/spec_F-150.md` §7.
+- **Para el humano**: el contraste de H12 NO está medido (la lectura fue denegada en la sesión
+  del spec-author): T11 lo mide antes de T9 y R32 manda PARAR si no discrimina. La excepción en
+  `R-VENTA-COEFICIENTES` es consecuencia de cruzar cobro con venta producida; alternativa sin
+  tocar la regla: IVA repercutido frente a ventas en `contabilidad.mayor` (sin medir).
+- **Pendiente MANUAL**: la lista de obras de vivienda (H12 = 10) de Control de Costes.
+
+### Antes (spec escrita, 27-10)
+
+- Spec en `specs/F-150-receta-caja/` (requirements 122/150, design 246/250, tasks T1-T15).
+  Mediciones de solo lectura en `progress/spec_F-150.md`. La rama nació de `main` `6681de8` y
+  se re-apuntó a `d3b412a` (los dos commits de `progress/` de R19/R25) antes de tener commits.
+- Lo medido: en las 18.997 partidas VENTA pendientes, el coeficiente del 9 y del 11 en la misma
+  versión V coinciden salvo en 238 partidas que pesan 0,02 M EUR; el 9 no tiene 93 (0,79 M EUR);
+  el pendiente pasa de 132,37 a 143,20 M EUR con coeficientes (+8,2 %); 5 de las 21 obras
+  mezclan partidas a 1,000 y a 1,19-1,26. El 9 no está en `stg.plan_mensual` ni tipado.
+  Sigrid casi no usa formas con varios vencimientos (6 contratos de compra, 0 de cliente).
+- Decisiones que estaban abiertas (ya cerradas, arriba):
+  D1 la receta en la ficha choca con `CONVENTIONS.md` («un procedimiento de negocio no entra en
+  el diccionario»): se propone una excepción acotada; D2 el 9 da solo el coeficiente (11 de
+  respaldo), el importe a certificar sería F-040; D3 el 9 en la misma versión V; D4 el agregado
+  obra-mes lleva el importe con coeficientes y el cociente; D5 unidad `PERFIL_MESES`: H03/H08 a
+  perfil y nuevas H24/H25 (25 hipótesis); D6 fallar si una partida de venta pendiente no tiene
+  coeficiente; D7 resumen nuevo de `R-CAJA-HIPOTESIS` (223 caracteres, F-147 baja 9).
+  De R25 de F-140: D8 H12 (vivienda al 10 %) fuera, por YAML; **D9 H10 por peso de los contratos
+  con retención: AMPLÍA el alcance** (3 obras, pesan 99,5-100 %); D10 H15 se queda.
+
 ## 2026-10-26 · F-140 · CERRADA (`done`, APROBADO pasada 2, `5bd69c8`) · merge `9b91165` · DESPLEGADA
 
 - Orden del humano (26-10). Imagen `r20261026-2111` desde un worktree limpio de `main`; el job
