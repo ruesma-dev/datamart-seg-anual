@@ -2395,7 +2395,7 @@
         "Albaranes sin facturar (N8): H20 fecha la factura a fin del mes del albarán, H27 (6 meses) aparta y declara lo más antiguo, y la `fuente_defecto` de H20 lleva la cifra buena (56,9 M EUR en las 21 obras)",
         "`bash harness/init.sh` en verde y APROBADO del reviewer; despliegue MANUAL en `progress/current.md`"
       ],
-      "status": "spec_ready",
+      "status": "in_progress",
       "sdd": true,
       "rigor": "estandar",
       "priority": 1,
