@@ -134,8 +134,8 @@ versión V); **perfil**, pares `[meses, porcentaje]` que reparten un importe ent
 - R29. ANTES de la receta (T12), en solo lectura en las 21 obras y con el dominio de T5: líneas de
   `coestr` no reconocidas (0 esperadas), contrato de otra obra (0), partidas con pendiente > 0 cuyo
   coeficiente del contrato difiere del master 11 en > 0,005 (≤ 6; medidas 5) y Σ (real × coef −
-  facturado) de las 21 obras entre 15,26 (todo a factor 1, medido) y 15,55 M EUR (la media de obra
-  solo sube 0,96 M EUR de real a ≤ 1,26); SI no, ENTONCES PARA.
+  facturado) con `MEDIA_OBRA` dentro del rango DEL DÍA (humano, 28-10): suelo = ese Σ con la venta
+  real sin coeficiente a factor 1; techo = suelo + 0,26 × esa venta (28-10: 15,50-15,75); SI no, PARA.
 - R30. Contraste MANUAL tras el build frente a `progress/impl_F-150.md` §2 y el valor de R29:
   18.997 partidas VENTA, pendiente ~132,4 y con coeficientes ~143,3 M EUR, cada coeficiente con su
   fuente (`CONTRATO`, `MASTER_CERT`, `MASTER_VENTA`; `MEDIA_OBRA` en el hueco), IVA y retención del
