@@ -9,22 +9,17 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-28 · F-150 · `blocked` · PARADA de T11 (R29) · rama `feature/F-150-receta-caja`
+## 2026-10-28 · F-150 · `in_progress` · T1-T14 y T16 hechas, pendiente el review · rama `feature/F-150-receta-caja`
 
-- Hechas y commiteadas T1-T10, T13 y T14 (`5a3b1d2`..`db6553a`); `azure-apps` commit local
-  `044beef` (sin push). `bash harness/init.sh` en VERDE sobre `db6553a` (9.638 passed, cobertura
-  100 % de 143 líneas). Mutación: 19 muertos y 1 superviviente, cerrado con un test.
-- La línea base de la campaña destapó cuatro huecos reales, ya arreglados (`e85a3d8`):
-  `coeficientes_texto` con `NULLIF`, `dvf` en `R-SIGRID-CON`, el inventario de `test_f079` y
-  los recuentos de abajo.
-- **PARADA T11 (R29)**: en solo lectura todo casa (0 `coestr` sin reconocer, 0 contratos de otra
-  obra, 5 partidas contrato ≠ master, IVA/retención ≥ 96 % en 19 obras, albaranes 56,83/22,91)
-  salvo el hueco de H26: **15,60 M EUR frente a 15,26-15,55**. Con la nocturna del 28-10 el suelo a
-  factor 1 es 15,50 (era 15,26): el dato se movió, no el método. **Decide el humano**: aceptar
-  15,60 o reformular R29 relativo a su suelo del día. Detalle: `progress/impl_F-150.md` §4.
-- Al retomar: T12 (diccionario v63), T16 (`init.sh` con T12 dentro), review; T15 es MANUAL.
-- Diccionario del árbol hoy: **252 objetos, 2178 columnas, 122 de consumo**, 22 reglas (v62 aún;
-  T12 la sube a v63).
+- Commits `5a3b1d2`..`425b5e2` (más el informe); `azure-apps` commit local `044beef` (sin push).
+- T11 paró por R29 (hueco 15,60 frente a 15,26-15,55) y el humano aprobó la opción (b): R29
+  relativo a los datos del día (suelo a factor 1; techo + 0,26 × la venta sin coeficiente). Con la
+  nocturna del 28-10, 15,50-15,75: pasa. Cambiado en `requirements.md`, `tasks.md` y `acceptance`.
+- T12: la receta en la ficha de `tesoreria.hipotesis_caja`, diccionario v63, presupuesto F-147
+  30.864. Mutación: 19 muertos y 1 superviviente, cerrado con test.
+- Siguiente: el reviewer; luego T15 (MANUAL, humano: imagen, `ingest` de `iva` y `dvf`, build,
+  `publicar-diccionario` v63, reiniciar `mcp-bbdd`, R30 y R31). Detalle: `progress/impl_F-150.md`.
+- Diccionario del árbol hoy: **252 objetos, 2178 columnas, 122 de consumo**, 22 reglas (v63).
 
 ## 2026-10-27 (noche) · F-150 · `blocked` · PARADA de T11 (R29) · rama `feature/F-150-receta-caja`
 

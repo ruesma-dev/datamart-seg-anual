@@ -1,11 +1,10 @@
 <!-- progress/impl_F-150.md -->
 # F-150 · Informe del implementer · la receta de la caja (fase 1)
 
-Fecha: 2026-10-28. Rama `feature/F-150-receta-caja`. **Estado: PARADA en T11 (R29)**: el
-contraste de solo lectura casa en todo menos en una cifra, Σ (real × coef − facturado) = **15,60 M
-EUR**, 0,05 por encima del techo de R29 (15,55); R29 dice «SI no, ENTONCES PARA» (§4). Hechas
-T1-T10, T13 y T14; `bash harness/init.sh` en VERDE. Sin hacer: T12 (va tras T11 en verde), T15
-(MANUAL) y T16 con T12 dentro.
+Fecha: 2026-10-28. Rama `feature/F-150-receta-caja`. **Estado: T1-T14 y T16 hechas**; T15 es
+MANUAL (humano). T11 paró por R29 (el hueco de H26, 15,60 M EUR, fuera de 15,26-15,55) y el
+humano aprobó la opción (b): R29 relativo a los datos del día (§4). `bash harness/init.sh` en
+verde con todo dentro (Evidencias).
 
 El informe de la PARADA del 2026-10-27 (las mediciones que la spec cita como «`impl_F-150.md`
 §1-§3»: formas reales de `coestr`, lo que casaba con §8, lo medido en Sigrid para T1) se ha
@@ -46,7 +45,10 @@ nuevos: `tests/test_f150_{ingesta,perfil,receta,contrato,coeficiente,hueco,sql,d
   del IVA de la ficha (`ROUND((i.iva * 100)::NUMERIC, 4)`, que pide §5.6): no aplica ninguna
   hipótesis. `test_f140_sql` r13: `07` lee también `stg.presupuesto` (R10).
 - **D-4** T13 se hizo antes que T12: T12 va «tras T11 en verde» y T11 estuvo bloqueada (Azure)
-  y ahora en PARADA; T13 no depende de cifras de T11. Si T11 obliga a cambiar algo, se revisan los textos de T13.
+  y luego en PARADA; T13 no depende de cifras de T11.
+- **D-6** T12: la pregunta nueva va primera en `hipotesis_caja` y la del plazo de cobro pasa a
+  tercera (F-147: se reordena, no se borra); `test_f140` r22 pasa de `== 2` a `>= 2`. Presupuesto
+  F-147: **30.864**. El guardián de cifras de F-006 (`_cifras`) ignora los códigos `H22`. Si T11 obliga a cambiar algo, se revisan los textos de T13.
 - **D-5** La línea base de la campaña de mutación salió ROJA y destapó cuatro fallos reales que
   las suites parciales no veían (arreglados en `e85a3d8`): `coeficientes_texto` declaraba
   `nulo_significa` pero `raw` trae cadena vacía (ahora `NULLIF(o.coestr, '')`; el guardián de
@@ -91,18 +93,15 @@ de Sigrid con `truncated` = False, y el dominio de T5. Scripts (scratchpad): `t1
 | `venta_pendiente_facturar` (suelo 0 por obra) / facturado por delante | 15,69 / 0,09 (solo 0711) | — | — |
 | Albaranes sin facturar / de más de 6 meses | 56,83 / 22,91 M EUR | 56,9 / 22,9 | sí |
 
-Por obra (M EUR, real × coef | parte a media | facturado | hueco): 0676-B 22,86 | 0,53 | 18,01 |
-4,85 · 0678 8,47 | 0,12 | 7,04 | 1,43 · 0686 33,56 | 0,27 | 32,25 | 1,30 · 0693 9,20 | 0,02 |
-8,74 | 0,46 · 0694 2,40 | 0 | 1,89 | 0,51 · 0696 29,00 | 0,02 | 25,88 | 3,13 · 0697 0,98 | 0,02 |
-0,65 | 0,34 · 0702 4,94 | 0 | 3,45 | 1,49 · 0707 3,44 | 0,04 | 3,15 | 0,29 · 0710 4,32 | 0 | 3,53 |
-0,79 · 0711 0,87 | 0,01 | 0,95 | 0 (0,09 por delante) · 0713 4,57 | 0 | 3,74 | 0,83 · resto ≤ 0,13.
+Por obra (M EUR, hueco): 0676-B 4,85 · 0696 3,13 · 0702 1,49 · 0678 1,43 · 0686 1,30 · 0713 0,83
+· 0710 0,79 · 0694 0,51 · 0693 0,46 · 0697 0,34 · 0707 0,29 · resto ≤ 0,13; 0711, 0,09 por delante.
 
-**Lectura del implementer (decide el humano)**: el método no se aparta; se ha movido el DATO.
-Con la misma regla que fijó el rango (suelo = todo a factor 1, techo = suelo + 0,26 × real sin
-coeficiente), hoy el rango sería **15,50-15,75** y 15,60 cae dentro. Del 27-10 al 28-10 el suelo
-sube 0,24 M EUR (0702 +0,20 de real, 0696 +0,14, 0697 +0,15 facturado...). Opciones: (a) aceptar
-15,60 como R29 con la nocturna del 28-10 y seguir con T12 y T16; (b) reformular R29 relativo a su
-suelo del día (no a cifras fijas), que no caduca cada noche. Recomiendo (b), que incluye (a).
+**DECISIÓN DEL HUMANO (2026-10-28, opción b)**: el método no se apartaba, se movió el dato (del
+27-10 al 28-10 el suelo a factor 1 sube 0,24 M EUR). R29 deja las cifras fijas y pasa a ser
+relativo al día con la misma regla: suelo = el hueco con la venta real sin coeficiente a factor 1;
+techo = suelo + 0,26 × esa venta. Con la nocturna del 28-10, **15,50-15,75 y el hueco 15,60:
+pasa**. Cambiado en `requirements.md` (R29), `tasks.md` (T11) y la `acceptance` de
+`features.json` (commit `0be8eab`).
 
 ## 5. Fase RED (comando exacto y salida real del fallo)
 
@@ -172,7 +171,15 @@ FAILED tests/test_f150_sql.py::test_f150_r21_el_comment_dice_27_y_h12 - asser...
 3 failed, 1 passed, 84 deselected in 0.39s
 ```
 
-Tras cada código, las mismas órdenes en verde (salida en los commits de cada tarea). R2 (la receta en la ficha) es de T12: aún no escrita, sin traza RED.
+**R2-R5, R15, R32 (T12, diccionario) · `python -m pytest tests/test_f150_diccionario.py -q -p no:cacheprovider`**
+```
+E       AssertionError: assert 'LA RECETA: DE DEVENGO A CAJA, EN ESTE ORDEN' in '**No disponible para el perfil restringido** ...
+E       AssertionError: assert {'tesoreria.d...ente_partida'} <= {'cierre.fact....presupuesto'}
+E       AssertionError: assert 'las 27 hipotesis (H01-H27)' in '**No disponible para el perfil restringido** ...
+7 failed, 3 passed in 1.05s   (r2, r3 x2, r4, r5, r15, r32; los 3 de docs de T13 ya pasaban)
+```
+
+Tras cada código, las mismas órdenes en verde (salida en los commits de cada tarea).
 
 ## 6. Verificaciones MANUAL pendientes (T15, del humano)
 
@@ -187,9 +194,7 @@ Tras cada código, las mismas órdenes en verde (salida en los commits de cada t
 
 ## 7. Qué falta para cerrar
 
-La decisión sobre R29 (§4), T12 (diccionario v63: la receta en la ficha,
-`R-CAJA-HIPOTESIS`, `R-VENTA-COEFICIENTES`, fichas «27», sus tests `r2-r5, r15, r32`), T16
-(`bash harness/init.sh` en verde con T12 dentro), review y T15.
+El review (reviewer contra `CHECKPOINTS.md`) y T15 (MANUAL, humano). Nada de despliegue hecho.
 
 ## Evidencias
 
