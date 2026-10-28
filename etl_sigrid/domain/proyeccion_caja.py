@@ -495,6 +495,7 @@ def _errores_de_perfil(valor: Any) -> list[str]:
             continue
         errores_par, meses_anterior = _errores_de_par(n, par, meses_anterior)
         errores.extend(errores_par)
+        # `par[1] == par[1]` es la guarda contra NaN (NaN != NaN): un NaN no se suma.
         if suma is not None and _es_numero(par[1]) and par[1] == par[1]:
             suma += Decimal(str(par[1]))
         else:

@@ -19,7 +19,7 @@ movido tal cual a `progress/impl_F-150_parada_T11.md`.
 | T3 | `9ef99af` | Unidad `PERFIL_MESES` (`MAX_MESES_PERFIL` 120): un error por cada fallo, suma exacta en `Decimal` |
 | T4 | `1aab362` | `PASOS_RECETA` (siete pasos), `paso_receta` obligatorio y último campo de `Hipotesis` |
 | T5 | `2d9a426` | `leer_coeficientes_contrato` (líneas, por código, `CLASE_POR_CODIGO`), `factor_coeficientes` (cascada de `COEF_DESADJ`), `porcentaje_iva`, `coeficiente_venta`, `importe_con_coeficiente`, `importe_por_porcentaje`, `hueco_facturacion`, `coeficiente_medio`, `FUENTE_MEDIA_OBRA`, `MOTIVO_H12_FICHA` |
-| T6 | `1d8c876` | `config/hipotesis_caja.yaml` a 27 (H24-H27; H03/H08 a perfil; H14 `MENSUAL`; H20 `FIN_MES_ALBARAN`; textos de §6), `paso_receta` en lector y carga; `unidad` a `VARCHAR(20)` |
+| T6 | `1d8c876` | `config/hipotesis_caja.yaml` a 27 (H24-H27; H03/H08 a perfil; H14 `MENSUAL`; H20 `FIN_MES_ALBARAN`; textos de §6), `paso_receta` en la carga (el lector valida con el dominio); `unidad` a `VARCHAR(20)` |
 | T7 | `abfb787` | `00_setup.sql`: `fn_coeficientes`, `fn_coeficientes_reconocidos` y las columnas nuevas por `ALTER ... ADD COLUMN IF NOT EXISTS`; fichas de todas |
 | T8 | `6da3271` | `06`: `coestr` leído una vez (`CROSS JOIN LATERAL`), clases, factor e IVA del contrato (`raw.iva`) |
 | T9 | `1812dbe` | `07`: `_dev_coef` (master 9/11 de V), `_dev_contrato`, columnas de la partida, guarda D6, reparto con coeficientes, IVA/retención de la obra-mes, `_dev_hueco` neto por obra con `MEDIA_OBRA` |
@@ -30,8 +30,8 @@ movido tal cual a `progress/impl_F-150_parada_T11.md`.
 | T11, T12 | `0be8eab`, `425b5e2` | R29 relativo al día (humano); la receta en la ficha, `R-CAJA-HIPOTESIS`, `R-VENTA-COEFICIENTES`, fichas a 27, v63 |
 
 Ficheros de producción: `etl_sigrid/domain/entities.py`, `domain/proyeccion_caja.py`,
-`application/steps/ingest_raw_step.py`, `infrastructure/config/hipotesis_caja_yaml.py`,
-`infrastructure/postgres/hipotesis_caja_sql.py`, `sql/tesoreria/00`, `06`, `07`, `08`. Config:
+`application/steps/ingest_raw_step.py`, `infrastructure/postgres/hipotesis_caja_sql.py` (el
+lector `hipotesis_caja_yaml.py` no cambia: valida con el dominio), `sql/tesoreria/00`-`08`. Config:
 `tables_sigrid.yaml`, `hipotesis_caja.yaml`, `diccionario/{raw,tesoreria,00_global}.yaml`. Tests
 nuevos: `tests/test_f150_{ingesta,perfil,receta,contrato,coeficiente,hueco,sql,diccionario}.py`.
 
@@ -184,14 +184,10 @@ Tras cada código, las mismas órdenes en verde (salida en los commits de cada t
 
 ## 6. Verificaciones MANUAL pendientes (T15, del humano)
 
-1. Imagen nueva y tag del job (comprobar que el job corre ESA imagen).
-2. `ingest` de `iva` y `dvf` antes del primer `build-tesoreria`.
-3. `build-tesoreria`: duración y contraste R30 (18.997 partidas, ~132,4 y ~143,3 M EUR, fuentes,
-   IVA y retención ≥ 96 % del pendiente en 19 obras, 0 fallos de guardas).
-4. `publicar-diccionario` (v63) con la imagen ya en el job; `check-diccionario`,
-   `check-declarados`, `check-unicidad`; reiniciar `mcp-bbdd`.
-5. R31 en conversación nueva: una obra a 1,19 y otra mixta (siete pasos, coeficientes, IVA y
-   retención del contrato, hueco de H26, albaranes de H20/H27, avisos de R4, 27 hipótesis).
+Con su comando exacto, en orden, en `progress/current.md`, subsección «F-150 · Despliegue MANUAL,
+T15» (review 1, C4): vuelta atrás a `r20261026-2111`, imagen y job, `ingest --table iva --full` y
+`--table dvf --full` antes de `build-tesoreria`, las consultas de R30, diccionario v63 con la
+imagen ya en el job y los tres `check-*`, reinicio de `mcp-bbdd` y R31 (0713 a 1,19 y 0696 mixta).
 
 ## 7. Qué falta para cerrar
 

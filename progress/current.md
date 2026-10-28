@@ -17,9 +17,74 @@
   nocturna del 28-10, 15,50-15,75: pasa. Cambiado en `requirements.md`, `tasks.md` y `acceptance`.
 - T12: la receta en la ficha de `tesoreria.hipotesis_caja`, diccionario v63, presupuesto F-147
   30.864. Mutación: 19 muertos y 1 superviviente, cerrado con test.
-- Siguiente: el reviewer; luego T15 (MANUAL, humano: imagen, `ingest` de `iva` y `dvf`, build,
-  `publicar-diccionario` v63, reiniciar `mcp-bbdd`, R30 y R31). Detalle: `progress/impl_F-150.md`.
+- Review 1: RECHAZADO solo por C4 (T15 sin comandos); corregido abajo. Siguiente: review 2; luego
+  T15 (MANUAL, humano), en el orden de la subsección siguiente. Detalle: `progress/impl_F-150.md`.
 - Diccionario del árbol hoy: **252 objetos, 2178 columnas, 122 de consumo**, 22 reglas (v63).
+
+### F-150 · Despliegue MANUAL, T15 (tras APROBADO y merge a `main`; lo autoriza el humano)
+
+Lo hace el humano, en este orden. Lectura con `.venv/Scripts/python.exe` desde el puesto (la IP
+del puesto tiene que estar en el firewall del Postgres). Ninguno de estos pasos es de un agente.
+
+0. Tag que corre HOY el job: `r20261026-2111` (F-140; comprobado con `az` el 28-10). Vuelta atrás:
+   `powershell -NoProfile -File infra/85_update_job.ps1 -Tag r20261026-2111`. El DDL de F-150 es
+   aditivo (`ADD COLUMN IF NOT EXISTS`, dos funciones, `unidad` a `VARCHAR(20)`): la imagen vieja
+   lo ignora, no hace falta deshacerlo (el YAML de hipótesis va dentro de cada imagen: la vieja
+   carga sus 23 y deja `paso_receta` a NULL).
+1. **Imagen**: `powershell -NoProfile -File infra/70_build_image.ps1` (anotar el tag nuevo).
+2. `powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag nuevo>` y comprobar que el job
+   ya apunta a ella: `az containerapp job show -n caj-datamart-seg-dev -g rg-datamart-seg-dev
+   --query "properties.template.containers[0].image" -o tsv` → acaba en `:<tag nuevo>`.
+3. **Ingesta** de las dos tablas nuevas, una a una, ANTES de cualquier `build-tesoreria` (sin
+   ellas `06` y `07` fallan: `raw.iva` y `raw.dvf` no existen):
+   `.venv/Scripts/python.exe main.py ingest --table iva --full` (esperado ~1.562 filas) y
+   `.venv/Scripts/python.exe main.py ingest --table dvf --full` (esperado ~15.665 filas, 9
+   columnas).
+4. **Build**: `.venv/Scripts/python.exe main.py build-tesoreria`, anotando la duración total y la
+   de `devengo_pendiente` (F-140: 239,7 s y 118,9 s; F-150 añade `_dev_coef`, `_dev_contrato` y
+   `_dev_hueco`). SUCCESS en todos los sub-pasos. Si salta la guarda de D6 («partidas de venta
+   con pendiente y sin coeficiente»), PARA: hoy son 0. Duraciones: `SELECT step, status,
+   finished_at - started_at FROM _meta.etl_runs WHERE step LIKE 'build_tesoreria%' ORDER BY
+   started_at DESC LIMIT 15`.
+5. **R30**, solo lectura (`psql -X -A -c "<consulta>" $dsn`, `$dsn = "host=<host> dbname=sigrid_dm
+   user=<usuario> sslmode=require"`; cifras del 28-10, ± la variación diaria):
+   - `SELECT count(*), round(sum(pendiente)/1e6,2), round(sum(pendiente_con_coeficientes)/1e6,2)
+     FROM tesoreria.devengo_pendiente_partida WHERE concepto = 'VENTA'` → ~19.005, ~132,1, ~142,9.
+   - `SELECT fuente_coeficiente, count(*), round(sum(pendiente)/1e6,2) FROM
+     tesoreria.devengo_pendiente_partida WHERE concepto = 'VENTA' GROUP BY 1 ORDER BY 1` →
+     CONTRATO ~54,4, MASTER_CERT ~76,9, MASTER_VENTA ~0,8, SIN con pendiente 0.
+   - `SELECT clave_obra, round(100 * sum(pendiente_con_coeficientes) FILTER (WHERE fuente_iva =
+     'CONTRATO') / NULLIF(sum(pendiente_con_coeficientes), 0), 1), round(100 *
+     sum(pendiente_con_coeficientes) FILTER (WHERE fuente_retencion = 'CONTRATO') /
+     NULLIF(sum(pendiente_con_coeficientes), 0), 1) FROM tesoreria.devengo_pendiente_partida WHERE
+     concepto = 'VENTA' GROUP BY 1 ORDER BY 1` → ≥ 96 % en 19 obras; 0608 y 0715, 0.
+   - `SELECT round(sum(venta_pendiente_facturar)/1e6,2), round(sum(facturado_por_delante)/1e6,2),
+     round(sum(venta_real_origen_con_coeficientes - facturado_origen)/1e6,2),
+     round(sum(venta_real_media_obra)/1e6,2) FROM tesoreria.devengo_corte_obra WHERE concepto =
+     'VENTA'` → ~15,69, ~0,09, neto ~15,60 (dentro del rango del día de R29), ~1,07.
+   - `SELECT round(sum(importe_pendiente_con_coeficientes)/1e6,2) FROM
+     tesoreria.devengo_pendiente_obra_mes WHERE concepto = 'VENTA'` → igual que la suma de
+     `pendiente_con_coeficientes` de arriba (la guarda del build ya lo exige).
+   - `SELECT count(*), count(DISTINCT obra_id), count(DISTINCT codigo), count(*) FILTER (WHERE
+     codigo = 'H12' AND fuente = 'SIGRID') FROM tesoreria.hipotesis_caja_obra` → 567, 21, 27, ~17.
+   - `SELECT paso_receta, count(*) FROM tesoreria.hipotesis_caja GROUP BY 1 ORDER BY 1` → 27 en
+     seis pasos (COEFICIENTES no tiene ninguna).
+6. **Diccionario, SOLO con la imagen ya en el job** (paso 2 comprobado; si no, la nocturna
+   republica la v62): `.venv/Scripts/python.exe main.py publicar-diccionario` (v63, 252 objetos).
+7. `.venv/Scripts/python.exe main.py check-diccionario` → OK;
+   `.venv/Scripts/python.exe main.py check-declarados` → sin faltantes;
+   `.venv/Scripts/python.exe main.py check-unicidad --timeout 300` → sin claves duplicadas.
+8. Reiniciar el MCP (cachea el diccionario): `az containerapp show -g rg-mcp-bbdd-dev -n
+   ca-mcp-bbdd-dev --query properties.latestReadyRevisionName -o tsv` y
+   `az containerapp revision restart -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --revision <revision>
+   -o none`. `contexto_bbdd()` abre con «Versión 63».
+9. **R31**, conversación NUEVA con el MCP (sin contexto previo): «¿qué caja necesitará la obra
+   0713 los próximos seis meses?» (coeficiente 1,19) y lo mismo con la 0696 (mixta: casetas y
+   vivienda) → sigue los siete pasos de la receta en orden, cobra con `importe_pendiente_con_
+   coeficientes`, el IVA y la retención del contrato (H12/H10 solo sobre las bases sin ellos),
+   suma el hueco de H26, aparta los albaranes de más de H27 meses declarando su importe, da los
+   avisos (revisión de precios F-040; H13/H14 pendientes de AdP) y declara las 27 hipótesis con
+   valor y nivel sin pedirlo. Anotar el resultado en `progress/impl_F-150.md` §6.
 
 ## 2026-10-27 (noche) · F-150 · `blocked` · PARADA de T11 (R29) · rama `feature/F-150-receta-caja`
 
