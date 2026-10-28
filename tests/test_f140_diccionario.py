@@ -57,6 +57,13 @@ def _columnas_setup(tabla: str) -> list[str]:
         nombre = trozo.strip().split(" ")[0]
         if nombre and nombre.upper() != "PRIMARY":
             columnas.append(nombre)
+    # F-150: las columnas que llegan con `ALTER TABLE ... ADD COLUMN IF NOT
+    # EXISTS` quedan al final, en el orden del fichero.
+    for nombre in re.findall(
+        rf"ALTER TABLE tesoreria\.{tabla} ADD COLUMN IF NOT EXISTS (\w+)", texto
+    ):
+        if nombre not in columnas:
+            columnas.append(nombre)
     return columnas
 
 

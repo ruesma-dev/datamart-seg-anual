@@ -84,6 +84,13 @@ def _columnas(tabla: str) -> list[str]:
         nombre = trozo.strip().split(" ")[0]
         if nombre and nombre.upper() != "PRIMARY":
             columnas.append(nombre)
+    # F-150: las columnas que llegan con `ALTER TABLE ... ADD COLUMN IF NOT
+    # EXISTS` quedan al final, en el orden del fichero.
+    for nombre in re.findall(
+        rf"ALTER TABLE {re.escape(tabla)} ADD COLUMN IF NOT EXISTS (\w+)", _ejecutable(RUTA_SETUP)
+    ):
+        if nombre not in columnas:
+            columnas.append(nombre)
     return columnas
 
 
@@ -214,6 +221,7 @@ def test_f140_setup_el_catalogo_tiene_los_campos_de_r1() -> None:
     assert _columnas("tesoreria.hipotesis_caja") == [
         "codigo", "sentido", "descripcion", "unidad", "valor_defecto", "opciones",
         "fuente_defecto", "ingrediente", "validado", "fecha_validacion", "admite_obra",
+        "paso_receta",  # F-150 (R1), con ALTER al final
     ]
     assert _columnas("tesoreria.hipotesis_caja_manual") == [
         "clave_obra", "codigo", "valor", "motivo", "fecha",
@@ -789,7 +797,7 @@ def test_f140_r5_p1a_se_publican_las_23_y_la_que_no_admite_obra_va_a_defecto() -
     from etl_sigrid.infrastructure.config.hipotesis_caja_yaml import cargar_hipotesis_caja
 
     catalogo = cargar_hipotesis_caja().catalogo
-    assert len(catalogo) == 23
+    assert len(catalogo) == 27  # F-150 suma H24-H27; el resto del test no cambia
     texto = _hipotesis_obra()
     select = texto[texto.index("INSERT INTO tesoreria.hipotesis_caja_obra"):]
     assert "WHERE h.admite_obra" not in select, "ningún filtro deja fuera hipótesis del catálogo"

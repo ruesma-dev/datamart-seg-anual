@@ -806,8 +806,9 @@ objetos:
       unidad:
         significado: >-
           Como se lee el valor: DIAS, MESES, PORCENTAJE, BOOLEANO, OPCION (una
-          de `opciones`) o MAPA_DIAS (dias por categoria).
-        valores: [DIAS, MESES, PORCENTAJE, BOOLEANO, OPCION, MAPA_DIAS]
+          de `opciones`), MAPA_DIAS (dias por categoria) o PERFIL_MESES (F-150:
+          pares [meses, porcentaje] que reparten un importe ENTERO; suman 100).
+        valores: [DIAS, MESES, PORCENTAJE, BOOLEANO, OPCION, MAPA_DIAS, PERFIL_MESES]
       valor_defecto:
         significado: El valor por defecto, en JSON (un numero, un booleano, un texto o un mapa).
       opciones:
@@ -827,6 +828,11 @@ objetos:
         nulo_significa: No validada.
       admite_obra:
         significado: Cierto si la hipotesis admite un valor distinto por obra.
+      paso_receta:
+        significado: >-
+          El paso de la receta en que se aplica (F-150). COEFICIENTES no tiene
+          ninguna: los coeficientes son dato del contrato y del master.
+        valores: [DEVENGO, DOCUMENTO, COEFICIENTES, PLAZO, RETENCION, IVA, CARTERA]
     relaciones: []
     ejemplos_preguntas:
       - Que hipotesis hay que fijar para proyectar la caja de una obra

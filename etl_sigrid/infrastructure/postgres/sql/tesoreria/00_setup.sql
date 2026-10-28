@@ -305,13 +305,13 @@ COMMENT ON FUNCTION tesoreria.fn_plazo_dias_retencion(TEXT) IS
 -- Los carga el sub-paso `hipotesis_carga` (Python) desde
 -- `config/hipotesis_caja.yaml`, validado por el dominio, en UNA transaccion.
 -- Los valores van en JSONB: una hipotesis es un DIAS, un PORCENTAJE, una
--- OPCION, un BOOLEANO o un MAPA_DIAS.
+-- OPCION, un BOOLEANO, un MAPA_DIAS o un PERFIL_MESES (F-150).
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS tesoreria.hipotesis_caja (
     codigo            VARCHAR(3)   PRIMARY KEY,
     sentido           VARCHAR(5)   NOT NULL,
     descripcion       TEXT         NOT NULL,
-    unidad            VARCHAR(10)  NOT NULL,
+    unidad            VARCHAR(20)  NOT NULL,
     valor_defecto     JSONB NOT NULL,
     opciones          JSONB,
     fuente_defecto    TEXT         NOT NULL,
@@ -320,6 +320,15 @@ CREATE TABLE IF NOT EXISTS tesoreria.hipotesis_caja (
     fecha_validacion  DATE,
     admite_obra       BOOLEAN      NOT NULL
 );
+
+-- F-150 (R27): `unidad` admite PERFIL_MESES (12 caracteres) en la tabla que ya
+-- existe con VARCHAR(10). Ensanchar un VARCHAR no reescribe la tabla y repetirlo
+-- con el mismo tipo no hace nada: idempotente.
+ALTER TABLE tesoreria.hipotesis_caja ALTER COLUMN unidad TYPE VARCHAR(20);
+-- F-150 (R1): el paso de la receta en que se aplica cada hipotesis. Admite NULL
+-- solo para poder anadirla a la tabla con filas; la carga la llena SIEMPRE (el
+-- dominio la exige).
+ALTER TABLE tesoreria.hipotesis_caja ADD COLUMN IF NOT EXISTS paso_receta VARCHAR(12);
 
 CREATE TABLE IF NOT EXISTS tesoreria.hipotesis_caja_manual (
     clave_obra  VARCHAR(40)  NOT NULL,

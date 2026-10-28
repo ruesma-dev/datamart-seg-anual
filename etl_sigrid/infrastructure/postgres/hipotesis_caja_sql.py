@@ -5,8 +5,8 @@ El SQL y las filas de la carga de hipótesis de caja (F-140, R3 y R4).
 `build_tesoreria` lee y valida `config/hipotesis_caja.yaml`; si no hay
 errores, `PostgresClient.cargar_hipotesis_caja` vacía y llena las dos tablas
 con esto, en UNA transacción. Los valores van como JSONB (`Json`): un DIAS, un
-PORCENTAJE, una OPCION o un MAPA_DIAS caben en la misma columna, y nada se
-interpola en el texto del SQL.
+PORCENTAJE, una OPCION, un MAPA_DIAS o un PERFIL_MESES (F-150) caben en la misma
+columna, y nada se interpola en el texto del SQL. F-150 suma `paso_receta`.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ SQL_VACIAR = "TRUNCATE tesoreria.hipotesis_caja, tesoreria.hipotesis_caja_manual
 SQL_INSERT_CATALOGO = (
     "INSERT INTO tesoreria.hipotesis_caja (codigo, sentido, descripcion, unidad, "
     "valor_defecto, opciones, fuente_defecto, ingrediente, validado, fecha_validacion, "
-    "admite_obra) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+    "admite_obra, paso_receta) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
 )
 
 SQL_INSERT_MANUAL = (
@@ -41,7 +41,7 @@ def filas_catalogo(catalogo: Iterable[Hipotesis]) -> list[tuple[Any, ...]]:
             Json(h.valor_defecto),
             Json(list(h.opciones)) if h.opciones else None,
             h.fuente_defecto, h.ingrediente, h.validado, h.fecha_validacion,
-            h.admite_obra,
+            h.admite_obra, h.paso_receta,
         )
         for h in catalogo
     ]
