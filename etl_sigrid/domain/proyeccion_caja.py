@@ -399,8 +399,9 @@ SENTIDOS: tuple[str, ...] = ("PAGO", "COBRO", "AMBOS")
 REGEX_CODIGO_HIPOTESIS = r"^H[0-9]{2}$"
 #: La clave de obra del YAML: `empresa-codigo` (`R-CODIGO-POR-EMPRESA`).
 REGEX_CLAVE_OBRA = r"^[0-9]+-\S.*$"
-#: Las hipótesis que `08` lee de los contratos con el cliente (D18-A).
-CODIGOS_SIGRID: tuple[str, ...] = ("H09", "H10", "H11")
+#: Las hipótesis que `08` resuelve como SIGRID: H09-H11 de los contratos con
+#: el cliente (D18-A) y, desde F-150 (N2), H12 de la ficha de la obra.
+CODIGOS_SIGRID: tuple[str, ...] = ("H09", "H10", "H11", "H12")
 
 _CAMPOS_OBLIGATORIOS = (
     "codigo", "sentido", "descripcion", "unidad", "valor_defecto",

@@ -471,3 +471,45 @@ def test_f150_r23_la_fuente_media_obra_no_se_escribe_como_fuente_de_partida() ->
 
 def test_f150_r13_07_sigue_sin_leer_hipotesis() -> None:
     assert "hipotesis" not in _devengo().lower()
+
+
+# ===========================================================================
+# R21 · `08`: H12 SIGRID desde la ficha de la obra (N2, T10)
+# ===========================================================================
+
+
+def _hipotesis_obra() -> str:
+    return _sin_comment_on(RUTA_HIPOTESIS_OBRA)
+
+
+def test_f150_r21_h12_es_codigo_sigrid() -> None:
+    """H12 se suma a los códigos que `08` resuelve como SIGRID; H09-H11 siguen."""
+    assert dom.CODIGOS_SIGRID == ("H09", "H10", "H11", "H12")
+    codigos = re.findall(r"'(H[0-9]{2})'::VARCHAR\(3\) AS codigo", _hipotesis_obra())
+    assert tuple(codigos) == dom.CODIGOS_SIGRID
+
+
+def test_f150_r21_h12_sale_de_la_ficha_de_la_obra_por_cien() -> None:
+    texto = _hipotesis_obra()
+    rama = texto[texto.index("'H12'::VARCHAR(3) AS codigo"):]
+    rama = rama[: rama.index(") s ON s.obra_id")]
+    assert "FROM raw.obr ob JOIN raw.iva i ON i.ide = NULLIF(ob.ivaide, 0)" in rama
+    assert "to_jsonb(ROUND((i.iva * 100)::NUMERIC, 4)) AS valor" in rama
+    assert f"'{dom.MOTIVO_H12_FICHA}' AS motivo" in rama
+    assert "SELECT ob.ide AS obra_id" in texto[texto.rindex("UNION ALL"):]
+    assert "condiciones_contrato_cliente" not in rama, "la ficha, no los contratos (N2)"
+
+
+def test_f150_r21_el_orden_y_h10_no_cambian() -> None:
+    texto = _hipotesis_obra()
+    assert ("CASE WHEN m.valor IS NOT NULL THEN m.valor WHEN s.valor IS NOT NULL THEN s.valor "
+            "ELSE h.valor_defecto END AS valor") in texto
+    assert "k.retencion_porcentaje AS valor" in texto, "H10: la regla de F-140 (N3)"
+    assert texto.count("FROM tesoreria.condiciones_contrato_cliente k") == 3
+
+
+def test_f150_r21_el_comment_dice_27_y_h12() -> None:
+    comment = _sql(RUTA_HIPOTESIS_OBRA)
+    comment = comment[comment.index("COMMENT ON TABLE tesoreria.hipotesis_caja_obra"):]
+    assert "las 27 hipotesis" in comment
+    assert "H12" in comment and "ficha de la obra" in comment

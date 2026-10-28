@@ -409,6 +409,12 @@ def test_f140_r6_ningun_valor_de_hipotesis_se_aplica(ruta: Path) -> None:
     texto = _sin_comment_on(ruta)
     if ruta == RUTA_HIPOTESIS_OBRA:
         sin_conteos = re.sub(r"count\(\*\)|SELECT \*", "", texto, flags=re.IGNORECASE)
+        # F-150 (R21, N2): H12 pasa el IVA de la ficha de fracción (0.21) a la
+        # unidad del catálogo (21 %). Es un cambio de unidad, no aplicar una
+        # hipótesis: es la ÚNICA cuenta que se tolera, y una sola vez.
+        unidad = "ROUND((i.iva * 100)::NUMERIC, 4)"
+        assert sin_conteos.count(unidad) == 1
+        sin_conteos = sin_conteos.replace(unidad, "")
         assert not re.search(r"[*/]|\s[+-]\s", sin_conteos), "08 no hace aritmética"
     else:
         assert "hipotesis" not in texto.lower(), f"{ruta.name} no lee hipótesis"
