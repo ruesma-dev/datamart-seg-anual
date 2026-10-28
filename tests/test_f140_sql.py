@@ -564,7 +564,9 @@ def test_f140_r12_r14_r15_el_orden_de_los_tres_insert() -> None:
 
 def test_f140_r13_el_unico_acceso_a_stg_filtra_obra_ambito_y_version() -> None:
     texto = _sin_to_regclass(_devengo())
-    assert re.findall(r"\bstg\.\w+", texto) == ["stg.plan_mensual"]
+    # F-150 (R10) suma la lectura de `stg.presupuesto` (el coeficiente del master),
+    # con sus tres filtros: la vigila `tests/test_f150_sql.py`.
+    assert re.findall(r"\bstg\.\w+", texto) == ["stg.plan_mensual", "stg.presupuesto"]
     assert (
         "JOIN stg.plan_mensual pm ON pm.obra_id = v.obra_id "
         "AND pm.ambito_id = v.ambito_id AND pm.version = v.version_master"

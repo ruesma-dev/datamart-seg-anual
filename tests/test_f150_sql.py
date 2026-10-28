@@ -244,3 +244,230 @@ def test_f150_r8_06_lee_raw_iva() -> None:
     assert "-- Lee de: raw.obrctr, raw.con, raw.auxcob, raw.auxefc, raw.rec, raw.iva." in _sql(
         RUTA_CLIENTE
     )
+
+
+# ===========================================================================
+# 07 · el coeficiente, el IVA y la retención de cada partida (R10-R14, R19, R20)
+# ===========================================================================
+
+
+def _devengo() -> str:
+    return _sin_comment_on(RUTA_DEVENGO)
+
+
+def _sin_to_regclass(texto: str) -> str:
+    return re.sub(r"to_regclass\('[^']*'\)", "", texto)
+
+
+def test_f150_r10_stg_presupuesto_solo_con_obra_ambitos_9_y_11_y_version() -> None:
+    texto = _sin_to_regclass(_devengo())
+    assert re.findall(r"\bstg\.\w+", texto) == ["stg.plan_mensual", "stg.presupuesto"]
+    ambitos = ", ".join(str(a) for a in dom.AMBITO_COEFICIENTE.values())
+    assert (
+        "JOIN stg.presupuesto pp ON pp.obra_id = v.obra_id "
+        f"AND pp.ambito_id IN ({ambitos}) AND pp.fase_num = v.version_master "
+        "WHERE v.concepto = 'VENTA'"
+    ) in texto
+
+
+@pytest.mark.parametrize("ruta", sorted(DIR_TESORERIA.glob("*.sql")), ids=lambda r: r.name)
+def test_f150_r10_ninguna_lectura_de_presupuesto_sin_sus_tres_filtros(ruta: Path) -> None:
+    texto = _sin_to_regclass(_sin_comment_on(ruta))
+    lecturas = re.findall(r"stg\.presupuesto (\w+) ON (.*?)(?= WHERE | GROUP BY |;)", texto)
+    assert texto.count("stg.presupuesto") == len(lecturas), ruta.name
+    for alias, condicion in lecturas:
+        assert f"{alias}.obra_id = " in condicion
+        assert f"{alias}.ambito_id IN (9, 11)" in condicion
+        assert f"{alias}.fase_num = " in condicion
+
+
+def test_f150_r9_el_coeficiente_del_master_como_el_dominio() -> None:
+    """`_coeficiente_master`: ROUND(oficial / importe, 6), oficial ausente = importe, sin 0."""
+    texto = _devengo()
+    for fuente, ambito in dom.AMBITO_COEFICIENTE.items():
+        sufijo = "cert" if fuente == "MASTER_CERT" else "venta"
+        assert (f"SUM(pp.importe) FILTER (WHERE pp.ambito_id = {ambito}) AS importe_{sufijo}"
+                in texto)
+        assert (f"SUM(pp.importe_oficial) FILTER (WHERE pp.ambito_id = {ambito}) "
+                f"AS oficial_{sufijo}") in texto
+    assert (
+        "CASE WHEN m.importe_cert <> 0 THEN ROUND(COALESCE(m.oficial_cert, m.importe_cert) "
+        "/ m.importe_cert, 6) WHEN m.importe_venta <> 0 THEN ROUND(COALESCE(m.oficial_venta, "
+        "m.importe_venta) / m.importe_venta, 6) END AS coeficiente_master"
+    ) in texto
+    assert (
+        "CASE WHEN m.importe_cert <> 0 THEN 'MASTER_CERT' WHEN m.importe_venta <> 0 "
+        "THEN 'MASTER_VENTA' END AS fuente_master"
+    ) in texto
+
+
+def test_f150_r9_manda_el_contrato_y_el_orden_del_coalesce_es_el_del_dominio() -> None:
+    texto = _devengo()
+    assert ("COALESCE(k.coeficiente_contrato, m.coeficiente_master) AS coeficiente_venta"
+            in texto)
+    assert (
+        "CASE WHEN k.coeficiente_contrato IS NOT NULL THEN 'CONTRATO' "
+        "WHEN m.coeficiente_master IS NOT NULL THEN m.fuente_master ELSE 'SIN' END "
+        "AS fuente_coeficiente"
+    ) in texto
+    literales = set(re.findall(r"'(CONTRATO|MASTER_CERT|MASTER_VENTA|SIN)'", texto))
+    assert literales == set(dom.FUENTES_COEFICIENTE)
+
+
+def test_f150_r11_el_contrato_solo_si_es_de_la_misma_obra() -> None:
+    texto = _devengo()
+    assert "LEFT JOIN raw.obrparpar op ON op.ide = pv.partida_id" in texto
+    assert (
+        "LEFT JOIN tesoreria.condiciones_contrato_cliente k "
+        "ON k.contrato_cliente_id = NULLIF(op.ctride, 0) AND k.obra_id = pv.obra_id"
+    ) in texto
+
+
+def test_f150_r11_r19_las_columnas_de_la_partida_solo_en_venta() -> None:
+    texto = _devengo()
+    assert (
+        "LEFT JOIN _dev_contrato c ON c.obra_id = d.obra_id AND c.partida_id = d.partida_id "
+        "AND d.concepto = 'VENTA'"
+    ) in texto
+    assert ("ROUND(GREATEST(0, d.plan_desde_version - d.ejecutado_intervalo) "
+            "* c.coeficiente_venta, 2) AS pendiente_con_coeficientes") in texto
+    columnas, _select = _insert(RUTA_DEVENGO, "tesoreria.devengo_pendiente_partida")
+    assert columnas[-9:] == list(COLUMNAS_NUEVAS["tesoreria.devengo_pendiente_partida"])
+
+
+def test_f150_r19_fuente_del_iva_y_de_la_retencion() -> None:
+    texto = _devengo()
+    assert ("CASE WHEN k.iva_porcentaje IS NOT NULL THEN 'CONTRATO' ELSE 'SIN' END "
+            "AS fuente_iva") in texto
+    assert ("CASE WHEN k.retencion_porcentaje IS NOT NULL THEN 'CONTRATO' ELSE 'SIN' END "
+            "AS fuente_retencion") in texto
+    assert dom.FUENTES_DATO_CONTRATO == ("CONTRATO", "SIN")
+
+
+def test_f150_r12_la_guarda_de_d6_antes_de_vaciar() -> None:
+    texto = _devengo()
+    i_guarda = texto.index("partidas de venta con pendiente y sin coeficiente")
+    assert i_guarda < texto.index("TRUNCATE"), "falla antes de vaciar nada"
+    guarda = texto[texto.rindex("DO $$", 0, i_guarda):texto.index("END $$;", i_guarda)]
+    assert ("WHERE d.concepto = 'VENTA' AND d.pendiente > 0 AND d.coeficiente_venta IS NULL"
+            in guarda)
+    assert "RAISE EXCEPTION" in guarda and "%" in guarda, "con su recuento"
+
+
+def test_f150_r12_la_guarda_de_entrada_exige_las_fuentes_nuevas() -> None:
+    texto = _devengo()
+    entrada = texto[texto.index("DO $$"):texto.index("END $$;")]
+    for objeto in ("stg.presupuesto", "raw.obrparpar", "raw.obr", "raw.dvf",
+                   "tesoreria.condiciones_contrato_cliente"):
+        assert f"to_regclass('{objeto}') IS NULL" in entrada, objeto
+
+
+def test_f150_r14_el_reparto_con_coeficientes_es_el_mismo_reparto() -> None:
+    texto = _devengo()
+    assert ("ROUND(d.pendiente_con_coeficientes * pr.importe_mes / d.total_perfil, 2) "
+            "AS parte_con_coef") in texto
+    assert (
+        "CASE WHEN r.desde_el_final = 1 THEN r.pendiente_con_coeficientes - "
+        "(r.suma_partes_con_coef - r.parte_con_coef) ELSE r.parte_con_coef END"
+    ) in texto
+    assert "d.pendiente_con_coeficientes AS importe_con_coef" in texto, "sin perfil, entero"
+
+
+def test_f150_r14_el_cociente_del_mes_a_seis_decimales() -> None:
+    assert (
+        "CASE WHEN x.concepto = 'VENTA' AND x.importe_pendiente <> 0 "
+        "THEN ROUND(x.importe_con_coef / x.importe_pendiente, 6) END AS coeficiente_venta"
+    ) in _devengo()
+
+
+def test_f150_r14_la_guarda_de_la_suma_mira_tambien_la_suma_con_coeficientes() -> None:
+    texto = _devengo()
+    guarda = texto[texto.index("INSERT INTO tesoreria.devengo_pendiente_obra_mes"):]
+    guarda = guarda[guarda.index("DO $$"):guarda.index("END $$;")]
+    assert "SUM(pendiente_con_coeficientes) AS total_coef" in guarda
+    assert "SUM(importe_pendiente_con_coeficientes) AS total_coef" in guarda
+    assert ("OR COALESCE(p.total_coef, 0) IS DISTINCT FROM COALESCE(m.total_coef, 0)"
+            in guarda)
+
+
+def test_f150_r20_iva_y_retencion_de_la_obra_mes_redondeados_al_final() -> None:
+    texto = _devengo()
+    for dato, fuente in (("iva", "fuente_iva"), ("retencion", "fuente_retencion")):
+        assert (f"SUM(r.importe_con_coef * r.{dato}_porcentaje) FILTER "
+                f"(WHERE r.{fuente} = 'CONTRATO') AS {dato}_bruto") in texto
+        assert (f"SUM(r.importe_con_coef) FILTER (WHERE r.{fuente} = 'SIN') "
+                f"AS base_sin_{dato}") in texto
+        assert (f"CASE WHEN x.concepto = 'VENTA' THEN ROUND(COALESCE(x.{dato}_bruto, 0) / 100, 2) "
+                f"END AS importe_{dato}_contrato") in texto
+        assert (f"CASE WHEN x.concepto = 'VENTA' THEN COALESCE(x.base_sin_{dato}, 0) END "
+                f"AS base_sin_{dato}_contrato") in texto
+
+
+def test_f150_r14_r20_las_columnas_del_mes_en_orden() -> None:
+    columnas, _select = _insert(RUTA_DEVENGO, "tesoreria.devengo_pendiente_obra_mes")
+    assert columnas[-6:] == list(COLUMNAS_NUEVAS["tesoreria.devengo_pendiente_obra_mes"])
+
+
+# ===========================================================================
+# 07 · el hueco de facturación de H26, NETO POR OBRA (R23, N9)
+# ===========================================================================
+
+
+def test_f150_r23_lo_real_a_origen_hasta_el_cierre_por_partida() -> None:
+    texto = _devengo()
+    assert (
+        "JOIN mart.fact_seguimiento_mensual f ON f.obra_id = v.obra_id AND f.concepto = v.concepto "
+        "AND f.tipo_dato = 'REAL' AND f.anio_mes <= v.mes_ultimo_cierre WHERE v.concepto = 'VENTA'"
+    ) in texto
+
+
+def test_f150_r23_la_media_de_la_obra_como_el_dominio() -> None:
+    """`coeficiente_medio`: real x coef / real, solo con coeficiente, a 6; sin nada, 1."""
+    texto = _devengo()
+    assert (
+        "COALESCE(ROUND(SUM(r.real_origen * c.coeficiente_venta) FILTER (WHERE "
+        "c.coeficiente_venta IS NOT NULL) / NULLIF(SUM(r.real_origen) FILTER (WHERE "
+        "c.coeficiente_venta IS NOT NULL), 0), 6), 1) AS coeficiente_medio"
+    ) in texto
+
+
+def test_f150_r23_lo_facturado_por_el_centro_de_coste_de_la_obra() -> None:
+    texto = _devengo()
+    assert "FROM raw.dvf fv JOIN raw.obr ob ON ob.cenide = fv.cenide" in texto
+    assert "SUM(fv.totbas) AS facturado_origen" in texto
+    assert "fecdoc" not in texto, "sin corte de fecha (riesgo 6)"
+
+
+def test_f150_r23_el_hueco_neto_por_obra_con_suelo_cero() -> None:
+    texto = _devengo()
+    assert ("GREATEST(0, h.venta_real_origen_con_coeficientes - h.facturado_origen) "
+            "AS venta_pendiente_facturar") in texto
+    assert ("GREATEST(0, h.facturado_origen - h.venta_real_origen_con_coeficientes) "
+            "AS facturado_por_delante") in texto
+    tramo_dvf = texto.split("FROM raw.dvf", 1)[1].split(";", 1)[0]
+    assert "ctride" not in tramo_dvf, "nunca por contrato: solo 4.665 de 15.665 facturas lo llevan"
+
+
+def test_f150_r23_iva_y_retencion_del_hueco_por_peso_de_contrato() -> None:
+    texto = _devengo()
+    for dato in ("iva", "retencion"):
+        assert (f"ROUND(h.venta_pendiente_facturar * h.{dato}_ponderado / 100 / "
+                f"NULLIF(h.real_con_coef_bruto, 0), 2)") in texto
+        assert (f"ROUND(h.venta_pendiente_facturar * h.real_sin_{dato} / "
+                f"NULLIF(h.real_con_coef_bruto, 0), 2)") in texto
+
+
+def test_f150_r23_las_columnas_del_corte_en_orden_y_null_en_coste() -> None:
+    columnas, select = _insert(RUTA_DEVENGO, "tesoreria.devengo_corte_obra")
+    assert columnas[-9:] == list(COLUMNAS_NUEVAS["tesoreria.devengo_corte_obra"])
+    assert ("LEFT JOIN _dev_hueco hu ON hu.obra_id = v.obra_id AND v.concepto = 'VENTA'"
+            in select)
+
+
+def test_f150_r23_la_fuente_media_obra_no_se_escribe_como_fuente_de_partida() -> None:
+    """MEDIA_OBRA solo vive en el hueco: ninguna partida la tiene como fuente."""
+    assert f"'{dom.FUENTE_MEDIA_OBRA}'" not in _devengo()
+
+
+def test_f150_r13_07_sigue_sin_leer_hipotesis() -> None:
+    assert "hipotesis" not in _devengo().lower()
