@@ -104,7 +104,9 @@ def test_f140_r22_las_funciones_tienen_ficha_y_no_se_consumen(funcion: str) -> N
 def test_f140_r22_las_recomendadas_enrutan_con_dos_preguntas(objeto: str) -> None:
     ficha = _fichas()[objeto]
     assert ficha["consumo_recomendado"] is True
-    assert len(ficha["ejemplos_preguntas"]) == 2
+    # Al menos 2: enrutan las dos primeras. F-147 manda reordenar, no borrar
+    # (`test_f147_r15_ninguna_pregunta_se_borra`), y F-150 añade una a `hipotesis_caja`.
+    assert len(ficha["ejemplos_preguntas"]) >= 2
     assert ficha["clave_negocio"], "clave_negocio para check-unicidad"
 
 
@@ -181,7 +183,7 @@ def test_f140_r23_la_regla_de_la_cartera_remite_a_la_nueva() -> None:
 
 def test_f140_r26_version_62_con_su_comentario() -> None:
     glob = _yaml("00_global.yaml")
-    assert int(glob["version"]) == 62
+    assert int(glob["version"]) >= 62  # F-150 la sube a 63; el comentario de la 62 se queda
     texto = (DICC / "00_global.yaml").read_text(encoding="utf-8")
     assert "# version 62 (F-140, 2026-10-25)" in texto
     assert glob["pendientes"] == []
@@ -223,7 +225,8 @@ def test_f140_docs_azure_apps() -> None:
 
 
 def test_f140_r22_p1a_la_ficha_de_hipotesis_por_obra_dice_las_23() -> None:
-    """P1-a del review: la tabla trae las 23 del catálogo por obra, H17 a DEFECTO."""
+    """P1-a del review: la tabla trae TODAS las del catálogo por obra (23 con F-140,
+    27 desde F-150), H17 a DEFECTO."""
     ficha = _fichas()["hipotesis_caja_obra"]
-    assert "las 23 hipotesis del catalogo" in _plano(ficha["grano"])
+    assert "las 27 hipotesis del catalogo" in _plano(ficha["grano"])
     assert "H17" in _plano(ficha["descripcion"]) and "DEFECTO" in _plano(ficha["descripcion"])

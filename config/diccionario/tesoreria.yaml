@@ -462,6 +462,20 @@ objetos:
       devengo pendiente y cartera viva sin pensarlo cuenta dos veces lo que
       ya se facturo despues del ultimo cierre.
 
+      **LA VENTA EJECUTADA SIN FACTURAR** (F-150, H26): en VENTA,
+      `venta_real_origen_con_coeficientes` es la venta real a origen hasta el
+      cierre con el coeficiente de cada partida (la que no tiene ninguno, con
+      la media ponderada de su obra: `venta_real_media_obra`), y
+      `facturado_origen` lo facturado al cliente (`raw.dvf`, base sin IVA, por
+      el centro de coste de la obra). `venta_pendiente_facturar` es la
+      diferencia POR OBRA con suelo 0 y `facturado_por_delante` lo facturado
+      de mas, que NO se cobra. El IVA y la retencion de ese hueco se reparten
+      por el peso de cada contrato. El 2026-10-28, en las 21 obras: 15,69 M
+      EUR pendientes de facturar y 0,09 facturados por delante. Lo que lleva
+      coeficientes NO se suma ni se compara con el coste, lo ejecutado ni la
+      venta sin ellos (`R-VENTA-COEFICIENTES`). En COSTE, todas estas columnas
+      son NULL.
+
       **Lee `mart.fact_seguimiento_mensual`** (los meses REAL y los
       planificados de cada obra) y se construyo despues de F-042: el duplicado
       de filas que ese build corrigio no le alcanza.
@@ -670,6 +684,18 @@ objetos:
       temporal sobre el que se aplican los plazos de cobro y pago. **No es
       caja** (`R-CAJA-HIPOTESIS`): mes de DEVENGO y SIN IVA.
 
+      **CON COEFICIENTES, IVA Y RETENCION DEL CONTRATO** (F-150): en VENTA,
+      `importe_pendiente_con_coeficientes` reparte el pendiente con
+      coeficientes de cada partida igual que `importe_pendiente`, y
+      `coeficiente_venta` es el cociente de los dos (no se aplica: cada
+      partida tiene el suyo). `importe_iva_contrato` e
+      `importe_retencion_contrato` suman partida a partida el IVA y la
+      retencion de su contrato; `base_sin_iva_contrato` y
+      `base_sin_retencion_contrato` son lo que no tiene ese dato, y solo sobre
+      ellas se aplican H12 y H10. Lo que lleva coeficientes NO se suma ni se
+      compara con el coste, lo ejecutado ni la venta sin ellos
+      (`R-VENTA-COEFICIENTES`). En COSTE, todas estas columnas son NULL.
+
       El reparto redondea al centimo y el ultimo mes de cada partida se lleva
       el resto: la suma por obra y concepto es exactamente la de
       `tesoreria.devengo_pendiente_partida` (lo comprueba el build). Lo
@@ -800,6 +826,18 @@ objetos:
       y lo que explica por que lo pendiente supera al plan restante: 913
       partidas de coste y 322 de venta van sobre-ejecutadas, y las retrasadas
       arrastran su retraso. **No es caja** (`R-CAJA-HIPOTESIS`): SIN IVA.
+
+      **LA VENTA CON LOS COEFICIENTES DE SU CONTRATO** (F-150): en VENTA, cada
+      partida lleva su contrato con el cliente (`raw.obrparpar.ctride`, de su
+      misma obra), su `coeficiente_venta` con su `fuente_coeficiente`
+      (CONTRATO; si no, el del master de certificacion de V, MASTER_CERT; si
+      no, el del master de venta, MASTER_VENTA), el
+      `pendiente_con_coeficientes` y el IVA y la retencion de su contrato.
+      Manda el contrato: el 2026-10-28 solo 5 partidas con pendiente difieren
+      del master en mas de 0,005. Una partida de venta con pendiente y sin
+      ningun coeficiente tumba el paso. Lo que lleva coeficientes NO se suma
+      ni se compara con el coste, lo ejecutado ni la venta sin ellos
+      (`R-VENTA-COEFICIENTES`). En COSTE, todas estas columnas son NULL.
 
       **Lee `mart.fact_seguimiento_mensual`** (los meses REAL y los
       planificados de cada obra) y se construyo despues de F-042: el duplicado
@@ -939,8 +977,8 @@ objetos:
       con su login la consulta devuelve «permission denied», y eso no se rodea:
       responde que el perfil no lo incluye.
 
-      **EL CATALOGO DE HIPOTESIS PARA PASAR DEVENGO A CAJA** (F-140): las 23
-      hipotesis (H01-H23) que hay que fijar para convertir el devengo
+      **EL CATALOGO DE HIPOTESIS PARA PASAR DEVENGO A CAJA** (F-140, F-150):
+      las 27 hipotesis (H01-H27) que hay que fijar para convertir el devengo
       pendiente en cobros y pagos, con su valor por DEFECTO, de que dato sale
       (`fuente_defecto`) y donde esta el dato que la alimenta
       (`ingrediente`): plazos de pago y de cobro, retenciones, IVA y su
@@ -949,13 +987,69 @@ objetos:
       `R-CAJA-HIPOTESIS` obliga a declararlas TODAS, con valor y nivel. Lo
       mantiene Control de Costes en `config/hipotesis_caja.yaml` y lo aprueba
       el humano (D15).
-    grano: Una fila por hipotesis, identificada por `codigo` (23).
+
+      **LA RECETA: DE DEVENGO A CAJA, EN ESTE ORDEN** (F-150). Cada hipotesis
+      dice en `paso_receta` en que paso se aplica; declaralas TODAS con valor
+      y nivel (`R-CAJA-HIPOTESIS`). COSTE se paga (PAGO) y VENTA se cobra
+      (COBRO). Los perfiles (`PERFIL_MESES`, pares `[meses, porcentaje]` que
+      suman 100) reparten el importe ENTERO: `[[0, 100]]` es todo en el mes de
+      partida y `[[1, 50], [2, 50]]`, la mitad uno y dos meses despues.
+      Redondea solo al final.
+
+      1. DEVENGO: el del mes, `importe_pendiente` de
+      `tesoreria.devengo_pendiente_obra_mes` (H18; o `importe_plan_restante`),
+      lo retrasado sin perfil segun H19, situado el dia H23. Sin IVA. Si H26
+      es INCLUIR, suma al cobro del primer mes pendiente la venta ejecutada sin
+      facturar (`venta_pendiente_facturar` de `tesoreria.devengo_corte_obra`,
+      ya con coeficientes); lo `facturado_por_delante` NO se cobra: declaralo.
+
+      2. DOCUMENTO: el devengo de cada mes se factura (pago, perfil H03) o se
+      certifica (cobro, perfil H08). Su mes es el del IVA del paso 6.
+
+      3. COEFICIENTES (solo cobro): se certifica y se cobra CON los
+      coeficientes del contrato de cada partida:
+      `importe_pendiente_con_coeficientes` (por partida,
+      `pendiente_con_coeficientes` y `fuente_coeficiente` de
+      `tesoreria.devengo_pendiente_partida`), nunca un coeficiente medio de
+      obra; jamas lo compares con el coste ni con lo ejecutado
+      (`R-VENTA-COEFICIENTES`). **Aviso**: la revision de precios y lo que se
+      certifica fuera del coeficiente NO estan (F-040).
+
+      4. PLAZO: desde el documento, la forma de pago del contrato (H01,
+      `tesoreria.condiciones_contrato_compra`; con varios vencimientos, H15) o,
+      sin contrato, la de su categoria (H02), con los dias fijos y meses sin
+      pago del proveedor (H04) y el retraso real (H05); el cobro, a H09
+      (`tesoreria.condiciones_contrato_cliente`) y menos la morosidad H22.
+      Cada pago y cada cobro se FRACCIONA en meses con H24 (pago) o H25
+      (cobro).
+
+      5. RETENCION, sobre la base SIN IVA: en el cobro,
+      `importe_retencion_contrato` (y `retencion_pendiente_facturar_contrato`)
+      ya es la del contrato; H10 solo se aplica a las bases
+      `sin_retencion_contrato`. En el pago, H06. Se devuelve segun H11 o H07.
+
+      6. IVA: en el cobro, `importe_iva_contrato` (y
+      `iva_pendiente_facturar_contrato`) es el del contrato (0 % en inversion
+      del sujeto pasivo); H12 solo se aplica a las bases `sin_iva_contrato`.
+      En el pago, H13. Se cobra o paga con su documento; la liquidacion con
+      Hacienda (repercutido menos soportado) va segun H14. **Aviso**: H13 y
+      H14 estan pendientes de validar con Administracion (AdP): dilo al dar
+      la caja.
+
+      7. CARTERA, SIN DUPLICAR: suma lo PREVISTO vivo de `tesoreria.efectos`
+      en su vencimiento (H16; el previsto antiguo, H17) y los albaranes sin
+      facturar de `compras.v_pbi_albaranes_sin_facturar` (sin las lineas de
+      `R-ALBARAN-ABSURDO`; H20: la factura, a fin del mes del albaran y el
+      plazo desde ahi; lo de mas de H27 meses NO es caja: excluyelo y declara
+      su importe), y quita del primer mes pendiente lo emitido tras el cierre
+      (H21, `cartera_emitida_tras_cierre`, CON IVA).
+    grano: Una fila por hipotesis, identificada por `codigo` (27).
     clave_negocio: [codigo]
     paso_etl: build_tesoreria
     refresco: nocturno
     columnas:
       codigo:
-        significado: Codigo de la hipotesis (H01 a H23).
+        significado: Codigo de la hipotesis (H01 a H27).
       sentido:
         significado: A que lado de la caja afecta.
         valores: [PAGO, COBRO, AMBOS]
@@ -993,6 +1087,7 @@ objetos:
         valores: [DEVENGO, DOCUMENTO, COEFICIENTES, PLAZO, RETENCION, IVA, CARTERA]
     relaciones: []
     ejemplos_preguntas:
+      - Como se pasa paso a paso el devengo de una obra a caja
       - Que hipotesis hay que fijar para proyectar la caja de una obra
       - Que plazo de cobro se supone por defecto y de donde sale
 
@@ -1006,20 +1101,23 @@ objetos:
       responde que el perfil no lo incluye.
 
       **EL VALOR DE CADA HIPOTESIS EN CADA OBRA** (F-140): para cada obra con
-      devengo pendiente (o con un valor manual), las 23 hipotesis del catalogo
+      devengo pendiente (o con un valor manual), las 27 hipotesis del catalogo
       con el valor que toca y su NIVEL: es la lista entera que hay que
       declarar. La que no admite valor por obra (H17) va siempre por DEFECTO.
       MANUAL (el de la seccion
-      `obras` del YAML) gana a SIGRID, y SIGRID al DEFECTO. SIGRID solo existe
+      `obras` del YAML) gana a SIGRID, y SIGRID al DEFECTO. SIGRID existe
       para H09 (plazo de cobro), H10 (retencion) y H11 (devolucion de la
-      retencion), y solo cuando TODOS los contratos con el cliente de la obra
-      dan el mismo valor: el 2026-10-25, 16, 16 y 4 de las 21 obras. Si el
+      retencion), solo cuando TODOS los contratos con el cliente de la obra
+      dan el mismo valor (el 2026-10-25, 16, 16 y 4 de las 21 obras), y desde
+      F-150 para H12, el tipo de IVA de la ficha de la obra. H10 y H12 solo
+      cubren la base SIN el dato del contrato: el del contrato ya va en el
+      devengo (`importe_retencion_contrato`, `importe_iva_contrato`). Si el
       usuario da otro valor en la conversacion, manda el suyo, con nivel
       USUARIO (`R-CAJA-HIPOTESIS`). **Nada se aplica aqui**: es lo que hay que
       declarar.
     grano: >-
-      Una fila por (`obra_id`, `codigo`): las 23 hipotesis del catalogo en
-      cada obra, 483 filas de 21 obras el 2026-10-25.
+      Una fila por (`obra_id`, `codigo`): las 27 hipotesis del catalogo en
+      cada obra, 567 filas de 21 obras con F-150 (483 con las 23 de F-140).
     clave_negocio: [obra_id, codigo]
     paso_etl: build_tesoreria
     refresco: nocturno
@@ -1043,7 +1141,9 @@ objetos:
           USUARIO, que manda sobre los dos.
         valores: [OBRA, DEFECTO]
       fuente:
-        significado: MANUAL (el YAML), SIGRID (los contratos con el cliente) o DEFECTO.
+        significado: >-
+          MANUAL (el YAML), SIGRID (los contratos con el cliente; H12, la ficha de
+          la obra) o DEFECTO.
         valores: [MANUAL, SIGRID, DEFECTO]
       motivo:
         significado: Por que la obra tiene ese valor (el del YAML o de donde se leyo).
@@ -1239,6 +1339,19 @@ objetos:
       forma de cobro, 525 con retencion. De aqui salen los valores SIGRID de
       H09-H11 en `tesoreria.hipotesis_caja_obra`. **Es un ingrediente**:
       ningun plazo se aplica a ninguna fecha (`R-CAJA-HIPOTESIS`).
+
+      **LOS COEFICIENTES Y EL IVA DEL CONTRATO** (F-150): `coeficientes_texto`
+      es el `coestr` de Sigrid (una linea por concepto,
+      `CODIGO|etiqueta|valor||base`), desglosado POR CODIGO en gastos
+      generales, beneficio industrial, otros, baja de adjudicacion y la
+      retencion que trae (`retencion_coestr`, aparte: no es coeficiente).
+      `coeficiente_contrato` es el factor `(1 + (GG + BI + otros) / 100) x
+      (1 + baja / 100)` a 6 decimales: la baja va en cascada sobre el subtotal
+      de contrata. Vacio o con un codigo desconocido no hay coeficiente
+      (`coeficientes_reconocidos` falso) y sus partidas toman el del master.
+      `iva_porcentaje` es el tipo de IVA del contrato (`raw.iva`; 0 en
+      inversion del sujeto pasivo). De aqui sale el coeficiente, el IVA y la
+      retencion de cada partida de venta de `tesoreria.devengo_pendiente_partida`.
     grano: Una fila por contrato con el cliente (`contrato_cliente_id`).
     clave_negocio: [contrato_cliente_id]
     paso_etl: build_tesoreria
