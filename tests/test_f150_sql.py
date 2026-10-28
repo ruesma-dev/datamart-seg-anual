@@ -198,7 +198,8 @@ def _insert(ruta: Path, tabla: str) -> tuple[list[str], str]:
 def test_f150_r8_06_publica_coestr_tal_cual_y_lo_lee_una_vez() -> None:
     columnas, select = _insert(RUTA_CLIENTE, "tesoreria.condiciones_contrato_cliente")
     assert columnas[-10:] == list(COLUMNAS_NUEVAS["tesoreria.condiciones_contrato_cliente"])
-    assert "o.coestr AS coeficientes_texto" in select
+    # vacío en Sigrid = NULL publicado: es lo que dice su `nulo_significa` (guardián de F-006)
+    assert "NULLIF(o.coestr, '') AS coeficientes_texto" in select
     assert "tesoreria.fn_coeficientes_reconocidos(o.coestr) AS coeficientes_reconocidos" in select
     assert "CROSS JOIN LATERAL (SELECT tesoreria.fn_coeficientes(o.coestr) AS c) AS k" in select
     assert select.count("tesoreria.fn_coeficientes(") == 1, "una sola lectura por contrato"

@@ -1236,7 +1236,7 @@ reglas:
       el campo exacto: `apu` (`apu.fec`, `apu.res`); `auxala` (`auxala.cod`, `auxala.res`); `auxban` (`auxban.res`); `auxcob` (`auxcob.cod`, `auxcob.res`); `auxefc` (`auxefc.res`); `auxefp` (`auxefp.res`); `auxemp` (`auxemp.res`); `auxhor` (`auxhor.cod`, `auxhor.res`); `auxrestip` (`auxrestip.res`); `auxmun` (`auxmun.res`); `auxnap` (`auxnap.res`); `auxobramb` (`auxobramb.cod`, `auxobramb.res`); `auxobrcla` (`auxobrcla.res`); `auxobrtip` (`auxobrtip.res`); `auxpag` (`auxpag.cod`, `auxpag.res`); `auxpro` (`auxpro.res`); `auxpronat` (`auxpronat.cod`, `auxpronat.res`); `conest` (`conest.cod`, `conest.res`); `conext` (`conext.cod`); `confir` (`confir.cod`, `confir.fec`); `ctrpro` (`ctrpro.res`); `dcapro` (`dcapro.res`); `dcfpro` (`dcfpro.res`); `dcopro` (`dcopro.res`); `dncpro` (`dncpro.fec`, `dncpro.res`); `gra` (`gra.cod`, `gra.fec`, `gra.res`); `obrfas` (`obrfas.res`); `obrfasamb` (`obrfasamb.fec`, `obrfasamb.res`); `hmores` (`hmores.fec`); `obrctr` (`obrctr.cod`, `obrctr.res`); `obrparpar` (`obrparpar.cod`, `obrparpar.res`); `prv` (`prv.cif`, `prv.raz`); `rac` (`rac.fec`, `rac.res`); `res` (`res.cif`); `usu` (`usu.cod`, `usu.res`). Ahi el valor bueno es el de la tabla, no el de
       `con`.
 
-      **4. Y hay tablas que no cuelgan de `con` en absoluto**: `auxhor`, `auxobramb`, `hmores`, `obrfas`, `obrfasamb`, `obrparpre`, `reshor`
+      **4. Y hay tablas que no cuelgan de `con` en absoluto**: `auxhor`, `auxobramb`, `dvf`, `hmores`, `obrfas`, `obrfasamb`, `obrparpre`, `reshor`
       no se unen a `raw.con` en ningun SQL de este repositorio, asi que para
       ellas el JOIN de los puntos 2 y 3 **no existe**; su nombre esta en su
       propio `res` o no esta.

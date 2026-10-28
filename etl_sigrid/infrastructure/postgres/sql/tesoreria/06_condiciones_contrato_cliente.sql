@@ -76,7 +76,7 @@ SELECT
     NULLIF(o.plaret, 0)                                      AS plazo_retencion_meses,
     NULLIF(o.plagar, 0)                                      AS plazo_garantia_meses,
     tesoreria.fn_fecha(o.fecinigar)                          AS fecha_inicio_garantia,
-    o.coestr                                                 AS coeficientes_texto,
+    NULLIF(o.coestr, '')                                     AS coeficientes_texto,
     tesoreria.fn_coeficientes_reconocidos(o.coestr)          AS coeficientes_reconocidos,
     k.c[1]                                                   AS coeficiente_gg,
     k.c[2]                                                   AS coeficiente_bi,

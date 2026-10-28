@@ -1326,7 +1326,9 @@ objetos:
         significado: >-
           Los coeficientes del contrato tal cual estan en Sigrid (`coestr`): una
           linea por concepto, `CODIGO|etiqueta|valor||base` (F-150).
-        nulo_significa: El contrato no tiene coeficientes en Sigrid.
+        nulo_significa: >-
+          El contrato no tiene coeficientes en Sigrid (`coestr` vacio); sus
+          partidas toman el coeficiente del master.
       coeficientes_reconocidos:
         significado: >-
           Cierto si `coeficientes_texto` se entiende entero: todos sus codigos
