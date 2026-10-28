@@ -29,6 +29,13 @@ ejecutado de más es `sobre_ejecutado` y no resta a otras partidas.
 proporción al plan de V de cada mes posterior al cierre; el último mes del
 perfil absorbe el redondeo. Sin perfil, todo al primer mes pendiente, marcado
 como retraso.
+
+**F-150, la receta** (R1, R7, R9, R22, R25): cada hipótesis dice en qué paso de
+`PASOS_RECETA` se aplica; el perfil `PERFIL_MESES` reparte un importe entero
+en meses; los coeficientes, el IVA y la retención salen del CONTRATO con el
+cliente de cada partida (`leer_coeficientes_contrato`, `coeficiente_venta`),
+y el hueco de facturación de H26 es NETO POR OBRA (`hueco_facturacion`). Sigue
+sin aplicar nada a un importe de caja: publica ingredientes.
 """
 
 from __future__ import annotations
@@ -151,6 +158,201 @@ def repartir_pendiente(
         reparto.append((mes, importe, False))
     reparto.append((meses[-1][0], pendiente - acumulado, False))
     return reparto
+
+
+# ---------------------------------------------------------------------------
+# El contrato con el cliente de una partida: coeficientes e IVA (F-150, R7, R18)
+# ---------------------------------------------------------------------------
+
+#: `raw.obrctr.coestr` es una LÍNEA por concepto (`\r\n`, medido el 2026-10-27).
+SEPARADOR_LINEAS = r"\r?\n"
+#: Cada línea: `CODIGO|etiqueta|valor||base`; código = campo 1, valor = campo 3.
+SEPARADOR_CAMPOS = "|"
+#: Un valor de coeficiente: número con punto decimal, con signo menos opcional.
+REGEX_PORCENTAJE_COEF = r"^-?[0-9]+(\.[0-9]+)?$"
+#: A qué clase va cada código (N10). Manda el CÓDIGO, nunca la etiqueta: la
+#: combinada «Gastos Generales+Beneficio Industrial|23.79» lleva `COEF_RECGG`.
+#: Las `RET*` son la retención declarada en el contrato: NO son coeficiente.
+#: Un código fuera de aquí hace la fila NO reconocida (falla cerrado).
+CLASE_POR_CODIGO: dict[str, str] = {
+    "COEF_RECGG": "gg",
+    "COEF_RECBI": "bi",
+    "COEF_RECCC": "otros",
+    "COEF_RECSYS": "otros",
+    "COEF_DESADJ": "baja",
+    "RETN": "retencion",
+    "RETESP": "retencion",
+    "RETNT": "retencion",
+}
+_CLASES_COEFICIENTE = ("gg", "bi", "otros", "baja")
+_SEIS_DECIMALES = Decimal("0.000001")
+_CUATRO_DECIMALES = Decimal("0.0001")
+
+
+class CoeficientesContrato(NamedTuple):
+    """Lo que dice el `coestr` de un contrato, en puntos porcentuales (R7).
+
+    Cada clase es la SUMA de sus líneas, o `None` si no tiene ninguna. Vacío,
+    `NULL`, un código desconocido o un valor no numérico: todo `None` y
+    `reconocido` falso, sin quedarse con el trozo que sí se entiende.
+    """
+
+    gg: Decimal | None
+    bi: Decimal | None
+    otros: Decimal | None
+    baja: Decimal | None
+    retencion: Decimal | None
+    reconocido: bool
+
+
+_SIN_COEFICIENTES = CoeficientesContrato(None, None, None, None, None, False)
+
+
+def leer_coeficientes_contrato(texto: str | None) -> CoeficientesContrato:
+    """Lee `coestr` por líneas y por código (R7, N10) o falla cerrado.
+
+    Las líneas se recortan de espacios (`btrim`) y las vacías se ignoran; el
+    valor (campo 3) también se recorta. Sin ninguna línea: sin dato.
+    """
+    if texto is None:
+        return _SIN_COEFICIENTES
+    lineas = [ln.strip(_BLANCO_DE_BTRIM) for ln in re.split(SEPARADOR_LINEAS, texto)]
+    lineas = [ln for ln in lineas if ln]
+    if not lineas:
+        return _SIN_COEFICIENTES
+    sumas: dict[str, Decimal] = {}
+    for linea in lineas:
+        campos = linea.split(SEPARADOR_CAMPOS)
+        clase = CLASE_POR_CODIGO.get(campos[0])
+        valor = campos[2].strip(_BLANCO_DE_BTRIM) if len(campos) > 2 else ""
+        if clase is None or not re.search(REGEX_PORCENTAJE_COEF, valor):
+            return _SIN_COEFICIENTES
+        sumas[clase] = sumas.get(clase, _CERO) + Decimal(valor)
+    return CoeficientesContrato(
+        sumas.get("gg"), sumas.get("bi"), sumas.get("otros"), sumas.get("baja"),
+        sumas.get("retencion"), True,
+    )
+
+
+def factor_coeficientes(c: CoeficientesContrato) -> Decimal | None:
+    """El coeficiente de venta del contrato, a 6 decimales (R7), o `None`.
+
+    GG, BI y otros se SUMAN y la baja va en CASCADA sobre ese subtotal de
+    contrata: `(1 + (gg + bi + otros) / 100) x (1 + baja / 100)`
+    (1,19 x 0,8723 = 1,038037). Sin reconocer, o sin ningún coeficiente
+    (solo retención), `None`: la partida cae al master.
+    """
+    if not c.reconocido or all(getattr(c, k) is None for k in _CLASES_COEFICIENTE):
+        return None
+    contrata = Decimal(1) + ((c.gg or _CERO) + (c.bi or _CERO) + (c.otros or _CERO)) / _CIEN
+    factor = contrata * (Decimal(1) + (c.baja or _CERO) / _CIEN)
+    return factor.quantize(_SEIS_DECIMALES, rounding=ROUND_HALF_UP)
+
+
+def porcentaje_iva(fraccion: Decimal | float | None) -> Decimal | None:
+    """`raw.iva.iva` (tanto por uno) en porcentaje con 4 decimales (R18).
+
+    0 es 0 (inversión del sujeto pasivo): un valor, no la falta de él.
+    """
+    if fraccion is None:
+        return None
+    return (Decimal(str(fraccion)) * _CIEN).quantize(_CUATRO_DECIMALES, rounding=ROUND_HALF_UP)
+
+
+# ---------------------------------------------------------------------------
+# El coeficiente de venta de una partida (F-150, R9) y sus importes (R11, R20)
+# ---------------------------------------------------------------------------
+
+#: De dónde sale el coeficiente de venta de una partida, en orden de mando.
+FUENTES_COEFICIENTE: tuple[str, ...] = ("CONTRATO", "MASTER_CERT", "MASTER_VENTA", "SIN")
+#: El ámbito de `stg.presupuesto` de cada fuente del master (D3).
+AMBITO_COEFICIENTE: dict[str, int] = {"MASTER_CERT": 9, "MASTER_VENTA": 11}
+#: De dónde sale el IVA y la retención de una partida: su contrato o nada.
+FUENTES_DATO_CONTRATO: tuple[str, ...] = ("CONTRATO", "SIN")
+#: El motivo con que `08` publica la H12 leída de la ficha de la obra (R21).
+MOTIVO_H12_FICHA = "Ficha de la obra (tipo de IVA)"
+#: La fuente de la venta real SIN coeficiente propio en el hueco (N9).
+FUENTE_MEDIA_OBRA = "MEDIA_OBRA"
+
+
+def _coeficiente_master(importe: Decimal | None, oficial: Decimal | None) -> Decimal | None:
+    """`ROUND(oficial / importe, 6)`; sin importe (o a 0), `None`; sin oficial, el importe."""
+    if importe is None or importe == 0:
+        return None
+    oficial = importe if oficial is None else oficial
+    return (Decimal(oficial) / Decimal(importe)).quantize(_SEIS_DECIMALES, rounding=ROUND_HALF_UP)
+
+
+def coeficiente_venta(
+    contrato: Decimal | None,
+    importe_cert: Decimal | None,
+    oficial_cert: Decimal | None,
+    importe_venta: Decimal | None,
+    oficial_venta: Decimal | None,
+) -> tuple[Decimal | None, str]:
+    """`(coeficiente, fuente)` de una partida de VENTA (R9).
+
+    Manda el del CONTRATO; si no, el de certificación del master (ámbito 9)
+    si su importe no es `None` ni 0; si no, el de venta (ámbito 11); si no,
+    `(None, "SIN")`. Es el `COALESCE` de `07` en el mismo orden.
+    """
+    if contrato is not None:
+        return contrato, "CONTRATO"
+    cert = _coeficiente_master(importe_cert, oficial_cert)
+    if cert is not None:
+        return cert, "MASTER_CERT"
+    venta = _coeficiente_master(importe_venta, oficial_venta)
+    if venta is not None:
+        return venta, "MASTER_VENTA"
+    return None, "SIN"
+
+
+def importe_con_coeficiente(importe: Decimal, coeficiente: Decimal | None) -> Decimal | None:
+    """`ROUND(importe x coeficiente, 2)` (R11); sin coeficiente, `None`."""
+    if coeficiente is None:
+        return None
+    return _redondear(importe * coeficiente)
+
+
+def importe_por_porcentaje(base: Decimal, porcentaje: Decimal | None) -> Decimal | None:
+    """`ROUND(base x porcentaje / 100, 2)` (R20); sin porcentaje, `None`."""
+    if porcentaje is None:
+        return None
+    return _redondear(base * porcentaje / _CIEN)
+
+
+# ---------------------------------------------------------------------------
+# El hueco de facturación de H26 (F-150, R22, N6, N9)
+# ---------------------------------------------------------------------------
+
+
+def hueco_facturacion(
+    real_con_coeficientes: Decimal | None, facturado: Decimal | None
+) -> tuple[Decimal, Decimal]:
+    """`(pendiente_facturar, facturado_por_delante)` de una OBRA, al céntimo (R22).
+
+    `(máx(0, real - facturado), máx(0, facturado - real))`: nunca los dos
+    positivos. Lo facturado por delante no se cobra: no resta a nada. `None`
+    cuenta 0.
+    """
+    diferencia = (real_con_coeficientes or _CERO) - (facturado or _CERO)
+    return _redondear(max(_CERO, diferencia)), _redondear(max(_CERO, -diferencia))
+
+
+def coeficiente_medio(
+    pares: Sequence[tuple[Decimal | None, Decimal | None]]
+) -> Decimal | None:
+    """Σ (real x coef) / Σ real de una obra, a 6 decimales (R22, `MEDIA_OBRA`).
+
+    Solo cuentan los pares con real y coeficiente: los que no tienen
+    coeficiente son los que RECIBEN la media. Σ real 0 (o nada): `None`.
+    """
+    validos = [(r, c) for r, c in pares if r is not None and c is not None]
+    total = sum((r for r, _c in validos), _CERO)
+    if total == 0:
+        return None
+    ponderado = sum((r * c for r, c in validos), _CERO)
+    return (ponderado / total).quantize(_SEIS_DECIMALES, rounding=ROUND_HALF_UP)
 
 
 # ---------------------------------------------------------------------------
