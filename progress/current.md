@@ -9,19 +9,20 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-10-28 · F-150 · `blocked` en T11 (Azure inalcanzable) · rama `feature/F-150-receta-caja`
+## 2026-10-28 · F-150 · `blocked` · PARADA de T11 (R29) · rama `feature/F-150-receta-caja`
 
-- Hechas y commiteadas T1-T10 y T13 (`5a3b1d2`..`886c9da`, más el arreglo de la base de la
-  campaña); `azure-apps` con commit local `044beef` (sin push). Verificado el SQL de `00`, `06`,
-  `07` y `08` en un Postgres 16 desechable contra el dominio (66 comprobaciones, 0 fallos).
-- **Bloqueo**: T11 (R29) es de solo lectura contra Azure y el puesto no llega al 5432 de
-  `psql-albaranes-rs9k2` (`connection timeout`): la IP pública de hoy no está entre las 19 reglas
-  del firewall (comprobado en solo lectura con `az ... firewall-rule list`). Añadir la regla es
-  escritura sobre un recurso compartido: la hace el humano (`az postgres flexible-server
-  firewall-rule create --server-name psql-albaranes-rs9k2 --resource-group rg-albaranes-dev
-  --name puesto-pgris-2026-10-28 --start-ip-address <IP> --end-ip-address <IP>`).
-- Al retomar: correr el contraste de T11 (script preparado, ver `progress/impl_F-150.md` §4);
-  si casa con R29, T12 (diccionario v63), la campaña de mutación (T14), `init.sh` (T16).
+- Hechas y commiteadas T1-T10, T13 y T14 (`5a3b1d2`..`db6553a`); `azure-apps` commit local
+  `044beef` (sin push). `bash harness/init.sh` en VERDE sobre `db6553a` (9.638 passed, cobertura
+  100 % de 143 líneas). Mutación: 19 muertos y 1 superviviente, cerrado con un test.
+- La línea base de la campaña destapó cuatro huecos reales, ya arreglados (`e85a3d8`):
+  `coeficientes_texto` con `NULLIF`, `dvf` en `R-SIGRID-CON`, el inventario de `test_f079` y
+  los recuentos de abajo.
+- **PARADA T11 (R29)**: en solo lectura todo casa (0 `coestr` sin reconocer, 0 contratos de otra
+  obra, 5 partidas contrato ≠ master, IVA/retención ≥ 96 % en 19 obras, albaranes 56,83/22,91)
+  salvo el hueco de H26: **15,60 M EUR frente a 15,26-15,55**. Con la nocturna del 28-10 el suelo a
+  factor 1 es 15,50 (era 15,26): el dato se movió, no el método. **Decide el humano**: aceptar
+  15,60 o reformular R29 relativo a su suelo del día. Detalle: `progress/impl_F-150.md` §4.
+- Al retomar: T12 (diccionario v63), T16 (`init.sh` con T12 dentro), review; T15 es MANUAL.
 - Diccionario del árbol hoy: **252 objetos, 2178 columnas, 122 de consumo**, 22 reglas (v62 aún;
   T12 la sube a v63).
 
