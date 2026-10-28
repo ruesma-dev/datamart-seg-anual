@@ -1,14 +1,12 @@
 # F-150 · Diseño (la receta de la caja, fase 1)
 
-Mediciones: `progress/spec_F-150.md` (§8, 27-10). Requisitos: `requirements.md`. Decisiones: §9
-(D1, D3-D7, D10 cerradas; **N1-N8 nuevas, a confirmar en la PARADA 1**). Parte de F-140 (v62).
+Mediciones: `progress/spec_F-150.md` §8-§9, `progress/impl_F-150.md` §1-§3. Decisiones: §9.
 
 ## 1. Encaje y límite
 
-Amplía `tesoreria` (F-140) sin objetos de consumo nuevos: columnas, dos tablas `raw` (`iva` y la
-cabecera de `dvf`), una ficha con la RECETA y una regla que remite a ella. El ETL publica
-ingredientes (coeficiente, IVA y retención del CONTRATO son DATOS de Sigrid) y la IA aplica las
-hipótesis en el orden de la receta.
+Amplía `tesoreria` (F-140) sin objetos de consumo nuevos: columnas, dos tablas `raw` (`iva`, la
+cabecera de `dvf`), la RECETA en una ficha y una regla que remite a ella. El ETL publica DATOS
+(coeficiente, IVA y retención del contrato) y la IA aplica las hipótesis en el orden de la receta.
 
 **Fronteras.** F-151 ejecutará la receta (aquí no hay caja). **F-040**: líneas de `dvf`,
 certificaciones y su casado por mes de certificación, importe a certificar, revisión de precios y
@@ -40,8 +38,7 @@ expedientes, adjudicado y fechas (el líder lo anota). H13/H14: de AdP. Ni `sigr
 
 **No se tocan**: `sql/stg/*`, `sql/mart/*`, `01`-`05`, permisos (el esquema ya se concede entero;
 `raw` no), `main.py`, `domain/diccionario.py`, `test_f147_*` (−9), `H21` (§8, riesgo 6). Ni IVA
-fijado a ninguna obra, ni regla del peso de H10, ni `importe_adjudicado` (N3), ni H13 por
-contrato (N7, siguiente paso).
+fijado a ninguna obra, ni regla del peso de H10, ni `importe_adjudicado` (N3), ni H13 por contrato (N7).
 
 ## 3. La receta (texto de la ficha de `tesoreria.hipotesis_caja`, tras su párrafo actual)
 
@@ -92,21 +89,24 @@ Se copia tal cual (redacción ajustable sin perder piezas de R2-R4). Va en `desc
 - `UNIDADES` += `"PERFIL_MESES"`; `_error_de_valor` llama a `_error_de_perfil(valor)` (R25;
   `MAX_MESES_PERFIL = 120`; pares lista o tupla de 2; `meses` no booleano; suma con
   `Decimal(str(p))`). Cada fallo, su mensaje.
-- **Coeficientes del contrato (N1)**, gemelo de `leer_formula_plazo`: `SEPARADOR_SEGMENTOS =
-  r"\|\|"`, `SEPARADOR_CAMPOS = "|"`, `REGEX_PORCENTAJE_COEF = r"^-?[0-9]+(\.[0-9]+)?$"`,
-  `CODIGO_COEF_GG = "COEF_RECGG"`, `CODIGO_COEF_BI = "COEF_RECBI"`, `PALABRA_BAJA = "BAJA"`.
-  `CoeficientesContrato(NamedTuple)`: `gg`, `bi`, `baja`, `otros` (`Decimal | None`),
-  `reconocido`. `leer_coeficientes_contrato(texto)` y `factor_coeficientes(c)` según R7 (HALF_UP).
-  Tests: las formas vistas (1,19; `...Industrial|23.79` -> otros, 1,2379), baja negativa, vacío,
-  coma decimal y segmento sin número.
+- **Coeficientes del contrato (N1, N10)**, gemelo de `leer_formula_plazo`: `SEPARADOR_LINEAS =
+  r"\r?\n"`, `SEPARADOR_CAMPOS = "|"`, `REGEX_PORCENTAJE_COEF = r"^-?[0-9]+(\.[0-9]+)?$"` y
+  `CLASE_POR_CODIGO = {"COEF_RECGG": "gg", "COEF_RECBI": "bi", "COEF_RECCC": "otros",
+  "COEF_RECSYS": "otros", "COEF_DESADJ": "baja", "RETN": "retencion", "RETESP": "retencion",
+  "RETNT": "retencion"}`. `CoeficientesContrato(NamedTuple)`: `gg`, `bi`, `otros`, `baja`,
+  `retencion` (`Decimal | None`), `reconocido`. `leer_coeficientes_contrato` y
+  `factor_coeficientes` según R7 (HALF_UP). Tests: todas las formas reales de `impl_F-150.md` §1.2
+  (1,19; base `TOTAL EJECUCION CONTRATA`; 23,79 -> gg; `RETN`; `COEF_DESADJ` −12,77 -> 1,038; vacío;
+  `NULL`), código desconocido y valor no numérico.
 - `FUENTES_COEFICIENTE = ("CONTRATO", "MASTER_CERT", "MASTER_VENTA", "SIN")`;
   `AMBITO_COEFICIENTE = {"MASTER_CERT": 9, "MASTER_VENTA": 11}`; `coeficiente_venta(...) ->
   tuple[Decimal | None, str]` (R9). `FUENTES_DATO_CONTRATO = ("CONTRATO", "SIN")`;
   `porcentaje_iva(fraccion)`: `None` -> `None`, si no `ROUND(fraccion × 100, 4)` (0 es 0).
   `importe_con_coeficiente` e `importe_por_porcentaje`: `_redondear(...)`. El reparto con
   coeficientes es el MISMO `repartir_pendiente` de F-140.
-- **Hueco (N6)**: `hueco_facturacion(real_con_coeficientes, facturado) -> tuple[Decimal,
-  Decimal]`: `(max(0, r − f), max(0, f − r))` al céntimo; `None` cuenta 0.
+- **Hueco (N6, N9)**: `hueco_facturacion(real_con_coeficientes, facturado) -> tuple[Decimal,
+  Decimal]`: `(max(0, r − f), max(0, f − r))` al céntimo, `None` cuenta 0; `coeficiente_medio(pares
+  (real, coef)) -> Decimal | None` (R22); `FUENTE_MEDIA_OBRA = "MEDIA_OBRA"` (solo en el hueco).
 - `MOTIVO_H12_FICHA = "Ficha de la obra (tipo de IVA)"`. `resolver_hipotesis` no cambia.
 
 El SQL lleva los literales del dominio (regex, códigos, fuentes, `9`, `11`, `ROUND(…, 6)`, orden
@@ -119,15 +119,16 @@ del `COALESCE`, `GREATEST(0, …)`, motivo de H12) y los tests los comparan (pat
 columnas; falla antes de `ensure_raw_table` si hay `include_columns` y `exclude_columns` a la vez
 o si una incluida no está en el esquema de Sigrid (R17; tests con un esquema falso, sin red).
 `iva`: entero, sin incremental (`sigrid_tablas.md` no le da `tiemod`), `iva` en tanto por uno.
-`dvf` (~330 columnas): `include_columns: [ide, cla, entide, cenide, ctride, fecdoc, totbas, totiva,
-totdoc]` (+ `tiemod` si existe). T1 mide antes en Sigrid (solo lectura): filas, columnas, `iva`
-en fracción, valores de `cla` (rectificativas, anuladas), cobertura de `ctride` y `cenide`.
+`dvf` (151 columnas, 15.665 filas, sin `tiemod`: medido en T1): `include_columns: [ide, cla,
+entide, cenide, ctride, fecdoc, totbas, totiva, totdoc]`; `cla` 1024 = rectificativas, ya netas en
+`totbas`; no hay marca de anulada. `iva`: 1.562 filas, 30 columnas, sin `tiemod`.
 
 **5.2 · `06` (N1, N2).** Funciones en `00_setup.sql`, `IMMUTABLE`, con `COMMENT`:
-`tesoreria.fn_coeficientes(f TEXT) RETURNS NUMERIC[]` (`{gg, bi, baja, otros}`, NULL si no se
-reconoce) y `tesoreria.fn_coeficientes_reconocidos(f TEXT) RETURNS BOOLEAN`. `06` gana
-`coeficientes_texto`, `coeficientes_reconocidos`, `coeficiente_gg`, `_bi`, `_baja`, `_otros`
-(NUMERIC(9,4)), `coeficiente_contrato` (NUMERIC(12,6)), `iva_id` e `iva_porcentaje`
+`tesoreria.fn_coeficientes(f TEXT) RETURNS NUMERIC[]` (`{gg, bi, otros, baja, retencion}`, NULL
+si no se reconoce; partido por `E'\r?\n'`) y `tesoreria.fn_coeficientes_reconocidos(f TEXT)
+RETURNS BOOLEAN`. `06` gana `coeficientes_texto`, `coeficientes_reconocidos`, `coeficiente_gg`,
+`_bi`, `_otros`, `_baja`, `retencion_coestr` (NUMERIC(9,4)), `coeficiente_contrato`
+(NUMERIC(12,6), la cascada de R7), `iva_id` e `iva_porcentaje`
 (`ROUND((i.iva * 100)::NUMERIC, 4)`, `LEFT JOIN raw.iva i`).
 
 **5.3 · `07`, coeficiente (N1, D3, D6).** Misma transacción; los pasos de F-140 solo ganan
@@ -154,16 +155,15 @@ ROUND(con / sin, 6)`, `importe_iva_contrato = ROUND(SUM(parte_con_coef * iva_por
 (fuente_iva = 'SIN')` y lo mismo con la retención. **La guarda de la suma** se extiende a la suma
 con coeficientes. Coste estimado +10-60 s sobre 118,9 s (R30).
 
-**5.5 · `07`, el hueco de facturación (N6, H26).** **6 bis · `_dev_hueco`**, por (obra, grupo),
-grupo = contrato de la partida o, sin él, NULL: `real` = Σ (real a origen hasta el último cierre
-de cada partida VENTA en `mart.fact_seguimiento_mensual`, la misma fuente que
-`real_origen_corte`) × su `coeficiente_venta` (partidas sin coeficiente: aparte, en
-`venta_real_sin_coeficiente`); `facturado` = Σ `dvf.totbas` con `raw.obr ob ON ob.cenide =
-dvf.cenide` (obra) y grupo `NULLIF(dvf.ctride, 0)` si ese contrato es de la obra, si no NULL; sin
-corte de fecha (lo facturado tras el cierre sigue en la cartera: §8, riesgo 6). Por grupo,
-`GREATEST(0, real − facturado)` y `GREATEST(0, facturado − real)`. `devengo_corte_obra` gana (VENTA;
-NULL en COSTE) las columnas de R23: sumas de los grupos; IVA y retención del grupo × su
-porcentaje del contrato (redondeo al final); bases `SIN` = hueco de los grupos sin el dato.
+**5.5 · `07`, el hueco de facturación (N9, H26).** **6 bis · `_dev_hueco`**, NETO POR OBRA:
+`real` = Σ (real a origen hasta el último cierre de cada partida VENTA, la fuente de
+`real_origen_corte`) × su `coeficiente_venta` (R9); sin ninguno, × la media ponderada de su obra
+(`MEDIA_OBRA`; sin ninguna en la obra, 1), esa parte en `venta_real_media_obra`; `facturado` = Σ
+`dvf.totbas` con `raw.obr ob ON ob.cenide = dvf.cenide`, sin corte de fecha (§8, riesgo 6). Por obra, `GREATEST(0, real − facturado)` y `GREATEST(0, facturado − real)`. El IVA y
+la retención del hueco: peso de cada contrato = su real × coef / el de la obra (partidas sin
+contrato, grupo propio); `iva_pendiente_facturar_contrato = ROUND(hueco × Σ peso × iva / 100, 2)`
+sobre los contratos con IVA, y la base sin él = hueco × peso restante (igual la retención). Por
+contrato NO: solo 4.665 de 15.665 facturas llevan `ctride` y el casado infla el hueco (18,59).
 
 **5.6 · `08`, H12 SIGRID (N2).** Rama más en el `UNION ALL` SIGRID: `raw.obr ob JOIN raw.iva i ON
 i.ide = NULLIF(ob.ivaide, 0)` -> `ROUND((i.iva * 100)::NUMERIC, 4)`, `MOTIVO_H12_FICHA`.
@@ -180,14 +180,14 @@ IVA H12, H13, H14 · CARTERA H16, H17, H20, H21, H27.
 | H08 | Perfil del mes de producción a la certificación | PERFIL_MESES | `[[1, 100]]` | todo al mes siguiente (propuesta) |
 | H24 | NUEVA · FRACCIONAMIENTO en meses de cada PAGO | PERFIL_MESES | `[[0, 100]]` | sin fraccionar; Sigrid no lo guarda (6 contratos con varios vencimientos) |
 | H25 | NUEVA · FRACCIONAMIENTO en meses de cada COBRO | PERFIL_MESES | `[[0, 100]]` | sin fraccionar; 0 contratos con el cliente con varios vencimientos |
-| H26 | NUEVA · Venta ejecutada pendiente de facturar | OPCION `[INCLUIR, NO_INCLUIR]` | `INCLUIR` | medido 27-10: 15,8 M EUR netos en 21 obras; lo facturado por delante no se cobra |
+| H26 | NUEVA · Venta ejecutada pendiente de facturar | OPCION `[INCLUIR, NO_INCLUIR]` | `INCLUIR` | ~15,3 M EUR netos en 21 obras (27-10); lo facturado por delante no se cobra |
 | H14 | Defecto | OPCION | `MENSUAL` | día 20 del mes siguiente; casi seguro (humano), lo confirma AdP |
 | H20 | Opciones `[FIN_MES_ALBARAN, EXCLUIR]` | OPCION | `FIN_MES_ALBARAN` | factura del mismo mes que el albarán en el 93 % (7 % el siguiente; proformas 94/6), sobre 239 M EUR (27-10) |
 | H27 | NUEVA · Antigüedad máxima de lo pendiente de facturar | MESES | `6` | lo más antiguo es casi siempre albarán sin enlazar con su factura, no deuda (como H17); lo revisa Control de Costes |
 
-Todas `validado: false`, `admite_obra: true`; ingrediente de H24/H25 `tesoreria.plazos_forma_pago`,
-de H26 `tesoreria.devengo_corte_obra`, de H20 y H27 `compras.v_pbi_albaranes_sin_facturar`. Ejemplos de cabecera: `[[1,
-50], [2, 50]]` (H08), `[[3, 50], [4, 50]]` (H25). H03/H08 mueven el DOCUMENTO; H24/H25, el dinero.
+Todas `validado: false`, `admite_obra: true`; ingrediente de H24/H25 `plazos_forma_pago`, de H26
+`devengo_corte_obra`, de H20/H27 `compras.v_pbi_albaranes_sin_facturar`. Ejemplos: `[[1, 50], [2,
+50]]` (H08), `[[3, 50], [4, 50]]` (H25). H03/H08 mueven el DOCUMENTO; H24/H25, el dinero.
 
 Textos: **H10** «La del contrato va en el devengo; esta solo cubre las bases
 `sin_retencion_contrato`: la de la obra si es única (SIGRID), si no 0». **H12** «El del contrato
@@ -215,10 +215,8 @@ coeficientes y porcentajes, NULL = COSTE; las 6 partidas en que manda el contrat
 Imagen y job; `ingest` de `iva` y `dvf` ANTES de `build-tesoreria`; R30; `publicar-diccionario`
 con la imagen ya en el job; `check-*`; MCP reiniciado; R31. Vuelta atrás: `r20261026-2111`.
 **Riesgos.** (1) La IA no abre la ficha: `resumen` y `regla` la nombran. (2) Doble fraccionamiento
-(`30 60 90` y H24): la receta los compone. (3) Tests de F-140: al día con su porqué. (4)
-**Gramática de `coestr`**: T11 lista las formas reales; una no reconocida cae al master; una baja
-en positivo sumaría; más de 6 partidas distintas, PARADA (R29). (5) El hueco exige que `dvf` sea
-la facturación completa (anuladas, rectificativas): T1 y T11, frente a 15,8 M EUR. (6) **H21 casa
+(`30 60 90` y H24): la receta los compone. (3) Tests de F-140: al día con su porqué. (4) Un código
+nuevo en `coestr` cae al master y se declara (R7). (5) `dvf` no marca anuladas (T1). (6) **H21 casa
 por fecha de emisión**: una certificación de un mes cerrado facturada tras el cierre se restaría
 dos veces (real a origen y `cartera_emitida_tras_cierre`); hoy 0 en cobros: no se cambia, F-040
 traerá el mes de la certificación. (7) Los albaranes viejos son casi siempre falta de enlace con
@@ -229,22 +227,23 @@ su factura (`docoritip` cubre el 32,5 % de las líneas): H27 los aparta, no los 
 **Cerradas (el humano, 27-10)**: D1, D3-D7, D10 (A); H26 (A); H24/H25 fraccionamiento; H14
 `MENSUAL`; H21 como riesgo. D2, D8 y D9, sustituidas por N1-N3.
 
-**NUEVAS, a confirmar en la PARADA 1** (Juan Romero, 27-10, y lo medido por el líder):
-- **N1 · Coeficiente: contrato, master 9, master 11** (recomendada; sustituye a D2). «Cada
-  contrato tiene sus coeficientes»; el 9 «no es un referente» en fase 0. Reproduce el master a 4
-  decimales salvo 6 partidas. Alternativa (solo master): sin desglose ni porqué de las 6.
-- **N2 · IVA: contrato de la partida; si no, H12 = MANUAL > ficha de la obra > 21 %**
-  (recomendada; sustituye a D8): coincide al 100 % con `cer` y `dvf`, también en las mixtas. El
-  MANUAL NO pisa el contrato, solo la base sin él (aplanar rompería las casetas al 21 % de la 0696).
-- **N3 · Retención del contrato; H10 (F-140) solo para la base sin ella** (recomendada; sustituye
-  a D9 e `importe_adjudicado`). Sin `coegar` ni recargo es `SIN` (en las 3 obras mixtas, DEFECTO 0).
-- **N4 · La obra-mes lleva IVA y retención ya sumados más la base `SIN`** (recomendada, como D4).
-  **N5 · Fuera y avisado**: revisión de precios (F-040); H13/H14 con AdP. H09 sigue por obra.
-- **N6 · Hueco por contrato dentro de la obra** (recomendada: IVA y retención de cada contrato)
-  frente a solo por obra; `include_columns` (recomendada) frente a `dvf` entera menos la lista.
-- **N7 · H13 por contrato de compra** (`importe_iva / importe_base` de
-  `condiciones_contrato_compra`; sin contrato, el 5,5 %): recomendada, pero NO cabe aquí (el
-  devengo de coste no va por contrato de compra) ni la ha confirmado AdP: feature propia.
-- **N8 · Albaranes sin facturar** (recomendada): H20 fecha la factura a fin del mes del albarán y
-  H27 (6 meses) excluye y declara lo más antiguo. Los 8,23 M EUR de F-140 venían de
-  `compras.fact_compras_linea`; lo bueno es 56,9 M EUR (`progress/spec_F-150.md` §8).
+**N1-N8, de la PARADA 1** (Juan Romero, 27-10, y lo medido por el líder):
+- **N1 · Coeficiente: contrato, master 9, master 11** (sustituye a D2): «cada contrato tiene sus
+  coeficientes»; el 9 «no es un referente» en fase 0; reproduce el master salvo 5-6 partidas.
+- **N2 · IVA: contrato; si no, H12 = MANUAL > ficha > 21 %** (sustituye a D8): casa al 100 % con
+  `cer` y `dvf`. El MANUAL NO pisa el contrato (aplanaría las casetas al 21 % de la 0696).
+- **N3 · Retención del contrato; H10 solo para la base sin ella** (sustituye a D9). **N4** · La
+  obra-mes lleva IVA y retención sumados y la base `SIN`. **N5** · Avisos: revisión de precios
+  (F-040), H13/H14 (AdP). H09 sigue por obra.
+- **N6** · `include_columns` para `dvf`. **N7** · H13 por contrato de compra (`importe_iva /
+  importe_base`; sin contrato, 5,5 %): fuera, feature propia (sin enlace coste -> contrato; AdP).
+- **N8 · Albaranes**: H20 a fin del mes del albarán; H27 (6 meses) aparta y declara lo antiguo.
+  Los 8,23 M EUR de F-140 eran `compras.fact_compras_linea`; lo bueno, 56,9 M EUR.
+
+**APROBADAS por el humano tras la PARADA de T11** (27-10, `impl_F-150.md` §1):
+- **N9 · Hueco NETO POR OBRA** (no por contrato), mínimo 0 y lo negativo declarado; la venta real
+  sin coeficiente entra con la media ponderada de su obra (`MEDIA_OBRA`, «si no existe puedes
+  deducirlo»); IVA y retención por el peso de cada contrato. R29 mide contra esta definición.
+- **N10 · Gramática real de `coestr`** (líneas `CODIGO|etiqueta|valor||base`, por código; `RET*`
+  aparte; `COEF_DESADJ` en cascada; vacío o `NULL` = sin dato, cae al master; código desconocido,
+  al master y declarado). R30 sin umbral de cobertura del coeficiente del contrato.

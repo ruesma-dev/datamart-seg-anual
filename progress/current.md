@@ -25,6 +25,14 @@
 - **Para decidir (humano)**: la gramática de `coestr` (`RET*`, `COEF_DESADJ`, vacío = factor 1 o
   sin dato) y qué hace el hueco con lo real sin coeficiente. Detalle: `progress/impl_F-150.md`.
 
+## 2026-10-28 · F-150 · spec ajustada tras la PARADA de T11 (`spec_ready`)
+
+- El humano aprobó (27-10) las dos propuestas: N9 hueco de H26 NETO POR OBRA con la venta sin
+  coeficiente a la media ponderada de su obra (`MEDIA_OBRA`) y R29 recalculado (15,26-15,55 M EUR);
+  N10 gramática real de `coestr` (por líneas y por código, `RET*` aparte, `COEF_DESADJ` en
+  cascada). R7, R8, R22, R23, R29, R30, `design.md` §4/§5.1/§5.2/§5.5/§9 y T1, T5, T9, T11 al día.
+  Detalle: `progress/spec_F-150.md` §9. Siguiente: el implementer retoma desde T1.
+
 ## 2026-10-27 (tarde) · F-150 · SPEC REHECHA (`spec_ready`, PARADA 1 pendiente) · rama `feature/F-150-receta-caja`
 
 - Tras el correo de Juan Romero (27-10) y lo medido por el líder en solo lectura, la spec cambia

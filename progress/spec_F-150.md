@@ -227,3 +227,28 @@ de `dvf`: si hay anuladas, el hueco cambia).
 
 Tamaños: requirements 146/150, design 250/250, tasks T1-T16. F-150 en `spec_ready` (acceptance y
 `notes` al día); backlog regenerado por `bash harness/init.sh` (ver el commit).
+
+## 9. Ajuste tras la PARADA de T11 (2026-10-28; aprobado por el humano el 27-10)
+
+El implementer paró en T11 (`progress/impl_F-150.md` §1): el hueco de H26 salía 14,30 M EUR
+(−9,5 % frente a 15,8) y la gramática de `coestr` de R7 no casaba con el dato. El humano aprobó:
+
+- **N9 · Hueco NETO POR OBRA** (R22, R23, `design.md` §5.5). Real a origen × coeficiente −
+  `dvf.totbas`, suelo 0 por obra y lo negativo declarado; nunca por contrato (solo 4.665 de 15.665
+  facturas llevan `ctride`; el casado por contrato lo infla a 18,59). La venta real sin ningún
+  coeficiente (0,96 M EUR) entra con la media ponderada de su obra (`MEDIA_OBRA`, declarada en
+  `venta_real_media_obra`); IVA y retención del hueco, por el peso de cada contrato en la venta
+  real × coef de la obra. **R29 se recalcula** sobre esta definición: Σ neto de las 21 obras entre
+  15,26 (todo a factor 1, lo medido) y 15,55 M EUR (0,96 a una media ≤ 1,26).
+- **N10 · Gramática real de `coestr`** (R7, R8, `design.md` §4 y §5.2): líneas por `\r\n`,
+  `CODIGO|etiqueta|valor||base`, clase POR CÓDIGO (`COEF_RECGG` gg, también la combinada 23,79, que
+  conserva su etiqueta en `coeficientes_texto`; `COEF_RECBI` bi; `COEF_RECCC`/`COEF_RECSYS` otros;
+  `COEF_DESADJ` baja EN CASCADA: (1 + gg + bi + otros) × (1 + baja), 1,19 × 0,8723 = 1,038;
+  `RETN`/`RETESP`/`RETNT` -> `retencion_coestr`, dato aparte que no suma). Vacío o NULL = sin dato
+  (al master); código desconocido, al master y declarado. Corrige la contradicción de §4 con R7.
+- **R30** sin umbral de cobertura del coeficiente del contrato (cubre 9 obras; en 10, `coestr`
+  vacío o NULL): cada coeficiente con su fuente; el ≥ 96 % queda para IVA y retención.
+- **T1 medido** (`impl_F-150.md` §3) llevado al diseño: `dvf` 151 columnas, sin `tiemod`, `cla`
+  1024 rectificativas ya netas en `totbas`, sin marca de anulada; `iva` 1.562 filas, sin `tiemod`.
+
+Tamaños: requirements 148/150, design 249/250, tasks T1-T16. F-150 de `blocked` a `spec_ready`.

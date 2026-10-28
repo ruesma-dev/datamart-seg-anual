@@ -1,16 +1,13 @@
 # F-150 · La receta de la caja (fase 1)
 
-Mediciones: `progress/spec_F-150.md` §8 (27-10, tras el correo de Juan Romero). Decisiones en
-`design.md` §9: D1, D3-D7 y D10 cerradas; **N1-N8 NUEVAS, pendientes de la PARADA 1** (sustituyen
-a D2, D8 y D9). **Objetivo**: que la IA pase el devengo de una obra a caja SIEMPRE en el mismo
-orden (la receta), cobrando la venta CON los coeficientes, el IVA y la retención del CONTRATO de
-cada partida, sin perder la venta ejecutada pendiente de facturar y fraccionando en varios meses.
-Sin caja proyectada (F-140): la función que la calcula es F-151.
+Mediciones: `progress/spec_F-150.md` §8-§9 e `impl_F-150.md` §1-§3. Decisiones: `design.md` §9.
+**Objetivo**: que la IA pase el devengo de una obra a caja SIEMPRE en el mismo orden (la receta),
+cobrando la venta CON los coeficientes, el IVA y la retención del CONTRATO de cada partida, sin
+perder la venta ejecutada sin facturar y fraccionando en meses. Sin caja proyectada: es F-151.
 
-Vocabulario: **receta**, los siete pasos de `design.md` §3. **Contrato de una partida**: el de
-`raw.obrparpar.ctride` (`raw.obrctr.ide`), de la misma obra. **Coeficiente del master**:
-`importe_oficial / importe` de `stg.presupuesto` en el ámbito 9 o 11, versión V (F-140).
-**Perfil**: pares `[meses, porcentaje]` que reparten un importe entero en el tiempo.
+Vocabulario: **contrato de una partida**, el de `raw.obrparpar.ctride` (`raw.obrctr.ide`) de su
+obra; **coeficiente del master**, `importe_oficial / importe` de `stg.presupuesto` (ámbito 9 u 11,
+versión V); **perfil**, pares `[meses, porcentaje]` que reparten un importe entero.
 
 ## La receta (D1, D7, N5)
 
@@ -38,16 +35,20 @@ Vocabulario: **receta**, los siete pasos de `design.md` §3. **Contrato de una p
 
 ## El coeficiente por partida (N1, D3, D4, D6)
 
-- R7. `leer_coeficientes_contrato(texto)` (dominio) debe devolver `gg`, `bi`, `baja`, `otros` y
-  `reconocido`: segmentos por `||`, campos por `|`, porcentaje = último campo no vacío;
-  `COEF_RECGG` -> `gg`, `COEF_RECBI` -> `bi`, etiqueta con `BAJA` -> `baja`, el resto -> `otros`
-  (sumados); vacío o `NULL` -> todo `None`; SI un segmento no acaba en número, ENTONCES todo `None`
-  y no reconocido (falla cerrado). `factor_coeficientes(c)` = `ROUND(1 + Σ / 100, 6)` si está
-  reconocido, `None` si no: se SUMAN, no se multiplican (13 + 6 = 1,19).
+- R7. (N10) `leer_coeficientes_contrato(texto)` (dominio) debe leer `coestr` por LÍNEAS (`\r\n`
+  o `\n`, recortadas; las vacías se ignoran), cada una `CODIGO|etiqueta|valor||base` (código =
+  campo 1, valor = campo 3), y devolver `gg`, `bi`, `otros`, `baja`, `retencion` y `reconocido`:
+  POR CÓDIGO, `COEF_RECGG` -> `gg` (también la forma «Gastos Generales+Beneficio Industrial»),
+  `COEF_RECBI` -> `bi`, `COEF_RECCC` y `COEF_RECSYS` -> `otros` (sumados), `COEF_DESADJ` ->
+  `baja`, `RETN`/`RETESP`/`RETNT` -> `retencion` (NO es coeficiente). Vacío o `NULL` -> sin dato;
+  SI un código es desconocido o un valor no es número, ENTONCES no reconocido (falla cerrado).
+  `factor_coeficientes(c)` = `ROUND((1 + (gg + bi + otros) / 100) × (1 + baja / 100), 6)` si está
+  reconocido y tiene algún coeficiente, `None` si no: GG y BI se SUMAN (1,19) y la baja va en
+  CASCADA sobre el subtotal de contrata (1,19 × (1 − 0,1277) = 1,038).
 - R8. `tesoreria.condiciones_contrato_cliente` debe publicar `coeficientes_texto` (`coestr` tal
-  cual), `coeficientes_reconocidos`, `coeficiente_gg`, `_bi`, `_baja`, `_otros` y
-  `coeficiente_contrato`, con funciones SQL de literales iguales al dominio (test, patrón de
-  `fn_plazo_dias`).
+  cual, con sus etiquetas), `coeficientes_reconocidos`, `coeficiente_gg`, `_bi`, `_otros`,
+  `_baja`, `coeficiente_contrato` y `retencion_coestr` (la retención declarada en `coestr`, dato
+  aparte), con funciones SQL de literales iguales al dominio (test, patrón de `fn_plazo_dias`).
 - R9. `coeficiente_venta(contrato, importe_cert, oficial_cert, importe_venta, oficial_venta)` debe
   devolver `(contrato, "CONTRATO")` si el del contrato existe; si no, el del 9 con `MASTER_CERT` si
   su importe no es `None` ni 0; si no, el del 11 con `MASTER_VENTA`; si no, `(None, "SIN")`. El del
@@ -72,9 +73,8 @@ Vocabulario: **receta**, los siete pasos de `design.md` §3. **Contrato de una p
 
 ## El IVA y la retención por partida (N2, N3, N4)
 
-- R16. `config/tables_sigrid.yaml` debe ingerir el catálogo `iva` entero en `raw.iva` (N2) y la
-  CABECERA de las facturas de venta en `raw.dvf` (N6) con `include_columns` (R17); fichas en
-  `config/diccionario/raw.yaml` y `TOTAL_TABLAS` = 80.
+- R16. `config/tables_sigrid.yaml` debe ingerir `iva` entero en `raw.iva` (N2) y la CABECERA de
+  `dvf` en `raw.dvf` (N6, R17), los dos sin `tiemod`; fichas en `raw.yaml`, `TOTAL_TABLAS` = 80.
 - R17. CUANDO una tabla declare `include_columns`, la ingesta debe traer solo esas; SI declara
   también `exclude_columns` o una de ellas no existe en Sigrid, ENTONCES falla antes de crear nada.
 - R18. `tesoreria.condiciones_contrato_cliente` debe publicar `iva_id` (`NULLIF(ivaide, 0)`) e
@@ -93,17 +93,18 @@ Vocabulario: **receta**, los siete pasos de `design.md` §3. **Contrato de una p
 
 ## La venta ejecutada pendiente de facturar (N6, H26)
 
-- R22. `hueco_facturacion(real_con_coeficientes, facturado)` (dominio) debe devolver
-  `(pendiente, por_delante)`, los dos ≥ 0 y al céntimo: lo que se ejecutó y no se facturó, y lo
-  facturado por delante (nunca se cobra).
-- R23. `tesoreria.devengo_corte_obra` debe publicar, en VENTA, por obra y sumando contrato a
-  contrato (partidas por su contrato; facturas por `dvf.ctride`; sin contrato, un grupo propio):
-  `venta_real_origen_con_coeficientes` (real a origen hasta el cierre × coeficiente de R9),
-  `facturado_origen` (Σ `dvf.totbas`, obra por `dvf.cenide = obr.cenide`),
-  `venta_pendiente_facturar` y `facturado_por_delante` (R22), `iva_pendiente_facturar_contrato`,
-  `retencion_pendiente_facturar_contrato`, `base_pendiente_facturar_sin_iva_contrato`,
-  `base_pendiente_facturar_sin_retencion_contrato` (como R20) y
-  `venta_real_sin_coeficiente` (lo no contado); en COSTE, NULL.
+- R22. (N9) `hueco_facturacion(real_con_coeficientes, facturado)` (dominio) debe devolver
+  `(pendiente, por_delante)`, ≥ 0 y al céntimo (lo facturado por delante nunca se cobra); y
+  `coeficiente_medio(pares)` = Σ (real × coef) / Σ real a 6 decimales, `None` si Σ real es 0.
+- R23. (N9) `tesoreria.devengo_corte_obra` debe publicar, en VENTA, NETO POR OBRA (nunca por
+  contrato): `venta_real_origen_con_coeficientes` (real a origen hasta el cierre de cada partida ×
+  su coeficiente de R9; sin ninguno, × el `coeficiente_medio` de su obra, fuente `MEDIA_OBRA`),
+  `venta_real_media_obra` (esa parte, declarada), `facturado_origen` (Σ `dvf.totbas`, rectificativas
+  incluidas; obra por `dvf.cenide = obr.cenide`), `venta_pendiente_facturar` y
+  `facturado_por_delante` (R22 por obra), `iva_pendiente_facturar_contrato` y
+  `retencion_pendiente_facturar_contrato` (el hueco repartido por el peso de cada contrato en la
+  venta real × coef de la obra, × su porcentaje) y `base_pendiente_facturar_sin_iva_contrato` /
+  `_sin_retencion_contrato` (el peso sin el dato); en COSTE, NULL.
 - R24. H26 debe nacer `OPCION` `[INCLUIR, NO_INCLUIR]`, defecto `INCLUIR`, COBRO, paso DEVENGO; y
   (N8) H27, antigüedad máxima de lo pendiente de facturar, `MESES`, defecto 6, PAGO, paso CARTERA;
   las dos `admite_obra: true`, `validado: false`: 27 hipótesis.
@@ -130,17 +131,18 @@ Vocabulario: **receta**, los siete pasos de `design.md` §3. **Contrato de una p
 
 ## Verificación, diccionario y documentación
 
-- R29. ANTES de escribir la receta (T12), en solo lectura en las 21 obras: formas de `coestr` no
-  reconocidas, partidas con contrato de otra obra (0), coeficiente del contrato frente al master a
-  4 decimales y el hueco de facturación; SI difieren más partidas que las 6 del líder (0676-B 1,
-  0696 3, 0697 1, 0724 1) o el hueco neto se aparta de 15,8 M EUR más de un 5 %, ENTONCES PARA.
-- R30. Contraste MANUAL tras el build frente a `progress/spec_F-150.md` §8: 18.997 partidas VENTA,
-  pendiente 132,37 y con coeficientes ~143,20 M EUR, `CONTRATO` en ≥ 96 % del pendiente de 19
-  obras, hueco ~15,8 M EUR, 0 fallos de las guardas, y la duración del primer `build-tesoreria`.
+- R29. ANTES de la receta (T12), en solo lectura en las 21 obras y con el dominio de T5: líneas de
+  `coestr` no reconocidas (0 esperadas), contrato de otra obra (0), partidas con pendiente > 0 cuyo
+  coeficiente del contrato difiere del master 11 en > 0,005 (≤ 6; medidas 5) y Σ (real × coef −
+  facturado) de las 21 obras entre 15,26 (todo a factor 1, medido) y 15,55 M EUR (la media de obra
+  solo sube 0,96 M EUR de real a ≤ 1,26); SI no, ENTONCES PARA.
+- R30. Contraste MANUAL tras el build frente a `progress/impl_F-150.md` §2 y el valor de R29:
+  18.997 partidas VENTA, pendiente ~132,4 y con coeficientes ~143,3 M EUR, cada coeficiente con su
+  fuente (`CONTRATO`, `MASTER_CERT`, `MASTER_VENTA`; `MEDIA_OBRA` en el hueco), IVA y retención del
+  contrato en ≥ 96 % del pendiente de 19 obras, 0 fallos de las guardas y la duración del build.
 - R31. CUANDO se pregunte al MCP, en conversación nueva, por la caja de una obra con coeficientes,
-  debe seguir los siete pasos, cobrar con coeficientes, IVA y retención del contrato y el hueco de
-  H26, apartar y declarar los albaranes de más de H27 meses, dar los avisos de R4 y declarar las
-  27 hipótesis: MANUAL (humano), anotado.
+  debe seguir los siete pasos (coeficientes, IVA y retención del contrato, hueco de H26, albaranes
+  de más de H27 meses aparte, avisos de R4) y declarar las 27 hipótesis: MANUAL (humano).
 - R32. Fichas al día (`paso_receta`, columnas nuevas, «27», `raw.iva`, `raw.dvf`), diccionario
   v63, `CLAUDE.md`, `docs/ARCHITECTURE.md` y `azure-apps/datamart_seg_anual.md` (consume `iva` y
   `dvf`); `bash harness/init.sh` en verde (pytest, cobertura y mutación `estandar`).
