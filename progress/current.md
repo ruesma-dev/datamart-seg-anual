@@ -9,6 +9,12 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-28 · F-150 · `in_progress` · implementer retomado desde T1 · rama `feature/F-150-receta-caja`
+
+- T1 (`include_columns`, `5a3b1d2`) y T2 (`iva`, `dvf`, censo a 80, `d463341`) hechas. En curso: T3.
+- Decisión menor: el censo 78 -> 80 toca ya en T2 los tests que lo fijan, `ARCHITECTURE.md` y la
+  enmienda del inventario de F-006 (250 objetos); el resto de la documentación va en T13.
+
 ## 2026-10-27 (noche) · F-150 · `blocked` · PARADA de T11 (R29) · rama `feature/F-150-receta-caja`
 
 - El humano confirmó N1-N8 (PARADA 1). El implementer adelantó la verificación de SOLO LECTURA

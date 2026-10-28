@@ -66,7 +66,10 @@ def test_f140_r2_el_catalogo_valido_no_tiene_errores() -> None:
 
 
 def test_f140_r2_las_listas_cerradas_son_las_del_diseno() -> None:
-    assert dom.UNIDADES == ("DIAS", "MESES", "PORCENTAJE", "BOOLEANO", "OPCION", "MAPA_DIAS")
+    # F-150 (R25) suma `PERFIL_MESES`, el reparto de un importe entero en varios meses
+    assert dom.UNIDADES == (
+        "DIAS", "MESES", "PORCENTAJE", "BOOLEANO", "OPCION", "MAPA_DIAS", "PERFIL_MESES",
+    )
     assert dom.NIVELES == ("DEFECTO", "OBRA", "USUARIO")
     assert dom.FUENTES == ("DEFECTO", "SIGRID", "MANUAL")
     assert dom.SENTIDOS == ("PAGO", "COBRO", "AMBOS")

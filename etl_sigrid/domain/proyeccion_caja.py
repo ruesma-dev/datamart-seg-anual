@@ -173,7 +173,12 @@ def es_columna_de_caja(nombre: str) -> bool:
 # ---------------------------------------------------------------------------
 
 #: Las unidades de un valor de hipótesis (lista cerrada, R2).
-UNIDADES: tuple[str, ...] = ("DIAS", "MESES", "PORCENTAJE", "BOOLEANO", "OPCION", "MAPA_DIAS")
+#: `PERFIL_MESES` (F-150, R25) reparte un importe ENTERO en varios meses.
+UNIDADES: tuple[str, ...] = (
+    "DIAS", "MESES", "PORCENTAJE", "BOOLEANO", "OPCION", "MAPA_DIAS", "PERFIL_MESES",
+)
+#: El mes más lejano de un perfil (R25): diez años desde el hecho.
+MAX_MESES_PERFIL = 120
 #: El NIVEL de un valor declarado (`R-CAJA-HIPOTESIS`): el del catálogo, el de
 #: la obra (personalizado o leído de Sigrid) o el que da el usuario en vivo.
 NIVELES: tuple[str, ...] = ("DEFECTO", "OBRA", "USUARIO")
@@ -233,8 +238,72 @@ def _es_fecha(valor: Any) -> bool:
     return isinstance(valor, date) and not isinstance(valor, datetime)
 
 
+#: Los decimales que admite un porcentaje de perfil: céntimos de punto.
+_DECIMALES_PERFIL = 2
+_CIEN = Decimal(100)
+
+
+def _errores_de_par(n: int, par: Any, meses_anterior: int | None) -> tuple[list[str], int | None]:
+    """Los errores del par `n` de un perfil y los meses que deja como «anterior»."""
+    meses, porcentaje = par
+    errores: list[str] = []
+    if not (_es_entero(meses) and 0 <= meses <= MAX_MESES_PERFIL):
+        errores.append(f"PERFIL_MESES, par {n}: meses {meses!r} no es un entero de 0 a "
+                       f"{MAX_MESES_PERFIL}")
+    elif meses_anterior is not None and meses <= meses_anterior:
+        errores.append(f"PERFIL_MESES, par {n}: meses {meses} no es mayor que el del par "
+                       "anterior (creciente estricto)")
+    else:
+        meses_anterior = meses
+    if not (_es_numero(porcentaje) and 0 < porcentaje <= 100):
+        errores.append(f"PERFIL_MESES, par {n}: porcentaje {porcentaje!r} no es > 0 y <= 100")
+    elif Decimal(str(porcentaje)).as_tuple().exponent < -_DECIMALES_PERFIL:
+        errores.append(f"PERFIL_MESES, par {n}: porcentaje {porcentaje!r} tiene mas de "
+                       f"{_DECIMALES_PERFIL} decimales")
+    return errores, meses_anterior
+
+
+def _errores_de_perfil(valor: Any) -> list[str]:
+    """Un error por cada fallo de un `PERFIL_MESES` (R25); vacía si vale.
+
+    Lista no vacía de pares `[meses, porcentaje]` (lista o tupla de dos):
+    `meses` entero de 0 a `MAX_MESES_PERFIL` y estrictamente creciente,
+    `porcentaje` > 0 y <= 100 con dos decimales como mucho, y la suma
+    exactamente 100 en `Decimal` (en float, 0.1 + 0.2 no es 0.3). La suma
+    solo se juzga si todos los pares son pares con porcentaje numérico.
+    """
+    if not (isinstance(valor, (list, tuple)) and valor):
+        return [f"valor {valor!r} no es un PERFIL_MESES: una lista no vacia de pares "
+                "[meses, porcentaje]"]
+    errores: list[str] = []
+    suma: Decimal | None = Decimal(0)
+    meses_anterior: int | None = None
+    for n, par in enumerate(valor, start=1):
+        if not (isinstance(par, (list, tuple)) and len(par) == 2):
+            errores.append(f"PERFIL_MESES, par {n} {par!r}: no es un par [meses, porcentaje]")
+            suma = None
+            continue
+        errores_par, meses_anterior = _errores_de_par(n, par, meses_anterior)
+        errores.extend(errores_par)
+        if suma is not None and _es_numero(par[1]) and par[1] == par[1]:
+            suma += Decimal(str(par[1]))
+        else:
+            suma = None
+    if suma is not None and suma != _CIEN:
+        errores.append(f"PERFIL_MESES: los porcentajes suman {suma.normalize():f}, no 100")
+    return errores
+
+
+def _errores_de_valor(valor: Any, unidad: str, opciones: Sequence[str]) -> list[str]:
+    """Todos los errores de `valor` para `unidad`: el perfil da uno por fallo."""
+    if unidad == "PERFIL_MESES":
+        return _errores_de_perfil(valor)
+    error = _error_de_valor(valor, unidad, opciones)
+    return [error] if error else []
+
+
 def _error_de_valor(valor: Any, unidad: str, opciones: Sequence[str]) -> str | None:
-    """Por qué `valor` no vale para `unidad`, o `None` si vale."""
+    """Por qué `valor` no vale para `unidad`, o `None` si vale (salvo el perfil)."""
     if unidad in ("DIAS", "MESES"):
         if not (_es_entero(valor) and valor >= 0):
             return f"valor {valor!r} no es un entero >= 0 de {unidad}"
@@ -292,9 +361,9 @@ def _errores_de_fila(fila: dict) -> list[str]:
     errores_opciones = _errores_de_opciones(fila, unidad)
     errores.extend(errores_opciones)
     if unidad_valida and "valor_defecto" in fila and not errores_opciones:
-        error = _error_de_valor(fila["valor_defecto"], unidad, fila.get("opciones") or ())
-        if error:
-            errores.append(error)
+        errores.extend(
+            _errores_de_valor(fila["valor_defecto"], unidad, fila.get("opciones") or ())
+        )
     for campo in ("descripcion", "fuente_defecto"):
         if campo in fila and not _es_texto(fila[campo]):
             errores.append(f"{campo} tiene que ser un texto no vacio")
@@ -380,9 +449,7 @@ def _errores_de_obra(fila: dict, catalogo: Mapping[str, Hipotesis]) -> list[str]
     elif hipotesis is not None and not hipotesis.admite_obra:
         errores.append(f"{codigo} no admite valor por obra (admite_obra: false)")
     elif hipotesis is not None and "valor" in fila:
-        error = _error_de_valor(fila["valor"], hipotesis.unidad, hipotesis.opciones)
-        if error:
-            errores.append(error)
+        errores.extend(_errores_de_valor(fila["valor"], hipotesis.unidad, hipotesis.opciones))
     if "motivo" in fila and not _es_texto(fila["motivo"]):
         errores.append("motivo tiene que ser un texto no vacio")
     if "fecha" in fila and not _es_fecha(fila["fecha"]):
