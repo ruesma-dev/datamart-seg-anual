@@ -35,6 +35,7 @@ _BASE = {
     "ingrediente": None,
     "validado": False,
     "admite_obra": True,
+    "paso_receta": "DOCUMENTO",
 }
 
 

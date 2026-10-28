@@ -177,6 +177,11 @@ def es_columna_de_caja(nombre: str) -> bool:
 UNIDADES: tuple[str, ...] = (
     "DIAS", "MESES", "PORCENTAJE", "BOOLEANO", "OPCION", "MAPA_DIAS", "PERFIL_MESES",
 )
+#: Los pasos de la receta de la caja (F-150, R1, D7), en su orden: la IA pasa
+#: el devengo a caja SIEMPRE así, y cada hipótesis dice en cuál se aplica.
+PASOS_RECETA: tuple[str, ...] = (
+    "DEVENGO", "DOCUMENTO", "COEFICIENTES", "PLAZO", "RETENCION", "IVA", "CARTERA",
+)
 #: El mes más lejano de un perfil (R25): diez años desde el hecho.
 MAX_MESES_PERFIL = 120
 #: El NIVEL de un valor declarado (`R-CAJA-HIPOTESIS`): el del catálogo, el de
@@ -197,7 +202,7 @@ CODIGOS_SIGRID: tuple[str, ...] = ("H09", "H10", "H11")
 
 _CAMPOS_OBLIGATORIOS = (
     "codigo", "sentido", "descripcion", "unidad", "valor_defecto",
-    "fuente_defecto", "ingrediente", "validado", "admite_obra",
+    "fuente_defecto", "ingrediente", "validado", "admite_obra", "paso_receta",
 )
 _CAMPOS_OPCIONALES = ("opciones", "fecha_validacion")
 _CAMPOS_OBRA = ("clave_obra", "codigo", "valor", "motivo", "fecha")
@@ -218,6 +223,8 @@ class Hipotesis:
     admite_obra: bool
     opciones: tuple[str, ...] = ()
     fecha_validacion: date | None = None
+    #: F-150 (R1): al final y con defecto, para no romper a quien ya la construye.
+    paso_receta: str = ""
 
 
 def _es_entero(valor: Any) -> bool:
@@ -354,6 +361,8 @@ def _errores_de_fila(fila: dict) -> list[str]:
         errores.append(f"codigo {codigo!r} no casa con {REGEX_CODIGO_HIPOTESIS}")
     if "sentido" in fila and fila["sentido"] not in SENTIDOS:
         errores.append(f"sentido {fila['sentido']!r} fuera de {list(SENTIDOS)}")
+    if "paso_receta" in fila and fila["paso_receta"] not in PASOS_RECETA:
+        errores.append(f"paso_receta {fila['paso_receta']!r} fuera de {list(PASOS_RECETA)}")
     unidad = fila.get("unidad")
     unidad_valida = unidad in UNIDADES
     if "unidad" in fila and not unidad_valida:
@@ -424,6 +433,7 @@ def construir_catalogo(filas: Sequence[Any]) -> tuple[Hipotesis, ...]:
             admite_obra=f["admite_obra"],
             opciones=tuple(f.get("opciones") or ()),
             fecha_validacion=f.get("fecha_validacion"),
+            paso_receta=f["paso_receta"],
         )
         for f in filas
     )

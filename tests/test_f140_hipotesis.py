@@ -40,6 +40,7 @@ def _fila(**cambios) -> dict:
         "ingrediente": "tesoreria.plazos_forma_pago",
         "validado": False,
         "admite_obra": True,
+        "paso_receta": "PLAZO",  # F-150 (R1): obligatorio
     }
     base.update(cambios)
     return base

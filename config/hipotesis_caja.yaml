@@ -34,6 +34,8 @@
 #   validado         true solo cuando Negocio lo aprueba
 #   fecha_validacion solo con validado: true
 #   admite_obra      si se puede personalizar por obra en la seccion `obras`
+#   paso_receta      F-150: el paso de la receta en que se aplica, uno de DEVENGO,
+#                    DOCUMENTO, COEFICIENTES, PLAZO, RETENCION, IVA o CARTERA
 #
 # VALORES POR OBRA (D14-A), seccion `obras`: `clave_obra` (empresa-codigo, como
 # `1-0704`: R-CODIGO-POR-EMPRESA), `codigo`, `valor`, `motivo` y `fecha`. Ganan
@@ -59,6 +61,7 @@ hipotesis:
     ingrediente: tesoreria.condiciones_contrato_compra
     validado: false
     admite_obra: true
+    paso_receta: PLAZO
 
   - codigo: H02
     sentido: PAGO
@@ -73,6 +76,7 @@ hipotesis:
     ingrediente: tesoreria.plazos_forma_pago
     validado: false
     admite_obra: true
+    paso_receta: PLAZO
 
   - codigo: H03
     sentido: PAGO
@@ -85,6 +89,7 @@ hipotesis:
     ingrediente: tesoreria.devengo_pendiente_obra_mes
     validado: false
     admite_obra: true
+    paso_receta: DOCUMENTO
 
   - codigo: H04
     sentido: PAGO
@@ -99,6 +104,7 @@ hipotesis:
     ingrediente: tesoreria.condiciones_contrato_compra
     validado: false
     admite_obra: true
+    paso_receta: PLAZO
 
   - codigo: H05
     sentido: PAGO
@@ -111,6 +117,7 @@ hipotesis:
     ingrediente: tesoreria.plazos_forma_pago
     validado: false
     admite_obra: true
+    paso_receta: PLAZO
 
   - codigo: H06
     sentido: PAGO
@@ -125,6 +132,7 @@ hipotesis:
     ingrediente: tesoreria.condiciones_contrato_compra
     validado: false
     admite_obra: true
+    paso_receta: RETENCION
 
   - codigo: H07
     sentido: PAGO
@@ -141,6 +149,7 @@ hipotesis:
     ingrediente: retenciones.fin_obra
     validado: false
     admite_obra: true
+    paso_receta: RETENCION
 
   - codigo: H08
     sentido: COBRO
@@ -151,6 +160,7 @@ hipotesis:
     ingrediente: tesoreria.devengo_pendiente_obra_mes
     validado: false
     admite_obra: true
+    paso_receta: DOCUMENTO
 
   - codigo: H09
     sentido: COBRO
@@ -163,6 +173,7 @@ hipotesis:
     ingrediente: tesoreria.condiciones_contrato_cliente
     validado: false
     admite_obra: true
+    paso_receta: PLAZO
 
   - codigo: H10
     sentido: COBRO
@@ -175,6 +186,7 @@ hipotesis:
     ingrediente: tesoreria.condiciones_contrato_cliente
     validado: false
     admite_obra: true
+    paso_receta: RETENCION
 
   - codigo: H11
     sentido: COBRO
@@ -189,6 +201,7 @@ hipotesis:
     ingrediente: tesoreria.condiciones_contrato_cliente
     validado: false
     admite_obra: true
+    paso_receta: RETENCION
 
   - codigo: H12
     sentido: COBRO
@@ -201,6 +214,7 @@ hipotesis:
     ingrediente: null
     validado: false
     admite_obra: true
+    paso_receta: IVA
 
   - codigo: H13
     sentido: PAGO
@@ -215,6 +229,7 @@ hipotesis:
     ingrediente: compras.facturas
     validado: false
     admite_obra: true
+    paso_receta: IVA
 
   - codigo: H14
     sentido: AMBOS
@@ -228,6 +243,7 @@ hipotesis:
     ingrediente: null
     validado: false
     admite_obra: true
+    paso_receta: IVA
 
   - codigo: H15
     sentido: AMBOS
@@ -241,6 +257,7 @@ hipotesis:
     ingrediente: tesoreria.plazos_forma_pago
     validado: false
     admite_obra: true
+    paso_receta: PLAZO
 
   - codigo: H16
     sentido: AMBOS
@@ -254,6 +271,7 @@ hipotesis:
     ingrediente: tesoreria.efectos
     validado: false
     admite_obra: true
+    paso_receta: CARTERA
 
   - codigo: H17
     sentido: AMBOS
@@ -267,6 +285,7 @@ hipotesis:
     ingrediente: tesoreria.efectos
     validado: false
     admite_obra: false
+    paso_receta: CARTERA
 
   - codigo: H18
     sentido: AMBOS
@@ -283,6 +302,7 @@ hipotesis:
     ingrediente: tesoreria.devengo_pendiente_obra_mes
     validado: false
     admite_obra: true
+    paso_receta: DEVENGO
 
   - codigo: H19
     sentido: AMBOS
@@ -296,6 +316,7 @@ hipotesis:
     ingrediente: tesoreria.devengo_pendiente_obra_mes
     validado: false
     admite_obra: true
+    paso_receta: DEVENGO
 
   - codigo: H20
     sentido: PAGO
@@ -310,6 +331,7 @@ hipotesis:
     ingrediente: compras.fact_compras_linea
     validado: false
     admite_obra: true
+    paso_receta: CARTERA
 
   - codigo: H21
     sentido: AMBOS
@@ -324,6 +346,7 @@ hipotesis:
     ingrediente: tesoreria.devengo_corte_obra
     validado: false
     admite_obra: true
+    paso_receta: CARTERA
 
   - codigo: H22
     sentido: COBRO
@@ -334,6 +357,7 @@ hipotesis:
     ingrediente: null
     validado: false
     admite_obra: true
+    paso_receta: PLAZO
 
   - codigo: H23
     sentido: AMBOS
@@ -345,6 +369,7 @@ hipotesis:
     ingrediente: null
     validado: false
     admite_obra: true
+    paso_receta: DEVENGO
 
 # Valores por obra: ninguno todavia.
 obras: []
