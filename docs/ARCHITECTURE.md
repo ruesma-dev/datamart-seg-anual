@@ -114,7 +114,7 @@ quien consulta, declarando sus hipótesis (regla dura `R-CAJA-HIPOTESIS`).
   `stg.plan_mensual` y `mart.fact_seguimiento_mensual` de la misma noche:
   `build_stg` y `build_mart` van delante, y la reanudación de F-148 lo sabe
   (`LECTURAS_PARA_REANUDAR`).
-- **Las hipótesis**: las 23 (H01-H23) viven en `config/hipotesis_caja.yaml`, que
+- **Las hipótesis**: las 27 (H01-H27 desde F-150) viven en `config/hipotesis_caja.yaml`, que
   mantiene Control de Costes y aprueba el humano; `build_tesoreria` lo valida
   (`infrastructure/config/hipotesis_caja_yaml.py`) justo antes de cargarlo y,
   si tiene errores, el paso queda FAILED con la lista: lo de `01`-`07` (cartera,
@@ -124,9 +124,38 @@ quien consulta, declarando sus hipótesis (regla dura `R-CAJA-HIPOTESIS`).
   catálogo y la sección manual ya cargados y `hipotesis_caja_obra` es la de
   ayer). Se publican en `tesoreria.hipotesis_caja` (catálogo, todas
   `validado` falso hoy), `tesoreria.hipotesis_caja_manual` (la sección `obras`)
-  y `tesoreria.hipotesis_caja_obra` (las 23 en cada obra, con su nivel: MANUAL >
-  SIGRID > DEFECTO; SIGRID solo para H09-H11, de los contratos con el cliente).
+  y `tesoreria.hipotesis_caja_obra` (las 27 en cada obra, con su nivel: MANUAL >
+  SIGRID > DEFECTO; SIGRID para H09-H11, de los contratos con el cliente, y desde
+  F-150 H12, el tipo de IVA de la ficha de la obra).
 - Ingesta: `auxcob` y `auxefc` entran a `raw` (78 tablas).
+
+**La receta de la caja (F-150, 2026-10-28), en el mismo esquema.** Sigue sin
+haber caja proyectada (F-151); lo que cambia es que la IA combina los
+ingredientes SIEMPRE en el mismo orden y con el dato del contrato:
+
+- **La receta** vive en la ficha de `tesoreria.hipotesis_caja` (excepción
+  acotada D1 de `docs/CONVENTIONS.md`): siete pasos (`PASOS_RECETA` del
+  dominio: DEVENGO, DOCUMENTO, COEFICIENTES, PLAZO, RETENCION, IVA, CARTERA) y
+  cada hipótesis declara el suyo (`paso_receta`, obligatorio: sin él el YAML no
+  valida). Las 27 incluyen los perfiles `PERFIL_MESES` (pares `[meses, %]` que
+  reparten el importe entero: H03, H08, H24, H25), el hueco de facturación (H26)
+  y la antigüedad de los albaranes que dejan de ser caja (H27).
+- **El contrato de cada partida** (`raw.obrparpar.ctride`): `06` lee su
+  `coestr` (líneas `CODIGO|etiqueta|valor||base`, por código, con
+  `tesoreria.fn_coeficientes`; `COEF_DESADJ` en cascada, `RET*` aparte) y su IVA
+  (`raw.iva`). `07` da a cada partida de venta su `coeficiente_venta`: el del
+  contrato, si no `importe_oficial / importe` del master 9 y si no del 11 en la
+  versión V (`stg.presupuesto`); una partida de venta con pendiente y sin
+  ninguno tumba el paso (D6). La obra-mes suma el pendiente con coeficientes, el
+  IVA y la retención del contrato, y las bases sin ese dato (para H12 y H10).
+- **El hueco de facturación** (`devengo_corte_obra`, N9): por obra, la venta
+  real a origen con coeficientes (la partida sin coeficiente, con la media
+  ponderada de su obra, `MEDIA_OBRA`) menos lo facturado (`raw.dvf.totbas` por
+  el centro de coste de la obra), con suelo 0; lo facturado por delante se
+  publica aparte y no se cobra. IVA y retención del hueco, por el peso de cada
+  contrato.
+- Ingesta: `iva` entera y `dvf` con la lista blanca `include_columns` (9 de sus
+  151 columnas): 80 tablas.
 
 **`descompuestos` (F-097, 2026-09-28) es de qué se compone cada partida**, por
 ORIGEN, y es el primer esquema del datamart que NO se reconstruye de cero:
@@ -541,9 +570,9 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
   Azure. Hoy **lee y valida, no carga** a `aux.*`: las tablas destino y el
   esquema de los libros no están definidos todavía.
 
-### Qué se copia de Sigrid: 78 tablas, y qué NO está ahí (F-066, F-074, F-080, F-102, F-107, F-095, F-085, F-090, F-138, F-140)
+### Qué se copia de Sigrid: 80 tablas, y qué NO está ahí (F-066, F-074, F-080, F-102, F-107, F-095, F-085, F-090, F-138, F-140, F-150)
 
-`config/tables_sigrid.yaml` declara **78 tablas**: eran 31, F-066 las dejó en 56
+`config/tables_sigrid.yaml` declara **80 tablas**: eran 31, F-066 las dejó en 56
 el 2026-09-06, F-074 sumó nueve más el 2026-09-09, F-080 otras tres el
 2026-09-11 —`auxnap`, `auxban` y `rpa`, el bloque de pago del efecto y las
 remesas—, F-102 una el 2026-09-23 —`auxemp`, las 38 empresas del grupo, que da
@@ -574,7 +603,11 @@ lectura sobre `con`, medio minuto de la ventana nocturna). F-140 suma las dos
 últimas el 2026-10-25, `auxcob` (las 52 formas de COBRO, a donde apunta
 `obrctr.pagide`) y `auxefc` (sus 8 medios): la pareja de `auxpag`/`auxefp` en el
 lado del cliente, enteras y con `tiemod`, para leer la fórmula de plazo del
-contrato con el cliente (`tesoreria.plazos_forma_pago`).
+contrato con el cliente (`tesoreria.plazos_forma_pago`). F-150 suma las dos
+últimas el 2026-10-28, `iva` (el catálogo de tipos de IVA, entero) y `dvf` (las
+facturas de venta), de la que **solo se traen 9 de sus 151 columnas** —la
+cabecera— con la lista blanca `include_columns` del ingestor: lo facturado
+al cliente que necesita el hueco de facturación de H26.
 Las 25 que entraron el primer día vienen en tres grupos, y ninguna se supuso: todo lo
 que sigue se midió contra Sigrid ese día por `sigrid-api` en solo lectura.
 

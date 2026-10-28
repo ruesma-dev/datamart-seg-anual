@@ -80,6 +80,14 @@ encaja: `docs/ARCHITECTURE.md`.
   primero, y deja el `para_que_sirve` de un esquema en 350 caracteres.
 - El diccionario describe **lo que el dato ES**, nunca cómo se decide con él.
   Un procedimiento de negocio no entra en un YAML de `config/diccionario/`.
+  **Excepción acotada (F-150, D1): la receta de la caja.** La ficha de
+  `tesoreria.hipotesis_caja` lleva el ORDEN en que se combinan objetos del
+  datamart para pasar devengo a caja (los siete pasos de `PASOS_RECETA`, cada
+  hipótesis en el suyo por `paso_receta`), porque sin ese orden la IA los
+  combina distinto en cada conversación. La excepción cubre una receta de
+  objetos del datamart y nada más: los VALORES de las hipótesis siguen en
+  `config/hipotesis_caja.yaml` (los mantiene Control de Costes), ninguna cifra
+  de negocio va a la ficha y el ETL sigue sin calcular caja (F-151).
 
 ## Tests
 

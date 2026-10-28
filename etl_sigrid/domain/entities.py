@@ -59,6 +59,10 @@ class TableSpec:
     where: str | None = None
     exclude_columns: list[str] = field(default_factory=list)
     page_size_override: int | None = None  # si None, usa el default del cliente
+    # F-150 (R17): LISTA BLANCA. Si no está vacía, se traen solo estas columnas
+    # (en el orden de Sigrid). Excluye a `exclude_columns`: declarar las dos es
+    # un error de configuración y la tabla falla antes de crear nada.
+    include_columns: tuple[str, ...] = ()
 
 
 @dataclass(slots=True)

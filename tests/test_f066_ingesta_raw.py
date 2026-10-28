@@ -47,10 +47,13 @@ FICHERO_PENDIENTES = RAIZ / "config" / "objetos_pendientes.yaml"
 #: F-090 añade `rcg` y `gra` --el índice de adjuntos de compras, filtradas-- y
 #: son 74; F-138 añade `conala` y `auxala` --las alarmas de los
 #: documentos, filtrada la primera-- y son 76; F-140 añade `auxcob` y `auxefc`
-#: --las formas y los medios de cobro-- y son 78. La
+#: --las formas y los medios de cobro-- y son 78; F-150 añade `iva` --el
+#: catálogo de impuestos de los contratos con el cliente y de la ficha de la
+#: obra-- y `dvf` --la CABECERA de las facturas de venta, por lista blanca,
+#: para el hueco de facturación de H26-- y son 80. La
 #: constante se mueve con la realidad a propósito: es lo que hace que
 #: los tres documentos que citan el número no se queden viejos en silencio.
-TOTAL_TABLAS = 78
+TOTAL_TABLAS = 80
 
 #: La lista estándar de nombres de texto/binario ilimitado de documentos, tal y
 #: como la declara el bloque COMPRAS de `config/tables_sigrid.yaml`.

@@ -5,7 +5,8 @@ Step que extrae datos de Sigrid (vía sigrid-api) y los vuelca a raw.* en Postgr
 Flujo:
     1. Para cada tabla declarada en config/tables_sigrid.yaml:
        a. Lee INFORMATION_SCHEMA.COLUMNS de Sigrid para esa tabla.
-       b. Excluye las columnas marcadas en `exclude_columns` (binarios, blobs).
+       b. Excluye las columnas marcadas en `exclude_columns` (binarios, blobs) o,
+          si la tabla declara `include_columns` (F-150), se queda solo con esas.
        c. Crea raw.<target_table> en Postgres si no existe.
        d. Si full_refresh=True: TRUNCATE raw.<target_table>.
           Si full_refresh=False: averigua el MAX(ide) en raw y arranca el cursor desde ahí.
@@ -28,7 +29,7 @@ from time import perf_counter
 
 from config.settings import Settings
 from etl_sigrid.application.steps.base import PipelineStep
-from etl_sigrid.domain.entities import StepResult, StepStatus, TableSpec
+from etl_sigrid.domain.entities import ColumnSpec, StepResult, StepStatus, TableSpec
 from etl_sigrid.domain.ventana import firma_de_obra
 from etl_sigrid.infrastructure.logging_config import get_logger
 from etl_sigrid.infrastructure.postgres.client_factory import build_postgres_client
@@ -249,7 +250,32 @@ class IngestRawStep(PipelineStep):
             where=raw_cfg.get("where"),
             exclude_columns=raw_cfg.get("exclude_columns") or [],
             page_size_override=raw_cfg.get("page_size"),
+            include_columns=tuple(raw_cfg.get("include_columns") or ()),
         )
+
+    @staticmethod
+    def _columnas_a_traer(spec: TableSpec, all_cols: list[ColumnSpec]) -> list[ColumnSpec]:
+        """Las columnas que se ingieren, en el orden de Sigrid (F-150, R17).
+
+        Con `include_columns`, solo esas; si además declara `exclude_columns`, o
+        alguna incluida no existe en Sigrid, falla ANTES de crear o vaciar nada:
+        una lista blanca que no casa con el origen no se adivina.
+        """
+        if not spec.include_columns:
+            excluded = set(spec.exclude_columns)
+            return [c for c in all_cols if c.name not in excluded]
+        if spec.exclude_columns:
+            raise SigridApiError(
+                f"{spec.source_table}: declara include_columns y exclude_columns a la vez"
+            )
+        existentes = {c.name for c in all_cols}
+        faltan = sorted(set(spec.include_columns) - existentes)
+        if faltan:
+            raise SigridApiError(
+                f"{spec.source_table}: include_columns que no existen en Sigrid: {faltan}"
+            )
+        incluidas = set(spec.include_columns)
+        return [c for c in all_cols if c.name in incluidas]
 
     def _ingest_one_table(
         self,
@@ -266,7 +292,7 @@ class IngestRawStep(PipelineStep):
             # 1. Schema desde Sigrid
             all_cols = api.fetch_table_schema(spec.source_table)
             excluded = set(spec.exclude_columns)
-            kept_cols = [c for c in all_cols if c.name not in excluded]
+            kept_cols = self._columnas_a_traer(spec, all_cols)
             if not kept_cols:
                 raise SigridApiError(
                     f"Sin columnas tras excluir {excluded} en {spec.source_table}"
@@ -277,6 +303,7 @@ class IngestRawStep(PipelineStep):
                 table=spec.source_table,
                 kept_cols=len(kept_cols),
                 excluded_cols=sorted(excluded),
+                included_cols=list(spec.include_columns),
                 page_size=spec.page_size_override or self._settings.sigrid_api.page_size,
             )
 

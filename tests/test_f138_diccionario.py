@@ -186,7 +186,7 @@ def test_f138_r26_version_recuento_y_pendientes() -> None:
     assert int(glob["version"]) >= 52, "F-138 sube la versión del diccionario"
     texto = (DIR_DICCIONARIO / "00_global.yaml").read_text(encoding="utf-8")
     assert "version 52 (F-138" in texto
-    assert "las 78 tablas" in texto  # +2 de F-140
+    assert "las 80 tablas" in texto  # +2 de F-140, +2 de F-150
     assert glob["pendientes"] == []
     frescura = {r["codigo"]: r for r in glob["reglas"]}["R-FRESCURA"]
     assert "compras_restringida" in frescura["ambito"]
@@ -194,7 +194,7 @@ def test_f138_r26_version_recuento_y_pendientes() -> None:
 
 def test_f138_r26_raw_yaml() -> None:
     texto = (DIR_DICCIONARIO / "raw.yaml").read_text(encoding="utf-8")
-    assert "Son 78 tablas" in texto  # +2 de F-140
+    assert "Son 80 tablas" in texto  # +2 de F-140, +2 de F-150
     conala = _texto(_ficha("raw", "conala"))
     for dato in ("F-138", "45.747", "D3", "43", "`fec1`", "`creusu`", "LOGIN",
                  "compras_restringida", "grep -n \"^| conala \" azure-apps/sigrid_tablas.md"):
@@ -207,7 +207,7 @@ def test_f138_r26_raw_yaml() -> None:
 # R27 · ARCHITECTURE, CLAUDE.md y azure-apps
 # ===========================================================================
 
-DATOS_DOCUMENTOS = ("78 tablas", "F-138", "`conala`", "`auxala`", "compras_restringida",
+DATOS_DOCUMENTOS = ("80 tablas", "F-138", "`conala`", "`auxala`", "compras_restringida",
                     "compras.documento_alarmas", "compras.documento_liquidatoria",
                     "compras.contrato_liquidacion", "compras.facturas_tras_liquidacion")
 

@@ -943,8 +943,10 @@ def _prosa_de(objeto: str) -> list[tuple[str, str]]:
 
 
 def _cifras(texto: str) -> set[str]:
-    """Los números de un texto, sin las fechas ISO, que no son medidas."""
-    sin_fechas = re.sub(r"\d{4}-\d{2}-\d{2}", " ", texto)
+    """Los números de un texto, sin las fechas ISO ni los códigos de hipótesis
+    (`H22`, F-150: la receta de `tesoreria.hipotesis_caja` los nombra), que no
+    son medidas."""
+    sin_fechas = re.sub(r"\d{4}-\d{2}-\d{2}|\bH\d{2}\b", " ", texto)
     return set(re.findall(r"\d[\d.,]*\d|\d", sin_fechas))
 
 

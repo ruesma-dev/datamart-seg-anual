@@ -41,6 +41,13 @@ def _columnas_setup(tabla: str) -> list[str]:
         nombre = trozo.strip().split(" ")[0]
         if nombre and nombre.upper() != "PRIMARY":
             columnas.append(nombre)
+    # F-150: las columnas que llegan con `ALTER TABLE ... ADD COLUMN IF NOT
+    # EXISTS` quedan al final, en el orden del fichero.
+    for nombre in re.findall(
+        rf"ALTER TABLE {re.escape(tabla)} ADD COLUMN IF NOT EXISTS (\w+)", texto
+    ):
+        if nombre not in columnas:
+            columnas.append(nombre)
     return columnas
 
 
@@ -76,7 +83,7 @@ def test_f140_r4_una_fila_por_hipotesis_del_catalogo_real() -> None:
     leidas = cargar_hipotesis_caja()
     filas = hsql.filas_catalogo(leidas.catalogo)
     assert [f[0] for f in filas] == [h.codigo for h in leidas.catalogo]
-    assert len(filas) == 23
+    assert len(filas) == 27  # F-150: H24-H27
     for fila, h in zip(filas, leidas.catalogo, strict=True):
         assert len(fila) == len(_columnas_setup("tesoreria.hipotesis_caja"))
         assert isinstance(fila[4], Json) and fila[4].obj == h.valor_defecto
@@ -85,7 +92,7 @@ def test_f140_r4_una_fila_por_hipotesis_del_catalogo_real() -> None:
             assert isinstance(fila[5], Json) and fila[5].obj == list(h.opciones)
         assert fila[1:4] == (h.sentido, h.descripcion, h.unidad)
         assert fila[6:] == (h.fuente_defecto, h.ingrediente, h.validado,
-                            h.fecha_validacion, h.admite_obra)
+                            h.fecha_validacion, h.admite_obra, h.paso_receta)
 
 
 def test_f140_r3_las_filas_manuales_llevan_el_valor_como_json() -> None:
@@ -135,7 +142,7 @@ def test_f140_r2_el_paso_carga_el_catalogo_del_repositorio(pg) -> None:
     assert resultado.status == StepStatus.SUCCESS, resultado.error_message
     assert len(pg.cargas) == 1
     catalogo, obras = pg.cargas[0]
-    assert len(catalogo) == 23 and obras == []
+    assert len(catalogo) == 27 and obras == []  # F-150: H24-H27
 
 
 def test_f140_r2_con_errores_falla_con_la_lista_y_no_escribe(pg, monkeypatch) -> None:
@@ -229,8 +236,9 @@ def test_f140_r21_las_formas_de_cobro_entran_como_las_de_pago(tabla: str) -> Non
 
 def test_f140_r21_el_censo_pasa_a_78() -> None:
     nombres = [t["source_table"] for t in _tablas_ingesta()]
-    assert len(nombres) == 78
-    assert len(set(nombres)) == 78, "tabla declarada dos veces"
+    # +2 de F-150 (`iva`, `dvf`): lo que fija este test es que las de F-140 siguen contadas
+    assert len(nombres) == 80
+    assert len(set(nombres)) == 80, "tabla declarada dos veces"
 
 
 def test_f140_r21_el_comentario_dice_cifras_y_para_que() -> None:

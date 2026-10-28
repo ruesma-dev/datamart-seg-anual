@@ -1,6 +1,8 @@
 # config/hipotesis_caja.yaml
 #
 # F-140 · EL CATALOGO DE HIPOTESIS para pasar el DEVENGO de una obra a CAJA.
+# F-150 · LA RECETA: cada hipotesis dice en que PASO de la receta se aplica
+# (`paso_receta`); la receta entera, en la ficha de `tesoreria.hipotesis_caja`.
 #
 # EL DATAMART NO CONVIERTE DEVENGO EN CAJA (regla del humano): publica los
 # ingredientes y este catalogo, y la conversion la hace la IA en vivo,
@@ -25,7 +27,8 @@
 #   codigo           H y dos cifras, unico
 #   sentido          PAGO, COBRO o AMBOS
 #   descripcion      que supone la hipotesis
-#   unidad           DIAS, MESES, PORCENTAJE (0-100), BOOLEANO, OPCION o MAPA_DIAS
+#   unidad           DIAS, MESES, PORCENTAJE (0-100), BOOLEANO, OPCION, MAPA_DIAS
+#                    o PERFIL_MESES (F-150, ver abajo)
 #   valor_defecto    casa con la unidad; en OPCION, una de `opciones` (la primera)
 #   opciones         solo en OPCION: el defecto y sus alternativas
 #   fuente_defecto   de que dato o decision sale el defecto
@@ -34,6 +37,17 @@
 #   validado         true solo cuando Negocio lo aprueba
 #   fecha_validacion solo con validado: true
 #   admite_obra      si se puede personalizar por obra en la seccion `obras`
+#   paso_receta      F-150: el paso de la receta en que se aplica, uno de DEVENGO,
+#                    DOCUMENTO, COEFICIENTES, PLAZO, RETENCION, IVA o CARTERA
+#
+# PERFIL_MESES (F-150, R25): reparte un importe ENTERO en varios meses. Es una
+# lista de pares [meses, porcentaje]: `meses` entero de 0 a 120 y estrictamente
+# creciente (0 es el mismo mes del hecho), `porcentaje` > 0 y <= 100 con dos
+# decimales como mucho, y la suma, exactamente 100. Ejemplos: [[0, 100]] todo en
+# el mes; [[1, 50], [2, 50]] (H08: la mitad se certifica al mes siguiente y la
+# otra mitad al otro); [[3, 50], [4, 50]] (H25: un cobro fraccionado en dos
+# meses, a los 3 y a los 4). H03 y H08 mueven el DOCUMENTO (desde el que corre
+# el plazo); H24 y H25, el DINERO (el fraccionamiento de cada pago y cobro).
 #
 # VALORES POR OBRA (D14-A), seccion `obras`: `clave_obra` (empresa-codigo, como
 # `1-0704`: R-CODIGO-POR-EMPRESA), `codigo`, `valor`, `motivo` y `fecha`. Ganan
@@ -59,6 +73,7 @@ hipotesis:
     ingrediente: tesoreria.condiciones_contrato_compra
     validado: false
     admite_obra: true
+    paso_receta: PLAZO
 
   - codigo: H02
     sentido: PAGO
@@ -73,18 +88,23 @@ hipotesis:
     ingrediente: tesoreria.plazos_forma_pago
     validado: false
     admite_obra: true
+    paso_receta: PLAZO
 
   - codigo: H03
     sentido: PAGO
     descripcion: >-
-      Meses entre el mes de devengo y la fecha de la factura del proveedor,
-      desde la que corre el plazo de pago.
-    unidad: MESES
-    valor_defecto: 0
-    fuente_defecto: La factura se fecha a fin del mes de devengo (propuesta, sin medir).
+      Perfil de meses entre el mes de devengo y la fecha de la factura del
+      proveedor, desde la que corre el plazo de pago. Mueve el DOCUMENTO, no el
+      dinero: el fraccionamiento del pago es H24.
+    unidad: PERFIL_MESES
+    valor_defecto: [[0, 100]]
+    fuente_defecto: >-
+      Todo en el mes de devengo: la factura se fecha a fin de ese mes
+      (propuesta, sin medir).
     ingrediente: tesoreria.devengo_pendiente_obra_mes
     validado: false
     admite_obra: true
+    paso_receta: DOCUMENTO
 
   - codigo: H04
     sentido: PAGO
@@ -99,6 +119,7 @@ hipotesis:
     ingrediente: tesoreria.condiciones_contrato_compra
     validado: false
     admite_obra: true
+    paso_receta: PLAZO
 
   - codigo: H05
     sentido: PAGO
@@ -111,6 +132,7 @@ hipotesis:
     ingrediente: tesoreria.plazos_forma_pago
     validado: false
     admite_obra: true
+    paso_receta: PLAZO
 
   - codigo: H06
     sentido: PAGO
@@ -125,6 +147,7 @@ hipotesis:
     ingrediente: tesoreria.condiciones_contrato_compra
     validado: false
     admite_obra: true
+    paso_receta: RETENCION
 
   - codigo: H07
     sentido: PAGO
@@ -141,16 +164,23 @@ hipotesis:
     ingrediente: retenciones.fin_obra
     validado: false
     admite_obra: true
+    paso_receta: RETENCION
 
   - codigo: H08
     sentido: COBRO
-    descripcion: Meses entre la produccion de un mes y su certificacion al cliente.
-    unidad: MESES
-    valor_defecto: 1
-    fuente_defecto: Se certifica el mes siguiente al de produccion (propuesta, sin medir).
+    descripcion: >-
+      Perfil de meses entre la produccion de un mes y su certificacion al
+      cliente, desde la que corre el plazo de cobro. Mueve el DOCUMENTO, no el
+      dinero: el fraccionamiento del cobro es H25.
+    unidad: PERFIL_MESES
+    valor_defecto: [[1, 100]]
+    fuente_defecto: >-
+      Todo al mes siguiente al de produccion (propuesta, sin medir). Ejemplo de
+      certificacion partida: [[1, 50], [2, 50]].
     ingrediente: tesoreria.devengo_pendiente_obra_mes
     validado: false
     admite_obra: true
+    paso_receta: DOCUMENTO
 
   - codigo: H09
     sentido: COBRO
@@ -163,18 +193,23 @@ hipotesis:
     ingrediente: tesoreria.condiciones_contrato_cliente
     validado: false
     admite_obra: true
+    paso_receta: PLAZO
 
   - codigo: H10
     sentido: COBRO
-    descripcion: Porcentaje de retencion de garantia que nos retiene el cliente.
+    descripcion: >-
+      Porcentaje de retencion de garantia que nos retiene el cliente. La del
+      contrato de cada partida va en el devengo (`importe_retencion_contrato`);
+      esta solo cubre las bases `sin_retencion_contrato`.
     unidad: PORCENTAJE
     valor_defecto: 0
     fuente_defecto: >-
-      El del contrato con el cliente si es unico (nivel OBRA, fuente SIGRID);
-      si no, ninguno.
+      La de la obra si es unica en sus contratos con el cliente (nivel OBRA,
+      fuente SIGRID); si no, 0.
     ingrediente: tesoreria.condiciones_contrato_cliente
     validado: false
     admite_obra: true
+    paso_receta: RETENCION
 
   - codigo: H11
     sentido: COBRO
@@ -189,18 +224,24 @@ hipotesis:
     ingrediente: tesoreria.condiciones_contrato_cliente
     validado: false
     admite_obra: true
+    paso_receta: RETENCION
 
   - codigo: H12
     sentido: COBRO
     descripcion: >-
-      IVA de la venta que se suma al cobro (el devengo va sin IVA).
+      IVA de la venta que se suma al cobro (el devengo va sin IVA). El del
+      contrato de cada partida va en el devengo (`importe_iva_contrato`; 0 % en
+      inversion del sujeto pasivo); esta solo cubre las bases
+      `sin_iva_contrato`.
     unidad: PORCENTAJE
     valor_defecto: 21
     fuente_defecto: >-
-      Tipo general. La vivienda va al 10 %: se personaliza por obra.
+      La ficha de la obra (su tipo de IVA, fuente SIGRID); si no, 21 %, el tipo
+      general. Control de Costes puede fijar la obra en la seccion `obras`.
     ingrediente: null
     validado: false
     admite_obra: true
+    paso_receta: IVA
 
   - codigo: H13
     sentido: PAGO
@@ -211,29 +252,35 @@ hipotesis:
     fuente_defecto: >-
       Cuota / base de las facturas de compra de 12 meses: 7,99 / 144,53 M EUR
       (medido). La marca de inversion del sujeto pasivo no sirve: es falsa en
-      todas.
+      todas. Propuesta pendiente de AdP: el IVA de cada contrato de compra
+      (F-150, N7).
     ingrediente: compras.facturas
     validado: false
     admite_obra: true
+    paso_receta: IVA
 
   - codigo: H14
     sentido: AMBOS
     descripcion: >-
-      Como se liquida el IVA con Hacienda: trimestral (dia 20 del mes
-      siguiente al trimestre), mensual o no se modela.
+      Como se liquida el IVA con Hacienda: mensual (dia 20 del mes siguiente),
+      trimestral (dia 20 del mes siguiente al trimestre) o no se modela.
     unidad: OPCION
-    valor_defecto: TRIMESTRAL
-    opciones: [TRIMESTRAL, MENSUAL, NO_MODELAR]
-    fuente_defecto: Regimen general trimestral (propuesta, sin medir).
+    valor_defecto: MENSUAL
+    opciones: [MENSUAL, TRIMESTRAL, NO_MODELAR]
+    fuente_defecto: >-
+      Mensual, dia 20 del mes siguiente: casi seguro (el humano, 2026-10-27);
+      pendiente de que lo confirme AdP.
     ingrediente: null
     validado: false
     admite_obra: true
+    paso_receta: IVA
 
   - codigo: H15
     sentido: AMBOS
     descripcion: >-
       Como se reparte un importe entre los vencimientos de una formula con
-      varios (`30 60 90`).
+      varios (`30 60 90`). Solo aplica a formas con varios vencimientos; con
+      uno, no aplica (D10).
     unidad: OPCION
     valor_defecto: PARTES_IGUALES
     opciones: [PARTES_IGUALES]
@@ -241,6 +288,7 @@ hipotesis:
     ingrediente: tesoreria.plazos_forma_pago
     validado: false
     admite_obra: true
+    paso_receta: PLAZO
 
   - codigo: H16
     sentido: AMBOS
@@ -254,6 +302,7 @@ hipotesis:
     ingrediente: tesoreria.efectos
     validado: false
     admite_obra: true
+    paso_receta: CARTERA
 
   - codigo: H17
     sentido: AMBOS
@@ -267,6 +316,7 @@ hipotesis:
     ingrediente: tesoreria.efectos
     validado: false
     admite_obra: false
+    paso_receta: CARTERA
 
   - codigo: H18
     sentido: AMBOS
@@ -283,6 +333,7 @@ hipotesis:
     ingrediente: tesoreria.devengo_pendiente_obra_mes
     validado: false
     admite_obra: true
+    paso_receta: DEVENGO
 
   - codigo: H19
     sentido: AMBOS
@@ -296,20 +347,26 @@ hipotesis:
     ingrediente: tesoreria.devengo_pendiente_obra_mes
     validado: false
     admite_obra: true
+    paso_receta: DEVENGO
 
   - codigo: H20
     sentido: PAGO
     descripcion: >-
       Que se hace con los albaranes recibidos y pendientes de facturar: ejecutado
-      que no es devengo pendiente ni esta en la cartera.
+      que no es devengo pendiente ni esta en la cartera. A fin del mes del
+      albaran se supone su factura, desde la que corre el plazo de pago; los de
+      mas de H27 meses no son caja.
     unidad: OPCION
-    valor_defecto: MES_SIGUIENTE
-    opciones: [MES_SIGUIENTE, EXCLUIR]
+    valor_defecto: FIN_MES_ALBARAN
+    opciones: [FIN_MES_ALBARAN, EXCLUIR]
     fuente_defecto: >-
-      Se facturan el mes siguiente al cierre (8,23 M EUR en 20 obras, medido).
-    ingrediente: compras.fact_compras_linea
+      La factura es del mismo mes que el albaran en el 93 % (7 % el siguiente;
+      proformas 94/6), sobre 239 M EUR (medido el 2026-10-27). Pendientes de
+      facturar en las 21 obras: 56,9 M EUR, no los 8,23 de F-140.
+    ingrediente: compras.v_pbi_albaranes_sin_facturar
     validado: false
     admite_obra: true
+    paso_receta: CARTERA
 
   - codigo: H21
     sentido: AMBOS
@@ -324,6 +381,7 @@ hipotesis:
     ingrediente: tesoreria.devengo_corte_obra
     validado: false
     admite_obra: true
+    paso_receta: CARTERA
 
   - codigo: H22
     sentido: COBRO
@@ -334,6 +392,7 @@ hipotesis:
     ingrediente: null
     validado: false
     admite_obra: true
+    paso_receta: PLAZO
 
   - codigo: H23
     sentido: AMBOS
@@ -345,6 +404,72 @@ hipotesis:
     ingrediente: null
     validado: false
     admite_obra: true
+    paso_receta: DEVENGO
+
+  - codigo: H24
+    sentido: PAGO
+    descripcion: >-
+      Fraccionamiento en meses de cada PAGO: como se reparte el importe de un
+      vencimiento desde su fecha. Mueve el dinero, no el documento (eso es H03).
+    unidad: PERFIL_MESES
+    valor_defecto: [[0, 100]]
+    fuente_defecto: >-
+      Sin fraccionar: Sigrid no guarda el fraccionamiento (6 contratos de compra
+      con varios vencimientos, F-150).
+    ingrediente: tesoreria.plazos_forma_pago
+    validado: false
+    admite_obra: true
+    paso_receta: PLAZO
+
+  - codigo: H25
+    sentido: COBRO
+    descripcion: >-
+      Fraccionamiento en meses de cada COBRO: como se reparte el importe de un
+      vencimiento desde su fecha. Mueve el dinero, no el documento (eso es H08).
+    unidad: PERFIL_MESES
+    valor_defecto: [[0, 100]]
+    fuente_defecto: >-
+      Sin fraccionar: 0 contratos con el cliente con varios vencimientos
+      (F-150). Ejemplo de cobro en dos meses: [[3, 50], [4, 50]].
+    ingrediente: tesoreria.plazos_forma_pago
+    validado: false
+    admite_obra: true
+    paso_receta: PLAZO
+
+  - codigo: H26
+    sentido: COBRO
+    descripcion: >-
+      Sumar al cobro la venta ejecutada pendiente de facturar
+      (`venta_pendiente_facturar`): el hueco de facturacion NETO POR OBRA, lo
+      real a origen con coeficientes menos lo facturado. Lo facturado por
+      delante (`facturado_por_delante`) no se cobra.
+    unidad: OPCION
+    valor_defecto: INCLUIR
+    opciones: [INCLUIR, NO_INCLUIR]
+    fuente_defecto: >-
+      Lo ejecutado tambien se cobra: ~15,3 M EUR netos en las 21 obras
+      (medido el 2026-10-27).
+    ingrediente: tesoreria.devengo_corte_obra
+    validado: false
+    admite_obra: true
+    paso_receta: DEVENGO
+
+  - codigo: H27
+    sentido: PAGO
+    descripcion: >-
+      Antiguedad maxima, en meses, de lo pendiente de facturar (albaranes, H20)
+      que se trata como caja: lo mas antiguo no se paga y se declara con su
+      importe.
+    unidad: MESES
+    valor_defecto: 6
+    fuente_defecto: >-
+      Lo mas antiguo es casi siempre un albaran sin enlazar con su factura, no
+      deuda (como H17): 22,9 de los 56,9 M EUR tienen mas de 6 meses (medido el
+      2026-10-27). Lo revisa Control de Costes.
+    ingrediente: compras.v_pbi_albaranes_sin_facturar
+    validado: false
+    admite_obra: true
+    paso_receta: CARTERA
 
 # Valores por obra: ninguno todavia.
 obras: []

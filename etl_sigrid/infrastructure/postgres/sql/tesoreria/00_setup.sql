@@ -300,18 +300,80 @@ COMMENT ON FUNCTION tesoreria.fn_plazo_dias_retencion(TEXT) IS
 
 
 -- ---------------------------------------------------------------------------
+-- Los coeficientes del contrato con el cliente (`raw.obrctr.coestr`): F-150, R7, R8
+--
+-- Una LINEA por concepto (`\r\n`), cada una `CODIGO|etiqueta|valor||base`; se
+-- lee POR CODIGO (campo 1) y el valor es el campo 3. GG y BI van a sus clases,
+-- control de calidad y seguridad y salud a `otros`, la baja de adjudicacion a
+-- `baja` y las retenciones `RET*` a `retencion`, que NO es coeficiente. Lo que
+-- no se entiende (un codigo desconocido, un valor no numerico) da NULL entero:
+-- falla cerrado y la partida cae al master. Vacio o NULL: NULL (sin dato).
+-- Mismos literales que `etl_sigrid/domain/proyeccion_caja.py`
+-- (`SEPARADOR_LINEAS`, `SEPARADOR_CAMPOS`, `REGEX_PORCENTAJE_COEF`,
+-- `CLASE_POR_CODIGO`); `tests/test_f150_sql.py` los compara.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION tesoreria.fn_coeficientes(f TEXT)
+RETURNS NUMERIC[]
+LANGUAGE sql IMMUTABLE AS $$
+    WITH lineas AS (
+        SELECT split_part(l.t, '|', 1) AS codigo,
+               btrim(split_part(l.t, '|', 3)) AS valor
+        FROM unnest(regexp_split_to_array(f, '\r?\n')) AS u(t0)
+        CROSS JOIN LATERAL (SELECT btrim(u.t0) AS t) AS l
+        WHERE btrim(u.t0) <> ''
+    ),
+    clasificadas AS (
+        SELECT CASE codigo
+                   WHEN 'COEF_RECGG' THEN 'gg'
+                   WHEN 'COEF_RECBI' THEN 'bi'
+                   WHEN 'COEF_RECCC' THEN 'otros'
+                   WHEN 'COEF_RECSYS' THEN 'otros'
+                   WHEN 'COEF_DESADJ' THEN 'baja'
+                   WHEN 'RETN' THEN 'retencion'
+                   WHEN 'RETESP' THEN 'retencion'
+                   WHEN 'RETNT' THEN 'retencion'
+               END AS clase,
+               CASE WHEN valor ~ '^-?[0-9]+(\.[0-9]+)?$' THEN valor::NUMERIC END AS v
+        FROM lineas
+    )
+    SELECT CASE WHEN count(*) > 0 AND count(*) = count(clase) AND count(*) = count(v)
+                THEN ARRAY[
+                    sum(v) FILTER (WHERE clase = 'gg'),
+                    sum(v) FILTER (WHERE clase = 'bi'),
+                    sum(v) FILTER (WHERE clase = 'otros'),
+                    sum(v) FILTER (WHERE clase = 'baja'),
+                    sum(v) FILTER (WHERE clase = 'retencion')
+                ] END
+    FROM clasificadas;
+$$;
+
+COMMENT ON FUNCTION tesoreria.fn_coeficientes(TEXT) IS
+'F-150. Los coeficientes de coestr de un contrato con el cliente, en puntos: {gg, bi, otros, baja, retencion}, cada uno la suma de sus lineas o NULL si no tiene. Una linea por concepto (CODIGO|etiqueta|valor||base), leida por codigo. NULL entero si un codigo es desconocido, un valor no es numero, o coestr esta vacio o es NULL: falla cerrado.';
+
+-- Cierto si `coestr` se entiende entero (y tiene alguna linea).
+CREATE OR REPLACE FUNCTION tesoreria.fn_coeficientes_reconocidos(f TEXT)
+RETURNS BOOLEAN
+LANGUAGE sql IMMUTABLE AS $$
+    SELECT tesoreria.fn_coeficientes(f) IS NOT NULL;
+$$;
+
+COMMENT ON FUNCTION tesoreria.fn_coeficientes_reconocidos(TEXT) IS
+'F-150. Cierto si el coestr de un contrato con el cliente se reconoce entero: todas sus lineas con un codigo conocido y un valor numerico. Vacio, NULL, un codigo desconocido o un valor no numerico: falso.';
+
+
+-- ---------------------------------------------------------------------------
 -- El catalogo de hipotesis (R1, R4) y los valores por obra del YAML (R3)
 --
 -- Los carga el sub-paso `hipotesis_carga` (Python) desde
 -- `config/hipotesis_caja.yaml`, validado por el dominio, en UNA transaccion.
 -- Los valores van en JSONB: una hipotesis es un DIAS, un PORCENTAJE, una
--- OPCION, un BOOLEANO o un MAPA_DIAS.
+-- OPCION, un BOOLEANO, un MAPA_DIAS o un PERFIL_MESES (F-150).
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS tesoreria.hipotesis_caja (
     codigo            VARCHAR(3)   PRIMARY KEY,
     sentido           VARCHAR(5)   NOT NULL,
     descripcion       TEXT         NOT NULL,
-    unidad            VARCHAR(10)  NOT NULL,
+    unidad            VARCHAR(20)  NOT NULL,
     valor_defecto     JSONB NOT NULL,
     opciones          JSONB,
     fuente_defecto    TEXT         NOT NULL,
@@ -320,6 +382,15 @@ CREATE TABLE IF NOT EXISTS tesoreria.hipotesis_caja (
     fecha_validacion  DATE,
     admite_obra       BOOLEAN      NOT NULL
 );
+
+-- F-150 (R27): `unidad` admite PERFIL_MESES (12 caracteres) en la tabla que ya
+-- existe con VARCHAR(10). Ensanchar un VARCHAR no reescribe la tabla y repetirlo
+-- con el mismo tipo no hace nada: idempotente.
+ALTER TABLE tesoreria.hipotesis_caja ALTER COLUMN unidad TYPE VARCHAR(20);
+-- F-150 (R1): el paso de la receta en que se aplica cada hipotesis. Admite NULL
+-- solo para poder anadirla a la tabla con filas; la carga la llena SIEMPRE (el
+-- dominio la exige).
+ALTER TABLE tesoreria.hipotesis_caja ADD COLUMN IF NOT EXISTS paso_receta VARCHAR(12);
 
 CREATE TABLE IF NOT EXISTS tesoreria.hipotesis_caja_manual (
     clave_obra  VARCHAR(40)  NOT NULL,
@@ -406,6 +477,19 @@ CREATE TABLE IF NOT EXISTS tesoreria.condiciones_contrato_cliente (
 
 CREATE INDEX IF NOT EXISTS idx_tes_ccl_obra ON tesoreria.condiciones_contrato_cliente (obra_id);
 
+-- F-150 (R8, R18): los coeficientes de `coestr` y el IVA del contrato, al final
+-- y con ALTER (la tabla ya existe con filas; precedente F-101).
+ALTER TABLE tesoreria.condiciones_contrato_cliente ADD COLUMN IF NOT EXISTS coeficientes_texto TEXT;
+ALTER TABLE tesoreria.condiciones_contrato_cliente ADD COLUMN IF NOT EXISTS coeficientes_reconocidos BOOLEAN;
+ALTER TABLE tesoreria.condiciones_contrato_cliente ADD COLUMN IF NOT EXISTS coeficiente_gg NUMERIC(9,4);
+ALTER TABLE tesoreria.condiciones_contrato_cliente ADD COLUMN IF NOT EXISTS coeficiente_bi NUMERIC(9,4);
+ALTER TABLE tesoreria.condiciones_contrato_cliente ADD COLUMN IF NOT EXISTS coeficiente_otros NUMERIC(9,4);
+ALTER TABLE tesoreria.condiciones_contrato_cliente ADD COLUMN IF NOT EXISTS coeficiente_baja NUMERIC(9,4);
+ALTER TABLE tesoreria.condiciones_contrato_cliente ADD COLUMN IF NOT EXISTS retencion_coestr NUMERIC(9,4);
+ALTER TABLE tesoreria.condiciones_contrato_cliente ADD COLUMN IF NOT EXISTS coeficiente_contrato NUMERIC(12,6);
+ALTER TABLE tesoreria.condiciones_contrato_cliente ADD COLUMN IF NOT EXISTS iva_id INTEGER;
+ALTER TABLE tesoreria.condiciones_contrato_cliente ADD COLUMN IF NOT EXISTS iva_porcentaje NUMERIC(9,4);
+
 
 -- ---------------------------------------------------------------------------
 -- El devengo pendiente (R12-R15): por partida, por obra y mes, y su corte
@@ -431,6 +515,18 @@ CREATE TABLE IF NOT EXISTS tesoreria.devengo_pendiente_partida (
     PRIMARY KEY (obra_id, partida_id, concepto)
 );
 
+-- F-150 (R11, R19): el contrato de la partida, su coeficiente de venta y su IVA y
+-- retencion. Solo en VENTA; en COSTE, NULL.
+ALTER TABLE tesoreria.devengo_pendiente_partida ADD COLUMN IF NOT EXISTS contrato_cliente_id INTEGER;
+ALTER TABLE tesoreria.devengo_pendiente_partida ADD COLUMN IF NOT EXISTS coeficiente_venta NUMERIC(12,6);
+ALTER TABLE tesoreria.devengo_pendiente_partida ADD COLUMN IF NOT EXISTS fuente_coeficiente VARCHAR(12);
+ALTER TABLE tesoreria.devengo_pendiente_partida ADD COLUMN IF NOT EXISTS coeficiente_master NUMERIC(12,6);
+ALTER TABLE tesoreria.devengo_pendiente_partida ADD COLUMN IF NOT EXISTS pendiente_con_coeficientes NUMERIC(18,2);
+ALTER TABLE tesoreria.devengo_pendiente_partida ADD COLUMN IF NOT EXISTS iva_porcentaje NUMERIC(9,4);
+ALTER TABLE tesoreria.devengo_pendiente_partida ADD COLUMN IF NOT EXISTS fuente_iva VARCHAR(8);
+ALTER TABLE tesoreria.devengo_pendiente_partida ADD COLUMN IF NOT EXISTS retencion_porcentaje NUMERIC(10,4);
+ALTER TABLE tesoreria.devengo_pendiente_partida ADD COLUMN IF NOT EXISTS fuente_retencion VARCHAR(8);
+
 CREATE TABLE IF NOT EXISTS tesoreria.devengo_pendiente_obra_mes (
     obra_id                      INTEGER       NOT NULL,
     empresa_id                   INTEGER,
@@ -447,6 +543,15 @@ CREATE TABLE IF NOT EXISTS tesoreria.devengo_pendiente_obra_mes (
     mes_pasado_sin_cierre        BOOLEAN       NOT NULL,
     PRIMARY KEY (obra_id, anio_mes, concepto, categoria)
 );
+
+-- F-150 (R14, R20): el pendiente con coeficientes de cada mes, su cociente, y el
+-- IVA y la retencion del contrato con las bases que no lo tienen. Solo VENTA.
+ALTER TABLE tesoreria.devengo_pendiente_obra_mes ADD COLUMN IF NOT EXISTS importe_pendiente_con_coeficientes NUMERIC(18,2);
+ALTER TABLE tesoreria.devengo_pendiente_obra_mes ADD COLUMN IF NOT EXISTS coeficiente_venta NUMERIC(12,6);
+ALTER TABLE tesoreria.devengo_pendiente_obra_mes ADD COLUMN IF NOT EXISTS importe_iva_contrato NUMERIC(18,2);
+ALTER TABLE tesoreria.devengo_pendiente_obra_mes ADD COLUMN IF NOT EXISTS base_sin_iva_contrato NUMERIC(18,2);
+ALTER TABLE tesoreria.devengo_pendiente_obra_mes ADD COLUMN IF NOT EXISTS importe_retencion_contrato NUMERIC(18,2);
+ALTER TABLE tesoreria.devengo_pendiente_obra_mes ADD COLUMN IF NOT EXISTS base_sin_retencion_contrato NUMERIC(18,2);
 
 CREATE TABLE IF NOT EXISTS tesoreria.devengo_corte_obra (
     obra_id                       INTEGER       NOT NULL,
@@ -476,3 +581,14 @@ CREATE TABLE IF NOT EXISTS tesoreria.devengo_corte_obra (
     cartera_emitida_tras_cierre   NUMERIC(18,2) NOT NULL,
     PRIMARY KEY (obra_id, concepto)
 );
+
+-- F-150 (R23, N9): el hueco de facturacion de H26, NETO POR OBRA. Solo VENTA.
+ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS venta_real_origen_con_coeficientes NUMERIC(18,2);
+ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS venta_real_media_obra NUMERIC(18,2);
+ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS facturado_origen NUMERIC(18,2);
+ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS venta_pendiente_facturar NUMERIC(18,2);
+ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS facturado_por_delante NUMERIC(18,2);
+ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS iva_pendiente_facturar_contrato NUMERIC(18,2);
+ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS base_pendiente_facturar_sin_iva_contrato NUMERIC(18,2);
+ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS retencion_pendiente_facturar_contrato NUMERIC(18,2);
+ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS base_pendiente_facturar_sin_retencion_contrato NUMERIC(18,2);

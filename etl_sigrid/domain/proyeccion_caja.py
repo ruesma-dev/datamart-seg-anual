@@ -29,6 +29,13 @@ ejecutado de más es `sobre_ejecutado` y no resta a otras partidas.
 proporción al plan de V de cada mes posterior al cierre; el último mes del
 perfil absorbe el redondeo. Sin perfil, todo al primer mes pendiente, marcado
 como retraso.
+
+**F-150, la receta** (R1, R7, R9, R22, R25): cada hipótesis dice en qué paso de
+`PASOS_RECETA` se aplica; el perfil `PERFIL_MESES` reparte un importe entero
+en meses; los coeficientes, el IVA y la retención salen del CONTRATO con el
+cliente de cada partida (`leer_coeficientes_contrato`, `coeficiente_venta`),
+y el hueco de facturación de H26 es NETO POR OBRA (`hueco_facturacion`). Sigue
+sin aplicar nada a un importe de caja: publica ingredientes.
 """
 
 from __future__ import annotations
@@ -154,6 +161,201 @@ def repartir_pendiente(
 
 
 # ---------------------------------------------------------------------------
+# El contrato con el cliente de una partida: coeficientes e IVA (F-150, R7, R18)
+# ---------------------------------------------------------------------------
+
+#: `raw.obrctr.coestr` es una LÍNEA por concepto (`\r\n`, medido el 2026-10-27).
+SEPARADOR_LINEAS = r"\r?\n"
+#: Cada línea: `CODIGO|etiqueta|valor||base`; código = campo 1, valor = campo 3.
+SEPARADOR_CAMPOS = "|"
+#: Un valor de coeficiente: número con punto decimal, con signo menos opcional.
+REGEX_PORCENTAJE_COEF = r"^-?[0-9]+(\.[0-9]+)?$"
+#: A qué clase va cada código (N10). Manda el CÓDIGO, nunca la etiqueta: la
+#: combinada «Gastos Generales+Beneficio Industrial|23.79» lleva `COEF_RECGG`.
+#: Las `RET*` son la retención declarada en el contrato: NO son coeficiente.
+#: Un código fuera de aquí hace la fila NO reconocida (falla cerrado).
+CLASE_POR_CODIGO: dict[str, str] = {
+    "COEF_RECGG": "gg",
+    "COEF_RECBI": "bi",
+    "COEF_RECCC": "otros",
+    "COEF_RECSYS": "otros",
+    "COEF_DESADJ": "baja",
+    "RETN": "retencion",
+    "RETESP": "retencion",
+    "RETNT": "retencion",
+}
+_CLASES_COEFICIENTE = ("gg", "bi", "otros", "baja")
+_SEIS_DECIMALES = Decimal("0.000001")
+_CUATRO_DECIMALES = Decimal("0.0001")
+
+
+class CoeficientesContrato(NamedTuple):
+    """Lo que dice el `coestr` de un contrato, en puntos porcentuales (R7).
+
+    Cada clase es la SUMA de sus líneas, o `None` si no tiene ninguna. Vacío,
+    `NULL`, un código desconocido o un valor no numérico: todo `None` y
+    `reconocido` falso, sin quedarse con el trozo que sí se entiende.
+    """
+
+    gg: Decimal | None
+    bi: Decimal | None
+    otros: Decimal | None
+    baja: Decimal | None
+    retencion: Decimal | None
+    reconocido: bool
+
+
+_SIN_COEFICIENTES = CoeficientesContrato(None, None, None, None, None, False)
+
+
+def leer_coeficientes_contrato(texto: str | None) -> CoeficientesContrato:
+    """Lee `coestr` por líneas y por código (R7, N10) o falla cerrado.
+
+    Las líneas se recortan de espacios (`btrim`) y las vacías se ignoran; el
+    valor (campo 3) también se recorta. Sin ninguna línea: sin dato.
+    """
+    if texto is None:
+        return _SIN_COEFICIENTES
+    lineas = [ln.strip(_BLANCO_DE_BTRIM) for ln in re.split(SEPARADOR_LINEAS, texto)]
+    lineas = [ln for ln in lineas if ln]
+    if not lineas:
+        return _SIN_COEFICIENTES
+    sumas: dict[str, Decimal] = {}
+    for linea in lineas:
+        campos = linea.split(SEPARADOR_CAMPOS)
+        clase = CLASE_POR_CODIGO.get(campos[0])
+        valor = campos[2].strip(_BLANCO_DE_BTRIM) if len(campos) > 2 else ""
+        if clase is None or not re.search(REGEX_PORCENTAJE_COEF, valor):
+            return _SIN_COEFICIENTES
+        sumas[clase] = sumas.get(clase, _CERO) + Decimal(valor)
+    return CoeficientesContrato(
+        sumas.get("gg"), sumas.get("bi"), sumas.get("otros"), sumas.get("baja"),
+        sumas.get("retencion"), True,
+    )
+
+
+def factor_coeficientes(c: CoeficientesContrato) -> Decimal | None:
+    """El coeficiente de venta del contrato, a 6 decimales (R7), o `None`.
+
+    GG, BI y otros se SUMAN y la baja va en CASCADA sobre ese subtotal de
+    contrata: `(1 + (gg + bi + otros) / 100) x (1 + baja / 100)`
+    (1,19 x 0,8723 = 1,038037). Sin reconocer, o sin ningún coeficiente
+    (solo retención), `None`: la partida cae al master.
+    """
+    if not c.reconocido or all(getattr(c, k) is None for k in _CLASES_COEFICIENTE):
+        return None
+    contrata = Decimal(1) + ((c.gg or _CERO) + (c.bi or _CERO) + (c.otros or _CERO)) / _CIEN
+    factor = contrata * (Decimal(1) + (c.baja or _CERO) / _CIEN)
+    return factor.quantize(_SEIS_DECIMALES, rounding=ROUND_HALF_UP)
+
+
+def porcentaje_iva(fraccion: Decimal | float | None) -> Decimal | None:
+    """`raw.iva.iva` (tanto por uno) en porcentaje con 4 decimales (R18).
+
+    0 es 0 (inversión del sujeto pasivo): un valor, no la falta de él.
+    """
+    if fraccion is None:
+        return None
+    return (Decimal(str(fraccion)) * _CIEN).quantize(_CUATRO_DECIMALES, rounding=ROUND_HALF_UP)
+
+
+# ---------------------------------------------------------------------------
+# El coeficiente de venta de una partida (F-150, R9) y sus importes (R11, R20)
+# ---------------------------------------------------------------------------
+
+#: De dónde sale el coeficiente de venta de una partida, en orden de mando.
+FUENTES_COEFICIENTE: tuple[str, ...] = ("CONTRATO", "MASTER_CERT", "MASTER_VENTA", "SIN")
+#: El ámbito de `stg.presupuesto` de cada fuente del master (D3).
+AMBITO_COEFICIENTE: dict[str, int] = {"MASTER_CERT": 9, "MASTER_VENTA": 11}
+#: De dónde sale el IVA y la retención de una partida: su contrato o nada.
+FUENTES_DATO_CONTRATO: tuple[str, ...] = ("CONTRATO", "SIN")
+#: El motivo con que `08` publica la H12 leída de la ficha de la obra (R21).
+MOTIVO_H12_FICHA = "Ficha de la obra (tipo de IVA)"
+#: La fuente de la venta real SIN coeficiente propio en el hueco (N9).
+FUENTE_MEDIA_OBRA = "MEDIA_OBRA"
+
+
+def _coeficiente_master(importe: Decimal | None, oficial: Decimal | None) -> Decimal | None:
+    """`ROUND(oficial / importe, 6)`; sin importe (o a 0), `None`; sin oficial, el importe."""
+    if importe is None or importe == 0:
+        return None
+    oficial = importe if oficial is None else oficial
+    return (Decimal(oficial) / Decimal(importe)).quantize(_SEIS_DECIMALES, rounding=ROUND_HALF_UP)
+
+
+def coeficiente_venta(
+    contrato: Decimal | None,
+    importe_cert: Decimal | None,
+    oficial_cert: Decimal | None,
+    importe_venta: Decimal | None,
+    oficial_venta: Decimal | None,
+) -> tuple[Decimal | None, str]:
+    """`(coeficiente, fuente)` de una partida de VENTA (R9).
+
+    Manda el del CONTRATO; si no, el de certificación del master (ámbito 9)
+    si su importe no es `None` ni 0; si no, el de venta (ámbito 11); si no,
+    `(None, "SIN")`. Es el `COALESCE` de `07` en el mismo orden.
+    """
+    if contrato is not None:
+        return contrato, "CONTRATO"
+    cert = _coeficiente_master(importe_cert, oficial_cert)
+    if cert is not None:
+        return cert, "MASTER_CERT"
+    venta = _coeficiente_master(importe_venta, oficial_venta)
+    if venta is not None:
+        return venta, "MASTER_VENTA"
+    return None, "SIN"
+
+
+def importe_con_coeficiente(importe: Decimal, coeficiente: Decimal | None) -> Decimal | None:
+    """`ROUND(importe x coeficiente, 2)` (R11); sin coeficiente, `None`."""
+    if coeficiente is None:
+        return None
+    return _redondear(importe * coeficiente)
+
+
+def importe_por_porcentaje(base: Decimal, porcentaje: Decimal | None) -> Decimal | None:
+    """`ROUND(base x porcentaje / 100, 2)` (R20); sin porcentaje, `None`."""
+    if porcentaje is None:
+        return None
+    return _redondear(base * porcentaje / _CIEN)
+
+
+# ---------------------------------------------------------------------------
+# El hueco de facturación de H26 (F-150, R22, N6, N9)
+# ---------------------------------------------------------------------------
+
+
+def hueco_facturacion(
+    real_con_coeficientes: Decimal | None, facturado: Decimal | None
+) -> tuple[Decimal, Decimal]:
+    """`(pendiente_facturar, facturado_por_delante)` de una OBRA, al céntimo (R22).
+
+    `(máx(0, real - facturado), máx(0, facturado - real))`: nunca los dos
+    positivos. Lo facturado por delante no se cobra: no resta a nada. `None`
+    cuenta 0.
+    """
+    diferencia = (real_con_coeficientes or _CERO) - (facturado or _CERO)
+    return _redondear(max(_CERO, diferencia)), _redondear(max(_CERO, -diferencia))
+
+
+def coeficiente_medio(
+    pares: Sequence[tuple[Decimal | None, Decimal | None]]
+) -> Decimal | None:
+    """Σ (real x coef) / Σ real de una obra, a 6 decimales (R22, `MEDIA_OBRA`).
+
+    Solo cuentan los pares con real y coeficiente: los que no tienen
+    coeficiente son los que RECIBEN la media. Σ real 0 (o nada): `None`.
+    """
+    validos = [(r, c) for r, c in pares if r is not None and c is not None]
+    total = sum((r for r, _c in validos), _CERO)
+    if total == 0:
+        return None
+    ponderado = sum((r * c for r, c in validos), _CERO)
+    return (ponderado / total).quantize(_SEIS_DECIMALES, rounding=ROUND_HALF_UP)
+
+
+# ---------------------------------------------------------------------------
 # Lo que no se publica (R16)
 # ---------------------------------------------------------------------------
 
@@ -173,7 +375,17 @@ def es_columna_de_caja(nombre: str) -> bool:
 # ---------------------------------------------------------------------------
 
 #: Las unidades de un valor de hipótesis (lista cerrada, R2).
-UNIDADES: tuple[str, ...] = ("DIAS", "MESES", "PORCENTAJE", "BOOLEANO", "OPCION", "MAPA_DIAS")
+#: `PERFIL_MESES` (F-150, R25) reparte un importe ENTERO en varios meses.
+UNIDADES: tuple[str, ...] = (
+    "DIAS", "MESES", "PORCENTAJE", "BOOLEANO", "OPCION", "MAPA_DIAS", "PERFIL_MESES",
+)
+#: Los pasos de la receta de la caja (F-150, R1, D7), en su orden: la IA pasa
+#: el devengo a caja SIEMPRE así, y cada hipótesis dice en cuál se aplica.
+PASOS_RECETA: tuple[str, ...] = (
+    "DEVENGO", "DOCUMENTO", "COEFICIENTES", "PLAZO", "RETENCION", "IVA", "CARTERA",
+)
+#: El mes más lejano de un perfil (R25): diez años desde el hecho.
+MAX_MESES_PERFIL = 120
 #: El NIVEL de un valor declarado (`R-CAJA-HIPOTESIS`): el del catálogo, el de
 #: la obra (personalizado o leído de Sigrid) o el que da el usuario en vivo.
 NIVELES: tuple[str, ...] = ("DEFECTO", "OBRA", "USUARIO")
@@ -187,12 +399,13 @@ SENTIDOS: tuple[str, ...] = ("PAGO", "COBRO", "AMBOS")
 REGEX_CODIGO_HIPOTESIS = r"^H[0-9]{2}$"
 #: La clave de obra del YAML: `empresa-codigo` (`R-CODIGO-POR-EMPRESA`).
 REGEX_CLAVE_OBRA = r"^[0-9]+-\S.*$"
-#: Las hipótesis que `08` lee de los contratos con el cliente (D18-A).
-CODIGOS_SIGRID: tuple[str, ...] = ("H09", "H10", "H11")
+#: Las hipótesis que `08` resuelve como SIGRID: H09-H11 de los contratos con
+#: el cliente (D18-A) y, desde F-150 (N2), H12 de la ficha de la obra.
+CODIGOS_SIGRID: tuple[str, ...] = ("H09", "H10", "H11", "H12")
 
 _CAMPOS_OBLIGATORIOS = (
     "codigo", "sentido", "descripcion", "unidad", "valor_defecto",
-    "fuente_defecto", "ingrediente", "validado", "admite_obra",
+    "fuente_defecto", "ingrediente", "validado", "admite_obra", "paso_receta",
 )
 _CAMPOS_OPCIONALES = ("opciones", "fecha_validacion")
 _CAMPOS_OBRA = ("clave_obra", "codigo", "valor", "motivo", "fecha")
@@ -213,6 +426,8 @@ class Hipotesis:
     admite_obra: bool
     opciones: tuple[str, ...] = ()
     fecha_validacion: date | None = None
+    #: F-150 (R1): al final y con defecto, para no romper a quien ya la construye.
+    paso_receta: str = ""
 
 
 def _es_entero(valor: Any) -> bool:
@@ -233,8 +448,73 @@ def _es_fecha(valor: Any) -> bool:
     return isinstance(valor, date) and not isinstance(valor, datetime)
 
 
+#: Los decimales que admite un porcentaje de perfil: céntimos de punto.
+_DECIMALES_PERFIL = 2
+_CIEN = Decimal(100)
+
+
+def _errores_de_par(n: int, par: Any, meses_anterior: int | None) -> tuple[list[str], int | None]:
+    """Los errores del par `n` de un perfil y los meses que deja como «anterior»."""
+    meses, porcentaje = par
+    errores: list[str] = []
+    if not (_es_entero(meses) and 0 <= meses <= MAX_MESES_PERFIL):
+        errores.append(f"PERFIL_MESES, par {n}: meses {meses!r} no es un entero de 0 a "
+                       f"{MAX_MESES_PERFIL}")
+    elif meses_anterior is not None and meses <= meses_anterior:
+        errores.append(f"PERFIL_MESES, par {n}: meses {meses} no es mayor que el del par "
+                       "anterior (creciente estricto)")
+    else:
+        meses_anterior = meses
+    if not (_es_numero(porcentaje) and 0 < porcentaje <= 100):
+        errores.append(f"PERFIL_MESES, par {n}: porcentaje {porcentaje!r} no es > 0 y <= 100")
+    elif Decimal(str(porcentaje)).as_tuple().exponent < -_DECIMALES_PERFIL:
+        errores.append(f"PERFIL_MESES, par {n}: porcentaje {porcentaje!r} tiene mas de "
+                       f"{_DECIMALES_PERFIL} decimales")
+    return errores, meses_anterior
+
+
+def _errores_de_perfil(valor: Any) -> list[str]:
+    """Un error por cada fallo de un `PERFIL_MESES` (R25); vacía si vale.
+
+    Lista no vacía de pares `[meses, porcentaje]` (lista o tupla de dos):
+    `meses` entero de 0 a `MAX_MESES_PERFIL` y estrictamente creciente,
+    `porcentaje` > 0 y <= 100 con dos decimales como mucho, y la suma
+    exactamente 100 en `Decimal` (en float, 0.1 + 0.2 no es 0.3). La suma
+    solo se juzga si todos los pares son pares con porcentaje numérico.
+    """
+    if not (isinstance(valor, (list, tuple)) and valor):
+        return [f"valor {valor!r} no es un PERFIL_MESES: una lista no vacia de pares "
+                "[meses, porcentaje]"]
+    errores: list[str] = []
+    suma: Decimal | None = Decimal(0)
+    meses_anterior: int | None = None
+    for n, par in enumerate(valor, start=1):
+        if not (isinstance(par, (list, tuple)) and len(par) == 2):
+            errores.append(f"PERFIL_MESES, par {n} {par!r}: no es un par [meses, porcentaje]")
+            suma = None
+            continue
+        errores_par, meses_anterior = _errores_de_par(n, par, meses_anterior)
+        errores.extend(errores_par)
+        # `par[1] == par[1]` es la guarda contra NaN (NaN != NaN): un NaN no se suma.
+        if suma is not None and _es_numero(par[1]) and par[1] == par[1]:
+            suma += Decimal(str(par[1]))
+        else:
+            suma = None
+    if suma is not None and suma != _CIEN:
+        errores.append(f"PERFIL_MESES: los porcentajes suman {suma.normalize():f}, no 100")
+    return errores
+
+
+def _errores_de_valor(valor: Any, unidad: str, opciones: Sequence[str]) -> list[str]:
+    """Todos los errores de `valor` para `unidad`: el perfil da uno por fallo."""
+    if unidad == "PERFIL_MESES":
+        return _errores_de_perfil(valor)
+    error = _error_de_valor(valor, unidad, opciones)
+    return [error] if error else []
+
+
 def _error_de_valor(valor: Any, unidad: str, opciones: Sequence[str]) -> str | None:
-    """Por qué `valor` no vale para `unidad`, o `None` si vale."""
+    """Por qué `valor` no vale para `unidad`, o `None` si vale (salvo el perfil)."""
     if unidad in ("DIAS", "MESES"):
         if not (_es_entero(valor) and valor >= 0):
             return f"valor {valor!r} no es un entero >= 0 de {unidad}"
@@ -285,6 +565,8 @@ def _errores_de_fila(fila: dict) -> list[str]:
         errores.append(f"codigo {codigo!r} no casa con {REGEX_CODIGO_HIPOTESIS}")
     if "sentido" in fila and fila["sentido"] not in SENTIDOS:
         errores.append(f"sentido {fila['sentido']!r} fuera de {list(SENTIDOS)}")
+    if "paso_receta" in fila and fila["paso_receta"] not in PASOS_RECETA:
+        errores.append(f"paso_receta {fila['paso_receta']!r} fuera de {list(PASOS_RECETA)}")
     unidad = fila.get("unidad")
     unidad_valida = unidad in UNIDADES
     if "unidad" in fila and not unidad_valida:
@@ -292,9 +574,9 @@ def _errores_de_fila(fila: dict) -> list[str]:
     errores_opciones = _errores_de_opciones(fila, unidad)
     errores.extend(errores_opciones)
     if unidad_valida and "valor_defecto" in fila and not errores_opciones:
-        error = _error_de_valor(fila["valor_defecto"], unidad, fila.get("opciones") or ())
-        if error:
-            errores.append(error)
+        errores.extend(
+            _errores_de_valor(fila["valor_defecto"], unidad, fila.get("opciones") or ())
+        )
     for campo in ("descripcion", "fuente_defecto"):
         if campo in fila and not _es_texto(fila[campo]):
             errores.append(f"{campo} tiene que ser un texto no vacio")
@@ -355,6 +637,7 @@ def construir_catalogo(filas: Sequence[Any]) -> tuple[Hipotesis, ...]:
             admite_obra=f["admite_obra"],
             opciones=tuple(f.get("opciones") or ()),
             fecha_validacion=f.get("fecha_validacion"),
+            paso_receta=f["paso_receta"],
         )
         for f in filas
     )
@@ -380,9 +663,7 @@ def _errores_de_obra(fila: dict, catalogo: Mapping[str, Hipotesis]) -> list[str]
     elif hipotesis is not None and not hipotesis.admite_obra:
         errores.append(f"{codigo} no admite valor por obra (admite_obra: false)")
     elif hipotesis is not None and "valor" in fila:
-        error = _error_de_valor(fila["valor"], hipotesis.unidad, hipotesis.opciones)
-        if error:
-            errores.append(error)
+        errores.extend(_errores_de_valor(fila["valor"], hipotesis.unidad, hipotesis.opciones))
     if "motivo" in fila and not _es_texto(fila["motivo"]):
         errores.append("motivo tiene que ser un texto no vacio")
     if "fecha" in fila and not _es_fecha(fila["fecha"]):
