@@ -79,9 +79,10 @@ hipotesis:
     sentido: PAGO
     descripcion: >-
       Plazo de pago, en dias, de lo que NO tiene contrato, por categoria de la
-      partida (CD, CI, CP, OTRO).
+      partida (CD, CI, OTRO). Sin CP: el CP no es caja de la obra (coste de
+      estructura, F-154): se excluye del devengo y se declara.
     unidad: MAPA_DIAS
-    valor_defecto: {CD: 120, CI: 120, CP: 120, OTRO: 120}
+    valor_defecto: {CD: 120, CI: 120, OTRO: 120}
     fuente_defecto: >-
       La forma de pago mas frecuente en los contratos de compra: 120 dias
       (5.624 de 19.170, medido).
@@ -361,9 +362,11 @@ hipotesis:
     opciones: [FIN_MES_ALBARAN, EXCLUIR]
     fuente_defecto: >-
       La factura es del mismo mes que el albaran en el 93 % (7 % el siguiente;
-      proformas 94/6), sobre 239 M EUR (medido el 2026-10-27). Pendientes de
-      facturar en las 21 obras: 56,9 M EUR, no los 8,23 de F-140.
-    ingrediente: compras.v_pbi_albaranes_sin_facturar
+      proformas 94/6), sobre 239 M EUR (medido el 2026-10-27). Lo pendiente es
+      el neto por proveedor: 8,76 M EUR en las 21 obras (la vista de compras
+      suma 56,9, pero 48,2 ya estan sobrefacturados al mismo proveedor; medido
+      el 2026-10-29). Las filas tras_cierre ya son devengo pendiente.
+    ingrediente: tesoreria.albaranes_pendientes_neto
     validado: false
     admite_obra: true
     paso_receta: CARTERA
@@ -464,9 +467,10 @@ hipotesis:
     valor_defecto: 6
     fuente_defecto: >-
       Lo mas antiguo es casi siempre un albaran sin enlazar con su factura, no
-      deuda (como H17): 22,9 de los 56,9 M EUR tienen mas de 6 meses (medido el
-      2026-10-27). Lo revisa Control de Costes.
-    ingrediente: compras.v_pbi_albaranes_sin_facturar
+      deuda (como H17). Con el neto por proveedor (FIFO), 0,52 de los 8,76 M
+      EUR tienen mas de 6 meses (bruto: 22,8; medido el 2026-10-29). Lo revisa
+      Control de Costes.
+    ingrediente: tesoreria.albaranes_pendientes_neto
     validado: false
     admite_obra: true
     paso_receta: CARTERA

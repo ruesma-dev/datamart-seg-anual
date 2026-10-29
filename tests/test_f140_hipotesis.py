@@ -383,7 +383,9 @@ from etl_sigrid.infrastructure.config import hipotesis_caja_yaml as lector  # no
 #: Los defectos de `design.md` §6, código por código (unidad, valor).
 DEFECTOS_DEL_DISENO = {
     "H01": ("OPCION", "CONTRATO"),
-    "H02": ("MAPA_DIAS", {"CD": 120, "CI": 120, "CP": 120, "OTRO": 120}),
+    # F-150 (N12, 29-10): el coste proporcional (CP) no es caja de la obra: sale
+    # del mapa de plazos (va a F-154) y la receta lo excluye por `categoria`.
+    "H02": ("MAPA_DIAS", {"CD": 120, "CI": 120, "OTRO": 120}),
     "H03": ("PERFIL_MESES", [[0, 100]]),  # F-150 (R26)
     "H04": ("BOOLEANO", True),
     "H05": ("DIAS", 0),

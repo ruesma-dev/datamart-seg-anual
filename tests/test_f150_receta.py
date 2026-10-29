@@ -159,7 +159,10 @@ def test_f150_r24_h26_la_venta_ejecutada_pendiente_de_facturar() -> None:
 def test_f150_r24_h27_la_antiguedad_maxima_de_lo_pendiente_de_facturar() -> None:
     h = _catalogo()["H27"]
     assert (h.sentido, h.unidad, h.valor_defecto) == ("PAGO", "MESES", 6)
-    assert h.ingrediente == "compras.v_pbi_albaranes_sin_facturar"
+    # N11 (29-10): el ingrediente son los albaranes NETOS por proveedor, no la
+    # vista de compras, que solo suma lineas > 0.
+    assert h.ingrediente == "tesoreria.albaranes_pendientes_neto"
+    assert "0,52" in _texto(h) and "8,76" in _texto(h)
     assert (h.paso_receta, h.admite_obra, h.validado) == ("CARTERA", True, False)
 
 
@@ -239,5 +242,14 @@ def test_f150_r28_h15_solo_con_varios_vencimientos() -> None:
 def test_f150_r28_h20_a_fin_de_mes_del_albaran_con_su_ingrediente() -> None:
     h = _catalogo()["H20"]
     assert (h.valor_defecto, h.opciones) == ("FIN_MES_ALBARAN", ("FIN_MES_ALBARAN", "EXCLUIR"))
-    assert h.ingrediente == "compras.v_pbi_albaranes_sin_facturar"
-    assert "56,9" in _texto(h) and "93 %" in _texto(h)
+    # N11 (29-10): ingrediente, los albaranes NETOS; la fuente dice por que.
+    assert h.ingrediente == "tesoreria.albaranes_pendientes_neto"
+    assert "56,9" in _texto(h) and "93 %" in _texto(h) and "8,76" in _texto(h)
+    assert "neto por proveedor" in _texto(h) and "tras_cierre" in _texto(h)
+
+
+def test_f150_r36_h02_sin_la_clave_cp() -> None:
+    """N12: el coste proporcional no es caja de la obra; H02 no le da plazo."""
+    h = _catalogo()["H02"]
+    assert set(h.valor_defecto) == {"CD", "CI", "OTRO"}
+    assert "el CP no es caja de la obra" in _texto(h)
