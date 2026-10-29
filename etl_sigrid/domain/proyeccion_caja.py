@@ -356,6 +356,43 @@ def coeficiente_medio(
 
 
 # ---------------------------------------------------------------------------
+# Los albaranes pendientes de facturar, NETOS por proveedor (F-150, R33, N11)
+# ---------------------------------------------------------------------------
+
+#: Las series de albarán con pendiente de facturar: `AC` (ALBARAN) y `PROF`
+#: (PROFORMA), las de `compras.fn_tipo_documento` que suma la vista de compras.
+SERIES_ALBARAN_PENDIENTE: tuple[str, ...] = ("AC", "PROF")
+#: Una línea con `|tot|` o `|pendiente|` por encima no es un importe: es el error
+#: de tecleo de `R-ALBARAN-ABSURDO` (68,7 billones en dos líneas de 2021).
+UMBRAL_IMPORTE_ABSURDO = 1e8
+
+
+def neto_fifo(importes: Sequence[Decimal | None]) -> list[Decimal]:
+    """El resto de cada línea pendiente de un (obra, proveedor), FIFO (R33, N11).
+
+    `importes` son los pendientes de facturar de las líneas de UN proveedor en
+    UNA obra, en orden (fecha, línea). Una línea negativa está SOBREFACTURADA:
+    `N` = Σ |negativos| ya está pagado en otras facturas y compensa las
+    positivas empezando por la MÁS ANTIGUA. A cada positiva `p` se le resta
+    `min(p, máx(0, N − Σ positivas anteriores))`; negativas, ceros y `None`
+    dan 0. Así ningún resto es < 0 ni > su línea, y Σ restos = máx(0, Σ
+    importes): el residuo sobrefacturado no es caja. Es la ventana de
+    `09_albaranes_pendientes.sql`, que lleva la misma fórmula.
+    """
+    a_compensar = sum((-x for x in importes if x is not None and x < 0), _CERO)
+    restos: list[Decimal] = []
+    acumulado = _CERO
+    for x in importes:
+        if x is None or x <= 0:
+            restos.append(_CERO)
+            continue
+        compensado = min(x, max(_CERO, a_compensar - acumulado))
+        restos.append(x - compensado)
+        acumulado += x
+    return restos
+
+
+# ---------------------------------------------------------------------------
 # Lo que no se publica (R16)
 # ---------------------------------------------------------------------------
 
