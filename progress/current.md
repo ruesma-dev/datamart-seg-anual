@@ -9,6 +9,22 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-29 · F-150 · spec AJUSTADA (N11-N14) · `in_progress` · rama `feature/F-150-receta-caja`
+
+Spec-author, a petición del líder (decisiones del humano del 29-10). Detalle y cifras en
+`progress/spec_F-150.md` §10; tareas **T17-T26** para el implementer (primera tanda) y **T27-T30**
+(N14, SEGUNDA TANDA, esperan respuestas del humano).
+- **N11**: `tesoreria.albaranes_pendientes_neto` (neto por obra y proveedor, FIFO, desde `raw`):
+  8,76 M EUR en 21 obras frente a los 56,9 de la vista; >6 meses 0,52; `tras_cierre` 0,47; 0686 0,19.
+- **N12**: CP fuera de la caja de la obra (14,48 M EUR de devengo; cartera CP ~0,03 por la
+  categoría de las partidas de la factura) y fuera de H02; su caja es F-154.
+- **N13**: el personal va por el devengo del recurso; **N13-b** (plazo) decidido por el líder: H02
+  `CI` + aviso, sin hipótesis nueva.
+- **Para validar por el humano**: subir `PRESUPUESTO_MAX` por la ficha recomendada nueva; si
+  LEVANTAMIENTO (1,91) y SEGURO T.R.C. (0,19), que son CP, deben salir de la caja de la obra; retirar
+  `R-ALBARAN-ABSURDO` (sus dos líneas ya no están en `raw.dcapro`, trabajo aparte); y las cuatro
+  preguntas de N14 (IVA del saldo, personal histórico, enlace AGR, retenciones) en §10.4.
+
 ## 2026-10-28 · F-150 · `in_progress` · T1-T14 y T16 hechas, pendiente el review · rama `feature/F-150-receta-caja`
 
 - Commits `5a3b1d2`..`425b5e2` (más el informe); `azure-apps` commit local `044beef` (sin push).
