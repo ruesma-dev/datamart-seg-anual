@@ -1,10 +1,9 @@
 <!-- progress/impl_F-150.md -->
 # F-150 · Informe del implementer · la receta de la caja (fase 1)
 
-Fecha: 2026-10-28. Rama `feature/F-150-receta-caja`. **Estado: T1-T14 y T16 hechas**; T15 es
-MANUAL (humano). T11 paró por R29 (el hueco de H26, 15,60 M EUR, fuera de 15,26-15,55) y el
-humano aprobó la opción (b): R29 relativo a los datos del día (§4). `bash harness/init.sh` en
-verde con todo dentro (Evidencias).
+Fecha: 2026-10-28 (arreglo del despliegue, 29-10). Rama `feature/F-150-receta-caja`. **T1-T14 y
+T16 hechas**; T15 MANUAL (humano). T11 paró por R29 (hueco de H26 15,60 M EUR, fuera de 15,26-15,55)
+y el humano aprobó la (b): R29 relativo a los datos del día (§4). `init.sh` verde (Evidencias).
 
 El informe de la PARADA del 2026-10-27 (las mediciones que la spec cita como «`impl_F-150.md`
 §1-§3»: formas reales de `coestr`, lo que casaba con §8, lo medido en Sigrid para T1) se ha
@@ -182,16 +181,27 @@ E       AssertionError: assert 'las 27 hipotesis (H01-H27)' in '**No disponible 
 
 Tras cada código, las mismas órdenes en verde (salida en los commits de cada tarea).
 
-## 6. Verificaciones MANUAL pendientes (T15, del humano)
+## 6-7. Verificaciones MANUAL pendientes y qué falta para cerrar
 
-Con su comando exacto, en orden, en `progress/current.md`, subsección «F-150 · Despliegue MANUAL,
-T15» (review 1, C4): vuelta atrás a `r20261026-2111`, imagen y job, `ingest --table iva --full` y
-`--table dvf --full` antes de `build-tesoreria`, las consultas de R30, diccionario v63 con la
-imagen ya en el job y los tres `check-*`, reinicio de `mcp-bbdd` y R31 (0713 a 1,19 y 0696 mixta).
+T15 (MANUAL, humano), con su comando exacto y en orden, en `progress/current.md` («F-150 ·
+Despliegue MANUAL, T15»): vuelta atrás, imagen y job, `ingest` de `iva` y `dvf`, `build-tesoreria`,
+R30, diccionario v63, `check-*`, reinicio de `mcp-bbdd` y R31. Review: APROBADO (pasada 2).
 
-## 7. Qué falta para cerrar
+## Arreglo del despliegue (29-10)
 
-El review (reviewer contra `CHECKPOINTS.md`) y T15 (MANUAL, humano). Nada de despliegue hecho.
+- **Causa.** T15 paso 4 (`build-tesoreria` en Azure, 09:05 UTC): `function round(double precision,
+  integer) does not exist`, LINE 549 de `07`. La ingesta guarda `raw.dvf.totbas/totiva/totdoc` como
+  `double precision` (`information_schema`) y el CTE `facturado` hacía `SUM(fv.totbas)`.
+- **Cambio** (`d1c2ee1`): `SUM(fv.totbas::NUMERIC(18, 2))`, como `c.totbas` en `05` (F-140).
+  Revisadas contra los tipos de Azure las demás expresiones nuevas de F-150 en `06`-`08`: los
+  otros `raw.*` que se redondean (`raw.iva.iva`) ya llevan cast, `mart`/`stg` son `numeric`.
+- **Test** `test_f150_r23_los_importes_de_raw_dvf_se_castean_a_numeric` (y el patrón de R23
+  ajustado). RED: `python -m pytest tests/test_f150_sql.py -q -k "dvf or facturado"` →
+  `AssertionError: importes de raw.dvf sin ::NUMERIC(18, 2): ['totbas']` · `2 failed, 2 passed`.
+- **Sandbox** (Postgres 16 desechable): `sandbox_f150_double.py` (scratchpad), el §3 con `raw` en
+  `double precision`. SQL de antes: `UndefinedFunction: function round(double precision, integer)
+  does not exist / LINE 549` (el de Azure); de ahora: **66 OK, 0 fallos**. **Lección:** el §3 creó
+  `raw` con `NUMERIC`; en una sandbox, `raw` lleva los tipos de la ingesta (`double precision`).
 
 ## Evidencias
 
@@ -206,7 +216,5 @@ El review (reviewer contra `CHECKPOINTS.md`) y T15 (MANUAL, humano). Nada de des
 | Verificación semántica del SQL | 66 comprobaciones en Postgres 16 desechable, 0 fallos (§3) |
 | `ruff` | sin avisos nuevos en los ficheros de F-150 (el único, `UP042` de `StepStatus`, es previo) |
 
-Dos lanzamientos previos de la campaña no cuentan: uno abortó porque la línea base con 4 workers
-no cabía en 600 s; el siguiente, porque la línea base salió ROJA, y eso destapó los cuatro huecos
-de D-5. El SQL no entra en la campaña (solo muta Python); lo cubren los tests de texto de
-`test_f150_sql.py` y la verificación del §3.
+Dos lanzamientos previos de la campaña no cuentan (línea base > 600 s con 4 workers; línea base
+ROJA, que destapó los huecos de D-5). El SQL no se muta: lo cubren `test_f150_sql.py` y el §3.
