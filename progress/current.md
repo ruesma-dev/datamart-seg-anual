@@ -20,6 +20,12 @@
 - Review 1: RECHAZADO solo por C4 (T15 sin comandos); corregido abajo. Siguiente: review 2; luego
   T15 (MANUAL, humano), en el orden de la subsección siguiente. Detalle: `progress/impl_F-150.md`.
 - Diccionario del árbol hoy: **252 objetos, 2178 columnas, 122 de consumo**, 22 reglas (v63).
+- **29-10 · arreglo del despliegue (T15, paso 4):** `build-tesoreria` cayó en Azure con
+  `round(double precision, integer) does not exist` (07, CTE `facturado`: `raw.dvf.totbas` es
+  `double precision`). Arreglo `d1c2ee1` en la rama: `SUM(fv.totbas::NUMERIC(18, 2))` y su test.
+  Revisados contra los tipos reales de Azure los demás usos de `raw.*` de F-150: ninguno más.
+  Sandbox repetida con importes `double precision`: el SQL de antes reproduce el error, el de
+  ahora da 66 OK. Detalle: `impl_F-150.md`, «Arreglo del despliegue (29-10)». Se relanza `build-tesoreria` desde la rama.
 
 ### F-150 · Despliegue MANUAL, T15 (tras APROBADO y merge a `main`; lo autoriza el humano)
 
