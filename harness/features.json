@@ -2448,6 +2448,19 @@
       "priority": 4,
       "status": "pending",
       "sdd": true
+    },
+    {
+      "id": "F-154",
+      "title": "La caja de ESTRUCTURA: el coste proporcional (CP) y los gastos generales, fuera de la caja de la obra",
+      "description": "Decidida por el humano el 2026-10-29 al revisar un flujo de caja de la 0686 hecho con el MCP: «los CP hay que sacarlos, no generan caja. Luego se hará el flujo de caja de estructura, que será otra feature». F-150 (N12) saca el coste proporcional de la receta de la caja de OBRA: el CP es la aportación de la obra a los gastos generales, no un pago a terceros. ESTA feature es la caja de la ESTRUCTURA: qué pagos reales hay detrás de los gastos generales (personal de estructura, alquileres, suministros, financieros) y cuándo, a partir de la contabilidad y la cartera de la empresa, sin pasar por el devengo de las obras. Antes de especificar: medir qué cuentas y qué efectos de cartera son de estructura (sin obra o con el centro de coste de estructura) y cómo se relacionan con el CP que imputan las obras. RELACIÓN: F-150 (caja de obra, receta e hipótesis), F-056 (contabilidad), F-037 (tesorería). Fuera: la caja de cada obra, que es F-150.",
+      "acceptance": [
+        "Medido y declarado qué pagos de estructura hay (cuentas, efectos sin obra o de centros de estructura) y su peso frente al CP imputado a las obras",
+        "Spec SDD con los ingredientes que se publican y las hipótesis de la caja de estructura, sin mezclar con la receta de obra de F-150",
+        "Fichas en el diccionario de lo que se publique; `bash harness/init.sh` en verde"
+      ],
+      "priority": 8,
+      "status": "pending",
+      "sdd": true
     }
   ]
 }
