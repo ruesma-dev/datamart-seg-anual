@@ -46,6 +46,8 @@ COLUMNAS_NUEVAS: dict[str, tuple[str, ...]] = {
         "venta_pendiente_facturar", "facturado_por_delante", "iva_pendiente_facturar_contrato",
         "base_pendiente_facturar_sin_iva_contrato", "retencion_pendiente_facturar_contrato",
         "base_pendiente_facturar_sin_retencion_contrato",
+        # N12 (29-10): la parte de coste proporcional de la cartera, solo en COSTE.
+        "cartera_viva_coste_proporcional", "cartera_emitida_tras_cierre_coste_proporcional",
     ),
     "tesoreria.hipotesis_caja": ("paso_receta",),
 }
@@ -477,7 +479,8 @@ def test_f150_r23_iva_y_retencion_del_hueco_por_peso_de_contrato() -> None:
 
 def test_f150_r23_las_columnas_del_corte_en_orden_y_null_en_coste() -> None:
     columnas, select = _insert(RUTA_DEVENGO, "tesoreria.devengo_corte_obra")
-    assert columnas[-9:] == list(COLUMNAS_NUEVAS["tesoreria.devengo_corte_obra"])
+    # 9 del hueco (R23) y, detrás, las 2 de la cartera de CP (N12, R36).
+    assert columnas[-11:] == list(COLUMNAS_NUEVAS["tesoreria.devengo_corte_obra"])
     assert ("LEFT JOIN _dev_hueco hu ON hu.obra_id = v.obra_id AND v.concepto = 'VENTA'"
             in select)
 

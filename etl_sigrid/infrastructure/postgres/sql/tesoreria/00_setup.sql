@@ -592,6 +592,11 @@ ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS iva_pendiente_
 ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS base_pendiente_facturar_sin_iva_contrato NUMERIC(18,2);
 ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS retencion_pendiente_facturar_contrato NUMERIC(18,2);
 ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS base_pendiente_facturar_sin_retencion_contrato NUMERIC(18,2);
+-- F-150 (N12, R36): la parte de COSTE PROPORCIONAL (CP, estructura) de la cartera
+-- de la obra, CON IVA: no es caja de la obra y el paso 7 de la receta la resta.
+-- Solo COSTE.
+ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS cartera_viva_coste_proporcional NUMERIC(18,2);
+ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS cartera_emitida_tras_cierre_coste_proporcional NUMERIC(18,2);
 
 
 -- ---------------------------------------------------------------------------

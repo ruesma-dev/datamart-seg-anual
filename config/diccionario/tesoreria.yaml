@@ -660,6 +660,23 @@ objetos:
         unidad: EUR
         agregacion: suma
         nulo_significa: COSTE.
+      cartera_viva_coste_proporcional:
+        significado: >-
+          La parte de COSTE PROPORCIONAL (CP, estructura: seguros, avales...) de
+          `cartera_viva`: cada efecto por la cuota CP de su factura (lineas de
+          partida con categoria CP / todas). El CP no es caja de la obra: el paso
+          7 de la receta la RESTA de la cartera de pago y la declara. CON IVA.
+          Un efecto sin factura cuenta 0 (F-150, N12).
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: VENTA.
+      cartera_emitida_tras_cierre_coste_proporcional:
+        significado: >-
+          La parte CP de `cartera_emitida_tras_cierre`, con la misma cuota por
+          factura. Se resta igual que la anterior. CON IVA (F-150, N12).
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: VENTA.
     relaciones:
       - de: obra_id
         a: maestro.obras.obra_id

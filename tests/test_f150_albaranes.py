@@ -307,3 +307,63 @@ def test_f150_r34_el_sub_paso_va_al_final() -> None:
         "albaranes_pendientes", "09_albaranes_pendientes.sql", "tesoreria",
         "albaranes_pendientes_neto",
     )
+
+
+# ===========================================================================
+# R36 · la parte de coste proporcional (CP) de la cartera de la obra (N12)
+# ===========================================================================
+
+COLUMNAS_CP = ("cartera_viva_coste_proporcional", "cartera_emitida_tras_cierre_coste_proporcional")
+
+
+def _devengo() -> str:
+    return _sin_comment_on(RUTA_DEVENGO)
+
+
+def test_f150_r36_setup_las_dos_columnas_con_alter() -> None:
+    texto = _ejecutable(RUTA_SETUP)
+    for columna in COLUMNAS_CP:
+        assert (f"ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS {columna} "
+                "NUMERIC(18,2);") in texto
+
+
+@pytest.mark.parametrize("columna", COLUMNAS_CP)
+def test_f150_r36_ninguna_columna_cp_es_de_caja(columna: str) -> None:
+    assert not dom.es_columna_de_caja(columna)
+
+
+def test_f150_r36_la_cuota_cp_por_las_partidas_de_la_factura() -> None:
+    """Mismo criterio que el devengo: la categoría de la partida de cada línea de
+    la factura del efecto; los importes de `raw.dcfpro` (double precision en
+    Azure) se castean antes de sumar."""
+    texto = _devengo()
+    assert ("COALESCE(SUM(l.tot::NUMERIC(18, 2)) FILTER (WHERE dp.categoria = 'CP') / "
+            "NULLIF(SUM(l.tot::NUMERIC(18, 2)), 0), 0) AS cuota_cp") in texto
+    assert "FROM raw.dcfpro l LEFT JOIN mart.v_pbi_dim_partida dp ON dp.partida_id = NULLIF(l.paride, 0)" in texto
+    assert re.findall(r"\bl\.tot\b(?!::NUMERIC\(18, 2\))", texto) == [], "tot de dcfpro sin cast"
+
+
+def test_f150_r36_la_cartera_cp_con_los_mismos_filter_y_solo_en_coste() -> None:
+    texto = _devengo()
+    assert ("SUM(e.importe * COALESCE(q.cuota_cp, 0)) FILTER (WHERE e.estado_tesoreria = "
+            "'PREVISTO' AND NOT e.previsto_antiguo) AS cartera_viva_cp") in texto
+    assert ("SUM(e.importe * COALESCE(q.cuota_cp, 0)) FILTER (WHERE v.mes_ultimo_cierre IS NULL "
+            "OR date_trunc('month', e.fecha_emision)::DATE > v.mes_ultimo_cierre) "
+            "AS cartera_emitida_tras_cierre_cp") in texto
+    assert "LEFT JOIN _dev_cuota_cp q ON q.documento_id = e.documento_id" in texto
+    for columna, origen in zip(COLUMNAS_CP, ("cartera_viva_cp", "cartera_emitida_tras_cierre_cp")):
+        assert (f"CASE WHEN v.concepto = 'COSTE' THEN ROUND(COALESCE(c.{origen}, 0), 2) END "
+                f"AS {columna}") in texto
+
+
+def test_f150_r36_la_guarda_de_entrada_exige_dcfpro() -> None:
+    texto = _devengo()
+    entrada = texto[: texto.index("CREATE TEMP TABLE")]
+    assert "to_regclass('raw.dcfpro') IS NULL" in entrada
+
+
+def test_f150_r36_el_comment_del_corte_dice_cp() -> None:
+    m = re.search(r"COMMENT ON TABLE tesoreria\.devengo_corte_obra IS '(.*?)';",
+                  _ejecutable(RUTA_DEVENGO))
+    assert m
+    assert "coste proporcional" in m.group(1) and "CP" in m.group(1)
