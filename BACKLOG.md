@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **141 features**, 73 abiertas (1 en curso, 1 con la spec lista, 0 bloqueadas y 71 en backlog) y 68 terminadas.
+Resumen: **142 features**, 74 abiertas (1 en curso, 1 con la spec lista, 0 bloqueadas y 72 en backlog) y 68 terminadas.
 
 ## En curso
 
@@ -31,6 +31,7 @@ _Ninguna feature bloqueada._
 | F-151 | La función de caja proyectada (fase 2): `tesoreria.fn_caja_proyectada(obra, hipótesis del usuario)` | 5 | critico | `feature/F-151-funcion-caja-proyectada` |
 | F-054 | Glosario de negocio para la IA (`_meta.glosario`): qué significan en Ruesma la valorada, el incurrido, el ABC o la liquidatoria, y dónde están en el datamart | 6 | documental | `feature/F-054-conocimiento-de-negocio` |
 | F-152 | La forma de pago por defecto de la ficha del proveedor (`prv.pagide` -> `auxpag`), junto a los días fijos y los meses sin pago que ya se publican | 7 | estandar | `feature/F-152-forma-pago-ficha-proveedor` |
+| F-154 | La caja de ESTRUCTURA: el coste proporcional (CP) y los gastos generales, fuera de la caja de la obra | 8 |  |  |
 | F-129 | El objetivo del comparativo se mide contra la oferta de referencia del propio comparativo (oficina técnica o planificado ABC), no contra el descompuesto: hoy casa el 29 % | 9 | critico | `feature/F-129-objetivo-contra-oferta-referencia` |
 | F-127 | El mayor analítico: los apuntes de la contabilidad analítica (apa) y sus saldos por cuenta analítica y mes, con las cuentas de contrapartida (CP) de los trabajadores | 10 | critico | `feature/F-127-mayor-analitico` |
 | F-092 | El catálogo de productos (maestro por empresa, árbol de naturalezas y su vínculo con la cuenta analítica) y el centro de coste en la cascada | 11 | estandar | `feature/F-092-productos-y-centro-de-coste` |
@@ -213,6 +214,12 @@ Pedida por el humano el 2026-09-02: 'enriquecer el conocimiento para cuando lea 
 estado **pendiente** · prioridad 7 · rigor `estandar` · SDD no · rama `feature/F-152-forma-pago-ficha-proveedor`
 
 Pedida por Juan Romero (Dir. Admon y Control de Costes) en su correo recordado el 2026-10-27: «Forma de pago genérica de la ficha del proveedor. Ya están publicados los días fijos de pago y los meses sin pago, pero falta la forma de pago por defecto de la ficha». LO QUE YA HAY: F-140 publica en `tesoreria.condiciones_contrato_compra` los días fijos (`prv.pagdia`) y los meses sin pago (`prv.pagmes`) del proveedor de cada CONTRATO, y la forma de pago del contrato (`ctr.pagide`) con sus plazos en `tesoreria.plazos_forma_pago` (de `auxpag`). LO QUE FALTA: la forma de pago de la FICHA del proveedor, `prv.pagide` («Con.Pago», índice a `auxpag`). `raw.prv` y `raw.auxpag` ya se ingieren enteras: no hace falta tocar la ingesta. Publicarla por proveedor (no solo por contrato), con su descripción y sus plazos, para poder responder qué forma de pago tiene un proveedor aunque no haya contrato y si la del contrato coincide con la de su ficha. Útil también para la caja (H02, pagos sin contrato), sin cambiar ninguna hipótesis en esta feature.
+
+### F-154 · La caja de ESTRUCTURA: el coste proporcional (CP) y los gastos generales, fuera de la caja de la obra
+
+estado **pendiente** · prioridad 8 · SDD sí
+
+Decidida por el humano el 2026-10-29 al revisar un flujo de caja de la 0686 hecho con el MCP: «los CP hay que sacarlos, no generan caja. Luego se hará el flujo de caja de estructura, que será otra feature». F-150 (N12) saca el coste proporcional de la receta de la caja de OBRA: el CP es la aportación de la obra a los gastos generales, no un pago a terceros. ESTA feature es la caja de la ESTRUCTURA: qué pagos reales hay detrás de los gastos generales (personal de estructura, alquileres, suministros, financieros) y cuándo, a partir de la contabilidad y la cartera de la empresa, sin pasar por el devengo de las obras. Antes de especificar: medir qué cuentas y qué efectos de cartera son de estructura (sin obra o con el centro de coste de estructura) y cómo se relacionan con el CP que imputan las obras. RELACIÓN: F-150 (caja de obra, receta e hipótesis), F-056 (contabilidad), F-037 (tesorería). Fuera: la caja de cada obra, que es F-150.
 
 ### F-129 · El objetivo del comparativo se mide contra la oferta de referencia del propio comparativo (oficina técnica o planificado ABC), no contra el descompuesto: hoy casa el 29 %
 
