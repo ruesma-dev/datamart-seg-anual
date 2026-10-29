@@ -74,7 +74,8 @@ def test_f037_r17_nombre_stage_y_dependencias() -> None:
 
 
 def test_f037_r17_los_sub_pasos_en_orden_con_su_tabla() -> None:
-    """Los cuatro de F-037 y, detrás, los seis de F-140 (R20)."""
+    """Los cuatro de F-037, detrás los seis de F-140 (R20) y, al final, el de los
+    albaranes netos de F-150 (N11): lee las obras de `devengo_corte_obra`."""
     assert [(s.name, s.sql_file, s.target_schema, s.target_table) for s in SUB_PASOS] == [
         ("setup", "00_setup.sql", None, None),
         ("efectos_completo", "01_efectos_completo.sql", "tesoreria_restringida", "efectos"),
@@ -90,6 +91,8 @@ def test_f037_r17_los_sub_pasos_en_orden_con_su_tabla() -> None:
          "tesoreria", "devengo_pendiente_partida"),
         ("hipotesis_carga", None, None, None),
         ("hipotesis_obra", "08_hipotesis_caja_obra.sql", "tesoreria", "hipotesis_caja_obra"),
+        ("albaranes_pendientes", "09_albaranes_pendientes.sql",
+         "tesoreria", "albaranes_pendientes_neto"),
     ]
 
 
@@ -118,8 +121,9 @@ def test_f037_r17_encadena_los_sql_y_cuenta_sus_tablas(instalar) -> None:
         ("tesoreria", "condiciones_contrato_cliente"),
         ("tesoreria", "devengo_pendiente_partida"),
         ("tesoreria", "hipotesis_caja_obra"),
+        ("tesoreria", "albaranes_pendientes_neto"),
     ]
-    assert resultado.rows_processed == 7 * 8, "siete tablas contadas y la carga"
+    assert resultado.rows_processed == 7 * 9, "ocho tablas contadas y la carga"
     assert resultado.finished_at is not None
     assert resultado.finished_at >= resultado.started_at
     assert resultado.error_message is None
@@ -199,7 +203,7 @@ def test_f037_r18_el_log_dice_las_filas_de_cada_sub_paso(instalar, monkeypatch) 
         ("setup", 0), ("efectos_completo", 5), ("efectos_general", 5),
         ("efectos_restringidos_mes", 5), ("plazos_forma_pago", 0),
         ("condiciones_compra", 5), ("condiciones_cliente", 5), ("devengo_pendiente", 5),
-        ("hipotesis_carga", 5), ("hipotesis_obra", 5),
+        ("hipotesis_carga", 5), ("hipotesis_obra", 5), ("albaranes_pendientes", 5),
     ]
     assert all(isinstance(h["duration_s"], float) for h in hechos)
 

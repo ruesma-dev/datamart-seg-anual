@@ -16,7 +16,10 @@ Primero el dominio (`neto_fifo`, el oráculo); después el SQL leído como texto
 
 from __future__ import annotations
 
+import re
 from decimal import Decimal
+from functools import cache
+from pathlib import Path
 
 import pytest
 
@@ -114,3 +117,193 @@ def test_f150_r33_los_literales_del_sql() -> None:
     no lleva pendiente en las 21 obras. El umbral es el de `R-ALBARAN-ABSURDO`."""
     assert dom.SERIES_ALBARAN_PENDIENTE == ("AC", "PROF")
     assert dom.UMBRAL_IMPORTE_ABSURDO == 1e8
+
+
+# ===========================================================================
+# El SQL, leído como texto (R34, R35): literales = dominio
+# ===========================================================================
+
+RAIZ = Path(__file__).resolve().parents[1]
+DIR_SQL = RAIZ / "etl_sigrid" / "infrastructure" / "postgres" / "sql"
+RUTA_SETUP = DIR_SQL / "tesoreria" / "00_setup.sql"
+RUTA_ALBARANES = DIR_SQL / "tesoreria" / "09_albaranes_pendientes.sql"
+RUTA_DEVENGO = DIR_SQL / "tesoreria" / "07_devengo_pendiente.sql"
+RUTA_COMPRAS = DIR_SQL / "compras" / "01_documentos.sql"
+
+#: Las columnas de la tabla nueva, en su orden (design.md §5.7).
+COLUMNAS_ALBARANES = (
+    "obra_id", "empresa_id", "clave_obra", "proveedor_id", "contrato_id", "mes_albaran",
+    "importe_pendiente_bruto", "importe_sobrefacturado", "importe_compensado",
+    "importe_pendiente_neto", "meses_antiguedad", "tras_cierre",
+)
+
+
+@cache
+def _sql(ruta: Path) -> str:
+    assert ruta.exists(), f"SQL no encontrado: {ruta}"
+    return ruta.read_text(encoding="utf-8")
+
+
+def _ejecutable(ruta: Path) -> str:
+    lineas = []
+    for linea in _sql(ruta).splitlines():
+        if linea.lstrip().startswith("--"):
+            continue
+        lineas.append(re.sub(r"\s--\s.*$", "", linea))
+    return re.sub(r"\s+", " ", "\n".join(lineas))
+
+
+def _sin_comment_on(ruta: Path) -> str:
+    return re.sub(r"COMMENT ON .*?';", "", _ejecutable(ruta))
+
+
+def _caso_pendiente(texto: str) -> str:
+    """El `CASE ... END` que acaba en `AS importe_pendiente_facturar`."""
+    fin = texto.index("END AS importe_pendiente_facturar")
+    inicio = texto.rindex("CASE WHEN COALESCE(l.can, 0) = 0", 0, fin)
+    return texto[inicio:fin + len("END")]
+
+
+def test_f150_r34_setup_crea_la_tabla_con_sus_columnas_y_tipos() -> None:
+    texto = _ejecutable(RUTA_SETUP)
+    m = re.search(r"CREATE TABLE IF NOT EXISTS tesoreria\.albaranes_pendientes_neto \((.*?)\);",
+                  texto)
+    assert m, "falta la tabla en 00_setup.sql"
+    columnas = [c.strip().split(" ")[0] for c in re.split(r",(?![^()]*\))", m.group(1))]
+    assert tuple(columnas) == COLUMNAS_ALBARANES
+    for importe in COLUMNAS_ALBARANES[6:10]:
+        assert re.search(rf"{importe} +NUMERIC\(18,2\) +NOT NULL", m.group(1)), importe
+    assert re.search(r"mes_albaran +DATE", m.group(1))
+    assert re.search(r"meses_antiguedad +INTEGER", m.group(1))
+    assert re.search(r"tras_cierre +BOOLEAN +NOT NULL", m.group(1))
+
+
+def test_f150_r34_setup_la_clave_con_nulls_not_distinct() -> None:
+    """Sin proveedor, sin contrato o sin mes son claves válidas: `NULLS NOT
+    DISTINCT` (precedente `retenciones.saldo_contable`)."""
+    assert ("CREATE UNIQUE INDEX IF NOT EXISTS uq_tes_albaranes_pendientes_neto ON "
+            "tesoreria.albaranes_pendientes_neto (obra_id, proveedor_id, contrato_id, "
+            "mes_albaran) NULLS NOT DISTINCT;") in _ejecutable(RUTA_SETUP)
+
+
+def test_f150_r34_la_formula_del_pendiente_es_la_de_compras_letra_a_letra() -> None:
+    """Riesgo 7 del diseño: la fórmula vive en dos sitios y este test los ata."""
+    assert _caso_pendiente(_ejecutable(RUTA_ALBARANES)) == _caso_pendiente(
+        _ejecutable(RUTA_COMPRAS)
+    )
+
+
+def test_f150_r34_lee_raw_y_no_compras() -> None:
+    """`compras` se construye DESPUÉS de `tesoreria`: leerla daría el pendiente
+    de la víspera."""
+    texto = _sin_comment_on(RUTA_ALBARANES)
+    assert not re.search(r"\bcompras\.", texto)
+    assert ("FROM raw.dcapro l JOIN raw.dca a ON a.ide = l.docide "
+            "JOIN raw.con c ON c.ide = a.ide") in texto
+
+
+def test_f150_r34_las_series_del_dominio() -> None:
+    lista = ", ".join(f"'{s}'" for s in dom.SERIES_ALBARAN_PENDIENTE)
+    assert f"tesoreria.fn_serie(c.cod) IN ({lista})" in _sin_comment_on(RUTA_ALBARANES)
+
+
+def test_f150_r34_el_umbral_de_r_albaran_absurdo() -> None:
+    texto = _sin_comment_on(RUTA_ALBARANES)
+    assert float("1e8") == dom.UMBRAL_IMPORTE_ABSURDO
+    assert "abs(x.tot) < 1e8" in texto
+    assert "abs(x.pendiente) < 1e8" in texto
+    assert "x.pendiente <> 0" in texto
+
+
+def test_f150_r34_el_universo_son_las_obras_de_coste_del_corte() -> None:
+    texto = _sin_comment_on(RUTA_ALBARANES)
+    assert "FROM tesoreria.devengo_corte_obra k WHERE k.concepto = 'COSTE'" in texto
+    assert "JOIN _alb_obra o ON o.obra_id = NULLIF(l.obride, 0)" in texto
+
+
+def test_f150_r34_proveedor_contrato_y_fecha() -> None:
+    texto = _sin_comment_on(RUTA_ALBARANES)
+    assert "NULLIF(a.entide, 0) AS proveedor_id" in texto
+    assert ("COALESCE(NULLIF(a.ctride, 0), CASE WHEN l.docoritip = 44 THEN "
+            "NULLIF(l.docoriide, 0) END) AS contrato_id") in texto
+    assert "tesoreria.fn_fecha(c.fec) AS fecha" in texto
+
+
+def test_f150_r34_la_ventana_fifo_es_la_del_dominio() -> None:
+    """`neto_fifo`: N = Σ |negativos| del (obra, proveedor), 0 sin proveedor; a
+    cada positiva, min(p, máx(0, N − positivas anteriores)), en orden (fecha,
+    línea)."""
+    texto = _sin_comment_on(RUTA_ALBARANES)
+    assert ("CASE WHEN x.proveedor_id IS NULL THEN 0 ELSE SUM(GREATEST(-x.pendiente, 0)) "
+            "OVER (PARTITION BY x.obra_id, x.proveedor_id) END AS a_compensar") in texto
+    assert ("SUM(GREATEST(x.pendiente, 0)) OVER (PARTITION BY x.obra_id, x.proveedor_id "
+            "ORDER BY x.fecha NULLS FIRST, x.linea_id) AS acumulado") in texto
+    assert ("CASE WHEN y.pendiente > 0 THEN LEAST(y.pendiente, GREATEST(0, y.a_compensar - "
+            "(y.acumulado - y.pendiente))) ELSE 0 END AS compensado") in texto
+    assert "GREATEST(y.pendiente, 0) AS bruto" in texto
+    assert "GREATEST(-y.pendiente, 0) AS sobrefacturado" in texto
+
+
+def test_f150_r34_el_insert_agrupa_por_la_clave_y_fecha_la_antiguedad() -> None:
+    texto = _sin_comment_on(RUTA_ALBARANES)
+    m = re.search(r"INSERT INTO tesoreria\.albaranes_pendientes_neto \((.*?)\) (SELECT .*?);",
+                  texto)
+    assert m, "falta el INSERT"
+    assert tuple(c.strip() for c in m.group(1).split(",")) == COLUMNAS_ALBARANES
+    select = m.group(2)
+    assert "date_trunc('month', f.fecha)::DATE AS mes_albaran" in select
+    assert "SUM(f.bruto - f.compensado) AS importe_pendiente_neto" in select
+    assert ("(date_part('year', age(date_trunc('month', CURRENT_DATE), "
+            "date_trunc('month', f.fecha))) * 12 + date_part('month', age(date_trunc('month', "
+            "CURRENT_DATE), date_trunc('month', f.fecha))))::INTEGER AS meses_antiguedad") in select
+    assert ("COALESCE(o.mes_ultimo_cierre IS NULL OR date_trunc('month', f.fecha)::DATE > "
+            "o.mes_ultimo_cierre, FALSE) AS tras_cierre") in select
+    assert "HAVING SUM(f.bruto) > 0 OR SUM(f.sobrefacturado) > 0" in select
+    assert texto.index("TRUNCATE tesoreria.albaranes_pendientes_neto;") < texto.index(
+        "INSERT INTO tesoreria.albaranes_pendientes_neto")
+
+
+def test_f150_r35_la_guarda_va_despues_del_insert_y_cuenta() -> None:
+    texto = _sin_comment_on(RUTA_ALBARANES)
+    guarda = texto[texto.index("INSERT INTO tesoreria.albaranes_pendientes_neto"):]
+    assert "RAISE EXCEPTION 'albaranes_pendientes: %" in guarda
+    assert ("p.neto <> CASE WHEN p.proveedor_id IS NULL THEN p.bruto "
+            "ELSE GREATEST(0, p.bruto - p.sobrefacturado) END") in guarda
+    assert "f.compensado < 0 OR f.compensado > f.bruto" in guarda
+
+
+def test_f150_r35_la_guarda_de_entrada_antes_de_nada() -> None:
+    texto = _sin_comment_on(RUTA_ALBARANES)
+    entrada = texto[: texto.index("CREATE TEMP TABLE")]
+    for fuente in ("raw.dca", "raw.dcapro", "raw.con", "tesoreria.devengo_corte_obra"):
+        assert f"to_regclass('{fuente}') IS NULL" in entrada
+    assert "TRUNCATE" not in entrada
+
+
+def test_f150_r34_comment_con_el_que_y_la_clave() -> None:
+    m = re.search(r"COMMENT ON TABLE tesoreria\.albaranes_pendientes_neto IS '(.*?)';",
+                  _ejecutable(RUTA_ALBARANES))
+    assert m, "sin COMMENT"
+    assert m.group(1).startswith("F-150.")
+    assert "Clave: obra_id, proveedor_id, contrato_id, mes_albaran" in m.group(1)
+
+
+def test_f150_r34_sin_drop_ni_grants() -> None:
+    texto = _ejecutable(RUTA_ALBARANES).upper().replace("ON COMMIT DROP AS", "")
+    assert "DROP " not in texto
+    assert not re.search(r"\b(GRANT|REVOKE)\b", texto)
+
+
+@pytest.mark.parametrize("columna", COLUMNAS_ALBARANES)
+def test_f150_r34_ninguna_columna_es_de_caja(columna: str) -> None:
+    assert not dom.es_columna_de_caja(columna)
+
+
+def test_f150_r34_el_sub_paso_va_al_final() -> None:
+    from etl_sigrid.application.steps import build_tesoreria_step as paso
+
+    ultimo = paso.SUB_PASOS[-1]
+    assert (ultimo.name, ultimo.sql_file, ultimo.target_schema, ultimo.target_table) == (
+        "albaranes_pendientes", "09_albaranes_pendientes.sql", "tesoreria",
+        "albaranes_pendientes_neto",
+    )

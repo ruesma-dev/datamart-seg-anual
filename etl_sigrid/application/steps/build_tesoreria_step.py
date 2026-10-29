@@ -36,6 +36,9 @@ Encadena los archivos SQL en orden:
                                        con la lista y no escribe
     08_hipotesis_caja_obra.sql       - F-140: el valor de cada hipótesis en cada
                                        obra (MANUAL > SIGRID > DEFECTO)
+    09_albaranes_pendientes.sql      - F-150 (N11): los albaranes pendientes de
+                                       facturar de las obras de la receta, NETOS
+                                       por proveedor (FIFO), leídos de `raw`
 
 Cada fichero es su transacción: si `07` falla, quedan las tablas de ayer y la
 cartera de hoy ya está hecha.
@@ -133,6 +136,13 @@ SUB_PASOS: tuple[_SubStep, ...] = (
         sql_file="08_hipotesis_caja_obra.sql",
         target_schema="tesoreria",
         target_table="hipotesis_caja_obra",
+    ),
+    # F-150 (N11): lee las obras de `devengo_corte_obra` (07); va al final.
+    _SubStep(
+        name="albaranes_pendientes",
+        sql_file="09_albaranes_pendientes.sql",
+        target_schema="tesoreria",
+        target_table="albaranes_pendientes_neto",
     ),
 )
 

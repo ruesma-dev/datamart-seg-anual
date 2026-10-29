@@ -592,3 +592,29 @@ ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS iva_pendiente_
 ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS base_pendiente_facturar_sin_iva_contrato NUMERIC(18,2);
 ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS retencion_pendiente_facturar_contrato NUMERIC(18,2);
 ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS base_pendiente_facturar_sin_retencion_contrato NUMERIC(18,2);
+
+
+-- ---------------------------------------------------------------------------
+-- F-150 (N11, R34): los albaranes pendientes de facturar, NETOS por proveedor
+--
+-- Una fila por (obra, proveedor, contrato, mes del albaran) de las obras de la
+-- receta; la llena `09_albaranes_pendientes.sql`. Sin proveedor, sin contrato o
+-- sin fecha son claves validas: `NULLS NOT DISTINCT` (precedente
+-- `retenciones.saldo_contable`), por eso un indice unico y no una clave primaria.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS tesoreria.albaranes_pendientes_neto (
+    obra_id                  INTEGER       NOT NULL,
+    empresa_id               INTEGER,
+    clave_obra               VARCHAR(40),
+    proveedor_id             INTEGER,
+    contrato_id              INTEGER,
+    mes_albaran              DATE,
+    importe_pendiente_bruto  NUMERIC(18,2) NOT NULL,
+    importe_sobrefacturado   NUMERIC(18,2) NOT NULL,
+    importe_compensado       NUMERIC(18,2) NOT NULL,
+    importe_pendiente_neto   NUMERIC(18,2) NOT NULL,
+    meses_antiguedad         INTEGER,
+    tras_cierre              BOOLEAN       NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_tes_albaranes_pendientes_neto ON tesoreria.albaranes_pendientes_neto (obra_id, proveedor_id, contrato_id, mes_albaran) NULLS NOT DISTINCT;

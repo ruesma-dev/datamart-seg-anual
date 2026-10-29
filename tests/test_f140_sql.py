@@ -26,7 +26,10 @@ RUTA_DEVENGO = DIR_TESORERIA / "07_devengo_pendiente.sql"
 RUTA_HIPOTESIS_OBRA = DIR_TESORERIA / "08_hipotesis_caja_obra.sql"
 
 #: Los ficheros NUEVOS de F-140 (el 00 se amplía).
-NUEVOS = (RUTA_PLAZOS, RUTA_COMPRA, RUTA_CLIENTE, RUTA_DEVENGO, RUTA_HIPOTESIS_OBRA)
+#: F-150 (N11) suma `09`: las mismas prohibiciones (ni hipótesis, ni personal, ni
+#: aritmética de fechas, ni GRANT ni DROP) valen para los albaranes netos.
+RUTA_ALBARANES = DIR_TESORERIA / "09_albaranes_pendientes.sql"
+NUEVOS = (RUTA_PLAZOS, RUTA_COMPRA, RUTA_CLIENTE, RUTA_DEVENGO, RUTA_HIPOTESIS_OBRA, RUTA_ALBARANES)
 
 #: Las ocho tablas nuevas y su clave primaria (design.md §4.1).
 TABLAS_NUEVAS: dict[str, str] = {
