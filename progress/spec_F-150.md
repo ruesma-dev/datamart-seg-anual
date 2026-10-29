@@ -373,3 +373,37 @@ avanzada a `main` (`935fdd3`, fast-forward).
 Diseño en `design.md` §5.9 (`tesoreria.saldo_partida_obra`, `10_saldo_partida.sql`, paso SALDO
 delante de los siete, H28 y H29: 29 hipótesis); requisitos R38-R40; tareas T27-T31 (segunda
 tanda, tras T26). Tamaños: requirements 150/150, design 248/250 (§5.3-§5.6 resumidos: hechos).
+
+### 10.6 · N15, el IVA con inversión del sujeto pasivo (humano, 29-10; TERCERA tanda)
+
+**H13 por obra** (`raw.dcfpro`, líneas con obra, factura de los 12 meses hasta el 29-10; las
+columnas de Sigrid son `double precision`: se pasan a `NUMERIC(18,2)`). Toda la base: 150,10 M EUR
+de base y 8,20 de cuota, **5,46 %** (el 5,5 de hoy). Por obra: 0696 4,40 % (19,64 de base); **0686
+2,36 %** (15,93); 0676-B 2,15; 0678 5,31; 0693 4,50; 0710 4,55; 0707 7,61; 0704 8,33; 0702 5,28;
+0713 5,95; 0694 11,68; 0711 7,69; 0723 0,87; **0697 20,90** (0,75); 0720 11,02; 0719 11,46; y con
+poca base 0724 9,25 (0,31), 0699 20,91 (0,24), 0608 y 0715 21,00 (0,02 y 0,00), 0690 sin compras.
+Umbral elegido: **base ≥ 0,5 M EUR en 12 meses** (16 de 21 obras con valor SIGRID; las 5 de abajo,
+DEFECTO 5,5); en SIGRID, como H12. Va en `08` (rama más del bloque SIGRID) y no en un objeto nuevo.
+
+**H30, cuándo vuelve el IVA a devolver** (`contabilidad.mayor`, empresa 1, solo lectura). 472 y
+477 se regularizan cada mes (saldo 0). **4700 (Hacienda deudora por IVA)** lleva un «LIQ. IVA <mes>»
+CADA MES (debe 0,2-0,75 M EUR en 2026) y un «DEVOLUCIÓN IVA <mes>» 3-5 meses después: octubre de
+2025 devuelto en febrero de 2026, noviembre en marzo, diciembre en mayo, enero en abril, febrero en
+junio, marzo en julio, mayo en agosto. Lectura: la empresa 1 liquida mensualmente (lo propio de
+REDEME), sale A DEVOLVER casi todos los meses (el repercutido de otras obras NO lo compensa) y el
+dinero vuelve a los ~4 meses, no el día 20. El defecto se queda en `COMPENSA_EMPRESA` (lo de hoy,
+por orden del líder), pero la `fuente_defecto` dice que los libros apuntan a `MENSUAL_REDEME` a 4
+meses: **para validar por el humano y AdP**. `MENSUAL_REDEME` = vuelve a los 4 meses del mes
+liquidado (mediana medida); `ANUAL` = tras la declaración del 4T (febrero del año siguiente).
+
+**IVA de lo pagado y cobrado** (lo que entra en el saldo de N14: PAGO REALIZADO sin AGR + originales
+agrupados vencidos, 8.718 efectos, 72,61 M EUR, todos con factura): **IVA soportado 4,14 M EUR**
+(cuota × importe / `totpag` de su factura); **0686: 0,80 de 23,27**. Pagado antes de 2026 (lo ya
+cubierto por el último 4T): 1,42 y 0,44. Lo cobrado REALIZADO (97,35; 79,00 con su `dvf`) solo
+lleva **0,34 M EUR** de IVA repercutido (0686: 0,02): casi todo es ISP. **Decisión del
+spec-author**: el saldo suma el IVA NETO recuperado (soportado − repercutido), no solo el
+soportado, para que las obras al 21 % no salgan mejor de lo real; con los defectos, el saldo de la
+0686 pasa de ~4,86 a **~5,64 M EUR** y el de las 21 obras de ~13,18 a ~16,98.
+
+Requisitos R41-R43; tareas T32-T35 (tercera tanda, tras T31). Tamaños: requirements 150/150,
+design 249/250 (§1, §4, §7, §8 y la historia de §9 resumidos).

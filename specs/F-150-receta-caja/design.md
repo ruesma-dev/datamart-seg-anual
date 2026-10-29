@@ -9,13 +9,9 @@ una ficha, una regla que remite a ella y (N11) UN objeto nuevo, `tesoreria.albar
 El ETL publica DATOS (coeficiente, IVA y retención del contrato, albaranes netos) y la IA aplica
 las hipótesis en el orden de la receta.
 
-**Fronteras.** F-151 ejecutará la receta (aquí no hay caja). **F-040**: líneas de `dvf`,
-certificaciones y su casado por mes de certificación, importe a certificar, revisión de precios y
-lo certificado fuera del coeficiente; aquí solo la CABECERA de `dvf` para el hueco. **F-099**
-(pendiente): F-150 le adelanta el desglose y el enlace partida -> contrato; F-099 conserva
-expedientes, adjudicado y fechas (el líder lo anota). H13/H14: de AdP. Ni `sigrid-api` ni el MCP.
-**N12**: la caja de ESTRUCTURA (el coste proporcional, CP: seguros, avales...) es F-154; aquí
-el CP sale de la receta, del devengo y de la cartera de la obra.
+**Fronteras.** F-151 ejecutará la receta. **F-040**: líneas de `dvf`, certificaciones, revisión de
+precios y lo certificado fuera del coeficiente. **F-099**: expedientes, adjudicado y fechas. H13,
+H14 y H30, de AdP. **F-154**: la caja de ESTRUCTURA (el CP). Ni `sigrid-api` ni el MCP.
 
 ## 2. Ficheros
 
@@ -72,12 +68,8 @@ RETENCION, IVA, CARTERA), cada hipótesis en el suyo. El ajuste del 29-10 cambia
 
 ## 4. Dominio (`domain/proyeccion_caja.py`, sin infraestructura)
 
-- `PASOS_RECETA = ("DEVENGO", "DOCUMENTO", "COEFICIENTES", "PLAZO", "RETENCION", "IVA",
-  "CARTERA")`. `paso_receta` pasa a `_CAMPOS_OBLIGATORIOS`; `_errores_de_fila` rechaza uno fuera
-  de la lista. `Hipotesis` gana `paso_receta: str = ""` AL FINAL; `construir_catalogo` lo rellena.
-- `UNIDADES` += `"PERFIL_MESES"`; `_error_de_valor` llama a `_error_de_perfil(valor)` (R25;
-  `MAX_MESES_PERFIL = 120`; pares lista o tupla de 2; `meses` no booleano; suma con
-  `Decimal(str(p))`). Cada fallo, su mensaje.
+- (Hecho, T3-T4) `PASOS_RECETA` y `paso_receta` obligatorio (R1); `PERFIL_MESES` con
+  `_error_de_perfil` y `MAX_MESES_PERFIL = 120` (R25).
 - (Hecho, T5) Coeficientes del contrato (`leer_coeficientes_contrato`, `CLASE_POR_CODIGO`,
   `factor_coeficientes`: R7, N10), `coeficiente_venta` y sus fuentes (R9), `porcentaje_iva`,
   `importe_con_coeficiente`, `importe_por_porcentaje`, `hueco_facturacion` y `coeficiente_medio`
@@ -107,6 +99,13 @@ leído de `stg.presupuesto` solo por obra, `ambito_id IN (9, 11)` y `fase_num`),
 guarda D6, el reparto con coeficientes, IVA y retención del contrato con sus bases `SIN` (R11-R20)
 y `_dev_hueco` NETO POR OBRA (R23; por contrato no: solo 4.665 de 15.665 facturas llevan `ctride`).
 En `08`, la rama H12 SIGRID (`raw.obr` -> `raw.iva`, `MOTIVO_H12_FICHA`). Detalle: los `COMMENT`.
+
+**5.6 bis · `08`, H13 SIGRID (N15, TERCERA tanda).** Rama más en el bloque SIGRID: por obra, `base`
+= Σ `raw.dcfpro.tot` y `cuota` = Σ `ivacuo` (`COALESCE(…, 0)::NUMERIC(18,2)`, `abs(tot) < 1e8`) de
+sus líneas (`obride`) con factura (`raw.con.fec`) en los 12 meses hasta el build; SIGRID =
+`ROUND(100 × cuota / base, 2)` si `base` ≥ 500.000 EUR (`UMBRAL_BASE_H13`) con `MOTIVO_H13_COMPRAS`;
+si no, DEFECTO (5,5, la empresa). Dominio: `iva_efectivo_compra(base, cuota)` -> `Decimal | None`.
+Receta, paso 6: el IVA del pago = base × el H13 DE LA OBRA, no el de la empresa.
 
 **5.7 · `09_albaranes_pendientes.sql` (N11).** Tabla en `00_setup.sql`:
 `tesoreria.albaranes_pendientes_neto` (`obra_id`, `empresa_id`, `clave_obra`, `proveedor_id`,
@@ -162,6 +161,11 @@ saldo = cobrado − (pagado sin AGR + [H29 `ORIGINALES`: agrupados vencidos | `A
 CP) − personal; con `SIN_SALDO`, 0, y la proyección parte de hoy con la cartera vencida y no
 pagada (H16, H17). En el paso 7, con `ORIGINALES`, resta `cartera_viva_agr_con_obra` y suma los
 originales pendientes a su vencimiento (filtro exacto de arriba en `tesoreria.efectos`).
+(N15) Gana `iva_soportado_pagado` (Σ importe del efecto × `totiva / totpag` de su factura en
+`raw.dcf`, lo pagado de arriba) e `iva_repercutido_cobrado` (Σ × `totiva / totdoc` de `raw.dvf`),
+y las dos `_hasta_4t` (pagado o cobrado antes del 1 de enero del año del build). El saldo SUMA
+`iva_soportado_pagado − iva_repercutido_cobrado` ya recuperado según H30 (`COMPENSA_EMPRESA` o
+`MENSUAL_REDEME`: todo; `ANUAL`: solo `_hasta_4t`).
 
 ## 6. El catálogo (`config/hipotesis_caja.yaml`)
 
@@ -179,6 +183,8 @@ IVA H12, H13, H14 · CARTERA H16, H17, H20, H21, H27.
 | H20 | Opciones `[FIN_MES_ALBARAN, EXCLUIR]`; (N11) ingrediente y fuente | OPCION | `FIN_MES_ALBARAN` | factura del mes del albarán en el 93 %; 8,76 M EUR NETOS por proveedor en 21 obras (la vista, 56,9: 48,2 ya sobrefacturados) |
 | H28 | (N14) NUEVA · Saldo de partida, AMBOS, paso SALDO | OPCION `[CON_SALDO, SIN_SALDO]` | `CON_SALDO` | CON IVA; sin saldo, desde hoy con la cartera vencida |
 | H29 | (N14) NUEVA · Pagarés agrupados, PAGO, paso SALDO | OPCION `[ORIGINALES, AGR]` | `ORIGINALES` | HIPÓTESIS: el AGR pierde la obra; vencido = pagado en su fecha, no vencido = pendiente a su vencimiento (0686: 1,32 y 0,27 M EUR) |
+| H13 | (N15) SIGRID por obra (§5.6 bis); defecto, la empresa | PORCENTAJE | `5.5` | 12 meses, base ≥ 0,5 M EUR: 16 de 21 obras (0686 2,36 %; 0697 20,9 %) |
+| H30 | (N15) NUEVA · Cuándo vuelve el IVA a devolver, AMBOS, paso IVA | OPCION `[COMPENSA_EMPRESA, MENSUAL_REDEME, ANUAL]` | `COMPENSA_EMPRESA` (lo de hoy, H14) | empresa 1: a devolver casi cada mes y devuelto a los 3-5 meses (4700): apunta a `MENSUAL_REDEME` (4 meses); AdP |
 | H27 | NUEVA · Antigüedad máxima de lo pendiente de facturar; (N11) ingrediente y fuente | MESES | `6` | con el neto FIFO, 0,52 de 8,76 M EUR tienen más de 6 meses (bruto: 22,8) |
 
 Todas `validado: false`, `admite_obra: true`; ingrediente de H24/H25 `plazos_forma_pago`, de H26
@@ -187,43 +193,32 @@ por proveedor; los `tras_cierre` ya son devengo». Textos de H10, H12-H15 como e
 
 ## 7. El diccionario y el presupuesto de F-147
 
-`R-CAJA-HIPOTESIS`: `resumen` de la v63 (223 caracteres, NO cambia); `ambito` +
-`tesoreria.albaranes_pendientes_neto`; la `regla` (no medida) gana: «el CP no es caja de la obra;
-el personal va en el devengo como recurso: no sumes nóminas de la cartera» y «los albaranes, netos
-por proveedor». Fichas (N11-N13): `albaranes_pendientes_neto` NUEVA (recomendada; grano, clave,
-`suma` en importes, `no_sumable` en `meses_antiguedad`; cómo sale el residuo: Σ sobrefacturado − Σ
-compensado; 2 preguntas cortas: «Cuanto queda de verdad por facturar de albaranes en la obra X»,
-«Cuando se pagaran los albaranes pendientes de la obra X»); `compras.v_pbi_albaranes_sin_facturar`
-avisa: solo líneas > 0, el pendiente real es el neto por proveedor; las tres `devengo_*`: «`CP`
-no es caja de la obra»; `tesoreria.efectos` y `efectos_restringidos_mes`: «en la caja de una obra
-el personal va por el devengo del recurso: no es lo que falta». `version` 64 con su nota. La ficha
-recomendada nueva sube el enrutado: `PRESUPUESTO_MAX` sube EXACTAMENTE lo medido, con su línea de
-historia (F-140 lo hizo igual); el resto del presupuesto no cambia.
+`R-CAJA-HIPOTESIS`: `resumen` de la v63 (NO cambia); `ambito` + los objetos nuevos; la `regla` (no
+medida) gana el CP fuera, el personal por el devengo del recurso y los albaranes netos. Fichas:
+`albaranes_pendientes_neto` NUEVA (recomendada; residuo = Σ sobrefacturado − Σ compensado; 2
+preguntas cortas: «Cuanto queda de verdad por facturar de albaranes en la obra X», «Cuando se
+pagaran los albaranes pendientes de la obra X»); aviso en `compras.v_pbi_albaranes_sin_facturar`
+(solo líneas > 0); `devengo_*`: «`CP` no es caja de la obra»; `efectos` y `efectos_restringidos_mes`:
+el personal va por el devengo. `version` 64 con su nota; `PRESUPUESTO_MAX` sube EXACTAMENTE lo que
+mida la ficha nueva, con su línea de historia.
 
 ## 8. Despliegue (MANUAL, tras el review) y riesgos
 
 Imagen y job; `ingest` de `iva` y `dvf` ANTES de `build-tesoreria`; R30; `publicar-diccionario`
 con la imagen ya en el job; `check-*`; MCP reiniciado; R31. Vuelta atrás: `r20261029-1340`.
 **Riesgos.** (1) La IA no abre la ficha: `resumen` y `regla` la nombran. (2) Doble fraccionamiento
-(`30 60 90` y H24). (3) Tests de F-140, al día con su porqué. (4) Código nuevo en `coestr`: al
-master, declarado. (5) `dvf` no marca anuladas. (6) H21 casa por fecha de emisión (F-040). (7) La
-fórmula del pendiente vive en `compras/01` y `09`: la ata un test. (8) FIFO es SUPOSICIÓN: la
-avalan el 93 % de facturas del mes del albarán y que deja 7,96 de 8,76 en los dos últimos meses
-(LIFO, 6,1 de más de un mes). (9) Las dos líneas de `R-ALBARAN-ABSURDO` ya NO están en `raw.dcapro`
-(29-10): el filtro se queda; retirar la regla es otro trabajo. (10) El CP incluye LEVANTAMIENTO
-(1,91) y SEGURO T.R.C. (0,19).
+(`30 60 90` y H24). (3) `dvf` no marca anuladas; H21 casa por emisión (F-040). (4) La fórmula del
+pendiente vive en `compras/01` y `09` (la ata un test). (5) FIFO es SUPOSICIÓN (lo avala el 93 % de
+facturas del mes del albarán). (6) Las líneas de `R-ALBARAN-ABSURDO` ya no están en `raw.dcapro`:
+retirar la regla es otro trabajo. (7) El CP incluye LEVANTAMIENTO (1,91) y SEGURO T.R.C. (0,19).
 
 ## 9. Decisiones
 
-**Cerradas (el humano, 27-10)**: D1, D3-D7, D10 (A); H26 (A); H24/H25 fraccionamiento; H14
-`MENSUAL`; H21 como riesgo. D2, D8 y D9, sustituidas por N1-N3. **N1-N8 (PARADA 1)**: N1
-coeficiente: contrato, master 9, master 11; N2 IVA: contrato y H12 = MANUAL > ficha > 21 % solo
-para la base sin él (el MANUAL NO pisa el contrato); N3 retención del contrato y H10 solo para la
-base sin ella; N4 la obra-mes lleva IVA, retención y bases `SIN`; N5 avisos (F-040, AdP); N6
-`include_columns`; N7 H13 por contrato de compra, fuera; N8 H20 a fin del mes del albarán y H27
-(6 meses). Detalle en `progress/spec_F-150.md` §8. **N9-N10 (tras la PARADA de T11)**: N9 hueco
-NETO POR OBRA con `MEDIA_OBRA` e IVA y retención por peso de contrato; N10 gramática real de
-`coestr`; R30 sin umbral de cobertura del coeficiente del contrato (§9 del informe).
+**Cerradas antes del 29-10** (detalle en `progress/spec_F-150.md` §7-§9): D1, D3-D7, D10; H26,
+H24/H25, H14 `MENSUAL`, H21 como riesgo; N1 coeficiente contrato > master 9 > master 11; N2 IVA del
+contrato y H12 solo para la base sin él; N3 lo mismo con la retención y H10; N4 bases `SIN`; N5
+avisos; N6 `include_columns`; N7 H13 por contrato, fuera; N8 H20 y H27; N9 hueco NETO POR OBRA; N10
+gramática real de `coestr`.
 
 **N11-N13, aprobadas por el humano el 29-10** (medido: `progress/spec_F-150.md` §10):
 - **N11 · Albaranes NETOS por (obra, proveedor), suelo 0**: objeto propio con grano (obra,
@@ -246,3 +241,9 @@ NETO POR OBRA con `MEDIA_OBRA` e IVA y retención por peso de contrato; N10 gram
   para no contarlos dos veces); retenciones, efectos propios; personal: **decisión del líder**,
   `raw.hmores.tot` de recursos PERSONA internos hasta el último cierre (Sigrid guarda el precio de
   cada parte: varía por año en 458 de 545 recursos; no hay otra tabla de histórico). §5.9.
+- **N15 · TERCERA TANDA, el IVA con inversión del sujeto pasivo (humano, 29-10; §10.6)**: H13
+  SIGRID por obra con umbral de base (§5.6 bis; la marca ISP de Sigrid es falsa); H30 nueva para
+  cuándo vuelve el IVA a devolver (`MENSUAL_REDEME` = a los 4 meses del mes liquidado, la mediana
+  medida; `ANUAL` = tras el 4T, en febrero); y el saldo suma el IVA neto ya recuperado (§5.9).
+  **Decisión del spec-author**: simétrico (resta también el repercutido cobrado, 0,34 M EUR: si no,
+  las obras al 21 % saldrían mejor de lo real). Tareas T32-T35, tras T31.

@@ -6,13 +6,10 @@ con los coeficientes, el IVA y la retención del CONTRATO de cada partida (`raw.
 Sin caja proyectada: es F-151. **Perfil**: pares `[meses, porcentaje]` que reparten un importe entero.
 
 ## La receta (D1, D7, N5)
-
-- R1. Cada hipótesis debe declarar `paso_receta`, uno de los siete pasos; SI falta o no es uno de
-  ellos, ENTONCES `validar_catalogo` da error y el paso no publica nada. `tesoreria.hipotesis_caja`
-  lo publica y el YAML real asigna cada código al paso de `design.md` §6 (test de la tabla entera).
-- R2. La `descripcion` de la ficha `tesoreria.hipotesis_caja` debe contener la receta: siete pasos
-  numerados en el orden de `PASOS_RECETA`, y en el tramo de cada paso los códigos cuyo
-  `paso_receta` es ese (test que cruza el YAML con la ficha).
+- R1. Cada hipótesis debe declarar `paso_receta` (uno de `PASOS_RECETA`); SI falta o no es válido,
+  ENTONCES `validar_catalogo` da error; el YAML asigna cada código al paso de `design.md` §6.
+- R2. La ficha de `tesoreria.hipotesis_caja` debe contener la receta: los pasos numerados en el orden
+  de `PASOS_RECETA` y, en cada tramo, los códigos de ese paso (test que cruza YAML y ficha).
 - R3. La receta debe nombrar sus ingredientes (las tres `devengo_*` y sus columnas nuevas de R14,
   R20, R23 y R36, las dos `condiciones_contrato_*`, `tesoreria.efectos`, `cartera_emitida_tras_cierre`
   y `tesoreria.albaranes_pendientes_neto`) y decir: COSTE se paga y VENTA se cobra; los perfiles reparten el importe entero; la retención
@@ -37,19 +34,16 @@ Sin caja proyectada: es F-151. **Perfil**: pares `[meses, porcentaje]` que repar
 - R8. `tesoreria.condiciones_contrato_cliente` debe publicar `coeficientes_texto`, `_reconocidos`,
   `coeficiente_gg`, `_bi`, `_otros`, `_baja`, `coeficiente_contrato` y `retencion_coestr`, con
   funciones SQL de literales iguales al dominio (test, patrón de `fn_plazo_dias`).
-- R9. `coeficiente_venta(contrato, importe_cert, oficial_cert, importe_venta, oficial_venta)` debe
-  devolver `(contrato, "CONTRATO")` si el del contrato existe; si no, el del 9 con `MASTER_CERT` si
-  su importe no es `None` ni 0; si no, el del 11 con `MASTER_VENTA`; si no, `(None, "SIN")`. El del
-  master es `ROUND(oficial / importe, 6)`, con `oficial` ausente = importe.
-- R10. (D3) `sql/tesoreria/` debe leer `stg.presupuesto` solo filtrando obra, `ambito_id IN (9,
-  11)` y `fase_num` = la versión V (un test rechaza cualquier lectura sin los tres filtros).
+- R9. `coeficiente_venta(...)` debe devolver `(contrato, "CONTRATO")` si existe; si no, el del 9
+  (`MASTER_CERT`, importe no `None` ni 0), el del 11 (`MASTER_VENTA`) o `(None, "SIN")`; el del
+  master, `ROUND(oficial / importe, 6)` con `oficial` ausente = importe.
+- R10. (D3) `sql/tesoreria/` debe leer `stg.presupuesto` solo por obra, `ambito_id IN (9, 11)` y V.
 - R11. `tesoreria.devengo_pendiente_partida` debe publicar, en VENTA (NULL en COSTE),
   `contrato_cliente_id` (de la misma obra), `coeficiente_venta`, `fuente_coeficiente`,
   `coeficiente_master` y `pendiente_con_coeficientes = ROUND(pendiente × coeficiente_venta, 2)`.
-- R12. (D6) SI una partida VENTA con `pendiente > 0` no tiene coeficiente, ENTONCES el SQL debe
-  fallar con su recuento antes de vaciar las tablas de consumo.
-- R13. Ninguna columna nueva debe casar con `PATRON_COLUMNA_DE_CAJA`, y el SQL nuevo no puede
-  aplicar un valor de hipótesis (los tests R6/R16 de F-140 siguen pasando sobre `07`).
+- R12. (D6) SI una partida VENTA con pendiente > 0 no tiene coeficiente, ENTONCES el SQL falla con su
+  recuento antes de vaciar nada. R13. Ninguna columna nueva casa con `PATRON_COLUMNA_DE_CAJA` ni
+  aplica un valor de hipótesis (tests R6/R16 de F-140).
 - R14. (D4) `devengo_pendiente_obra_mes` debe publicar, en VENTA, `importe_pendiente_con_coeficientes`
   (repartido con `repartir_pendiente`) y `coeficiente_venta` (6 dec., NULL si el pendiente es 0); la
   guarda de la suma comprueba también la suma con coeficientes.
@@ -59,10 +53,9 @@ Sin caja proyectada: es F-151. **Perfil**: pares `[meses, porcentaje]` que repar
 
 ## El IVA y la retención por partida (N2, N3, N4)
 
-- R16. `config/tables_sigrid.yaml` debe ingerir `iva` entero en `raw.iva` (N2) y la CABECERA de
-  `dvf` en `raw.dvf` (N6, R17), los dos sin `tiemod`; fichas en `raw.yaml`, `TOTAL_TABLAS` = 80.
-- R17. CUANDO una tabla declare `include_columns`, la ingesta debe traer solo esas; SI declara
-  también `exclude_columns` o una de ellas no existe en Sigrid, ENTONCES falla antes de crear nada.
+- R16. `tables_sigrid.yaml` debe ingerir `raw.iva` entero y la CABECERA de `raw.dvf`, sin `tiemod`;
+  fichas en `raw.yaml`; `TOTAL_TABLAS` = 80. R17. CUANDO una tabla declare `include_columns`, la
+  ingesta debe traer solo esas; SI declara también `exclude_columns` o una no existe, ENTONCES falla.
 - R18. `condiciones_contrato_cliente` debe publicar `iva_id` (`NULLIF(ivaide, 0)`) e `iva_porcentaje`
   (`raw.iva.iva` × 100, 4 dec.; 0 es 0; sin catálogo, NULL).
 - R19. `devengo_pendiente_partida` debe publicar, en VENTA, `iva_porcentaje` y `retencion_porcentaje`
@@ -148,3 +141,10 @@ Sin caja proyectada: es F-151. **Perfil**: pares `[meses, porcentaje]` que repar
   `ORIGINALES`) deben nacer en el paso nuevo `SALDO` (primero de `PASOS_RECETA`): 29 hipótesis.
 - R40. (N14) La receta debe dar la fórmula del saldo del paso 0 (§5.9), decir que H29 es HIPÓTESIS
   que rompe `R-TESORERIA-ESTADO` a propósito, y que las retenciones entran al cobrarse o pagarse.
+- R41. (N15, tercera tanda) `08` debe dar a H13 un valor SIGRID por obra = `ROUND(100 × Σ ivacuo / Σ
+  tot, 2)` de sus líneas de factura de compra de 12 meses si Σ `tot` ≥ `UMBRAL_BASE_H13` (500.000),
+  con `MOTIVO_H13_COMPRAS`; si no, DEFECTO; `iva_efectivo_compra` del dominio da lo mismo (test).
+- R42. (N15) H30 `[COMPENSA_EMPRESA, MENSUAL_REDEME, ANUAL]` (defecto `COMPENSA_EMPRESA`, paso IVA,
+  `validado: false`) debe nacer con el aviso de AdP y lo medido en la contabilidad: 30 hipótesis.
+- R43. (N15) `saldo_partida_obra` debe publicar `iva_soportado_pagado`, `iva_repercutido_cobrado` y
+  sus `_hasta_4t`, y la receta sumar al saldo el IVA neto ya recuperado según H30 (`design.md` §5.9).
