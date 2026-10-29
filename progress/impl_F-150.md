@@ -207,11 +207,11 @@ R30, diccionario v63, `check-*`, reinicio de `mcp-bbdd` y R31. Review: APROBADO 
 
 | Evidencia | Valor real |
 |---|---|
-| `bash harness/init.sh` T16 (sobre `8500c37`, con T12) | **verde**, código 0, «ENTORNO LISTO»: 9.645 passed, 266 skipped, 2.504 warnings (antes, sobre `db6553a`: 9.638) |
-| Tiempo de la suite | 4.832,65 s (1:20:32), con medición de cobertura |
+| `bash harness/init.sh` | T16 (`8500c37`): **verde**, 9.645 passed. **Arreglo 29-10 (`2d30248`): verde**, código 0, «ENTORNO LISTO»: **9.646 passed**, 266 skipped, 2.504 warnings |
+| Tiempo de la suite | 4.832,65 s (1:20:32) en T16; 5.902,04 s (1:38:22) en el arreglo; con cobertura |
 | Tests de F-150 (`tests/test_f150_*.py`) | 281 (los 7 de T12 incluidos); familias del diccionario (F-006, F-14x, F-150): verdes |
-| Cobertura de las líneas cambiadas | `PUERTA COBERTURA`: **100,0 %** (143/143, umbral 80 %, `estandar`) |
-| Tamaño | `PUERTA TAMAÑO`: requirements 148/150, design 249/250, impl 215/220 |
+| Cobertura de las líneas cambiadas | **100,0 %** (143/143, umbral 80 %) en T16; en el arreglo, N/A (sin Python de producción frente a `main`) |
+| Tamaño | `PUERTA TAMAÑO`: requirements 148/150, design 249/250, impl 220/220 tras el arreglo |
 | Mutación (`python -m harness.mutacion --feature F-150 --workers 2 --timeout 2400`) | 95 generados, 20 evaluados (muestreo `estandar`, semilla 20260820): 17 muertos, 1 superviviente, 2 timeouts; tras reevaluar en serie, **19 muertos y 1 superviviente, cerrado con un test** (`progress/mutacion_F-150.md`, 15.325,8 s) |
 | Verificación semántica del SQL | 66 comprobaciones en Postgres 16 desechable, 0 fallos (§3) |
 | `ruff` | sin avisos nuevos en los ficheros de F-150 (el único, `UP042` de `StepStatus`, es previo) |
