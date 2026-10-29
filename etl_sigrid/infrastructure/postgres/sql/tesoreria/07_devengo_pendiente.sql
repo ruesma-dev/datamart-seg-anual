@@ -586,13 +586,18 @@ ANALYZE _dev_hueco;
 -- ---------------------------------------------------------------------------
 -- Solo las facturas de los pagos de las obras en COSTE: la categoria de la
 -- partida de cada linea, el mismo criterio que el devengo (la cuenta del efecto
--- es la del proveedor y el nombre del tercero da falsos positivos).
+-- es la del proveedor y el nombre del tercero da falsos positivos). La vista de
+-- partidas va MATERIALIZED: sin ello el planificador la recorre en bucle
+-- (medido en solo lectura el 29-10: 205 s frente a 10 s).
 CREATE TEMP TABLE _dev_cuota_cp ON COMMIT DROP AS
+WITH dp AS MATERIALIZED (
+    SELECT partida_id, categoria FROM mart.v_pbi_dim_partida
+)
 SELECT
     l.docide AS documento_id,
     COALESCE(SUM(l.tot::NUMERIC(18, 2)) FILTER (WHERE dp.categoria = 'CP') / NULLIF(SUM(l.tot::NUMERIC(18, 2)), 0), 0) AS cuota_cp
 FROM raw.dcfpro l
-LEFT JOIN mart.v_pbi_dim_partida dp ON dp.partida_id = NULLIF(l.paride, 0)
+LEFT JOIN dp ON dp.partida_id = NULLIF(l.paride, 0)
 WHERE l.docide IN (
     SELECT e.documento_id
     FROM tesoreria.efectos e

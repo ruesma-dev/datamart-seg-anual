@@ -339,7 +339,10 @@ def test_f150_r36_la_cuota_cp_por_las_partidas_de_la_factura() -> None:
     texto = _devengo()
     assert ("COALESCE(SUM(l.tot::NUMERIC(18, 2)) FILTER (WHERE dp.categoria = 'CP') / "
             "NULLIF(SUM(l.tot::NUMERIC(18, 2)), 0), 0) AS cuota_cp") in texto
-    assert "FROM raw.dcfpro l LEFT JOIN mart.v_pbi_dim_partida dp ON dp.partida_id = NULLIF(l.paride, 0)" in texto
+    # La vista de partidas, MATERIALIZED (205 s sin ello, 10 s con ello, 29-10).
+    assert ("WITH dp AS MATERIALIZED ( SELECT partida_id, categoria FROM "
+            "mart.v_pbi_dim_partida )") in texto
+    assert "FROM raw.dcfpro l LEFT JOIN dp ON dp.partida_id = NULLIF(l.paride, 0)" in texto
     assert re.findall(r"\bl\.tot\b(?!::NUMERIC\(18, 2\))", texto) == [], "tot de dcfpro sin cast"
 
 
