@@ -341,3 +341,35 @@ aparte? Tareas T27-T30 en `tasks.md`.
 Tamaños: requirements 150/150, design 249/250 (§3, §4, §5.1-§5.2 y §8 resumidos y enlazados: el
 texto completo de la receta vive ya en la ficha), tasks T1-T30. Rama `feature/F-150-receta-caja`
 avanzada a `main` (`935fdd3`, fast-forward).
+
+### 10.5 · N14 cerrada con las respuestas del humano (29-10)
+
+1. **IVA**: el saldo va CON IVA (los efectos lo llevan). Y es OPCIONAL: H28 `[CON_SALDO, SIN_SALDO]`
+   (defecto `CON_SALDO`); sin saldo, la proyección parte de hoy con la cartera vencida y no pagada.
+2. **Personal histórico** (Sigrid, solo lectura, `truncated` falso): no hay tabla de histórico de
+   coste por recurso, pero NO hace falta: cada línea de parte (`hmores`) guarda su `pre` y su `tot`
+   del momento. En los partes ingeridos el precio medio por recurso y año VARÍA en 458 de 545
+   recursos con más de un año. 0686 en Sigrid: 4.986 líneas, 2.295.755 EUR (fechas 2024-03 a
+   2026-10), igual que `raw.hmores`. Recursos PERSONA internos (`personal.recursos`): 21 obras
+   11,67 M EUR (11,55 hasta el último cierre); 0686 2,13 (2,07 hasta su cierre, 2026-09); los
+   CONSUMO, 0,77, no son personal. **Decisión del líder**: `personal_coste_partes` = Σ `tot` de
+   PERSONA interna hasta el último cierre (lo de después ya es devengo pendiente: no se cuenta dos
+   veces); se da por pagado en su mes. Descartado: recurso actual × horas (pierde el histórico) y
+   el real de los cierres por nombre de partida (en la 0686 solo encuentra 0,02).
+3. **AGR**: por los ORIGINALES (`sentido = 'PAGO'`, `estado_tesoreria = 'BAJA'`, `estado_codigo
+   = 14`, «Agrupados»; 56.503 en toda la cartera, 99,33 M EUR). 21 obras: vencidos (< 29-10)
+   **8,63 M EUR** (3.498, 21 obras), pendientes **2,21** (796, 18 obras); **0686: 1.315.128,62 y
+   271.733,31 (64 efectos)**, lo mismo que midió la conversación. Riesgo de doble conteo: los AGR
+   que CONSERVAN la obra están ya en la cartera de la obra (REALIZADO 2,22, PREVISTO 0,58; 0686
+   0,32 y 0,12): con `ORIGINALES` se dejan fuera. Validación por proveedor (aproximada: un AGR
+   mezcla obras): de los 2,21 pendientes, 1,48 tienen AGR PREVISTO sin obra del mismo tercero que
+   los cubre y 0,59 son de proveedores sin ningún AGR previsto (quizá ya pagados: caso 0722
+   ERCALUM); se declara. H29 `[ORIGINALES, AGR]`, defecto `ORIGINALES`, HIPÓTESIS.
+4. **Retenciones**: efectos propios de la factura; el saldo = efectos REALIZADO (sin las pendientes,
+   que van en la proyección como hoy). No hace falta columna.
+
+**Saldo medido con los defectos** (H28 `CON_SALDO`, H29 `ORIGINALES`, CP ~0): 21 obras ≈ 97,35 −
+63,99 − 8,63 − 11,55 = **13,18 M EUR**; 0686 ≈ 30,21 − 21,96 − 1,32 − 2,07 = **4,86 M EUR**.
+Diseño en `design.md` §5.9 (`tesoreria.saldo_partida_obra`, `10_saldo_partida.sql`, paso SALDO
+delante de los siete, H28 y H29: 29 hipótesis); requisitos R38-R40; tareas T27-T31 (segunda
+tanda, tras T26). Tamaños: requirements 150/150, design 248/250 (§5.3-§5.6 resumidos: hechos).

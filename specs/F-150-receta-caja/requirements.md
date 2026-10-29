@@ -34,28 +34,25 @@ Sin caja proyectada: es F-151. **Perfil**: pares `[meses, porcentaje]` que repar
   SI un código es desconocido o un valor no es número, ENTONCES no reconocido (falla cerrado).
   `factor_coeficientes` = `ROUND((1 + (gg + bi + otros) / 100) × (1 + baja / 100), 6)` (1,19;
   baja en CASCADA: 1,038) si está reconocido y tiene algún coeficiente; si no, `None`.
-- R8. `tesoreria.condiciones_contrato_cliente` debe publicar `coeficientes_texto` (`coestr` tal
-  cual, con sus etiquetas), `coeficientes_reconocidos`, `coeficiente_gg`, `_bi`, `_otros`,
-  `_baja`, `coeficiente_contrato` y `retencion_coestr` (la retención declarada en `coestr`, dato
-  aparte), con funciones SQL de literales iguales al dominio (test, patrón de `fn_plazo_dias`).
+- R8. `tesoreria.condiciones_contrato_cliente` debe publicar `coeficientes_texto`, `_reconocidos`,
+  `coeficiente_gg`, `_bi`, `_otros`, `_baja`, `coeficiente_contrato` y `retencion_coestr`, con
+  funciones SQL de literales iguales al dominio (test, patrón de `fn_plazo_dias`).
 - R9. `coeficiente_venta(contrato, importe_cert, oficial_cert, importe_venta, oficial_venta)` debe
   devolver `(contrato, "CONTRATO")` si el del contrato existe; si no, el del 9 con `MASTER_CERT` si
   su importe no es `None` ni 0; si no, el del 11 con `MASTER_VENTA`; si no, `(None, "SIN")`. El del
   master es `ROUND(oficial / importe, 6)`, con `oficial` ausente = importe.
 - R10. (D3) `sql/tesoreria/` debe leer `stg.presupuesto` solo filtrando obra, `ambito_id IN (9,
   11)` y `fase_num` = la versión V (un test rechaza cualquier lectura sin los tres filtros).
-- R11. `tesoreria.devengo_pendiente_partida` debe publicar, en VENTA, `contrato_cliente_id` (solo
-  si es de la misma obra), `coeficiente_venta`, `fuente_coeficiente`, `coeficiente_master` (aunque
-  mande el contrato) y `pendiente_con_coeficientes = ROUND(pendiente × coeficiente_venta, 2)`; en
-  COSTE, NULL.
+- R11. `tesoreria.devengo_pendiente_partida` debe publicar, en VENTA (NULL en COSTE),
+  `contrato_cliente_id` (de la misma obra), `coeficiente_venta`, `fuente_coeficiente`,
+  `coeficiente_master` y `pendiente_con_coeficientes = ROUND(pendiente × coeficiente_venta, 2)`.
 - R12. (D6) SI una partida VENTA con `pendiente > 0` no tiene coeficiente, ENTONCES el SQL debe
   fallar con su recuento antes de vaciar las tablas de consumo.
 - R13. Ninguna columna nueva debe casar con `PATRON_COLUMNA_DE_CAJA`, y el SQL nuevo no puede
   aplicar un valor de hipótesis (los tests R6/R16 de F-140 siguen pasando sobre `07`).
-- R14. (D4) `tesoreria.devengo_pendiente_obra_mes` debe publicar
-  `importe_pendiente_con_coeficientes` (el de cada partida repartido con `repartir_pendiente`) y
-  `coeficiente_venta` (cociente con `importe_pendiente`, 6 decimales, NULL si este es 0); en
-  COSTE, NULL. La guarda de la suma comprueba también, por (obra, VENTA), la suma con coeficientes.
+- R14. (D4) `devengo_pendiente_obra_mes` debe publicar, en VENTA, `importe_pendiente_con_coeficientes`
+  (repartido con `repartir_pendiente`) y `coeficiente_venta` (6 dec., NULL si el pendiente es 0); la
+  guarda de la suma comprueba también la suma con coeficientes.
 - R15. `R-VENTA-COEFICIENTES` debe incluir en su `ambito` las tres `devengo_*` (la `regla`, sin
   excepciones), y sus fichas decir que lo que lleva coeficientes no se suma ni compara con el
   coste, lo ejecutado ni la venta sin ellos.
@@ -66,16 +63,13 @@ Sin caja proyectada: es F-151. **Perfil**: pares `[meses, porcentaje]` que repar
   `dvf` en `raw.dvf` (N6, R17), los dos sin `tiemod`; fichas en `raw.yaml`, `TOTAL_TABLAS` = 80.
 - R17. CUANDO una tabla declare `include_columns`, la ingesta debe traer solo esas; SI declara
   también `exclude_columns` o una de ellas no existe en Sigrid, ENTONCES falla antes de crear nada.
-- R18. `tesoreria.condiciones_contrato_cliente` debe publicar `iva_id` (`NULLIF(ivaide, 0)`) e
-  `iva_porcentaje` (`raw.iva.iva` × 100, 4 decimales; 0 es 0, inversión del sujeto pasivo); sin
-  `iva_id` o sin fila en el catálogo, NULL.
-- R19. `tesoreria.devengo_pendiente_partida` debe publicar, en VENTA, `iva_porcentaje` y
-  `retencion_porcentaje` del contrato de la partida, con `fuente_iva` y `fuente_retencion` =
-  `CONTRATO` si hay valor y `SIN` si no; en COSTE, NULL.
-- R20. (N4) `tesoreria.devengo_pendiente_obra_mes` debe publicar, en VENTA,
-  `importe_iva_contrato` e `importe_retencion_contrato` (Σ de la parte con coeficientes de cada
-  partida `CONTRATO` × su porcentaje / 100, redondeado solo al final) y `base_sin_iva_contrato` y
-  `base_sin_retencion_contrato` (Σ de la de las partidas `SIN`); en COSTE, NULL.
+- R18. `condiciones_contrato_cliente` debe publicar `iva_id` (`NULLIF(ivaide, 0)`) e `iva_porcentaje`
+  (`raw.iva.iva` × 100, 4 dec.; 0 es 0; sin catálogo, NULL).
+- R19. `devengo_pendiente_partida` debe publicar, en VENTA, `iva_porcentaje` y `retencion_porcentaje`
+  del contrato con `fuente_iva`/`fuente_retencion` (`CONTRATO` o `SIN`).
+- R20. (N4) `devengo_pendiente_obra_mes` debe publicar, en VENTA, `importe_iva_contrato` e
+  `importe_retencion_contrato` (Σ parte con coeficientes `CONTRATO` × % / 100, redondeado al final)
+  y `base_sin_iva_contrato` / `base_sin_retencion_contrato` (Σ de las `SIN`).
 - R21. `08` debe dar a H12 un valor SIGRID desde la ficha de la obra (`raw.obr.ivaide` ->
   `raw.iva`, × 100) con su motivo literal; MANUAL > SIGRID > DEFECTO y H10 de F-140, sin cambios.
 
@@ -95,13 +89,11 @@ Sin caja proyectada: es F-151. **Perfil**: pares `[meses, porcentaje]` que repar
 
 ## El catálogo y el reparto en varios meses (D5)
 
-- R25. El dominio debe admitir la unidad `PERFIL_MESES`: lista no vacía de pares `[meses,
-  porcentaje]`, `meses` entero de 0 a 120 y estrictamente creciente, `porcentaje` > 0 y ≤ 100 con
-  2 decimales como mucho, suma exacta 100; SI no, ENTONCES un error por cada fallo, igual en
-  `valor_defecto` y en la sección `obras`.
-- R26. H03 y H08 deben pasar a `PERFIL_MESES` (`[[0, 100]]` y `[[1, 100]]`), y nacer H24 (PAGO) y
-  H25 (COBRO), el FRACCIONAMIENTO de cada pago y cada cobro, en `PERFIL_MESES` con `[[0, 100]]`,
-  paso PLAZO, `validado: false` y `admite_obra: true`; su `descripcion` dice «fraccionamiento».
+- R25. El dominio debe admitir `PERFIL_MESES`: pares `[meses, porcentaje]` no vacíos, `meses` entero
+  0-120 estrictamente creciente, `porcentaje` > 0, ≤ 100 y ≤ 2 decimales, suma exacta 100; SI no,
+  ENTONCES un error por fallo, en `valor_defecto` y en `obras`.
+- R26. H03 y H08 deben pasar a `PERFIL_MESES` (`[[0, 100]]`, `[[1, 100]]`) y nacer H24 (PAGO) y H25
+  (COBRO), el FRACCIONAMIENTO, con `[[0, 100]]`, paso PLAZO, `validado: false`, `admite_obra: true`.
 - R27. CUANDO `obras` dé un perfil a una obra, el paso debe cargarlo en `hipotesis_caja_manual` y
   `hipotesis_caja_obra` publicarlo tal cual (JSON, OBRA/MANUAL); `unidad` admite `PERFIL_MESES`.
 - R28. El YAML debe decir: H10 y H12, el valor del contrato va en el devengo y la hipótesis solo
@@ -148,3 +140,11 @@ Sin caja proyectada: es F-151. **Perfil**: pares `[meses, porcentaje]` que repar
 - R37. (N13) La receta, la `regla` de `R-CAJA-HIPOTESIS` y las fichas de `tesoreria.efectos` y
   `efectos_restringidos_mes` deben decir que el personal entra por el devengo del RECURSO: no se
   suman nóminas de la cartera ni se dan por ausentes; y avisar de que va con H02 `CI` (N13-b).
+- R38. (N14, segunda tanda) `tesoreria.saldo_partida_obra` debe publicar por obra del universo, CON
+  IVA y con `fecha_corte`, las columnas de `design.md` §5.9: lo cobrado y pagado REALIZADO (sin
+  AGR), los AGR con obra, los ORIGINALES agrupados (`estado_codigo = 14`) vencidos y pendientes, la
+  cuota CP de lo pagado y `personal_coste_partes` (`raw.hmores.tot`, PERSONA interna, ≤ cierre).
+- R39. (N14) H28 `[CON_SALDO, SIN_SALDO]` (defecto `CON_SALDO`) y H29 `[ORIGINALES, AGR]` (defecto
+  `ORIGINALES`) deben nacer en el paso nuevo `SALDO` (primero de `PASOS_RECETA`): 29 hipótesis.
+- R40. (N14) La receta debe dar la fórmula del saldo del paso 0 (§5.9), decir que H29 es HIPÓTESIS
+  que rompe `R-TESORERIA-ESTADO` a propósito, y que las retenciones entran al cobrarse o pagarse.

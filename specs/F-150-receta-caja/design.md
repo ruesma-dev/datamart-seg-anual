@@ -41,7 +41,7 @@ el CP sale de la receta, del devengo y de la cartera de la obra.
   `azure-apps/datamart_seg_anual.md` (consume `iva` y `dvf`; publica los albaranes netos).
 
 **Crear**: `tests/test_f150_{receta,coeficiente,contrato,hueco,ingesta,perfil,sql,diccionario,
-albaranes}.py`; `sql/tesoreria/09_albaranes_pendientes.sql` (N11).
+albaranes,saldo}.py`; `sql/tesoreria/09_albaranes_pendientes.sql` (N11), `10_saldo_partida.sql` (N14).
 
 **No se tocan**: `sql/stg/*`, `sql/mart/*`, `sql/compras/*` (N11 COPIA la fórmula, §5.7), `01`-
 `05`, permisos (el esquema ya se concede entero; `raw` no), `main.py`, `domain/diccionario.py`,
@@ -101,34 +101,13 @@ rectificativas ya netas, sin marca de anulada; `iva` entero (en tanto por uno). 
 `fn_coeficientes_reconocidos` en `00_setup.sql`; `06` gana el desglose de R8 y `iva_id` /
 `iva_porcentaje` (`ROUND((i.iva * 100)::NUMERIC, 4)`, `LEFT JOIN raw.iva i`).
 
-**5.3 · `07`, coeficiente (N1, D3, D6).** Misma transacción; los pasos de F-140 solo ganan
-columnas. La guarda de entrada exige además `raw.obrparpar`, `raw.obr`, `raw.dvf` y
-`tesoreria.condiciones_contrato_cliente`. **2 bis · `_dev_coef`**: por (obra, partida) de VENTA,
-desde `stg.presupuesto pp JOIN _dev_version v ON pp.obra_id = v.obra_id AND pp.ambito_id IN (9,
-11) AND pp.fase_num = v.version_master WHERE v.concepto = 'VENTA'`: `SUM(importe)` y
-`SUM(importe_oficial)` por ámbito (`FILTER`) -> `coeficiente_master` y su fuente. **2 ter ·
-`_dev_contrato`**: `raw.obrparpar pp ON pp.ide = partida_id JOIN
-tesoreria.condiciones_contrato_cliente k ON k.contrato_cliente_id = NULLIF(pp.ctride, 0) AND
-k.obra_id = obra_id`; `coeficiente_venta = COALESCE(contrato, master)` y su fuente. **4 ·
-`_dev_partida`** gana las columnas de R11 y R19 (NULL en COSTE); **guarda** (D6) con su recuento.
+**5.3-5.6 · `07` y `08` (hecho, T9-T10).** En `07`, misma transacción: `_dev_coef` (el master de V
+leído de `stg.presupuesto` solo por obra, `ambito_id IN (9, 11)` y `fase_num`), `_dev_contrato`
+(`raw.obrparpar.ctride` de la misma obra), `coeficiente_venta = COALESCE(contrato, master)`, la
+guarda D6, el reparto con coeficientes, IVA y retención del contrato con sus bases `SIN` (R11-R20)
+y `_dev_hueco` NETO POR OBRA (R23; por contrato no: solo 4.665 de 15.665 facturas llevan `ctride`).
+En `08`, la rama H12 SIGRID (`raw.obr` -> `raw.iva`, `MOTIVO_H12_FICHA`). Detalle: los `COMMENT`.
 
-**5.4 · `07`, IVA y retención (N2-N4).** `fuente_iva`/`fuente_retencion`: `CONTRATO` si el valor
-no es NULL, si no `SIN`. **5 · `_dev_reparto`** gana `parte_con_coef` (mismo reparto; resto al
-último mes; sin perfil, al primero). `devengo_pendiente_obra_mes` gana (VENTA; NULL en COSTE)
-`importe_pendiente_con_coeficientes`, `coeficiente_venta = ROUND(con / sin, 6)`,
-`importe_iva_contrato = ROUND(SUM(parte_con_coef * iva_porcentaje) FILTER (fuente_iva =
-'CONTRATO') / 100, 2)`, `base_sin_iva_contrato` y lo mismo con la retención. La guarda de la suma
-se extiende a la suma con coeficientes.
-
-**5.5 · `07`, el hueco de facturación (N9, H26).** **6 bis · `_dev_hueco`**, NETO POR OBRA:
-`real` = Σ (real a origen hasta el último cierre de cada partida VENTA) × su `coeficiente_venta`;
-sin ninguno, × la media ponderada de su obra (`MEDIA_OBRA`; sin ninguna, 1), esa parte en
-`venta_real_media_obra`; `facturado` = Σ `dvf.totbas` con `raw.obr ob ON ob.cenide = dvf.cenide`,
-sin corte de fecha. Por obra, `GREATEST(0, real − facturado)` y `GREATEST(0, facturado − real)`.
-IVA y retención del hueco por el peso de cada contrato en real × coef (sin contrato, grupo propio).
-Por contrato NO: solo 4.665 de 15.665 facturas llevan `ctride` (el casado infla a 18,59).
-
-**5.6 · `08`, H12 SIGRID (N2; hecho).** `raw.obr` -> `raw.iva` (× 100, 4 dec.), `MOTIVO_H12_FICHA`.
 **5.7 · `09_albaranes_pendientes.sql` (N11).** Tabla en `00_setup.sql`:
 `tesoreria.albaranes_pendientes_neto` (`obra_id`, `empresa_id`, `clave_obra`, `proveedor_id`,
 `contrato_id`, `mes_albaran` DATE, `importe_pendiente_bruto`, `importe_sobrefacturado`,
@@ -167,6 +146,23 @@ e.documento_id`) cuya partida (`paride`) es `categoria = 'CP'` en `mart.v_pbi_di
 devengo (la categoría de la partida); la cuenta del efecto es la del proveedor (400/410) y el
 nombre del tercero da falsos positivos (§10 del informe). Guarda de entrada: `raw.dcfpro`.
 
+**5.9 · `10_saldo_partida.sql` (N14, SEGUNDA TANDA).** `tesoreria.saldo_partida_obra`, una fila por
+obra del universo (COSTE), CON IVA, `fecha_corte` = `CURRENT_DATE` del build. Columnas (todas de
+`tesoreria.efectos`, no BAJA salvo los originales, y la cuota CP de §5.8): `cobrado_realizado`
+(COBRO REALIZADO); `pagado_realizado_sin_agr` (PAGO REALIZADO, `serie_efecto <> 'AGR'`);
+`pagado_agr_con_obra` (los AGR REALIZADO que conservan obra); `agrupados_vencidos` y
+`agrupados_pendientes` (los ORIGINALES: `sentido = 'PAGO'`, `estado_tesoreria = 'BAJA'`,
+`estado_codigo = 14`, vencimiento < o ≥ `fecha_corte`); `cartera_viva_agr_con_obra` (AGR PREVISTO
+con obra); `pagado_coste_proporcional` (cuota CP de lo pagado que se use); `personal_coste_partes`
+(Σ `raw.hmores.tot` de recursos PERSONA internos de la obra con mes ≤ `mes_ultimo_cierre`: el
+precio de cada parte es el del momento, sin IVA). Las retenciones son efectos propios: entran al
+cobrarse o pagarse y las pendientes van en la proyección. Sub-paso tras `09`; guarda de entrada.
+La receta, paso 0 SALDO (`PASOS_RECETA` gana `"SALDO"` delante: ocho pasos): con H28 `CON_SALDO`,
+saldo = cobrado − (pagado sin AGR + [H29 `ORIGINALES`: agrupados vencidos | `AGR`: AGR con obra] −
+CP) − personal; con `SIN_SALDO`, 0, y la proyección parte de hoy con la cartera vencida y no
+pagada (H16, H17). En el paso 7, con `ORIGINALES`, resta `cartera_viva_agr_con_obra` y suma los
+originales pendientes a su vencimiento (filtro exacto de arriba en `tesoreria.efectos`).
+
 ## 6. El catálogo (`config/hipotesis_caja.yaml`)
 
 `paso_receta` de las 27: DEVENGO H18, H19, H23, H26 · DOCUMENTO H03, H08 · COEFICIENTES ninguna
@@ -181,6 +177,8 @@ IVA H12, H13, H14 · CARTERA H16, H17, H20, H21, H27.
 | H26 | NUEVA · Venta ejecutada pendiente de facturar | OPCION `[INCLUIR, NO_INCLUIR]` | `INCLUIR` | el hueco neto; lo facturado por delante no se cobra |
 | H14 | Defecto | OPCION | `MENSUAL` | día 20 del mes siguiente; lo confirma AdP |
 | H20 | Opciones `[FIN_MES_ALBARAN, EXCLUIR]`; (N11) ingrediente y fuente | OPCION | `FIN_MES_ALBARAN` | factura del mes del albarán en el 93 %; 8,76 M EUR NETOS por proveedor en 21 obras (la vista, 56,9: 48,2 ya sobrefacturados) |
+| H28 | (N14) NUEVA · Saldo de partida, AMBOS, paso SALDO | OPCION `[CON_SALDO, SIN_SALDO]` | `CON_SALDO` | CON IVA; sin saldo, desde hoy con la cartera vencida |
+| H29 | (N14) NUEVA · Pagarés agrupados, PAGO, paso SALDO | OPCION `[ORIGINALES, AGR]` | `ORIGINALES` | HIPÓTESIS: el AGR pierde la obra; vencido = pagado en su fecha, no vencido = pendiente a su vencimiento (0686: 1,32 y 0,27 M EUR) |
 | H27 | NUEVA · Antigüedad máxima de lo pendiente de facturar; (N11) ingrediente y fuente | MESES | `6` | con el neto FIFO, 0,52 de 8,76 M EUR tienen más de 6 meses (bruto: 22,8) |
 
 Todas `validado: false`, `admite_obra: true`; ingrediente de H24/H25 `plazos_forma_pago`, de H26
@@ -242,8 +240,9 @@ NETO POR OBRA con `MEDIA_OBRA` e IVA y retención por peso de contrato; N10 gram
   29-10, por la prisa del humano; opción D del informe §10)**: sin hipótesis nueva; va con H02
   `CI` y un aviso en la receta. El personal no se identifica limpio en el devengo (por nombre de
   partida, ~6,03 M EUR de los 12,83 de CI; ni código estándar ni naturaleza en `descompuestos`).
-- **N14 · SEGUNDA TANDA: el saldo de partida (paso 0)**, la caja ya movida (cobrado − pagado
-  REALIZADO a origen) con los criterios de N11-N13 (sin CP, personal como coste real de los
-  cierres, AGR devueltos a su obra, sin retenciones pendientes ni IVA). Medido y preguntas
-  abiertas (con o sin IVA; cómo se identifica el personal histórico; enlace AGR -> efectos de
-  origen) en `progress/spec_F-150.md` §10; tareas T27-T30, que NO bloquean N11-N13.
+- **N14 · SEGUNDA TANDA, el saldo de partida (paso 0; respuestas del humano del 29-10, §10.5)**:
+  CON IVA y opcional (H28); AGR por sus ORIGINALES como hipótesis (H29: rompe
+  `R-TESORERIA-ESTADO` a propósito y se declara; con `ORIGINALES` los AGR con obra no se suman
+  para no contarlos dos veces); retenciones, efectos propios; personal: **decisión del líder**,
+  `raw.hmores.tot` de recursos PERSONA internos hasta el último cierre (Sigrid guarda el precio de
+  cada parte: varía por año en 458 de 545 recursos; no hay otra tabla de histórico). §5.9.
