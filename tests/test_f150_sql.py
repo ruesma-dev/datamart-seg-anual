@@ -435,8 +435,25 @@ def test_f150_r23_la_media_de_la_obra_como_el_dominio() -> None:
 def test_f150_r23_lo_facturado_por_el_centro_de_coste_de_la_obra() -> None:
     texto = _devengo()
     assert "FROM raw.dvf fv JOIN raw.obr ob ON ob.cenide = fv.cenide" in texto
-    assert "SUM(fv.totbas) AS facturado_origen" in texto
+    assert "SUM(fv.totbas::NUMERIC(18, 2)) AS facturado_origen" in texto
     assert "fecdoc" not in texto, "sin corte de fecha (riesgo 6)"
+
+
+def test_f150_r23_los_importes_de_raw_dvf_se_castean_a_numeric() -> None:
+    """Arreglo del despliegue del 29-10: en Azure la ingesta guarda los importes
+    de `raw.dvf` (`totbas`, `totiva`, `totdoc`) como `double precision`, y
+    `ROUND(double precision, integer)` no existe en PostgreSQL. Todo importe de
+    `raw.dvf` se lee con `::NUMERIC(18, 2)`, como `c.totbas` en 05 (F-140)."""
+    texto = _devengo()
+    cte = texto.split(", facturado AS (", 1)[1].split(", h AS (", 1)[0]
+    assert "FROM raw.dvf" in cte
+    usos = re.findall(r"fv\.(totbas|totiva|totdoc)(::NUMERIC\(18, 2\))?", cte)
+    assert usos, "el CTE facturado debe leer algun importe de raw.dvf"
+    sin_cast = [col for col, cast in usos if not cast]
+    assert not sin_cast, f"importes de raw.dvf sin ::NUMERIC(18, 2): {sin_cast}"
+    usos_fuera = re.findall(r"fv\.(totbas|totiva|totdoc)(?!::NUMERIC\(18, 2\))",
+                            texto.replace(cte, ""))
+    assert not usos_fuera, f"importes de raw.dvf fuera del CTE sin cast: {usos_fuera}"
 
 
 def test_f150_r23_el_hueco_neto_por_obra_con_suelo_cero() -> None:

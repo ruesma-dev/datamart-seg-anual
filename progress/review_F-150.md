@@ -1,44 +1,49 @@
 <!-- progress/review_F-150.md -->
-Revisión incremental desde 6efddfe (pasada 2) · `git diff 6efddfe..7eed62e` · HEAD `7eed62e`
+Revisión incremental desde b08f0b6 (pasada 3) · `git diff b08f0b6..289fedb` · HEAD `289fedb`
 
 # F-150 · Review · la receta de la caja (fase 1)
 
-**Veredicto: APROBADO.** La pasada 1 (sobre `6efddfe`) solo rechazó C4: las verificaciones MANUAL
-de T15 no tenían su comando exacto. Está corregido. Lo demás ya quedó aprobado en la pasada 1, que
-sigue debajo.
+**Veredicto: APROBADO** (pasada 3, el arreglo del despliegue). Pasada 1 (`6efddfe`): rechazo solo
+por C4. Pasada 2 (`7eed62e`): APROBADO. Las tres siguen debajo, resumidas.
 
 **Nivel de rigor:** `estandar`, declarado en `features.json`. Exige fase RED en los requisitos
 centrales, cobertura de lo cambiado ≥ 80 % y mutación con los supervivientes analizados.
 
-## Pasada 2 · el delta
+## Pasada 3 (arreglo del despliegue, 29-10)
 
-- **`progress/current.md`**, subsección «F-150 · Despliegue MANUAL, T15». Diez pasos en orden,
-  cada uno con su comando:
-  - vuelta atrás `85_update_job.ps1 -Tag r20261026-2111`;
-  - `70_build_image.ps1`;
-  - cambio del job, comprobado con `az containerapp job show`;
-  - `ingest --table iva --full` y `--table dvf --full` ANTES de `build-tesoreria`, con su duración
-    sacada de `_meta.etl_runs`;
-  - las siete consultas de R30, escritas y con su cifra esperada;
-  - `publicar-diccionario` solo con la imagen ya en el job;
-  - `check-diccionario`, `check-declarados` y `check-unicidad --timeout 300`;
-  - el reinicio de `mcp-bbdd` con `az`;
-  - R31 con la 0713 (a 1,19) y la 0696 (mixta).
+- **Alcance:** `07` (1 línea), `test_f150_sql.py`, `impl_F-150.md`, `current.md`. Sin firmas ni otro SQL.
+- **Cambio mínimo y en estilo:** `SUM(fv.totbas)` → `SUM(fv.totbas::NUMERIC(18, 2))` en el CTE
+  `facturado`, el mismo cast que `c.totbas::NUMERIC(18, 2)` de `05:57` (F-140). Lo de aguas abajo
+  (`ROUND(COALESCE(fa.facturado_origen, 0), 2)`, `GREATEST`) queda en `numeric`.
+- **RED reproducido por mí** (worktree desechable en el scratchpad, ya borrado): con el `07` de
+  `b08f0b6` y el test de `289fedb`, `-k "dvf or facturado"` → `AssertionError: importes de raw.dvf
+  sin ::NUMERIC(18, 2): ['totbas']` · **2 failed, 2 passed**; con el `07` de `289fedb`, 4 passed.
+  Coincide con la salida que cita `impl_F-150.md`.
+- **Ninguna otra columna `raw` `double precision` en una función solo `numeric`** en lo que F-150
+  añade a `00`, `06`, `07` y `08` (diff contra `a80bb1b`): `raw.iva.iva` va como
+  `ROUND((i.iva * 100)::NUMERIC, 4)` en `06` y `08`; `coestr` es texto que `fn_coeficientes` pasa a
+  `NUMERIC[]`; `op.ctride`, `ob.ivaide`, `ob.cenide`, `o.ivaide` solo se usan en `JOIN`/`NULLIF`
+  (igualdad, válida con `double`); `stg.presupuesto.importe/importe_oficial` son `NUMERIC(18,2)`
+  (`stg/01_ddl.sql:91-92`) y el resto viene de `mart`/`stg`/`tesoreria`. La prueba definitiva es
+  la del líder: `build-tesoreria` con `d1c2ee1` acabó SUCCESS en Azure (229,3 s) y R30 cuadra.
+- **`init.sh`:** acreditado en `impl_F-150.md` («Evidencias»): verde sobre `2d30248`, 9.646 passed
+  / 266 skipped (5.902 s). `289fedb` solo toca `impl_F-150.md`, así que vale para HEAD. No lo
+  reejecuto (instrucción del líder). Cobertura N/A justificada: sin Python de producción frente a
+  `main`. Mutación N/A: el SQL no se muta; lo cubren el test de texto y la sandbox.
+- **Progress:** `impl_F-150.md` trae causa, cambio, test con su RED, sandbox con `raw` en `double
+  precision` (antes: el error de Azure; ahora: 66 OK) y la lección; `current.md`, la línea del
+  29-10. Tamaño de `impl` 220/220. **Sin secretos** (barrido del diff vacío). Commits `F-150 ...`.
+- **Aviso, no bloqueante:** `main` (`8b08d59`) lleva F-150 SIN el arreglo. Hasta integrar la rama
+  y reconstruir la imagen del job, la nocturna volverá a caer en `build-tesoreria`.
+- **Checkpoints del delta:** C1 `[x]` (acreditado) · C3 `[x]` capa y estilo · C4 `[x]` test que
+  falla sin el arreglo · C4 bis `[x]` RED con salida real · C5 `[x]` árbol limpio, commits.
 
-  Todo lo que nombran existe: los scripts `infra/70`/`85`, las opciones de `main.py`
-  (`--table`, `--full`, `--timeout`), las columnas `hipotesis_caja_obra.fuente` y `etl_runs.step`
-  / `started_at` / `finished_at`, y los nombres de recurso, que ya están en `infra/env/dev.json`.
-  Sin secretos: el host va como `<host>` y el usuario como `<usuario>`. `impl_F-150.md` §6 remite
-  a esa subsección. **C4 MANUAL: `[x]`.**
-- **Los tres no bloqueantes, resueltos:**
-  - `impl_F-150.md` §1 ya no da `hipotesis_caja_yaml.py` por modificado;
-  - `proyeccion_caja.py:498` lleva el comentario de la guarda contra NaN. Es solo un comentario y
-    no cambia el AST ni el alcance de la mutación;
-  - `BACKLOG.md` es un fichero generado y se regenera al integrar.
-- **Lo aprobado sigue valiendo:** el delta no cambia ninguna firma, ningún SQL ni ningún dato.
-  Los tests afectados se han ejecutado (`test_f150_{perfil,contrato,receta,coeficiente,hueco}`,
-  `test_f140_{hipotesis,paso}`): 330 passed.
-- **`init.sh` entero sobre `7eed62e`:** verde, «ENTORNO LISTO», 9.645 passed / 266 skipped (6.024 s); cobertura 100 % (143/143); tamaño OK.
+## Pasada 2 (`6efddfe..7eed62e`) · resumen
+
+- C4 MANUAL corregido: la subsección «F-150 · Despliegue MANUAL, T15» de `current.md` trae los
+  diez pasos con su comando; todo lo que nombran existe y sin secretos (`<host>`, `<usuario>`).
+- Los tres no bloqueantes, resueltos; el delta no cambió firmas, SQL ni datos (330 passed).
+- `init.sh` sobre `7eed62e`: verde, 9.645 passed / 266 skipped (6.024 s); cobertura 100 %.
 
 ## Pasada 1 (sobre `6efddfe`) · lo que se verificó
 
@@ -53,8 +58,7 @@ centrales, cobertura de lo cambiado ≥ 80 % y mutación con los supervivientes 
   - existen las columnas fuente (`obr.ivaide`, `obrctr.coestr`/`ivaide`, `obrparpar.ctride`,
     `stg.presupuesto`);
   - `raw.iva` y `raw.dvf` aún no existen en Azure. Es lo esperado: llegan en T15.
-- **Sigrid** (`azure-apps/sigrid_tablas.md`): `dvf` tiene las 9 columnas de la lista blanca y ni
-  `dvf` ni `iva` tienen `tiemod`, como midió en vivo el implementer.
+- **Sigrid** (`sigrid_tablas.md`): `dvf` con las 9 columnas de la lista blanca; ni `dvf` ni `iva` con `tiemod`.
 - **El código frente a la spec**, leído línea a línea:
   - `coestr` se lee por líneas `\r?\n` y por CÓDIGO; `RET*` va aparte y no suma; `COEF_DESADJ` va
     en cascada; un código desconocido o un valor no numérico fallan cerrado. Python y SQL son
@@ -75,11 +79,8 @@ centrales, cobertura de lo cambiado ≥ 80 % y mutación con los supervivientes 
 - **Diccionario:** v63; fichas de `raw.iva` y `raw.dvf`; columnas nuevas con `significado` y
   `nulo_significa`; `R-CAJA-HIPOTESIS` remite a la receta y `R-VENTA-COEFICIENTES` cubre las tres
   `devengo_*`.
-- **`azure-apps` `044beef`** (local, limpio): recoge `iva`, la cabecera de `dvf`, las 80 tablas, la
-  lectura de `stg.presupuesto`, las columnas y funciones publicadas, la guarda D6, el despliegue
-  y «SIN DESPLEGAR».
-- **Tests de F-140 modificados:** solo se ajustaron recuentos (23 a 27, 78 a 80) y se pasó a
-  `>= 2` / `>= 62` donde F-150 crece; los de F-150 fijan los valores exactos.
+- **`azure-apps` `044beef`:** `iva`, cabecera de `dvf`, 80 tablas, columnas, guarda D6, despliegue.
+- **Tests de F-140:** solo recuentos (23→27, 78→80, `>= 2`/`>= 62`); los de F-150 fijan los exactos.
 
 ## Mutación (C4 bis)
 
