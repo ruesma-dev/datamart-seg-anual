@@ -536,7 +536,7 @@ WITH media AS (
     GROUP BY obra_id
 )
 , facturado AS (
-    SELECT ob.ide AS obra_id, SUM(fv.totbas) AS facturado_origen
+    SELECT ob.ide AS obra_id, SUM(fv.totbas::NUMERIC(18, 2)) AS facturado_origen
     FROM raw.dvf fv JOIN raw.obr ob ON ob.cenide = fv.cenide
     WHERE ob.ide IN (SELECT obra_id FROM _dev_version WHERE concepto = 'VENTA')
     GROUP BY ob.ide
