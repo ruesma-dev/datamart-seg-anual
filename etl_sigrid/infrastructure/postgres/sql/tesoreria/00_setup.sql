@@ -648,5 +648,11 @@ CREATE TABLE IF NOT EXISTS tesoreria.saldo_partida_obra (
     pagado_coste_proporcional               NUMERIC(18,2) NOT NULL,
     agrupados_vencidos_coste_proporcional   NUMERIC(18,2) NOT NULL,
     personal_coste_partes                   NUMERIC(18,2) NOT NULL,
+    iva_soportado_pagado                    NUMERIC(18,2) NOT NULL,
+    iva_repercutido_cobrado                 NUMERIC(18,2) NOT NULL,
+    iva_soportado_pagado_hasta_4t           NUMERIC(18,2) NOT NULL,
+    iva_repercutido_cobrado_hasta_4t        NUMERIC(18,2) NOT NULL,
+    iva_soportado_pagado_hasta_4m           NUMERIC(18,2) NOT NULL,
+    iva_repercutido_cobrado_hasta_4m        NUMERIC(18,2) NOT NULL,
     PRIMARY KEY (obra_id)
 );

@@ -115,6 +115,9 @@ def test_f150_r2_cada_paso_nombra_sus_hipotesis_y_solo_las_suyas() -> None:
     assert len(catalogo) == _n_hipotesis()
     for paso, tramo in _tramos().items():
         esperados = {h.codigo for h in catalogo if h.paso_receta == paso}
+        if paso == "SALDO":
+            # N15 (R43): el saldo suma el IVA ya recuperado SEGUN H30 (paso IVA).
+            esperados |= {"H30"}
         assert set(re.findall(r"\bH[0-9]{2}\b", tramo)) == esperados, paso
 
 
@@ -326,3 +329,23 @@ def test_f150_r32_version_65_con_su_nota() -> None:
     assert int(glob["version"]) >= 65
     texto = (DICC / "00_global.yaml").read_text(encoding="utf-8")
     assert "# version 65 (F-150, 2026-10-30)" in texto
+
+
+def test_f150_r43_el_paso_0_suma_el_iva_neto_ya_recuperado() -> None:
+    tramo = _plano(_tramos()["SALDO"])
+    assert "+ el IVA neto ya recuperado (`iva_soportado_pagado` \u2212 `iva_repercutido_cobrado`" in tramo
+    for opcion, columnas in (("MENSUAL_REDEME", "_hasta_4m"), ("COMPENSA_EMPRESA", "todo"),
+                             ("ANUAL", "_hasta_4t")):
+        assert f"`{opcion}`: {columnas}" in tramo, opcion
+    assert "H30" in tramo
+
+
+def test_f150_r43_el_paso_6_con_el_h13_de_la_obra() -> None:
+    tramo = _plano(_tramos()["IVA"])
+    assert "H13 DE LA OBRA" in tramo and "H30" in tramo
+
+
+def test_f150_r32_version_66_con_su_nota() -> None:
+    glob = yaml.safe_load((DICC / "00_global.yaml").read_text(encoding="utf-8"))
+    assert int(glob["version"]) >= 66
+    assert "# version 66 (F-150, 2026-10-30)" in (DICC / "00_global.yaml").read_text(encoding="utf-8")

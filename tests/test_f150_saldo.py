@@ -69,6 +69,7 @@ def test_f150_r39_h29_los_agrupados_por_sus_originales() -> None:
 
 
 def test_f150_r39_son_29_en_su_orden() -> None:
+    # N15 suma H30 detras.
     assert list(_catalogo())[:29] == [f"H{n:02d}" for n in range(1, 30)]
 
 
@@ -90,6 +91,10 @@ COLUMNAS_SALDO = (
     "agrupados_vencidos", "agrupados_pendientes", "cartera_viva_agr_con_obra",
     "pagado_coste_proporcional", "agrupados_vencidos_coste_proporcional",
     "personal_coste_partes",
+    # N15 (R43): el IVA de lo pagado y lo cobrado, y cuanto ya volvio segun H30.
+    "iva_soportado_pagado", "iva_repercutido_cobrado",
+    "iva_soportado_pagado_hasta_4t", "iva_repercutido_cobrado_hasta_4t",
+    "iva_soportado_pagado_hasta_4m", "iva_repercutido_cobrado_hasta_4m",
 )
 
 
@@ -194,7 +199,8 @@ def test_f150_r38_la_guarda_de_entrada_antes_de_nada() -> None:
     texto = _saldo()
     entrada = texto[: texto.index("CREATE TEMP TABLE")]
     for fuente in ("raw.hmores", "raw.res", "raw.dcfpro", "tesoreria.efectos",
-                   "tesoreria.devengo_corte_obra", "mart.v_pbi_dim_partida"):
+                   "tesoreria.devengo_corte_obra", "mart.v_pbi_dim_partida",
+                   "raw.dcf", "raw.dvf"):
         assert f"to_regclass('{fuente}') IS NULL" in entrada, fuente
     assert "TRUNCATE" not in entrada
 
@@ -222,3 +228,58 @@ def test_f150_r38_el_sub_paso_tras_los_albaranes() -> None:
     sub = paso.SUB_PASOS[i]
     assert (sub.sql_file, sub.target_schema, sub.target_table) == (
         "10_saldo_partida.sql", "tesoreria", "saldo_partida_obra")
+
+
+# ===========================================================================
+# R43 · el IVA de lo pagado y lo cobrado (N15, T34)
+# ===========================================================================
+
+
+def test_f150_r43_la_fraccion_de_iva_de_cada_factura() -> None:
+    """Pago: cuota / total a pagar de `raw.dcf`; cobro: cuota / total de `raw.dvf`.
+    Los `double precision` de Sigrid pasan a NUMERIC (lección del 29-10)."""
+    texto = _saldo()
+    assert ("SELECT f.ide AS documento_id, 'PAGO'::VARCHAR(5) AS sentido, "
+            "f.totiva::NUMERIC(18, 2) / NULLIF(f.totpag::NUMERIC(18, 2), 0) AS fraccion_iva "
+            "FROM raw.dcf f") in texto
+    assert ("SELECT v.ide AS documento_id, 'COBRO'::VARCHAR(5) AS sentido, "
+            "v.totiva::NUMERIC(18, 2) / NULLIF(v.totdoc::NUMERIC(18, 2), 0) AS fraccion_iva "
+            "FROM raw.dvf v") in texto
+    assert ("LEFT JOIN _sal_iva_doc d ON d.documento_id = e.documento_id "
+            "AND d.sentido = e.sentido") in texto
+
+
+PAGADO = ("e.sentido = 'PAGO' AND (e.estado_tesoreria = 'REALIZADO' AND e.serie_efecto IS DISTINCT "
+          "FROM 'AGR' OR e.estado_tesoreria = 'BAJA' AND e.estado_codigo = 14 AND "
+          "e.fecha_vencimiento < CURRENT_DATE)")
+COBRADO = "e.sentido = 'COBRO' AND e.estado_tesoreria = 'REALIZADO'"
+HASTA_4T = "e.fecha_movimiento < date_trunc('year', CURRENT_DATE)::DATE"
+HASTA_4M = ("(date_part('year', CURRENT_DATE) * 12 + date_part('month', CURRENT_DATE)) "
+            "- (date_part('year', e.fecha_movimiento) * 12 + date_part('month', e.fecha_movimiento)) >= 4")
+
+
+@pytest.mark.parametrize(("alias", "filtro"), [
+    ("iva_soportado_pagado", PAGADO),
+    ("iva_repercutido_cobrado", COBRADO),
+    ("iva_soportado_pagado_hasta_4t", f"{PAGADO} AND {HASTA_4T}"),
+    ("iva_repercutido_cobrado_hasta_4t", f"{COBRADO} AND {HASTA_4T}"),
+    ("iva_soportado_pagado_hasta_4m", f"{PAGADO} AND {HASTA_4M}"),
+    ("iva_repercutido_cobrado_hasta_4m", f"{COBRADO} AND {HASTA_4M}"),
+])
+def test_f150_r43_cada_iva_con_su_filtro(alias: str, filtro: str) -> None:
+    assert (f"SUM(e.importe * COALESCE(d.fraccion_iva, 0)) FILTER (WHERE {filtro}) "
+            f"AS {alias}") in _saldo()
+    assert f"ROUND(COALESCE(s.{alias}, 0), 2) AS {alias}" in _saldo()
+
+
+def test_f150_r43_la_fecha_del_movimiento() -> None:
+    """Lo realizado, en su fecha real (o su vencimiento); el original agrupado, en su vencimiento."""
+    assert ("CASE WHEN e.estado_tesoreria = 'REALIZADO' THEN COALESCE(e.fecha_real, "
+            "e.fecha_vencimiento) ELSE e.fecha_vencimiento END AS fecha_movimiento") in _saldo()
+
+
+def test_f150_r43_el_sql_no_elige_h30() -> None:
+    """Las tres opciones de H30 tienen su columna; elegir es de la receta."""
+    texto = _saldo()
+    for opcion in ("MENSUAL_REDEME", "COMPENSA_EMPRESA", "ANUAL"):
+        assert opcion not in texto

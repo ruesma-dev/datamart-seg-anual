@@ -1158,6 +1158,11 @@ objetos:
       por el coste de sus partes (`personal_coste_partes`, sin IVA) hasta el
       ultimo cierre, y lo de despues por el devengo pendiente. El coste
       proporcional (`CP`) de lo pagado no es caja de la obra: se resta.
+
+      **EL IVA** (N15): lo pagado lleva IVA soportado y lo cobrado repercutido
+      (con inversion del sujeto pasivo, casi nada). El saldo suma el IVA NETO
+      ya recuperado (soportado − repercutido) segun H30: con `MENSUAL_REDEME`
+      (defecto) solo las columnas `_hasta_4m`.
     grano: Una fila por obra (`obra_id`) de `tesoreria.devengo_corte_obra` (las de la receta).
     clave_negocio: [obra_id]
     paso_etl: build_tesoreria
@@ -1230,6 +1235,43 @@ objetos:
           internos de la obra hasta `mes_ultimo_cierre`. SIN IVA.
         unidad: EUR
         agregacion: suma
+      iva_soportado_pagado:
+        significado: >-
+          El IVA soportado de lo pagado (sin AGR y los originales vencidos):
+          importe del efecto × cuota / total a pagar de su factura (`raw.dcf`).
+          Con inversion del sujeto pasivo, 0.
+        unidad: EUR
+        agregacion: suma
+      iva_repercutido_cobrado:
+        significado: >-
+          El IVA repercutido de lo cobrado: importe del efecto × cuota / total de
+          su factura de venta (`raw.dvf`).
+        unidad: EUR
+        agregacion: suma
+      iva_soportado_pagado_hasta_4t:
+        significado: >-
+          La parte de `iva_soportado_pagado` pagada antes del 1 de enero del ano
+          de `fecha_corte`: la ya recuperada con H30 `ANUAL`.
+        unidad: EUR
+        agregacion: suma
+      iva_repercutido_cobrado_hasta_4t:
+        significado: >-
+          La parte de `iva_repercutido_cobrado` cobrada antes del 1 de enero del
+          ano de `fecha_corte` (H30 `ANUAL`).
+        unidad: EUR
+        agregacion: suma
+      iva_soportado_pagado_hasta_4m:
+        significado: >-
+          La parte de `iva_soportado_pagado` pagada en un mes 4 o mas meses antes
+          del de `fecha_corte`: la ya devuelta con H30 `MENSUAL_REDEME` (defecto).
+        unidad: EUR
+        agregacion: suma
+      iva_repercutido_cobrado_hasta_4m:
+        significado: >-
+          La parte de `iva_repercutido_cobrado` cobrada en un mes 4 o mas meses
+          antes del de `fecha_corte` (H30 `MENSUAL_REDEME`).
+        unidad: EUR
+        agregacion: suma
     relaciones:
       - de: obra_id
         a: maestro.obras.obra_id
@@ -1275,7 +1317,10 @@ objetos:
       `tesoreria.saldo_partida_obra` (CON IVA, hasta `fecha_corte`, el dia del
       build). Con H28 `CON_SALDO`, saldo = `cobrado_realizado` −
       (`pagado_realizado_sin_agr` + [H29 `ORIGINALES`: `agrupados_vencidos` |
-      `AGR`: `pagado_agr_con_obra`] − CP) − `personal_coste_partes`, con CP =
+      `AGR`: `pagado_agr_con_obra`] − CP) − `personal_coste_partes` + el IVA
+      neto ya recuperado (`iva_soportado_pagado` − `iva_repercutido_cobrado`
+      segun H30: `MENSUAL_REDEME`: _hasta_4m; `COMPENSA_EMPRESA`: todo;
+      `ANUAL`: _hasta_4t; el IVA aun no recuperado es caja futura), con CP =
       `pagado_coste_proporcional` (+ `agrupados_vencidos_coste_proporcional`
       con `ORIGINALES`): el coste proporcional no es caja de la obra; con
       `SIN_SALDO`, 0, y la proyeccion parte de hoy. H29 es una HIPOTESIS que
@@ -1329,9 +1374,10 @@ objetos:
       6. IVA: en el cobro, `importe_iva_contrato` (y
       `iva_pendiente_facturar_contrato`) es el del contrato (0 % en inversion
       del sujeto pasivo); H12 solo se aplica a las bases `sin_iva_contrato`.
-      En el pago, H13. Se cobra o paga con su documento; la liquidacion con
+      En el pago, la base por el H13 DE LA OBRA (SIGRID: el IVA efectivo de
+      sus compras), no el de la empresa. Se cobra o paga con su documento; la liquidacion con
       Hacienda (repercutido menos soportado) va segun H14, y el IVA a devolver
-      vuelve a caja segun H30. **Aviso**: H13 y
+      vuelve a caja segun H30 (con `MENSUAL_REDEME`, a los 4 meses). **Aviso**: H13 y
       H14 estan pendientes de validar con Administracion (AdP): dilo al dar
       la caja.
 

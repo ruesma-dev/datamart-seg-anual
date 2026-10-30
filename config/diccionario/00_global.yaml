@@ -735,7 +735,13 @@
 # obra de la receta, CON IVA, los pagares agrupados por sus originales (H29) y
 # el personal de los partes hasta el cierre. La receta gana el paso 0 SALDO
 # (ocho pasos) con H28 y H29: 29 hipotesis.
-version: 65
+# version 66 (F-150, 2026-10-30): EL IVA CON INVERSION DEL SUJETO PASIVO (N15).
+# H13 tiene valor por obra (SIGRID: cuota entre base de sus compras de 12 meses,
+# desde 0,5 M EUR) y nace H30 (cuando vuelve el IVA a devolver; defecto
+# MENSUAL_REDEME, decision del humano del 29-10): 30 hipotesis.
+# `tesoreria.saldo_partida_obra` gana el IVA soportado y repercutido de lo
+# pagado y cobrado, en total y ya recuperado (_hasta_4t, _hasta_4m).
+version: 66
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -1155,7 +1161,8 @@ reglas:
       devengo como recurso: no sumes nominas de la cartera ni las des por
       ausentes. Y el saldo de partida (paso 0) va CON IVA
       (`tesoreria.saldo_partida_obra`) y es opcional (H28); los pagares
-      agrupados cuentan por sus originales o por el AGR (H29): declaralas.
+      agrupados cuentan por sus originales o por el AGR (H29) y el IVA neto ya
+      recuperado, segun H30: declaralas.
     motivo: >-
       Decision del humano del 2026-10-24/25 (F-140): convertir devengo en caja
       depende de plazos, retenciones, IVA y criterios que Negocio aun no ha
