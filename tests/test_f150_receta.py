@@ -1,10 +1,10 @@
 # tests/test_f150_receta.py
 """
 F-150 · La receta de la caja en el dominio (R1, D7): cada hipótesis dice en
-qué PASO de la receta se aplica, uno de siete y en este orden.
+qué PASO de la receta se aplica, uno de ocho y en este orden (N14: SALDO, el 0).
 
 El orden es la receta: la IA pasa el devengo a caja SIEMPRE así, y la ficha de
-`tesoreria.hipotesis_caja` lo cuenta con los mismos siete pasos (R2, T12).
+`tesoreria.hipotesis_caja` lo cuenta con los mismos pasos (R2, T12, T30).
 Dominio puro: sin BBDD.
 """
 
@@ -48,13 +48,14 @@ def _fila(**cambios) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# R1 · los siete pasos, en su orden
+# R1 · los ocho pasos, en su orden
 # ---------------------------------------------------------------------------
 
 
-def test_f150_r1_los_siete_pasos_en_el_orden_de_la_receta() -> None:
+def test_f150_r1_los_ocho_pasos_en_el_orden_de_la_receta() -> None:
+    """N14 (29-10): el saldo de partida va delante, como paso 0."""
     assert PASOS_RECETA == (
-        "DEVENGO", "DOCUMENTO", "COEFICIENTES", "PLAZO", "RETENCION", "IVA", "CARTERA",
+        "SALDO", "DEVENGO", "DOCUMENTO", "COEFICIENTES", "PLAZO", "RETENCION", "IVA", "CARTERA",
     )
 
 
@@ -115,13 +116,14 @@ RUTA_YAML = RAIZ / "config" / "hipotesis_caja.yaml"
 DIR_SQL = RAIZ / "etl_sigrid" / "infrastructure" / "postgres" / "sql" / "tesoreria"
 RUTA_SETUP = DIR_SQL / "00_setup.sql"
 
-#: `design.md` §6: el paso de la receta de cada una de las 27.
+#: `design.md` §6: el paso de la receta de cada una (N14 suma H28 y H29, SALDO).
 PASO_DE_CADA_CODIGO = {
+    **dict.fromkeys(("H28", "H29"), "SALDO"),
     **dict.fromkeys(("H18", "H19", "H23", "H26"), "DEVENGO"),
     **dict.fromkeys(("H03", "H08"), "DOCUMENTO"),
     **dict.fromkeys(("H01", "H02", "H04", "H05", "H09", "H15", "H22", "H24", "H25"), "PLAZO"),
     **dict.fromkeys(("H06", "H07", "H10", "H11"), "RETENCION"),
-    **dict.fromkeys(("H12", "H13", "H14"), "IVA"),
+    **dict.fromkeys(("H12", "H13", "H14", "H30"), "IVA"),
     **dict.fromkeys(("H16", "H17", "H20", "H21", "H27"), "CARTERA"),
 }
 
@@ -159,12 +161,16 @@ def test_f150_r24_h26_la_venta_ejecutada_pendiente_de_facturar() -> None:
 def test_f150_r24_h27_la_antiguedad_maxima_de_lo_pendiente_de_facturar() -> None:
     h = _catalogo()["H27"]
     assert (h.sentido, h.unidad, h.valor_defecto) == ("PAGO", "MESES", 6)
-    assert h.ingrediente == "compras.v_pbi_albaranes_sin_facturar"
+    # N11 (29-10): el ingrediente son los albaranes NETOS por proveedor, no la
+    # vista de compras, que solo suma lineas > 0.
+    assert h.ingrediente == "tesoreria.albaranes_pendientes_neto"
+    assert "0,52" in _texto(h) and "8,76" in _texto(h)
     assert (h.paso_receta, h.admite_obra, h.validado) == ("CARTERA", True, False)
 
 
 def test_f150_r24_son_27() -> None:
-    assert list(_catalogo()) == [f"H{n:02d}" for n in range(1, 28)]
+    # N14 suma H28 y H29 detras: las 27 de la primera tanda siguen en su orden.
+    assert list(_catalogo())[:27] == [f"H{n:02d}" for n in range(1, 28)]
 
 
 @pytest.mark.parametrize(("codigo", "defecto"), [("H03", [[0, 100]]), ("H08", [[1, 100]])])
@@ -231,6 +237,26 @@ def test_f150_r28_h13_pendiente_de_adp_y_h14_mensual() -> None:
     assert "dia 20 del mes siguiente" in _texto(h14) and "AdP" in _texto(h14)
 
 
+def test_f150_r42_h30_cuando_vuelve_el_iva_a_devolver() -> None:
+    """N15, decision del humano del 29-10: por defecto MENSUAL_REDEME (vuelve a
+    los 4 meses del mes liquidado, la mediana medida en la 4700), sin validar."""
+    h30 = _catalogo()["H30"]
+    assert (h30.sentido, h30.unidad, h30.paso_receta) == ("AMBOS", "OPCION", "IVA")
+    assert h30.valor_defecto == "MENSUAL_REDEME" and h30.opciones[0] == h30.valor_defecto
+    assert set(h30.opciones) == {"MENSUAL_REDEME", "COMPENSA_EMPRESA", "ANUAL"}
+    assert h30.validado is False and h30.admite_obra is True
+    fuente = " ".join(h30.fuente_defecto.split())
+    for dato in ("4700", "a los 4 meses", "AdP", "Decision del humano del 2026-10-29"):
+        assert dato in fuente, dato
+    descripcion = " ".join(h30.descripcion.split())
+    for opcion in h30.opciones:
+        assert f"{opcion}:" in descripcion, opcion
+
+
+def test_f150_r42_son_30() -> None:
+    assert list(_catalogo()) == [f"H{n:02d}" for n in range(1, 31)]
+
+
 def test_f150_r28_h15_solo_con_varios_vencimientos() -> None:
     assert "varios vencimientos" in _texto(_catalogo()["H15"])
     assert "no aplica" in _texto(_catalogo()["H15"])
@@ -239,5 +265,14 @@ def test_f150_r28_h15_solo_con_varios_vencimientos() -> None:
 def test_f150_r28_h20_a_fin_de_mes_del_albaran_con_su_ingrediente() -> None:
     h = _catalogo()["H20"]
     assert (h.valor_defecto, h.opciones) == ("FIN_MES_ALBARAN", ("FIN_MES_ALBARAN", "EXCLUIR"))
-    assert h.ingrediente == "compras.v_pbi_albaranes_sin_facturar"
-    assert "56,9" in _texto(h) and "93 %" in _texto(h)
+    # N11 (29-10): ingrediente, los albaranes NETOS; la fuente dice por que.
+    assert h.ingrediente == "tesoreria.albaranes_pendientes_neto"
+    assert "56,9" in _texto(h) and "93 %" in _texto(h) and "8,76" in _texto(h)
+    assert "neto por proveedor" in _texto(h) and "tras_cierre" in _texto(h)
+
+
+def test_f150_r36_h02_sin_la_clave_cp() -> None:
+    """N12: el coste proporcional no es caja de la obra; H02 no le da plazo."""
+    h = _catalogo()["H02"]
+    assert set(h.valor_defecto) == {"CD", "CI", "OTRO"}
+    assert "el CP no es caja de la obra" in _texto(h)

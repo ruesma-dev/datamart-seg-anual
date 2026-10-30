@@ -107,13 +107,20 @@ confirmación cubre el plan que se enseñó, no lo que apareció después.
   también los INGREDIENTES de la caja futura, no la caja: lo pactado
   (`condiciones_contrato_*`, `plazos_forma_pago`), el devengo pendiente de la
   última versión master descontado por partida (`devengo_*`, lee `stg` y `mart`
-  de la misma noche) y las 27 hipótesis de `config/hipotesis_caja.yaml` (las
+  de la misma noche) y las 30 hipótesis de `config/hipotesis_caja.yaml` (las
   mantiene Control de Costes; si el YAML no valida, el paso falla). Quien pase
   devengo a caja las declara todas (`R-CAJA-HIPOTESIS`) y sigue **la receta**
-  (F-150): siete pasos en la ficha de `tesoreria.hipotesis_caja`, cada hipótesis
+  (F-150): ocho pasos en la ficha de `tesoreria.hipotesis_caja`, cada hipótesis
   con su `paso_receta`, y la venta con el coeficiente, el IVA y la retención del
   CONTRATO de cada partida (`coestr` y `raw.iva`; si no, el master 9 u 11), más
-  el hueco de facturación por obra (`raw.dvf`). **`compras/` publica
+  el hueco de facturación por obra (`raw.dvf`). Los albaranes, NETOS por
+  proveedor (`tesoreria.albaranes_pendientes_neto`, FIFO, leído de `raw`: la
+  vista de compras solo suma líneas > 0); el coste proporcional (`CP`) NO es caja
+  de la obra (sale por `categoria`; su caja es F-154) y el personal va por el
+  devengo del recurso, no por las nóminas de la cartera. El paso 0 es el SALDO
+  de partida (`tesoreria.saldo_partida_obra`, CON IVA, H28): los pagarés AGR por
+  sus originales de BAJA (H29, rompe `R-TESORERIA-ESTADO` a propósito) y el
+  personal por el coste de sus partes hasta el cierre. **`compras/` publica
   también las alarmas de los documentos (F-138)**: `raw.conala` (lista explícita
   de 17 familias, sin empleados) da `compras.documento_alarmas` y la marca
   «liquidatoria» de facturas, albaranes y proformas (`documento_liquidatoria`,

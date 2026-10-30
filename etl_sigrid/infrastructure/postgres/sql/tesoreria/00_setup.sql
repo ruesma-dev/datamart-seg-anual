@@ -592,3 +592,67 @@ ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS iva_pendiente_
 ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS base_pendiente_facturar_sin_iva_contrato NUMERIC(18,2);
 ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS retencion_pendiente_facturar_contrato NUMERIC(18,2);
 ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS base_pendiente_facturar_sin_retencion_contrato NUMERIC(18,2);
+-- F-150 (N12, R36): la parte de COSTE PROPORCIONAL (CP, estructura) de la cartera
+-- de la obra, CON IVA: no es caja de la obra y el paso 7 de la receta la resta.
+-- Solo COSTE.
+ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS cartera_viva_coste_proporcional NUMERIC(18,2);
+ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS cartera_emitida_tras_cierre_coste_proporcional NUMERIC(18,2);
+
+
+-- ---------------------------------------------------------------------------
+-- F-150 (N11, R34): los albaranes pendientes de facturar, NETOS por proveedor
+--
+-- Una fila por (obra, proveedor, contrato, mes del albaran) de las obras de la
+-- receta; la llena `09_albaranes_pendientes.sql`. Sin proveedor, sin contrato o
+-- sin fecha son claves validas: `NULLS NOT DISTINCT` (precedente
+-- `retenciones.saldo_contable`), por eso un indice unico y no una clave primaria.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS tesoreria.albaranes_pendientes_neto (
+    obra_id                  INTEGER       NOT NULL,
+    empresa_id               INTEGER,
+    clave_obra               VARCHAR(40),
+    proveedor_id             INTEGER,
+    contrato_id              INTEGER,
+    mes_albaran              DATE,
+    importe_pendiente_bruto  NUMERIC(18,2) NOT NULL,
+    importe_sobrefacturado   NUMERIC(18,2) NOT NULL,
+    importe_compensado       NUMERIC(18,2) NOT NULL,
+    importe_pendiente_neto   NUMERIC(18,2) NOT NULL,
+    meses_antiguedad         INTEGER,
+    tras_cierre              BOOLEAN       NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_tes_albaranes_pendientes_neto ON tesoreria.albaranes_pendientes_neto (obra_id, proveedor_id, contrato_id, mes_albaran) NULLS NOT DISTINCT;
+
+
+-- ---------------------------------------------------------------------------
+-- F-150 (N14, R38): el SALDO DE PARTIDA de cada obra de la receta
+--
+-- Una fila por obra: lo cobrado y lo pagado REALIZADO hasta el build, CON IVA,
+-- con los pagares agrupados (AGR) por separado y por sus ORIGINALES, la parte
+-- de coste proporcional de lo pagado y el coste del personal de los partes. Lo
+-- llena `10_saldo_partida.sql`; la cuenta del saldo la hace la receta (H28, H29).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS tesoreria.saldo_partida_obra (
+    obra_id                                 INTEGER       NOT NULL,
+    empresa_id                              INTEGER,
+    clave_obra                              VARCHAR(40),
+    fecha_corte                             DATE          NOT NULL,
+    mes_ultimo_cierre                       DATE,
+    cobrado_realizado                       NUMERIC(18,2) NOT NULL,
+    pagado_realizado_sin_agr                NUMERIC(18,2) NOT NULL,
+    pagado_agr_con_obra                     NUMERIC(18,2) NOT NULL,
+    agrupados_vencidos                      NUMERIC(18,2) NOT NULL,
+    agrupados_pendientes                    NUMERIC(18,2) NOT NULL,
+    cartera_viva_agr_con_obra               NUMERIC(18,2) NOT NULL,
+    pagado_coste_proporcional               NUMERIC(18,2) NOT NULL,
+    agrupados_vencidos_coste_proporcional   NUMERIC(18,2) NOT NULL,
+    personal_coste_partes                   NUMERIC(18,2) NOT NULL,
+    iva_soportado_pagado                    NUMERIC(18,2) NOT NULL,
+    iva_repercutido_cobrado                 NUMERIC(18,2) NOT NULL,
+    iva_soportado_pagado_hasta_4t           NUMERIC(18,2) NOT NULL,
+    iva_repercutido_cobrado_hasta_4t        NUMERIC(18,2) NOT NULL,
+    iva_soportado_pagado_hasta_4m           NUMERIC(18,2) NOT NULL,
+    iva_repercutido_cobrado_hasta_4m        NUMERIC(18,2) NOT NULL,
+    PRIMARY KEY (obra_id)
+);

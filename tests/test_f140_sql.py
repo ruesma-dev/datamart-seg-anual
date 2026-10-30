@@ -26,7 +26,10 @@ RUTA_DEVENGO = DIR_TESORERIA / "07_devengo_pendiente.sql"
 RUTA_HIPOTESIS_OBRA = DIR_TESORERIA / "08_hipotesis_caja_obra.sql"
 
 #: Los ficheros NUEVOS de F-140 (el 00 se amplía).
-NUEVOS = (RUTA_PLAZOS, RUTA_COMPRA, RUTA_CLIENTE, RUTA_DEVENGO, RUTA_HIPOTESIS_OBRA)
+#: F-150 (N11) suma `09`: las mismas prohibiciones (ni hipótesis, ni personal, ni
+#: aritmética de fechas, ni GRANT ni DROP) valen para los albaranes netos.
+RUTA_ALBARANES = DIR_TESORERIA / "09_albaranes_pendientes.sql"
+NUEVOS = (RUTA_PLAZOS, RUTA_COMPRA, RUTA_CLIENTE, RUTA_DEVENGO, RUTA_HIPOTESIS_OBRA, RUTA_ALBARANES)
 
 #: Las ocho tablas nuevas y su clave primaria (design.md §4.1).
 TABLAS_NUEVAS: dict[str, str] = {
@@ -415,6 +418,11 @@ def test_f140_r6_ningun_valor_de_hipotesis_se_aplica(ruta: Path) -> None:
         unidad = "ROUND((i.iva * 100)::NUMERIC, 4)"
         assert sin_conteos.count(unidad) == 1
         sin_conteos = sin_conteos.replace(unidad, "")
+        # F-150 (R41, N15): H13 MIDE el IVA efectivo de las compras de la obra
+        # (cuota / base, en %). Otra medida, no aplicar una hipótesis: una vez.
+        medida = "ROUND(100 * x.cuota / x.base, 2)"
+        assert sin_conteos.count(medida) == 1
+        sin_conteos = sin_conteos.replace(medida, "")
         assert not re.search(r"[*/]|\s[+-]\s", sin_conteos), "08 no hace aritmética"
     else:
         assert "hipotesis" not in texto.lower(), f"{ruta.name} no lee hipótesis"
@@ -805,7 +813,7 @@ def test_f140_r5_p1a_se_publican_las_23_y_la_que_no_admite_obra_va_a_defecto() -
     from etl_sigrid.infrastructure.config.hipotesis_caja_yaml import cargar_hipotesis_caja
 
     catalogo = cargar_hipotesis_caja().catalogo
-    assert len(catalogo) == 27  # F-150 suma H24-H27; el resto del test no cambia
+    assert len(catalogo) == 30  # F-150 suma H24-H30; el resto del test no cambia
     texto = _hipotesis_obra()
     select = texto[texto.index("INSERT INTO tesoreria.hipotesis_caja_obra"):]
     assert "WHERE h.admite_obra" not in select, "ningún filtro deja fuera hipótesis del catálogo"

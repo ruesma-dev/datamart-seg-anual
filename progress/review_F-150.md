@@ -1,140 +1,125 @@
 <!-- progress/review_F-150.md -->
-Revisión incremental desde b08f0b6 (pasada 3) · `git diff b08f0b6..289fedb` · HEAD `289fedb`
+Revisión incremental desde 935fdd3 (pasada 4) · `git diff 935fdd3..1c54b31` · HEAD `1c54b31`
 
-# F-150 · Review · la receta de la caja (fase 1)
+# F-150 · Review · la receta de la caja
 
-**Veredicto: APROBADO** (pasada 3, el arreglo del despliegue). Pasada 1 (`6efddfe`): rechazo solo
-por C4. Pasada 2 (`7eed62e`): APROBADO. Las tres siguen debajo, resumidas.
+**Veredicto: APROBADO** (pasada 4: N11-N15, T17-T35, R33-R43). Pasadas 1-3 (fase 1, hasta el
+hotfix `f51b041`/`289fedb`) aprobadas y resumidas al final; el delta no las invalida (no cambia
+firmas de la fase 1; `07` y `08` solo añaden ramas y columnas).
 
-**Nivel de rigor:** `estandar`, declarado en `features.json`. Exige fase RED en los requisitos
-centrales, cobertura de lo cambiado ≥ 80 % y mutación con los supervivientes analizados.
+**Nivel de rigor:** `estandar` (declarado en `features.json`): fase RED en los requisitos
+centrales, cobertura de lo cambiado ≥ 80 %, mutación con supervivientes analizados.
 
-## Pasada 3 (arreglo del despliegue, 29-10)
+## Pasada 4 · lo que se verificó
 
-- **Alcance:** `07` (1 línea), `test_f150_sql.py`, `impl_F-150.md`, `current.md`. Sin firmas ni otro SQL.
-- **Cambio mínimo y en estilo:** `SUM(fv.totbas)` → `SUM(fv.totbas::NUMERIC(18, 2))` en el CTE
-  `facturado`, el mismo cast que `c.totbas::NUMERIC(18, 2)` de `05:57` (F-140). Lo de aguas abajo
-  (`ROUND(COALESCE(fa.facturado_origen, 0), 2)`, `GREATEST`) queda en `numeric`.
-- **RED reproducido por mí** (worktree desechable en el scratchpad, ya borrado): con el `07` de
-  `b08f0b6` y el test de `289fedb`, `-k "dvf or facturado"` → `AssertionError: importes de raw.dvf
-  sin ::NUMERIC(18, 2): ['totbas']` · **2 failed, 2 passed**; con el `07` de `289fedb`, 4 passed.
-  Coincide con la salida que cita `impl_F-150.md`.
-- **Ninguna otra columna `raw` `double precision` en una función solo `numeric`** en lo que F-150
-  añade a `00`, `06`, `07` y `08` (diff contra `a80bb1b`): `raw.iva.iva` va como
-  `ROUND((i.iva * 100)::NUMERIC, 4)` en `06` y `08`; `coestr` es texto que `fn_coeficientes` pasa a
-  `NUMERIC[]`; `op.ctride`, `ob.ivaide`, `ob.cenide`, `o.ivaide` solo se usan en `JOIN`/`NULLIF`
-  (igualdad, válida con `double`); `stg.presupuesto.importe/importe_oficial` son `NUMERIC(18,2)`
-  (`stg/01_ddl.sql:91-92`) y el resto viene de `mart`/`stg`/`tesoreria`. La prueba definitiva es
-  la del líder: `build-tesoreria` con `d1c2ee1` acabó SUCCESS en Azure (229,3 s) y R30 cuadra.
-- **`init.sh`:** acreditado en `impl_F-150.md` («Evidencias»): verde sobre `2d30248`, 9.646 passed
-  / 266 skipped (5.902 s). `289fedb` solo toca `impl_F-150.md`, así que vale para HEAD. No lo
-  reejecuto (instrucción del líder). Cobertura N/A justificada: sin Python de producción frente a
-  `main`. Mutación N/A: el SQL no se muta; lo cubren el test de texto y la sandbox.
-- **Progress:** `impl_F-150.md` trae causa, cambio, test con su RED, sandbox con `raw` en `double
-  precision` (antes: el error de Azure; ahora: 66 OK) y la lección; `current.md`, la línea del
-  29-10. Tamaño de `impl` 220/220. **Sin secretos** (barrido del diff vacío). Commits `F-150 ...`.
-- **Aviso, no bloqueante:** `main` (`8b08d59`) lleva F-150 SIN el arreglo. Hasta integrar la rama
-  y reconstruir la imagen del job, la nocturna volverá a caer en `build-tesoreria`.
-- **Checkpoints del delta:** C1 `[x]` (acreditado) · C3 `[x]` capa y estilo · C4 `[x]` test que
-  falla sin el arreglo · C4 bis `[x]` RED con salida real · C5 `[x]` árbol limpio, commits.
+- **`bash harness/init.sh` ejecutado por mí sobre `1c54b31`:** **verde**, exit 0, «ENTORNO LISTO»:
+  9.813 passed, 268 skipped (5.783 s); `PUERTA COBERTURA` `[OK]` 100 % (21/21, diff desde
+  `935fdd35ee`); `PUERTA TAMAÑO` `[OK]`. Coincide con lo que declara el implementer.
+- **Alcance:** dominio (`neto_fifo`, `iva_efectivo_compra`, constantes, `PASOS_RECETA` con SALDO,
+  `CODIGOS_SIGRID` con H13), dos sub-pasos nuevos en `build_tesoreria_step.py`, `00_setup`, `07`
+  (cuota CP), `08` (rama H13), `09` y `10` nuevos, YAML de hipótesis (30), diccionario v66,
+  ARCHITECTURE, CLAUDE.md, tests. Coincide con `design.md` y con el informe. Hexagonal respetada:
+  dominio puro, SQL en `sql/tesoreria/NN_`, la secuencia en `application`.
+- **`double precision` de `raw` (el fallo de `d1c2ee1`), SQL nuevo leído línea a línea:**
+  - `09`: el único `ROUND` es `ROUND((COALESCE(l.tot,0) * (1 - canfac/can))::NUMERIC, 2)`; las
+    otras ramas, `::NUMERIC(18,2)`; `abs(x.tot) < 1e8` no exige numeric. Correcto.
+  - `10`: todos los `l.tot`, `h.tot`, `totiva`, `totpag`, `totdoc` llevan `::NUMERIC(18, 2)`; los
+    ocho `ROUND(..., 2)` son sobre `tesoreria.efectos.importe` (`NUMERIC(18,2)`, `00_setup:100`)
+    por cuotas ya numeric. Correcto.
+  - `07`: los dos `ROUND` nuevos, sobre `efectos.importe × cuota_cp` (numeric). `08`: `ROUND(100 *
+    cuota / base, 2)` con `tot` e `ivacuo` casteados. Correcto.
+  - Los tests de repositorio son de TEXTO (fijan cada cast y prohíben `l.tot`/`h.tot` sin él:
+    `test_f150_saldo.py:183,195`, `test_f150_albaranes.py:349`, `test_f150_iva_isp.py:96`). La
+    ejecución real con `raw` en `double precision` está en las sandboxes del implementer (Postgres
+    16 desechable: `09` 23 OK, `10` 14 OK, `impl_F-150.md` §4), fuera del repo como en la fase 1;
+    los contrastes de solo lectura en Azure (§3) ejecutaron `09` y `10` sobre los tipos reales.
+- **Decisiones del humano, respetadas:**
+  - N11: `_alb_fifo` particiona por `(obra_id, proveedor_id)`, orden `(fecha NULLS FIRST,
+    linea_id)`, compensa lo más antiguo; sin proveedor no compensa; guarda R35 dentro de la
+    transacción. `neto_fifo` del dominio es la misma fórmula.
+  - N12: H02 sin `CP`; cuota CP de la cartera (`07`) y del saldo (`10`) por la categoría de la
+    partida de cada línea de `raw.dcfpro`; la receta lo resta y lo declara (F-154 fuera).
+  - N13: el saldo usa `raw.hmores.tot` de recursos PERSONA internos hasta el cierre y la cartera
+    GENERAL (sin nóminas); la receta prohíbe sumar nóminas.
+  - H28 `[CON_SALDO, SIN_SALDO]` defecto `CON_SALDO`; H29 `[ORIGINALES, AGR]` con los originales
+    `BAJA` + `estado_codigo = 14` (y la ruptura de `R-TESORERIA-ESTADO` declarada); retenciones
+    como efectos propios (receta paso 0 y `COMMENT` de `10`).
+  - N15: H13 SIGRID por obra con `base >= 500000` (= `UMBRAL_BASE_H13`, test `iva_isp:113`), si no
+    DEFECTO (valor NULL cae al defecto en el `CASE` de `08`); H30 `MENSUAL_REDEME` por defecto, con
+    `_hasta_4m`; el paso 0 suma el IVA NETO recuperado (soportado − repercutido) según H30.
+- **Diccionario:** v66; fichas de `albaranes_pendientes_neto` y `saldo_partida_obra` con el aviso
+  de `R-PERFILES`; ambas en `NO_DISPONIBLES` de F-141 (`5f02555`). `azure-apps` `3ca37bf` al día.
+- **Sin secretos:** barrido del diff, solo `127.0.0.1:55432` (contenedor local). Ni `GRANT` ni
+  `DROP` de tablas reales. Primera línea con ruta en ficheros nuevos; sin `print`.
+- **MANUAL:** el redespliegue de N11-N15 está en `current.md` con comandos exactos (paso 0 de
+  vuelta atrás, imagen, `build-tesoreria`, cifras esperadas, `publicar-diccionario` v66, `check-*`,
+  MCP). T15/T25/T31/T35 abiertas solo por ese despliegue MANUAL, como en la fase 1.
 
-## Pasada 2 (`6efddfe..7eed62e`) · resumen
+### Observaciones (no bloquean)
 
-- C4 MANUAL corregido: la subsección «F-150 · Despliegue MANUAL, T15» de `current.md` trae los
-  diez pasos con su comando; todo lo que nombran existe y sin secretos (`<host>`, `<usuario>`).
-- Los tres no bloqueantes, resueltos; el delta no cambió firmas, SQL ni datos (330 passed).
-- `init.sh` sobre `7eed62e`: verde, 9.645 passed / 266 skipped (6.024 s); cobertura 100 %.
+1. Con H29 = `AGR`, el IVA del saldo sigue contando el de los originales vencidos (los AGR no son
+   factura y no tienen fracción): aproximación razonable, pero la ficha podría decirlo.
+2. `08` lleva el umbral 500000 como literal; lo ata al dominio el test de texto, no el código.
+3. Tasks: T24/T31/T35 marcan la mutación e `init.sh` hechos; queda solo el despliegue.
 
-## Pasada 1 (sobre `6efddfe`) · lo que se verificó
+## Mutación (C4 bis) · `progress/mutacion_F-150_n11_n15.md`
 
-- **`bash harness/init.sh` en esta pasada:** **verde**, exit 0, «ENTORNO LISTO»: 9.645 passed, 266 skipped (5.817 s); cobertura `[OK]` 100 % (143/143); tamaño OK.
-- **SQL ejecutado de verdad:** el `sandbox_f150.py` del implementer, vuelto a correr sobre un
-  `postgres:16` desechable lanzado por mí con el SQL de HEAD: **66 OK, 0 fallos**. El oráculo es el
-  dominio. Cubre `00` aplicado dos veces, `06`, `07` (con la guarda D6) y `08`. Contenedor borrado.
-- **Azure, solo lectura** (`filas_solo_lectura`):
-  - las 21 obras de VENTA tienen un `cenide` propio, ni 0 ni compartido, así que el hueco no
-    cuenta dos veces una factura;
-  - las 19.005 partidas VENTA casan con `raw.obrparpar.ide`, y 0 son de otra obra;
-  - existen las columnas fuente (`obr.ivaide`, `obrctr.coestr`/`ivaide`, `obrparpar.ctride`,
-    `stg.presupuesto`);
-  - `raw.iva` y `raw.dvf` aún no existen en Azure. Es lo esperado: llegan en T15.
-- **Sigrid** (`sigrid_tablas.md`): `dvf` con las 9 columnas de la lista blanca; ni `dvf` ni `iva` con `tiemod`.
-- **El código frente a la spec**, leído línea a línea:
-  - `coestr` se lee por líneas `\r?\n` y por CÓDIGO; `RET*` va aparte y no suma; `COEF_DESADJ` va
-    en cascada; un código desconocido o un valor no numérico fallan cerrado. Python y SQL son
-    gemelos, incluido un `\r` suelto;
-  - fuente del coeficiente: CONTRATO > 9 > 11 > SIN; la guarda D6 salta antes del `TRUNCATE`;
-  - el hueco es neto por obra, con `GREATEST(0, …)`, `MEDIA_OBRA` (1 si la obra no tiene ningún
-    coeficiente) y el IVA y la retención por el peso de cada contrato;
-  - H12 SIGRID sale de la ficha de la obra; un MANUAL lo pisa.
-- **Catálogo:** `cargar_hipotesis_caja()` da **27 hipótesis y 0 errores**, con los pasos de §6,
-  los perfiles H03/H08/H24/H25, H14 `MENSUAL`, H20 `FIN_MES_ALBARAN` y H26/H27 como R24; ninguna
-  validada. Los textos de H10, H12, H13, H15 y H20 son los de §6.
-- **Reglas de producción:**
-  - sin secretos: el barrido del diff solo encuentra el `127.0.0.1` local;
-  - ni `DROP` ni `GRANT` (solo `ON COMMIT DROP` de tablas temporales);
-  - ni `_des_texto` ni `_versiones_cargadas` aparecen en el diff;
-  - `objetos_pendientes.yaml` sigue vacío y es coherente: lo nuevo son dos tablas `raw` de la
-    ingesta y dos funciones de `00`.
-- **Diccionario:** v63; fichas de `raw.iva` y `raw.dvf`; columnas nuevas con `significado` y
-  `nulo_significa`; `R-CAJA-HIPOTESIS` remite a la receta y `R-VENTA-COEFICIENTES` cubre las tres
-  `devengo_*`.
-- **`azure-apps` `044beef`:** `iva`, cabecera de `dvf`, 80 tablas, columnas, guarda D6, despliegue.
-- **Tests de F-140:** solo recuentos (23→27, 78→80, `>= 2`/`>= 62`); los de F-150 fijan los exactos.
+- **Recálculo puro** (`alcance_de_feature('F-150', base='0659528')` + `generar_mutantes`): **78
+  líneas** (20 + 58) y **17 mutantes**, igual que el informe. Con la semilla `20260820` la muestra
+  de 8 sale entera en `neto_fifo` (`:401` ×3, `:405` ×3, `:409`, `:410`).
+- **Campaña no reejecutada:** 9.754,7 s según el informe (> 60 s).
+- **RM1:** medido en `5f02555`; hasta HEAD solo cambian `progress/` y `tasks.md`. Alcance igual.
+- **RM2:** base ~2.280 s (3 workers), media 1.219,3 s, `8 × 1.219,3 = 9.754` = tiempo total.
+  Coherente; ningún salto de orden de magnitud.
+- **RM3:** los dos equivalentes posibles del generador (`:401 x <= 0` y `:405 x < 0`, el cero no
+  cambia nada) NO están en la muestra. Ningún equivalente sale muerto.
+- **RM4 (copia `git archive` en el scratchpad, ya borrada):** sin mutar, 69 passed en
+  `test_f150_albaranes.py` + `test_f150_iva_isp.py`; `:405 x <= 1` → 3 failed; y un no muestreado,
+  `:408 a_compensar + acumulado` → 8 failed.
+- **RM5:** N/A, rigor `estandar`. **RM6:** no se quitó ninguna guarda.
+- Sin «CAMPAÑA NO VÁLIDA», 0 «Sin veredicto». Muestra de 8 (tope 20) justificada por coste en el
+  informe; el SQL no se muta y lo cubren textos y sandboxes.
 
-## Mutación (C4 bis)
+## Checkpoints (pasada 4)
 
-- **Recálculo puro:** **329 líneas en 4 ficheros y 95 mutantes**, igual que el informe. La muestra
-  (semilla `20260820`) contiene el superviviente (`:227`) y los dos timeouts (`:485`, `:498`), con
-  el mismo texto original → mutado.
-- **Campaña no reejecutada:** 15.325,8 s según el informe, por encima del umbral de 60 s.
-- **RM4, sobre una copia (`git archive`, ya borrada):**
-  - con `> 3` en `:227` falla `test_f150_r7_una_linea_de_solo_tres_campos_se_lee_como_el_sql`
-    (1 failed / 40 passed), y sin el mutante pasan 41;
-  - `:485` (`or valor`) y `:498` (`par[2]`) también mueren.
-- **RM1:** medido en `e85a3d8`. Hasta HEAD no cambia nada de `etl_sigrid/`, así que el alcance es
-  el mismo.
-- **RM2:** base de 1.265 / 1.281 s y media de 766,3 s con 2 workers, es decir, 1.532 s reales por
-  mutante, del orden de la base. `20 × 766,3` = 15.326, el tiempo total. Es coherente.
-- **RM3:** ningún equivalente sale muerto. Lo comprobé en `:247` (`otros`) y `:468` (`1 <`): los
-  matan casos que existen en los tests (`COEF_RECCC`, porcentajes 0,01 y 0,1).
-- **RM5:** N/A, porque el rigor es `estandar`.
-- **RM6:** no se quitó ninguna guarda.
-- **Validez del informe:** sin la cabecera «CAMPAÑA NO VÁLIDA» y con 0 «Sin veredicto».
-
-## Checkpoints
-
-- **C1:** `[x]` `init.sh` con código 0 · `[x]` existen los ficheros base.
+- **C1:** `[x]` `init.sh` código 0 (ejecutado por mí) · `[x]` ficheros base.
 - **C2:** `[x]` una sola `in_progress` · `[x]` rama `feature/F-150-receta-caja` · `[x]`
-  `current.md` con F-150 como sección activa (lo demás, como en F-140) · `history.md`: N/A, no es
-  `done`.
-- **C3:**
-  - `[x]` hexagonal: dominio puro (`re`, `decimal`, `typing`), el SQL en `sql/tesoreria/NN_` y la
-    ingesta en `application`;
-  - `[x]` la primera línea es la ruta;
-  - `[x]` sin `print`, TODO, secretos ni dependencias nuevas;
-  - `[x]` semántica de Sigrid: `stg.presupuesto` con obra, ámbito 9/11 y `fase_num` = V (R10); lo
-    real con `importe_mes` y tope en el cierre (la misma fuente que `real_origen_corte` de F-140).
-- **C3 bis:** N/A, porque no toca `docs/referencia/`.
-- **C4:** `[x]` trazabilidad (tabla de abajo) · `[x]` sin red ni BBDD · **`[ ]` MANUAL con su
-  comando exacto en `current.md`** (pasada 1); `[x]` en la pasada 2 · `[x]` dobles: comprobación automática en `init.sh`.
-- **C4 bis:** `[x]` rigor declarado · `[x]` fase RED con salida real (`impl_F-150.md` §5: R1-R5,
-  R7, R9, R12, R14, R15, R17, R20-R23, R25, R32) · `[x]` cobertura `[OK]` 100 % (143/143) · `[x]` mutación
-  verificada · `[x]` «Evidencias» con los cuatro números y los 2 workers.
-- **C4 ter:** N/A, porque no existe `harness/rutas_sensibles.json` (solo el `.ejemplo`).
-- **C5:** `[x]` T1-T14 y T16 `[x]` con su commit; T15 es el despliegue MANUAL tras la review,
-  como en F-140 · `[x]` `git status` limpio · `[x]` `features.json` al día.
+  `current.md` al día · `history.md`: N/A, la feature no es `done` (falta el despliegue MANUAL).
+- **C3:** `[x]` hexagonal · `[x]` primera línea con ruta · `[x]` sin `print`, TODO, secretos ni
+  dependencias nuevas · `[x]` semántica de Sigrid (pendiente con la fórmula de `compras/01`
+  copiada y comparada por test; `R-ALBARAN-ABSURDO` a 1e8; personal por `hmores.tot`).
+- **C3 bis:** N/A, el delta no toca `docs/referencia/`.
+- **C4:** `[x]` trazabilidad (tabla) · `[x]` sin red ni BBDD en los tests · `[x]` MANUAL con su
+  comando exacto en `current.md` · `[x]` dobles: comprobación automática de `init.sh`.
+- **C4 bis:** `[x]` rigor declarado · `[x]` RED con salida real para T17-T34 (`impl_F-150.md` §5)
+  · `[x]` cobertura `[OK]` (ver la línea de `init.sh` arriba) · `[x]` mutación verificada · `[x]`
+  «Evidencias» con los cuatro números.
+- **C4 ter:** N/A, no existe `harness/rutas_sensibles.json` (solo el `.ejemplo`).
+- **C5:** `[x]` T17-T23, T27-T30, T32-T34 `[x]` con su commit `F-150 Tn`; T24/T25/T31/T35 abiertas
+  solo por el despliegue MANUAL · `[x]` árbol limpio · `[x]` `features.json` al día.
 
-## Cobertura · requisito → test (`tests/test_f150_*.py`)
+## Cobertura · requisito → test (pasada 4)
 
-| Requisitos | Tests |
+| Req. | Tests (`tests/test_f150_*.py`, nº) |
 |---|---|
-| R1, R24-R28 | `receta`/`perfil` r1 (12), r24 (3), r25 (9), r26 (3), r27 (3), r28 (4) |
-| R2-R6, R15, R32 | `diccionario` r2, r3 (2), r4, r5, r6 (2), r15, r32 (2) |
-| R7, R9, R18, R22 | `contrato` r7 (17), r18; `coeficiente` r9 (10); `hueco` r22 (11) |
-| R8, R10-R14, R19-R21, R23 | `sql` r8 (9), r10-r13 (2-3 cada uno), r14 (7), r19, r20 (2), r21 (4), r23 (7) |
-| R16, R17 · R29 · R30-R31 | `ingesta` r16 (5), r17 (6) · MANUAL hecho (§4, 15,60 en 15,50-15,75) · MANUAL T15, con comandos en `current.md` |
+| R33-R35 | `albaranes` r33 (13), r34 (16), r35 (2) + sandbox `09` |
+| R36-R37 | `albaranes`/`sql`/`diccionario` r36 (9), r37 (2) |
+| R38-R40 | `saldo` r38 (12), `receta`/`saldo` r39 (4), `diccionario` r40 (4) + sandbox `10` |
+| R41-R43 | `iva_isp` r41 (10), `receta` r42 (2), `saldo`/`diccionario` r43 (6) |
+
+## Pasadas 1-3 · resumen
+
+- **Pasada 1** (`6efddfe`): rechazo solo por C4 (MANUAL sin comando exacto en `current.md`).
+  `init.sh` verde (9.645 passed), sandbox `sandbox_f150.py` reejecutada (66 OK), Azure en solo
+  lectura, catálogo 27 hipótesis, mutación 20 mutantes con RM1-RM6 verificados (RM4 en `:227`,
+  `:485`, `:498`).
+- **Pasada 2** (`7eed62e`): APROBADO; C4 MANUAL corregido; `init.sh` verde (9.645 passed).
+- **Pasada 3** (`289fedb`): APROBADO; hotfix `SUM(fv.totbas::NUMERIC(18, 2))` en `07` con su RED
+  reproducido; ninguna otra columna `double precision` de `raw` en función solo numeric.
 
 ## Automejora (propuesta, no aplicada)
 
-En `implementer.md` (y `arnes-base`): «MANUAL a `current.md` CON su comando exacto». Es el segundo rechazo por esto (F-140 y F-150).
+1. `CHECKPOINTS.md` C4 bis: cuando el SQL nuevo lea `raw`, exigir que la sandbox con tipos de
+   Azure (`double precision`) viva en el repo (p. ej. `tests/sandbox/`, marcada y saltada sin
+   Docker) en vez de en el scratchpad: hoy el reviewer no puede reejecutarla si no se la pasan.
+2. `implementer.md` (y `arnes-base`): «MANUAL a `current.md` CON su comando exacto» (pasada 1).

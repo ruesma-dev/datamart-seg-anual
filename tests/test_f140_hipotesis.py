@@ -370,8 +370,8 @@ def test_f140_r5_el_orden_de_las_fuentes() -> None:
 
 def test_f140_r5_los_codigos_que_lee_sigrid() -> None:
     """D18-A: H09-H11, de los contratos con el cliente; F-150 (N2) suma H12,
-    de la ficha de la obra."""
-    assert dom.CODIGOS_SIGRID == ("H09", "H10", "H11", "H12")
+    de la ficha de la obra, y N15 H13, de las compras de la obra."""
+    assert dom.CODIGOS_SIGRID == ("H09", "H10", "H11", "H12", "H13")
 
 
 # ===========================================================================
@@ -383,7 +383,9 @@ from etl_sigrid.infrastructure.config import hipotesis_caja_yaml as lector  # no
 #: Los defectos de `design.md` §6, código por código (unidad, valor).
 DEFECTOS_DEL_DISENO = {
     "H01": ("OPCION", "CONTRATO"),
-    "H02": ("MAPA_DIAS", {"CD": 120, "CI": 120, "CP": 120, "OTRO": 120}),
+    # F-150 (N12, 29-10): el coste proporcional (CP) no es caja de la obra: sale
+    # del mapa de plazos (va a F-154) y la receta lo excluye por `categoria`.
+    "H02": ("MAPA_DIAS", {"CD": 120, "CI": 120, "OTRO": 120}),
     "H03": ("PERFIL_MESES", [[0, 100]]),  # F-150 (R26)
     "H04": ("BOOLEANO", True),
     "H05": ("DIAS", 0),
@@ -428,8 +430,8 @@ ALTERNATIVAS_DEL_DISENO = {
 def test_f140_r1_yaml_real_pasa_la_validacion() -> None:
     leido = lector.cargar_hipotesis_caja(RUTA_YAML)
     assert leido.errores == []
-    # F-150 suma H24-H27: son 27
-    assert [h.codigo for h in leido.catalogo] == [f"H{n:02d}" for n in range(1, 28)]
+    # F-150 suma H24-H27, (N14) H28-H29 y (N15) H30: son 30
+    assert [h.codigo for h in leido.catalogo] == [f"H{n:02d}" for n in range(1, 31)]
 
 
 def test_f140_r1_yaml_los_defectos_son_los_del_diseno() -> None:
@@ -465,7 +467,7 @@ def test_f140_r1_yaml_la_seccion_obras_nace_vacia() -> None:
 def test_f140_r1_yaml_el_sentido_de_cada_hipotesis() -> None:
     catalogo = {h.codigo: h for h in lector.cargar_hipotesis_caja(RUTA_YAML).catalogo}
     pagos = {"H01", "H02", "H03", "H04", "H05", "H06", "H07", "H13", "H20",
-             "H24", "H27"}  # F-150
+             "H24", "H27", "H29"}  # F-150
     cobros = {"H08", "H09", "H10", "H11", "H12", "H22", "H25", "H26"}  # F-150
     for codigo, h in catalogo.items():
         esperado = "PAGO" if codigo in pagos else "COBRO" if codigo in cobros else "AMBOS"

@@ -228,5 +228,13 @@ def test_f140_r22_p1a_la_ficha_de_hipotesis_por_obra_dice_las_23() -> None:
     """P1-a del review: la tabla trae TODAS las del catálogo por obra (23 con F-140,
     27 desde F-150), H17 a DEFECTO."""
     ficha = _fichas()["hipotesis_caja_obra"]
-    assert "las 27 hipotesis del catalogo" in _plano(ficha["grano"])
+    assert f"las {_n_hipotesis()} hipotesis del catalogo" in _plano(ficha["grano"])
     assert "H17" in _plano(ficha["descripcion"]) and "DEFECTO" in _plano(ficha["descripcion"])
+
+
+def _n_hipotesis() -> int:
+    """Cuantas hipotesis tiene el catalogo: los textos dicen ESA cifra (N14 y N15 la suben)."""
+    import yaml as _yaml
+
+    ruta = Path(__file__).resolve().parents[1] / "config" / "hipotesis_caja.yaml"
+    return len(_yaml.safe_load(ruta.read_text(encoding="utf-8"))["hipotesis"])

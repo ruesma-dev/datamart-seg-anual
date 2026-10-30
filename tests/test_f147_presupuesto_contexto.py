@@ -39,6 +39,18 @@ from tests.test_f006_formato import _dicc, _ficha, _regla
 #: fórmula de R17. Solo baja (trinquete: R19 falla si sobra más de
 #: `HOLGURA_TRINQUETE`). Historia, de la más reciente a la más antigua:
 #:
+#: * 31.129 · 2026-10-30, F-150 N14 (diccionario v64 en el arbol), SUBIDO con
+#:   motivo: el saldo de partida. Enrutado 15.263 (+114: la ficha recomendada
+#:   nueva `tesoreria.saldo_partida_obra` y sus dos preguntas, que enrutan
+#:   «cuanto ha cobrado y pagado ya la obra X» a sus piezas y no a sumar la
+#:   cartera a mano); reglas 7.424 y bloques 8.442 sin cambio.
+#: * 31.015 · 2026-10-29, F-150 N11 (diccionario v64), SUBIDO con motivo: los
+#:   albaranes netos por proveedor. Enrutado 15.149 (+151: la ficha recomendada
+#:   nueva `tesoreria.albaranes_pendientes_neto` y sus dos preguntas, que enrutan
+#:   «cuanto queda de verdad por facturar de albaranes en la obra X» lejos de la
+#:   vista de compras, que suma 56,9 M EUR donde quedan 8,76); reglas 7.424 y
+#:   bloques 8.442 sin cambio (el `resumen` de `R-CAJA-HIPOTESIS` no cambia). La
+#:   v63 medía 30.864.
 #: * 30.873 · 2026-10-25, F-140 (diccionario v62), SUBIDO con motivo: los
 #:   ingredientes de la caja. Reglas 7.431 (+325: `R-CAJA-HIPOTESIS`, bloqueante,
 #:   con resumen: sin ella el agente da una caja sin declarar sus hipotesis),
@@ -52,7 +64,7 @@ from tests.test_f006_formato import _dicc, _ficha, _regla
 #:   todas las preguntas): 78.057.
 #: * 29.787 · 2026-10-22, F-147 T5: PROVISIONAL, la medida de T2 sobre la v58
 #:   (sin resúmenes todavía: reglas 2.233, enrutado 13.886, bloques 13.668).
-PRESUPUESTO_MAX = 30_873
+PRESUPUESTO_MAX = 31_129
 
 
 def _medir(dicc) -> PresupuestoContexto:
