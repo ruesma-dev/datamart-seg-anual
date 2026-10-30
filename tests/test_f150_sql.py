@@ -529,8 +529,16 @@ def test_f150_r21_el_orden_y_h10_no_cambian() -> None:
     assert texto.count("FROM tesoreria.condiciones_contrato_cliente k") == 3
 
 
-def test_f150_r21_el_comment_dice_27_y_h12() -> None:
+def test_f150_r21_el_comment_dice_cuantas_y_h12() -> None:
     comment = _sql(RUTA_HIPOTESIS_OBRA)
     comment = comment[comment.index("COMMENT ON TABLE tesoreria.hipotesis_caja_obra"):]
-    assert "las 27 hipotesis" in comment
+    assert f"las {_n_hipotesis()} hipotesis" in comment
     assert "H12" in comment and "ficha de la obra" in comment
+
+
+def _n_hipotesis() -> int:
+    """Cuantas hipotesis tiene el catalogo: los textos dicen ESA cifra (N14 y N15 la suben)."""
+    import yaml as _yaml
+
+    ruta = Path(__file__).resolve().parents[1] / "config" / "hipotesis_caja.yaml"
+    return len(_yaml.safe_load(ruta.read_text(encoding="utf-8"))["hipotesis"])

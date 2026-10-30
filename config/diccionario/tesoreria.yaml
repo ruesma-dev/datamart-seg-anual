@@ -1253,7 +1253,7 @@ objetos:
       responde que el perfil no lo incluye.
 
       **EL CATALOGO DE HIPOTESIS PARA PASAR DEVENGO A CAJA** (F-140, F-150):
-      las 27 hipotesis (H01-H27) que hay que fijar para convertir el devengo
+      las 29 hipotesis (H01-H29) que hay que fijar para convertir el devengo
       pendiente en cobros y pagos, con su valor por DEFECTO, de que dato sale
       (`fuente_defecto`) y donde esta el dato que la alimenta
       (`ingrediente`): plazos de pago y de cobro, retenciones, IVA y su
@@ -1270,6 +1270,21 @@ objetos:
       suman 100) reparten el importe ENTERO: `[[0, 100]]` es todo en el mes de
       partida y `[[1, 50], [2, 50]]`, la mitad uno y dos meses despues.
       Redondea solo al final.
+
+      0. SALDO: la caja que la obra YA movio, de
+      `tesoreria.saldo_partida_obra` (CON IVA, hasta `fecha_corte`, el dia del
+      build). Con H28 `CON_SALDO`, saldo = `cobrado_realizado` −
+      (`pagado_realizado_sin_agr` + [H29 `ORIGINALES`: `agrupados_vencidos` |
+      `AGR`: `pagado_agr_con_obra`] − CP) − `personal_coste_partes`, con CP =
+      `pagado_coste_proporcional` (+ `agrupados_vencidos_coste_proporcional`
+      con `ORIGINALES`): el coste proporcional no es caja de la obra; con
+      `SIN_SALDO`, 0, y la proyeccion parte de hoy. H29 es una HIPOTESIS que
+      rompe `R-TESORERIA-ESTADO` a proposito: los originales agrupados estan
+      de BAJA, y se cuentan pagados en su vencimiento; declarala. El personal
+      del saldo es el coste de sus partes hasta el ultimo cierre (sin IVA); lo
+      de despues esta en el devengo. No hay retenciones aparte: las
+      retenciones entran al cobrarse o pagarse (son efectos propios), y las
+      pendientes van en la cartera del paso 7.
 
       1. DEVENGO: el del mes, `importe_pendiente` de
       `tesoreria.devengo_pendiente_obra_mes` (H18; o `importe_plan_restante`),
@@ -1332,14 +1347,19 @@ objetos:
       CON IVA). De la cartera de PAGO resta lo de CP
       (`cartera_viva_coste_proporcional` y
       `cartera_emitida_tras_cierre_coste_proporcional` de
-      `tesoreria.devengo_corte_obra`), y declaralo.
-    grano: Una fila por hipotesis, identificada por `codigo` (27).
+      `tesoreria.devengo_corte_obra`), y declaralo. Con los agrupados por sus
+      ORIGINALES (paso 0), resta `cartera_viva_agr_con_obra` (ya estan en sus
+      originales) y suma los originales pendientes (`agrupados_pendientes` de
+      `tesoreria.saldo_partida_obra`) a su vencimiento: en `tesoreria.efectos`,
+      `sentido` PAGO, `estado_tesoreria` BAJA, `estado_codigo` 14 y
+      `fecha_vencimiento` desde hoy.
+    grano: Una fila por hipotesis, identificada por `codigo` (29).
     clave_negocio: [codigo]
     paso_etl: build_tesoreria
     refresco: nocturno
     columnas:
       codigo:
-        significado: Codigo de la hipotesis (H01 a H27).
+        significado: Codigo de la hipotesis (H01 a H29).
       sentido:
         significado: A que lado de la caja afecta.
         valores: [PAGO, COBRO, AMBOS]
@@ -1374,7 +1394,7 @@ objetos:
         significado: >-
           El paso de la receta en que se aplica (F-150). COEFICIENTES no tiene
           ninguna: los coeficientes son dato del contrato y del master.
-        valores: [DEVENGO, DOCUMENTO, COEFICIENTES, PLAZO, RETENCION, IVA, CARTERA]
+        valores: [SALDO, DEVENGO, DOCUMENTO, COEFICIENTES, PLAZO, RETENCION, IVA, CARTERA]
     relaciones: []
     ejemplos_preguntas:
       - Como se pasa paso a paso el devengo de una obra a caja
@@ -1391,7 +1411,7 @@ objetos:
       responde que el perfil no lo incluye.
 
       **EL VALOR DE CADA HIPOTESIS EN CADA OBRA** (F-140): para cada obra con
-      devengo pendiente (o con un valor manual), las 27 hipotesis del catalogo
+      devengo pendiente (o con un valor manual), las 29 hipotesis del catalogo
       con el valor que toca y su NIVEL: es la lista entera que hay que
       declarar. La que no admite valor por obra (H17) va siempre por DEFECTO.
       MANUAL (el de la seccion
@@ -1406,7 +1426,7 @@ objetos:
       USUARIO (`R-CAJA-HIPOTESIS`). **Nada se aplica aqui**: es lo que hay que
       declarar.
     grano: >-
-      Una fila por (`obra_id`, `codigo`): las 27 hipotesis del catalogo en
+      Una fila por (`obra_id`, `codigo`): las 29 hipotesis del catalogo en
       cada obra, 567 filas de 21 obras con F-150 (483 con las 23 de F-140).
     clave_negocio: [obra_id, codigo]
     paso_etl: build_tesoreria

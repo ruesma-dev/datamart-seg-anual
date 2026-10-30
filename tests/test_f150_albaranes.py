@@ -101,7 +101,7 @@ def test_f150_r33_suma_es_max_cero_y_cada_resto_entre_cero_y_su_linea(importes) 
     assert len(restos) == len(importes)
     total = sum((x for x in importes if x is not None), D(0))
     assert sum(restos, D(0)) == max(D(0), total)
-    for x, r in zip(importes, restos):
+    for x, r in zip(importes, restos, strict=True):
         tope = x if x is not None and x > 0 else D(0)
         assert D(0) <= r <= tope
 
@@ -231,7 +231,7 @@ def test_f150_r34_proveedor_contrato_y_fecha() -> None:
 
 def test_f150_r34_la_ventana_fifo_es_la_del_dominio() -> None:
     """`neto_fifo`: N = Σ |negativos| del (obra, proveedor), 0 sin proveedor; a
-    cada positiva, min(p, máx(0, N − positivas anteriores)), en orden (fecha,
+    cada positiva, min(p, máx(0, N - positivas anteriores)), en orden (fecha,
     línea)."""
     texto = _sin_comment_on(RUTA_ALBARANES)
     assert ("CASE WHEN x.proveedor_id IS NULL THEN 0 ELSE SUM(GREATEST(-x.pendiente, 0)) "
@@ -357,7 +357,8 @@ def test_f150_r36_la_cartera_cp_con_los_mismos_filter_y_solo_en_coste() -> None:
             "OR date_trunc('month', e.fecha_emision)::DATE > v.mes_ultimo_cierre) "
             "AS cartera_emitida_tras_cierre_cp") in texto
     assert "LEFT JOIN _dev_cuota_cp q ON q.documento_id = e.documento_id" in texto
-    for columna, origen in zip(COLUMNAS_CP, ("cartera_viva_cp", "cartera_emitida_tras_cierre_cp")):
+    for columna, origen in zip(COLUMNAS_CP, ("cartera_viva_cp", "cartera_emitida_tras_cierre_cp"),
+                               strict=True):
         assert (f"CASE WHEN v.concepto = 'COSTE' THEN ROUND(COALESCE(c.{origen}, 0), 2) END "
                 f"AS {columna}") in texto
 

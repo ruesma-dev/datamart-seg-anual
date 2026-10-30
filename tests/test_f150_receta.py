@@ -1,10 +1,10 @@
 # tests/test_f150_receta.py
 """
 F-150 · La receta de la caja en el dominio (R1, D7): cada hipótesis dice en
-qué PASO de la receta se aplica, uno de siete y en este orden.
+qué PASO de la receta se aplica, uno de ocho y en este orden (N14: SALDO, el 0).
 
 El orden es la receta: la IA pasa el devengo a caja SIEMPRE así, y la ficha de
-`tesoreria.hipotesis_caja` lo cuenta con los mismos siete pasos (R2, T12).
+`tesoreria.hipotesis_caja` lo cuenta con los mismos pasos (R2, T12, T30).
 Dominio puro: sin BBDD.
 """
 
@@ -48,7 +48,7 @@ def _fila(**cambios) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# R1 · los siete pasos, en su orden
+# R1 · los ocho pasos, en su orden
 # ---------------------------------------------------------------------------
 
 

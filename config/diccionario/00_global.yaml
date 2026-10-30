@@ -730,7 +730,12 @@
 # las fichas del devengo lo dicen y `devengo_corte_obra` publica la parte CP de
 # la cartera. El personal va por el devengo del recurso (N13): la receta, la
 # regla de `R-CAJA-HIPOTESIS` y las fichas de la cartera lo dicen.
-version: 64
+# version 65 (F-150, 2026-10-30): EL SALDO DE PARTIDA. Nace
+# `tesoreria.saldo_partida_obra` (N14): lo cobrado y pagado REALIZADO de cada
+# obra de la receta, CON IVA, los pagares agrupados por sus originales (H29) y
+# el personal de los partes hasta el cierre. La receta gana el paso 0 SALDO
+# (ocho pasos) con H28 y H29: 29 hipotesis.
+version: 65
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -1120,6 +1125,7 @@ reglas:
       - tesoreria.plazos_forma_pago
       - tesoreria.efectos
       - tesoreria.albaranes_pendientes_neto
+      - tesoreria.saldo_partida_obra
       - mart.fact_seguimiento_mensual
     resumen: >-
       No hay caja proyectada: sigue la receta de la ficha de
@@ -1128,7 +1134,7 @@ reglas:
       OBRA o USUARIO (manda).
     regla: >-
       Sigue la RECETA de la ficha de `tesoreria.hipotesis_caja`, en su orden
-      (siete pasos; cada hipotesis dice el suyo en `paso_receta`). El
+      (ocho pasos; cada hipotesis dice el suyo en `paso_receta`). El
       datamart NO tiene una caja proyectada: tiene sus ingredientes. Para
       proyectar cobros y pagos parte de `tesoreria.devengo_corte_obra` y
       `tesoreria.devengo_pendiente_obra_mes` (el devengo pendiente de la ultima
@@ -1147,7 +1153,9 @@ reglas:
       (`tesoreria.albaranes_pendientes_neto`). Ojo: el CP no es caja de la obra:
       excluyelo del devengo y de la cartera y declaralo. El personal va en el
       devengo como recurso: no sumes nominas de la cartera ni las des por
-      ausentes.
+      ausentes. Y el saldo de partida (paso 0) va CON IVA
+      (`tesoreria.saldo_partida_obra`) y es opcional (H28); los pagares
+      agrupados cuentan por sus originales o por el AGR (H29): declaralas.
     motivo: >-
       Decision del humano del 2026-10-24/25 (F-140): convertir devengo en caja
       depende de plazos, retenciones, IVA y criterios que Negocio aun no ha

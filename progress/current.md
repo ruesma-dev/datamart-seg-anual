@@ -35,7 +35,7 @@ Spec-author, a petición del líder (decisiones del humano del 29-10). Detalle y
   30.864. Mutación: 19 muertos y 1 superviviente, cerrado con test.
 - Review 1: RECHAZADO solo por C4 (T15 sin comandos); corregido abajo. Siguiente: review 2; luego
   T15 (MANUAL, humano), en el orden de la subsección siguiente. Detalle: `progress/impl_F-150.md`.
-- Diccionario del árbol hoy: **254 objetos, 2206 columnas, 124 de consumo**, 22 reglas (v64).
+- Diccionario del árbol hoy: **254 objetos, 2206 columnas, 124 de consumo**, 22 reglas (v65).
 - **29-10 · arreglo del despliegue (T15, paso 4):** `build-tesoreria` cayó en Azure con
   `round(double precision, integer) does not exist` (07, CTE `facturado`: `raw.dvf.totbas` es
   `double precision`). Arreglo `d1c2ee1` en la rama: `SUM(fv.totbas::NUMERIC(18, 2))` y su test.
