@@ -504,8 +504,9 @@ def _hipotesis_obra() -> str:
 
 
 def test_f150_r21_h12_es_codigo_sigrid() -> None:
-    """H12 se suma a los códigos que `08` resuelve como SIGRID; H09-H11 siguen."""
-    assert dom.CODIGOS_SIGRID == ("H09", "H10", "H11", "H12")
+    """H12 se suma a los códigos que `08` resuelve como SIGRID; H09-H11 siguen
+    (y N15 suma H13 detrás: `test_f150_iva_isp.py`)."""
+    assert dom.CODIGOS_SIGRID[:4] == ("H09", "H10", "H11", "H12")
     codigos = re.findall(r"'(H[0-9]{2})'::VARCHAR\(3\) AS codigo", _hipotesis_obra())
     assert tuple(codigos) == dom.CODIGOS_SIGRID
 
@@ -513,11 +514,11 @@ def test_f150_r21_h12_es_codigo_sigrid() -> None:
 def test_f150_r21_h12_sale_de_la_ficha_de_la_obra_por_cien() -> None:
     texto = _hipotesis_obra()
     rama = texto[texto.index("'H12'::VARCHAR(3) AS codigo"):]
-    rama = rama[: rama.index(") s ON s.obra_id")]
+    rama = rama[: rama.index("'H13'::VARCHAR(3) AS codigo")]
     assert "FROM raw.obr ob JOIN raw.iva i ON i.ide = NULLIF(ob.ivaide, 0)" in rama
     assert "to_jsonb(ROUND((i.iva * 100)::NUMERIC, 4)) AS valor" in rama
     assert f"'{dom.MOTIVO_H12_FICHA}' AS motivo" in rama
-    assert "SELECT ob.ide AS obra_id" in texto[texto.rindex("UNION ALL"):]
+    assert "SELECT ob.ide AS obra_id, 'H12'::VARCHAR(3) AS codigo" in texto
     assert "condiciones_contrato_cliente" not in rama, "la ficha, no los contratos (N2)"
 
 

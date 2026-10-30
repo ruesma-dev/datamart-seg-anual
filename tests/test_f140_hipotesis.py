@@ -370,8 +370,8 @@ def test_f140_r5_el_orden_de_las_fuentes() -> None:
 
 def test_f140_r5_los_codigos_que_lee_sigrid() -> None:
     """D18-A: H09-H11, de los contratos con el cliente; F-150 (N2) suma H12,
-    de la ficha de la obra."""
-    assert dom.CODIGOS_SIGRID == ("H09", "H10", "H11", "H12")
+    de la ficha de la obra, y N15 H13, de las compras de la obra."""
+    assert dom.CODIGOS_SIGRID == ("H09", "H10", "H11", "H12", "H13")
 
 
 # ===========================================================================

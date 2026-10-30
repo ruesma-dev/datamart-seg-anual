@@ -22,6 +22,12 @@
 --      -> `raw.iva`, x 100), una fila por obra (no hay contratos que casar).
 --      Ese IVA solo cubre las bases `sin_iva_contrato` del devengo: el del
 --      contrato ya va en `devengo_pendiente_obra_mes.importe_iva_contrato`.
+--      F-150 (N15): H13, el IVA efectivo de las compras de la obra: 100 x
+--      cuota entre base de sus lineas de factura de compra (`raw.dcfpro`, con la
+--      fecha de la factura en `raw.con`) de los 12 meses hasta el build, si la
+--      base llega a `UMBRAL_BASE_H13` (0,5 M EUR); si no, DEFECTO. Es la medida
+--      de un porcentaje, como el x 100 de H12, no aplicar una hipotesis. La
+--      marca ISP de Sigrid es falsa: se mide la cuota.
 --   3. DEFECTO: el del catalogo (nivel DEFECTO).
 --
 -- NO SE APLICA: este fichero no multiplica ni suma nada (R6, test), salvo
@@ -35,7 +41,8 @@
 --
 -- Lee de: tesoreria.hipotesis_caja, tesoreria.hipotesis_caja_manual,
 --         tesoreria.condiciones_contrato_cliente, tesoreria.devengo_corte_obra,
---         maestro.v_obra_fichas, raw.obr y raw.iva (H12, F-150).
+--         maestro.v_obra_fichas, raw.obr y raw.iva (H12, F-150),
+--         raw.dcfpro y raw.con (H13, F-150 N15).
 -- Escribe en: tesoreria.hipotesis_caja_obra.
 -- ============================================================================
 
@@ -119,7 +126,23 @@ LEFT JOIN (
            to_jsonb(ROUND((i.iva * 100)::NUMERIC, 4)) AS valor,
            'Ficha de la obra (tipo de IVA)' AS motivo
     FROM raw.obr ob JOIN raw.iva i ON i.ide = NULLIF(ob.ivaide, 0)
+    UNION ALL
+    -- F-150 (N15): H13, cuota entre base de las compras de la obra en 12 meses.
+    SELECT x.obra_id, 'H13'::VARCHAR(3) AS codigo,
+           CASE WHEN x.base >= 500000 THEN to_jsonb(ROUND(100 * x.cuota / x.base, 2)) END AS valor,
+           'Compras de la obra en 12 meses (cuota de IVA entre base)' AS motivo
+    FROM (
+        SELECT NULLIF(l.obride, 0) AS obra_id,
+               SUM(COALESCE(l.tot, 0)::NUMERIC(18, 2)) AS base,
+               SUM(COALESCE(l.ivacuo, 0)::NUMERIC(18, 2)) AS cuota
+        FROM raw.dcfpro l JOIN raw.con c ON c.ide = l.docide
+        WHERE abs(l.tot) < 1e8
+          AND tesoreria.fn_fecha(c.fec) <= CURRENT_DATE
+          AND date_part('year', age(CURRENT_DATE, tesoreria.fn_fecha(c.fec))) = 0
+        GROUP BY NULLIF(l.obride, 0)
+    ) x
+    WHERE x.obra_id IS NOT NULL
 ) s ON s.obra_id = o.obra_id AND s.codigo = h.codigo AND h.admite_obra;
 
 COMMENT ON TABLE tesoreria.hipotesis_caja_obra IS
-'F-140, F-150. El valor de las 29 hipotesis de caja (catalogo tesoreria.hipotesis_caja; la que no admite valor por obra, siempre DEFECTO) en cada obra con devengo pendiente o con valor manual: MANUAL (seccion obras del YAML), si no SIGRID (H09-H11, solo si todos los contratos con el cliente de la obra dan el mismo valor; H12, el tipo de IVA de la ficha de la obra, que solo cubre las bases sin IVA del contrato), si no DEFECTO. nivel OBRA o DEFECTO. Nada se aplica: es el valor que quien consulta debe declarar (R-CAJA-HIPOTESIS). Clave: obra_id, codigo.';
+'F-140, F-150. El valor de las 29 hipotesis de caja (catalogo tesoreria.hipotesis_caja; la que no admite valor por obra, siempre DEFECTO) en cada obra con devengo pendiente o con valor manual: MANUAL (seccion obras del YAML), si no SIGRID (H09-H11, solo si todos los contratos con el cliente de la obra dan el mismo valor; H12, el tipo de IVA de la ficha de la obra, que solo cubre las bases sin IVA del contrato; H13, cuota / base de las compras de la obra en 12 meses si la base llega a 0,5 M EUR), si no DEFECTO. nivel OBRA o DEFECTO. Nada se aplica: es el valor que quien consulta debe declarar (R-CAJA-HIPOTESIS). Clave: obra_id, codigo.';

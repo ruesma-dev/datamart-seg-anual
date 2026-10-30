@@ -248,14 +248,18 @@ hipotesis:
     sentido: PAGO
     descripcion: >-
       IVA efectivo de la compra que se suma al pago (el devengo va sin IVA).
+      POR OBRA (SIGRID, F-150 N15): cuota / base de las lineas de factura de
+      compra de la obra en los 12 meses hasta el build, si su base llega a
+      0,5 M EUR; si no, el defecto de la empresa. Con inversion del sujeto
+      pasivo la cuota es 0: una obra con mucha ISP tiene un H13 bajo.
     unidad: PORCENTAJE
     valor_defecto: 5.5
     fuente_defecto: >-
-      Cuota / base de las facturas de compra de 12 meses: 7,99 / 144,53 M EUR
-      (medido). La marca de inversion del sujeto pasivo no sirve: es falsa en
-      todas. Propuesta pendiente de AdP: el IVA de cada contrato de compra
-      (F-150, N7).
-    ingrediente: compras.facturas
+      Cuota / base de las facturas de compra de 12 meses: 8,20 / 150,10 M EUR,
+      5,46 % (medido el 2026-10-29). La marca de inversion del sujeto pasivo
+      no sirve: es falsa en todas. Por obra va de 0,87 % a 20,9 % (0686 2,36
+      %): 16 de 21 obras con valor SIGRID; pendiente de AdP.
+    ingrediente: tesoreria.hipotesis_caja_obra
     validado: false
     admite_obra: true
     paso_receta: IVA

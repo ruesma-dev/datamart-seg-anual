@@ -418,6 +418,11 @@ def test_f140_r6_ningun_valor_de_hipotesis_se_aplica(ruta: Path) -> None:
         unidad = "ROUND((i.iva * 100)::NUMERIC, 4)"
         assert sin_conteos.count(unidad) == 1
         sin_conteos = sin_conteos.replace(unidad, "")
+        # F-150 (R41, N15): H13 MIDE el IVA efectivo de las compras de la obra
+        # (cuota / base, en %). Otra medida, no aplicar una hipótesis: una vez.
+        medida = "ROUND(100 * x.cuota / x.base, 2)"
+        assert sin_conteos.count(medida) == 1
+        sin_conteos = sin_conteos.replace(medida, "")
         assert not re.search(r"[*/]|\s[+-]\s", sin_conteos), "08 no hace aritmética"
     else:
         assert "hipotesis" not in texto.lower(), f"{ruta.name} no lee hipótesis"

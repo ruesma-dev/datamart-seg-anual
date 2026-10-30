@@ -259,6 +259,18 @@ def porcentaje_iva(fraccion: Decimal | float | None) -> Decimal | None:
     return (Decimal(str(fraccion)) * _CIEN).quantize(_CUATRO_DECIMALES, rounding=ROUND_HALF_UP)
 
 
+def iva_efectivo_compra(base: Decimal | None, cuota: Decimal | None) -> Decimal | None:
+    """H13 de la obra (N15, R41): 100 × cuota / base a dos decimales (mitad arriba).
+
+    `base` y `cuota` son las sumas de las líneas de factura de compra de la obra
+    en 12 meses (los abonos restan). Sin base o bajo `UMBRAL_BASE_H13`, `None`:
+    la obra va con el DEFECTO de la empresa. Cuota vacía es 0.
+    """
+    if base is None or base < UMBRAL_BASE_H13:
+        return None
+    return (_CIEN * (cuota or _CERO) / base).quantize(_CENTIMO, rounding=ROUND_HALF_UP)
+
+
 # ---------------------------------------------------------------------------
 # El coeficiente de venta de una partida (F-150, R9) y sus importes (R11, R20)
 # ---------------------------------------------------------------------------
@@ -271,6 +283,13 @@ AMBITO_COEFICIENTE: dict[str, int] = {"MASTER_CERT": 9, "MASTER_VENTA": 11}
 FUENTES_DATO_CONTRATO: tuple[str, ...] = ("CONTRATO", "SIN")
 #: El motivo con que `08` publica la H12 leída de la ficha de la obra (R21).
 MOTIVO_H12_FICHA = "Ficha de la obra (tipo de IVA)"
+
+#: N15 (T32): base mínima (Σ `raw.dcfpro.tot`, EUR, 12 meses) para que la obra
+#: tenga su propio H13; por debajo, el DEFECTO de la empresa (5,5).
+UMBRAL_BASE_H13 = 500_000
+
+#: El motivo de H13 SIGRID en `tesoreria.hipotesis_caja_obra` (lo copia `08`).
+MOTIVO_H13_COMPRAS = "Compras de la obra en 12 meses (cuota de IVA entre base)"
 #: La fuente de la venta real SIN coeficiente propio en el hueco (N9).
 FUENTE_MEDIA_OBRA = "MEDIA_OBRA"
 
@@ -438,7 +457,7 @@ REGEX_CODIGO_HIPOTESIS = r"^H[0-9]{2}$"
 REGEX_CLAVE_OBRA = r"^[0-9]+-\S.*$"
 #: Las hipótesis que `08` resuelve como SIGRID: H09-H11 de los contratos con
 #: el cliente (D18-A) y, desde F-150 (N2), H12 de la ficha de la obra.
-CODIGOS_SIGRID: tuple[str, ...] = ("H09", "H10", "H11", "H12")
+CODIGOS_SIGRID: tuple[str, ...] = ("H09", "H10", "H11", "H12", "H13")
 
 _CAMPOS_OBLIGATORIOS = (
     "codigo", "sentido", "descripcion", "unidad", "valor_defecto",
