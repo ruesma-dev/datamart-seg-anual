@@ -623,3 +623,30 @@ CREATE TABLE IF NOT EXISTS tesoreria.albaranes_pendientes_neto (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_tes_albaranes_pendientes_neto ON tesoreria.albaranes_pendientes_neto (obra_id, proveedor_id, contrato_id, mes_albaran) NULLS NOT DISTINCT;
+
+
+-- ---------------------------------------------------------------------------
+-- F-150 (N14, R38): el SALDO DE PARTIDA de cada obra de la receta
+--
+-- Una fila por obra: lo cobrado y lo pagado REALIZADO hasta el build, CON IVA,
+-- con los pagares agrupados (AGR) por separado y por sus ORIGINALES, la parte
+-- de coste proporcional de lo pagado y el coste del personal de los partes. Lo
+-- llena `10_saldo_partida.sql`; la cuenta del saldo la hace la receta (H28, H29).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS tesoreria.saldo_partida_obra (
+    obra_id                                 INTEGER       NOT NULL,
+    empresa_id                              INTEGER,
+    clave_obra                              VARCHAR(40),
+    fecha_corte                             DATE          NOT NULL,
+    mes_ultimo_cierre                       DATE,
+    cobrado_realizado                       NUMERIC(18,2) NOT NULL,
+    pagado_realizado_sin_agr                NUMERIC(18,2) NOT NULL,
+    pagado_agr_con_obra                     NUMERIC(18,2) NOT NULL,
+    agrupados_vencidos                      NUMERIC(18,2) NOT NULL,
+    agrupados_pendientes                    NUMERIC(18,2) NOT NULL,
+    cartera_viva_agr_con_obra               NUMERIC(18,2) NOT NULL,
+    pagado_coste_proporcional               NUMERIC(18,2) NOT NULL,
+    agrupados_vencidos_coste_proporcional   NUMERIC(18,2) NOT NULL,
+    personal_coste_partes                   NUMERIC(18,2) NOT NULL,
+    PRIMARY KEY (obra_id)
+);

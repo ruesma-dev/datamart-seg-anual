@@ -39,6 +39,9 @@ Encadena los archivos SQL en orden:
     09_albaranes_pendientes.sql      - F-150 (N11): los albaranes pendientes de
                                        facturar de las obras de la receta, NETOS
                                        por proveedor (FIFO), leídos de `raw`
+    10_saldo_partida.sql             - F-150 (N14): el saldo de partida de cada
+                                       obra (cobrado y pagado REALIZADO, CON IVA,
+                                       y el personal de los partes)
 
 Cada fichero es su transacción: si `07` falla, quedan las tablas de ayer y la
 cartera de hoy ya está hecha.
@@ -143,6 +146,13 @@ SUB_PASOS: tuple[_SubStep, ...] = (
         sql_file="09_albaranes_pendientes.sql",
         target_schema="tesoreria",
         target_table="albaranes_pendientes_neto",
+    ),
+    # F-150 (N14): el saldo de partida, tras los albaranes; lee el corte de 07.
+    _SubStep(
+        name="saldo_partida",
+        sql_file="10_saldo_partida.sql",
+        target_schema="tesoreria",
+        target_table="saldo_partida_obra",
     ),
 )
 

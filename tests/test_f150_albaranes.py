@@ -299,10 +299,13 @@ def test_f150_r34_ninguna_columna_es_de_caja(columna: str) -> None:
     assert not dom.es_columna_de_caja(columna)
 
 
-def test_f150_r34_el_sub_paso_va_al_final() -> None:
+def test_f150_r34_el_sub_paso_va_tras_el_devengo() -> None:
+    """Tras 07 (lee su corte). N14 pone el saldo de partida detras."""
     from etl_sigrid.application.steps import build_tesoreria_step as paso
 
-    ultimo = paso.SUB_PASOS[-1]
+    nombres = [s.name for s in paso.SUB_PASOS]
+    assert nombres.index("albaranes_pendientes") > nombres.index("devengo_pendiente")
+    ultimo = paso.SUB_PASOS[nombres.index("albaranes_pendientes")]
     assert (ultimo.name, ultimo.sql_file, ultimo.target_schema, ultimo.target_table) == (
         "albaranes_pendientes", "09_albaranes_pendientes.sql", "tesoreria",
         "albaranes_pendientes_neto",

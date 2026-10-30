@@ -1128,6 +1128,121 @@ objetos:
       - Cuanto queda de verdad por facturar de albaranes en la obra X
       - Cuando se pagaran los albaranes pendientes de la obra X
 
+  saldo_partida_obra:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **No disponible para el perfil restringido** (F-141, `R-PERFILES`):
+      con su login la consulta devuelve «permission denied», y eso no se rodea:
+      responde que el perfil no lo incluye.
+
+      **LA CAJA QUE LA OBRA YA MOVIO: EL SALDO DE PARTIDA** (F-150, N14): por
+      obra de la receta (`tesoreria.devengo_corte_obra`), lo cobrado y lo
+      pagado REALIZADO hasta `fecha_corte` (el dia del build), CON IVA (los
+      efectos lo llevan), y el coste del personal de sus partes. Es el
+      ingrediente del paso 0 (SALDO) de la receta (`tesoreria.hipotesis_caja`),
+      con H28 (con o sin saldo) y H29 (los agrupados). **No es el saldo**: son
+      sus piezas, y la cuenta la hace quien consulta declarando H28 y H29.
+
+      **LOS PAGARES AGRUPADOS (AGR)**: Sigrid agrupa efectos de pago en un
+      pagare AGR que muchas veces pierde la obra; los efectos ORIGINALES
+      quedan de BAJA con `estado_codigo` 14 y conservan la suya. Con H29 =
+      `ORIGINALES` (defecto) el pagado suma `agrupados_vencidos` (pagado en su
+      vencimiento) y no los AGR con obra; `agrupados_pendientes` va a la
+      proyeccion. Con H29 = `AGR`, `pagado_agr_con_obra` y
+      `cartera_viva_agr_con_obra`. Sumar originales de BAJA rompe
+      `R-TESORERIA-ESTADO` a proposito: es una hipotesis y se declara.
+
+      **EL PERSONAL**: las nominas no estan en esta cartera; el personal va
+      por el coste de sus partes (`personal_coste_partes`, sin IVA) hasta el
+      ultimo cierre, y lo de despues por el devengo pendiente. El coste
+      proporcional (`CP`) de lo pagado no es caja de la obra: se resta.
+    grano: Una fila por obra (`obra_id`) de `tesoreria.devengo_corte_obra` (las de la receta).
+    clave_negocio: [obra_id]
+    paso_etl: build_tesoreria
+    refresco: nocturno
+    columnas:
+      obra_id:
+        significado: La obra de la receta (una fila por obra).
+        agregacion: no_sumable
+      empresa_id:
+        significado: Empresa de la obra (`R-CODIGO-POR-EMPRESA`).
+        agregacion: no_sumable
+      clave_obra:
+        significado: La obra como empresa-codigo (1-0686).
+      fecha_corte:
+        significado: El dia del build. Vencido es antes de esta fecha.
+      mes_ultimo_cierre:
+        significado: >-
+          Primer dia del mes del ultimo cierre de la obra: el personal de los
+          partes se cuenta hasta el.
+        nulo_significa: La obra no tiene cierre (no hay personal en el saldo).
+      cobrado_realizado:
+        significado: Σ de los cobros REALIZADO de la obra. CON IVA.
+        unidad: EUR
+        agregacion: suma
+      pagado_realizado_sin_agr:
+        significado: Σ de los pagos REALIZADO de la obra que no son pagares AGR. CON IVA.
+        unidad: EUR
+        agregacion: suma
+      pagado_agr_con_obra:
+        significado: >-
+          Σ de los pagares AGR REALIZADO que conservan la obra. Solo con H29 =
+          `AGR`. CON IVA.
+        unidad: EUR
+        agregacion: suma
+      agrupados_vencidos:
+        significado: >-
+          Σ de los efectos ORIGINALES agrupados (PAGO de BAJA, estado 14) con
+          vencimiento anterior a `fecha_corte`: pagados en su fecha. Solo con
+          H29 = `ORIGINALES`. CON IVA.
+        unidad: EUR
+        agregacion: suma
+      agrupados_pendientes:
+        significado: >-
+          Σ de los originales agrupados que vencen desde `fecha_corte`: pago
+          futuro, va a la proyeccion (paso 7) con H29 = `ORIGINALES`. CON IVA.
+        unidad: EUR
+        agregacion: suma
+      cartera_viva_agr_con_obra:
+        significado: >-
+          Σ de los pagares AGR PREVISTO vivos con obra: con H29 = `ORIGINALES`
+          no se suman en la proyeccion (ya estan en sus originales). CON IVA.
+        unidad: EUR
+        agregacion: suma
+      pagado_coste_proporcional:
+        significado: >-
+          La parte `CP` de `pagado_realizado_sin_agr` (la cuota de coste
+          proporcional de su factura, como en `devengo_corte_obra`): no es caja
+          de la obra y se resta. Puede ser negativa.
+        unidad: EUR
+        agregacion: suma
+      agrupados_vencidos_coste_proporcional:
+        significado: >-
+          La parte `CP` de `agrupados_vencidos`: se resta solo con H29 =
+          `ORIGINALES`. Puede ser negativa.
+        unidad: EUR
+        agregacion: suma
+      personal_coste_partes:
+        significado: >-
+          Σ del coste de los partes (`raw.hmores.tot`) de los recursos PERSONA
+          internos de la obra hasta `mes_ultimo_cierre`. SIN IVA.
+        unidad: EUR
+        agregacion: suma
+    relaciones:
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "1:1"
+        porque: La ficha de la obra.
+      - de: obra_id
+        a: tesoreria.devengo_corte_obra.obra_id
+        cardinalidad: "1:N"
+        porque: El corte del devengo de la misma obra (una fila por concepto).
+    ejemplos_preguntas:
+      - Cuanto ha cobrado y pagado ya la obra X
+      - Cual es el saldo de caja de la obra X hasta hoy
+
   hipotesis_caja:
     tipo: tabla
     capa: consumo
