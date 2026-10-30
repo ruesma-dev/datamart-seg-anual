@@ -475,5 +475,45 @@ hipotesis:
     admite_obra: true
     paso_receta: CARTERA
 
+  - codigo: H28
+    sentido: AMBOS
+    descripcion: >-
+      Si la caja de la obra parte de su SALDO DE PARTIDA (lo cobrado menos lo
+      pagado REALIZADO hasta hoy, CON IVA, `tesoreria.saldo_partida_obra`) o de
+      cero. Sin saldo, la proyeccion parte de hoy con la cartera vencida y no
+      pagada (H16, H17).
+    unidad: OPCION
+    valor_defecto: CON_SALDO
+    opciones: [CON_SALDO, SIN_SALDO]
+    fuente_defecto: >-
+      Decision del humano del 2026-10-29: el saldo va CON IVA (los efectos lo
+      llevan) y es opcional. Con los defectos, 21 obras ~13,2 M EUR y la 0686
+      ~4,9 (medido el 2026-10-29, sin el IVA recuperado de H30).
+    ingrediente: tesoreria.saldo_partida_obra
+    validado: false
+    admite_obra: true
+    paso_receta: SALDO
+
+  - codigo: H29
+    sentido: PAGO
+    descripcion: >-
+      Como cuentan en el saldo los pagares AGRUPADOS (serie AGR), que pierden la
+      obra: por sus efectos ORIGINALES (los agrupados, que siguen con su obra:
+      vencido = pagado en su fecha, no vencido = pendiente a su vencimiento) o
+      por el AGR que conserva la obra. Es una HIPOTESIS que rompe
+      `R-TESORERIA-ESTADO` a proposito (los originales estan de BAJA): declarala.
+    unidad: OPCION
+    valor_defecto: ORIGINALES
+    opciones: [ORIGINALES, AGR]
+    fuente_defecto: >-
+      Mas de la mitad de lo agrupado no tiene obra en el AGR (108,72 M EUR sin
+      obra). Con los originales, en la 0686, 1,32 M EUR vencidos y 0,27
+      pendientes (64 efectos; medido el 2026-10-29). Con ORIGINALES los AGR que
+      conservan obra no se suman: ya estan en sus originales.
+    ingrediente: tesoreria.saldo_partida_obra
+    validado: false
+    admite_obra: true
+    paso_receta: SALDO
+
 # Valores por obra: ninguno todavia.
 obras: []

@@ -430,8 +430,8 @@ ALTERNATIVAS_DEL_DISENO = {
 def test_f140_r1_yaml_real_pasa_la_validacion() -> None:
     leido = lector.cargar_hipotesis_caja(RUTA_YAML)
     assert leido.errores == []
-    # F-150 suma H24-H27: son 27
-    assert [h.codigo for h in leido.catalogo] == [f"H{n:02d}" for n in range(1, 28)]
+    # F-150 suma H24-H27 y (N14) H28-H29: son 29
+    assert [h.codigo for h in leido.catalogo] == [f"H{n:02d}" for n in range(1, 30)]
 
 
 def test_f140_r1_yaml_los_defectos_son_los_del_diseno() -> None:
@@ -467,7 +467,7 @@ def test_f140_r1_yaml_la_seccion_obras_nace_vacia() -> None:
 def test_f140_r1_yaml_el_sentido_de_cada_hipotesis() -> None:
     catalogo = {h.codigo: h for h in lector.cargar_hipotesis_caja(RUTA_YAML).catalogo}
     pagos = {"H01", "H02", "H03", "H04", "H05", "H06", "H07", "H13", "H20",
-             "H24", "H27"}  # F-150
+             "H24", "H27", "H29"}  # F-150
     cobros = {"H08", "H09", "H10", "H11", "H12", "H22", "H25", "H26"}  # F-150
     for codigo, h in catalogo.items():
         esperado = "PAGO" if codigo in pagos else "COBRO" if codigo in cobros else "AMBOS"

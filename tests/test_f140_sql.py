@@ -808,7 +808,7 @@ def test_f140_r5_p1a_se_publican_las_23_y_la_que_no_admite_obra_va_a_defecto() -
     from etl_sigrid.infrastructure.config.hipotesis_caja_yaml import cargar_hipotesis_caja
 
     catalogo = cargar_hipotesis_caja().catalogo
-    assert len(catalogo) == 27  # F-150 suma H24-H27; el resto del test no cambia
+    assert len(catalogo) == 29  # F-150 suma H24-H29; el resto del test no cambia
     texto = _hipotesis_obra()
     select = texto[texto.index("INSERT INTO tesoreria.hipotesis_caja_obra"):]
     assert "WHERE h.admite_obra" not in select, "ningún filtro deja fuera hipótesis del catálogo"

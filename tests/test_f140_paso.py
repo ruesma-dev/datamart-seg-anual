@@ -83,7 +83,7 @@ def test_f140_r4_una_fila_por_hipotesis_del_catalogo_real() -> None:
     leidas = cargar_hipotesis_caja()
     filas = hsql.filas_catalogo(leidas.catalogo)
     assert [f[0] for f in filas] == [h.codigo for h in leidas.catalogo]
-    assert len(filas) == 27  # F-150: H24-H27
+    assert len(filas) == 29  # F-150: H24-H27 y H28-H29 (N14)
     for fila, h in zip(filas, leidas.catalogo, strict=True):
         assert len(fila) == len(_columnas_setup("tesoreria.hipotesis_caja"))
         assert isinstance(fila[4], Json) and fila[4].obj == h.valor_defecto
@@ -142,7 +142,7 @@ def test_f140_r2_el_paso_carga_el_catalogo_del_repositorio(pg) -> None:
     assert resultado.status == StepStatus.SUCCESS, resultado.error_message
     assert len(pg.cargas) == 1
     catalogo, obras = pg.cargas[0]
-    assert len(catalogo) == 27 and obras == []  # F-150: H24-H27
+    assert len(catalogo) == 29 and obras == []  # F-150: H24-H27 y H28-H29 (N14)
 
 
 def test_f140_r2_con_errores_falla_con_la_lista_y_no_escribe(pg, monkeypatch) -> None:

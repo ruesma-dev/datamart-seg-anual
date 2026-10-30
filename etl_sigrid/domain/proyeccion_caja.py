@@ -419,7 +419,7 @@ UNIDADES: tuple[str, ...] = (
 #: Los pasos de la receta de la caja (F-150, R1, D7), en su orden: la IA pasa
 #: el devengo a caja SIEMPRE así, y cada hipótesis dice en cuál se aplica.
 PASOS_RECETA: tuple[str, ...] = (
-    "DEVENGO", "DOCUMENTO", "COEFICIENTES", "PLAZO", "RETENCION", "IVA", "CARTERA",
+    "SALDO", "DEVENGO", "DOCUMENTO", "COEFICIENTES", "PLAZO", "RETENCION", "IVA", "CARTERA",
 )
 #: El mes más lejano de un perfil (R25): diez años desde el hecho.
 MAX_MESES_PERFIL = 120

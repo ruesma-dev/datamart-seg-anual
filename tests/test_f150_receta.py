@@ -52,9 +52,10 @@ def _fila(**cambios) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def test_f150_r1_los_siete_pasos_en_el_orden_de_la_receta() -> None:
+def test_f150_r1_los_ocho_pasos_en_el_orden_de_la_receta() -> None:
+    """N14 (29-10): el saldo de partida va delante, como paso 0."""
     assert PASOS_RECETA == (
-        "DEVENGO", "DOCUMENTO", "COEFICIENTES", "PLAZO", "RETENCION", "IVA", "CARTERA",
+        "SALDO", "DEVENGO", "DOCUMENTO", "COEFICIENTES", "PLAZO", "RETENCION", "IVA", "CARTERA",
     )
 
 
@@ -115,8 +116,9 @@ RUTA_YAML = RAIZ / "config" / "hipotesis_caja.yaml"
 DIR_SQL = RAIZ / "etl_sigrid" / "infrastructure" / "postgres" / "sql" / "tesoreria"
 RUTA_SETUP = DIR_SQL / "00_setup.sql"
 
-#: `design.md` §6: el paso de la receta de cada una de las 27.
+#: `design.md` §6: el paso de la receta de cada una (N14 suma H28 y H29, SALDO).
 PASO_DE_CADA_CODIGO = {
+    **dict.fromkeys(("H28", "H29"), "SALDO"),
     **dict.fromkeys(("H18", "H19", "H23", "H26"), "DEVENGO"),
     **dict.fromkeys(("H03", "H08"), "DOCUMENTO"),
     **dict.fromkeys(("H01", "H02", "H04", "H05", "H09", "H15", "H22", "H24", "H25"), "PLAZO"),
@@ -167,7 +169,8 @@ def test_f150_r24_h27_la_antiguedad_maxima_de_lo_pendiente_de_facturar() -> None
 
 
 def test_f150_r24_son_27() -> None:
-    assert list(_catalogo()) == [f"H{n:02d}" for n in range(1, 28)]
+    # N14 suma H28 y H29 detras: las 27 de la primera tanda siguen en su orden.
+    assert list(_catalogo())[:27] == [f"H{n:02d}" for n in range(1, 28)]
 
 
 @pytest.mark.parametrize(("codigo", "defecto"), [("H03", [[0, 100]]), ("H08", [[1, 100]])])
