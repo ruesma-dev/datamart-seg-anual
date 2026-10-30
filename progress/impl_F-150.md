@@ -23,7 +23,7 @@ inversión del sujeto pasivo (N15). Rama `feature/F-150-receta-caja`, sin push.
 | T32 | `500a4ea` | H13 SIGRID por obra: `iva_efectivo_compra`, `UMBRAL_BASE_H13`, `MOTIVO_H13_COMPRAS`, rama en `08` (R41) |
 | T33 | `1c84fd9` | H30 (defecto `MENSUAL_REDEME`, decisión del humano) y la spec corregida (R42) |
 | T34 | `34639c6` | El IVA del saldo (6 columnas), receta paso 0 y 6, fichas, v66; `azure-apps` `3ca37bf` (R43) |
-| T24/T31/T35 | (este informe) | Mutación incremental, `init.sh` y pasos MANUAL (en `current.md`) |
+| T35 | `9777534`, `5f02555`, `c255396` | Informe y pasos MANUAL; lista de F-141 con las fichas nuevas; mutación incremental (T24/T31/T35 juntas) |
 
 Ficheros de producción tocados: `etl_sigrid/domain/proyeccion_caja.py`,
 `etl_sigrid/application/steps/build_tesoreria_step.py`, `sql/tesoreria/00_setup.sql`, `07`, `08`,
@@ -158,4 +158,20 @@ diccionario (F-006, F-147), F-037, F-140 y F-150: **1.991 passed, 262 skipped** 
 
 ## Evidencias
 
-PENDIENTE_EVIDENCIAS
+| Evidencia | Valor real |
+|---|---|
+| `bash harness/init.sh` (una vez, al final, sobre `c255396`) | **verde**, código 0, «ENTORNO LISTO. Puedes trabajar.»: **9.813 passed**, 268 skipped, 2.570 warnings |
+| Tiempo de la suite | 4.108,94 s (1:08:28), con cobertura |
+| Cobertura de las líneas cambiadas | `PUERTA COBERTURA`: **100,0 %** (21/21, umbral 80 %, nivel estandar; diff desde `935fdd35ee`) |
+| Tamaño | `PUERTA TAMAÑO`: requirements 150/150, design 250/250, impl 161/220, review 140/140 |
+| Mutación incremental (`python -m harness.mutacion --feature F-150 --base 0659528 --max-mutantes 8 --workers 3 --timeout 3000`) | 78 líneas de producción, 17 mutantes generados, **8 evaluados: 8 muertos, 0 supervivientes, 0 timeouts** (9.754,7 s; `progress/mutacion_F-150_n11_n15.md`). Sin superviviente que analizar |
+| Verificación semántica del SQL | `09`: 23 OK; `10`: 14 OK, 0 fallos (Postgres 16, tipos de Azure) |
+| `ruff` | 276 avisos de deuda previa (no bloquea); los de mis ficheros, corregidos |
+
+Muestra reducida a 8 (el tope del nivel es 20): cada mutante corre la suite entera (~38 min con
+3 workers) y la campaña de 20 de la fase 1 tardó 4 h 15 min; los 78 renglones son `neto_fifo`,
+`iva_efectivo_compra`, constantes y la lista de sub-pasos. Dos lanzamientos previos no cuentan:
+línea base > 600 s con 4 workers, y línea base ROJA por `test_f141_r28_ninguna_otra_ficha_lleva_el_aviso`
+(las dos fichas nuevas de `tesoreria` faltaban en su lista; corregido en `5f02555`, no lo habían
+cazado las familias que corrí antes de cada commit). El SQL no se muta: lo cubren los tests de
+literales y las sandboxes (§4).
