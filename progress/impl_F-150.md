@@ -1,220 +1,161 @@
 <!-- progress/impl_F-150.md -->
-# F-150 · Informe del implementer · la receta de la caja (fase 1)
+# F-150 · Informe del implementer · segunda y tercera tanda (T17-T35)
 
-Fecha: 2026-10-28 (arreglo del despliegue, 29-10). Rama `feature/F-150-receta-caja`. **T1-T14 y
-T16 hechas**; T15 MANUAL (humano). T11 paró por R29 (hueco de H26 15,60 M EUR, fuera de 15,26-15,55)
-y el humano aprobó la (b): R29 relativo a los datos del día (§4). `init.sh` verde (Evidencias).
+La fase 1 (T1-T16, el arreglo del despliegue del 29-10, su RED y sus evidencias) está en
+[`impl_F-150_fase1.md`](impl_F-150_fase1.md); la PARADA de T11, en `impl_F-150_parada_T11.md`.
+Este informe cubre el ajuste del 29-10 (N11-N13), el saldo de partida (N14) y el IVA con
+inversión del sujeto pasivo (N15). Rama `feature/F-150-receta-caja`, sin push.
 
-El informe de la PARADA del 2026-10-27 (las mediciones que la spec cita como «`impl_F-150.md`
-§1-§3»: formas reales de `coestr`, lo que casaba con §8, lo medido en Sigrid para T1) se ha
-movido tal cual a `progress/impl_F-150_parada_T11.md`.
-
-## 1. Qué cambió (por tarea, un commit cada una)
+## 1. Qué cambió (un commit por tarea)
 
 | Tarea | Commit | Qué |
 |---|---|---|
-| T1 | `5a3b1d2` | `TableSpec.include_columns` (lista blanca) e `IngestRawStep._columnas_a_traer`: solo esas columnas, en el orden de Sigrid; con `exclude_columns` a la vez o una inexistente, falla antes de crear nada |
-| T2 | `d463341` | `iva` (entera) y `dvf` (9 de 151 columnas) en `config/tables_sigrid.yaml`; fichas en `raw.yaml`; censo 78 -> 80 en los tests que lo fijan, `ARCHITECTURE.md`, `00_global.yaml` y la enmienda del inventario de F-006 |
-| T3 | `9ef99af` | Unidad `PERFIL_MESES` (`MAX_MESES_PERFIL` 120): un error por cada fallo, suma exacta en `Decimal` |
-| T4 | `1aab362` | `PASOS_RECETA` (siete pasos), `paso_receta` obligatorio y último campo de `Hipotesis` |
-| T5 | `2d9a426` | `leer_coeficientes_contrato` (líneas, por código, `CLASE_POR_CODIGO`), `factor_coeficientes` (cascada de `COEF_DESADJ`), `porcentaje_iva`, `coeficiente_venta`, `importe_con_coeficiente`, `importe_por_porcentaje`, `hueco_facturacion`, `coeficiente_medio`, `FUENTE_MEDIA_OBRA`, `MOTIVO_H12_FICHA` |
-| T6 | `1d8c876` | `config/hipotesis_caja.yaml` a 27 (H24-H27; H03/H08 a perfil; H14 `MENSUAL`; H20 `FIN_MES_ALBARAN`; textos de §6), `paso_receta` en la carga (el lector valida con el dominio); `unidad` a `VARCHAR(20)` |
-| T7 | `abfb787` | `00_setup.sql`: `fn_coeficientes`, `fn_coeficientes_reconocidos` y las columnas nuevas por `ALTER ... ADD COLUMN IF NOT EXISTS`; fichas de todas |
-| T8 | `6da3271` | `06`: `coestr` leído una vez (`CROSS JOIN LATERAL`), clases, factor e IVA del contrato (`raw.iva`) |
-| T9 | `1812dbe` | `07`: `_dev_coef` (master 9/11 de V), `_dev_contrato`, columnas de la partida, guarda D6, reparto con coeficientes, IVA/retención de la obra-mes, `_dev_hueco` neto por obra con `MEDIA_OBRA` |
-| T10 | `6ba7839` | `08`: H12 SIGRID desde la ficha de la obra con `MOTIVO_H12_FICHA`; `COMMENT` a 27 |
-| T13 | `886c9da` | `CONVENTIONS.md` (excepción acotada D1), `ARCHITECTURE.md` (la receta), `CLAUDE.md` (mapa, 27); `azure-apps` commit local `044beef` |
-| — | `e85a3d8` | Los cuatro huecos que destapó la línea base de la campaña (§2, D-5) |
-| T14 | `db6553a` | Campaña de mutación (`progress/mutacion_F-150.md`) y el test que cierra su superviviente |
-| T11, T12 | `0be8eab`, `425b5e2` | R29 relativo al día (humano); la receta en la ficha, `R-CAJA-HIPOTESIS`, `R-VENTA-COEFICIENTES`, fichas a 27, v63 |
+| T17 | `1b3e96a` | Dominio: `neto_fifo`, `SERIES_ALBARAN_PENDIENTE`, `UMBRAL_IMPORTE_ABSURDO` (R33) |
+| T18 | `5864298` | `tesoreria.albaranes_pendientes_neto` (00_setup + `09_albaranes_pendientes.sql`), sub-paso `albaranes_pendientes` (R34, R35) |
+| T19 | `98b050e` | `07`: cuota CP de la cartera de pago (`cartera_viva_coste_proporcional`, `cartera_emitida_tras_cierre_coste_proporcional`) (R36) |
+| T20 | `3389999` | Contraste de solo lectura en Azure de `09` y de la cuota CP; la vista de partidas `MATERIALIZED` (205 s → 10 s) |
+| T21 | `6f227ac` | YAML: H02 sin `CP`; H20/H27 con los albaranes netos (N11, N12) |
+| T22 | `ea73489` | Diccionario v64: receta, ficha nueva, CP fuera, personal por el recurso (R3, R4, R34, R36, R37) |
+| T23 | `514e965` | ARCHITECTURE, CLAUDE.md; `azure-apps` `c57c52e` |
+| T27 | `23ad2bd` | `PASOS_RECETA` con `SALDO` delante (ocho); H28 y H29 (R39) |
+| T28-T29 | `ac3b1b2` | `tesoreria.saldo_partida_obra` (00_setup + `10_saldo_partida.sql`), sub-paso `saldo_partida`, ficha, inventario 254, presupuesto F-147 31.129; contraste (R38) |
+| T30 | `ea47886` | Receta paso 0 SALDO y paso 7 con los originales; regla; recuentos 29 derivados del YAML en los tests; v65; `azure-apps` `d3cafe9` (R40) |
+| T32 | `500a4ea` | H13 SIGRID por obra: `iva_efectivo_compra`, `UMBRAL_BASE_H13`, `MOTIVO_H13_COMPRAS`, rama en `08` (R41) |
+| T33 | `1c84fd9` | H30 (defecto `MENSUAL_REDEME`, decisión del humano) y la spec corregida (R42) |
+| T34 | `34639c6` | El IVA del saldo (6 columnas), receta paso 0 y 6, fichas, v66; `azure-apps` `3ca37bf` (R43) |
+| T24/T31/T35 | (este informe) | Mutación incremental, `init.sh` y pasos MANUAL (en `current.md`) |
 
-Ficheros de producción: `etl_sigrid/domain/entities.py`, `domain/proyeccion_caja.py`,
-`application/steps/ingest_raw_step.py`, `infrastructure/postgres/hipotesis_caja_sql.py` (el
-lector `hipotesis_caja_yaml.py` no cambia: valida con el dominio), `sql/tesoreria/00`-`08`. Config:
-`tables_sigrid.yaml`, `hipotesis_caja.yaml`, `diccionario/{raw,tesoreria,00_global}.yaml`. Tests
-nuevos: `tests/test_f150_{ingesta,perfil,receta,contrato,coeficiente,hueco,sql,diccionario}.py`.
+Ficheros de producción tocados: `etl_sigrid/domain/proyeccion_caja.py`,
+`etl_sigrid/application/steps/build_tesoreria_step.py`, `sql/tesoreria/00_setup.sql`, `07`, `08`,
+`09_albaranes_pendientes.sql` (nuevo), `10_saldo_partida.sql` (nuevo), `config/hipotesis_caja.yaml`,
+`config/diccionario/{00_global,tesoreria,compras}.yaml`. Tests nuevos: `test_f150_albaranes.py`,
+`test_f150_saldo.py`, `test_f150_iva_isp.py`; ampliados los de F-037, F-140, F-147 y F-150.
 
-## 2. Decisiones y desviaciones respecto a la spec
+## 2. Decisiones y desviaciones (justificadas)
 
-- **D-1** `_errores_de_perfil` devuelve una LISTA (el design decía `_error_de_perfil`): R25 pide un
-  error por cada fallo, y con una cadena solo saldría el primero.
-- **D-2** `CODIGOS_SIGRID` pasa a `("H09", "H10", "H11", "H12")` (el design solo nombra
-  `MOTIVO_H12_FICHA`): la constante ya era «los códigos que `08` resuelve como SIGRID» y el test
-  de F-140 la cruza con el SQL; tener H12 fuera habría dejado el cruce mintiendo.
-- **D-3** `test_f140_sql` r6 («`08` no hace aritmética») tolera UNA cuenta, la del cambio de unidad
-  del IVA de la ficha (`ROUND((i.iva * 100)::NUMERIC, 4)`, que pide §5.6): no aplica ninguna
-  hipótesis. `test_f140_sql` r13: `07` lee también `stg.presupuesto` (R10).
-- **D-4** T13 se hizo antes que T12: T12 va «tras T11 en verde» y T11 estuvo bloqueada (Azure)
-  y luego en PARADA; T13 no depende de cifras de T11.
-- **D-6** T12: la pregunta nueva va primera en `hipotesis_caja` y la del plazo de cobro pasa a
-  tercera (F-147: se reordena, no se borra); `test_f140` r22 pasa de `== 2` a `>= 2`. Presupuesto
-  F-147: **30.864**. El guardián de cifras de F-006 (`_cifras`) ignora los códigos `H22`. Si T11 obliga a cambiar algo, se revisan los textos de T13.
-- **D-5** La línea base de la campaña de mutación salió ROJA y destapó cuatro fallos reales que
-  las suites parciales no veían (arreglados en `e85a3d8`): `coeficientes_texto` declaraba
-  `nulo_significa` pero `raw` trae cadena vacía (ahora `NULLIF(o.coestr, '')`; el guardián de
-  F-006); `dvf` no cuelga de `con` en ningún SQL y `R-SIGRID-CON` no lo decía (punto 4); las dos
-  funciones nuevas faltaban en el inventario de `test_f079`; y `current.md` no tenía los recuentos
-  de hoy del diccionario (252 objetos, 2.178 columnas, 122 de consumo).
-- Literales del dominio = SQL (patrón F-135): los tests de `test_f150_sql.py` comparan el texto.
+1. **Decisión del humano (29-10), N15**: H30 por defecto `MENSUAL_REDEME` (vuelve a los 4 meses del
+   mes liquidado; mediana de la 4700), `validado: false`; el saldo suma el IVA NETO recuperado
+   (soportado − repercutido). La spec decía `COMPENSA_EMPRESA`: corregida en `requirements.md` R42/R43,
+   `design.md` §5.9 y §6 y `spec_F-150.md` §10.6 (T33). El defecto es un dato del YAML: ni el SQL ni
+   el dominio lo nombran (test `test_f150_r43_el_sql_no_elige_h30`).
+2. **Columnas `_hasta_4m`** (desviación de §5.9, que solo traía `_hasta_4t`): sin ellas
+   `MENSUAL_REDEME` no se puede aplicar. Pagado o cobrado en un mes 4 o más meses antes del mes del
+   build (aritmética de meses con `date_part`, sin `interval`).
+3. **Columna extra `agrupados_vencidos_coste_proporcional`**: la parte CP de los originales vencidos
+   va aparte para que, con H29 = `AGR`, el CP del saldo siga siendo exacto. Fórmula de la receta: CP
+   = `pagado_coste_proporcional` (+ esa columna con `ORIGINALES`).
+4. **Paso 0**: la receta numera SALDO como 0 (los pasos 1-7 conservan su número). El tramo del
+   SALDO nombra también H30 (el IVA recuperado): el test r2 lo admite de forma explícita.
+5. **H13, 12 meses sin aritmética de fechas** (el test de F-140 la prohíbe en `08`):
+   `fn_fecha(c.fec) <= CURRENT_DATE AND date_part('year', age(CURRENT_DATE, fn_fecha(c.fec))) = 0`.
+   La medida `ROUND(100 * x.cuota / x.base, 2)` es la segunda cuenta tolerada en `08` (como el ×100
+   de H12): mide un porcentaje, no aplica una hipótesis. El motivo dice «entre» y no «/» por eso.
+6. `09`: el `COMMENT` va en `09` y no en `00_setup`; `tras_cierre` con `COALESCE(..., FALSE)`; la
+   vista de partidas como CTE `MATERIALIZED` (también en `10`).
+7. **Recuentos de hipótesis**: los tests leen la cifra del YAML (`_n_hipotesis()`) en vez de repetir
+   27/29/30. **Inventario F-006**: enmienda en `design_detalle.md` (254 objetos); el guardián pasaba
+   antes por coincidencia de subcadena.
+8. El `init.sh` inicial de esta sesión se saltó (verde en `289fedb`, urgencia del líder); el final sí.
+9. Lint: corregidos los avisos de ruff de mis ficheros (`zip(strict=True)`, signos «−»/«×»).
 
-## 3. Verificación semántica del SQL (Postgres 16 desechable, datos sintéticos)
+**PARADA**: ninguna. Las cifras de T29 y T34 están dentro del 5 % (§3).
 
-Contenedor `postgres:16` local en `127.0.0.1:55432` (precedente F-135), destruido al terminar; ni
-Azure ni Sigrid. Script `sandbox_f150.py` (scratchpad): ejecuta `00` (dos veces: idempotente),
-`06`, `07` y `08` como el paso (cada fichero en una transacción) y compara con el dominio.
-Resultado: **66 comprobaciones OK, 0 fallos**. Cubre: las clases y el factor de cada forma de
-`coestr` (con `\r\n`, base `TOTAL EJECUCION CONTRATA`, `COEF_DESADJ` en cascada, `RETN`, vacío,
-código desconocido); IVA del contrato (0 es 0); coeficiente y fuente por partida (contrato >
-master 9 > master 11; contrato de otra obra NO se casa); pendiente con coeficientes al céntimo
-(HALF_UP); sumas de la obra-mes, IVA/retención y cociente; hueco por obra (obra 1: real 2.323,07,
-parte a media 285,70, facturado 800, hueco 1.523,07, IVA 196,61, base sin IVA 586,83; obra 2:
-facturado por delante 451,87); `08` con H12 SIGRID 21 y su motivo, MANUAL manda, 27 códigos por
-obra; y la guarda D6 salta con una partida de venta con pendiente y sin coeficiente.
+## 3. Contrastes de SOLO LECTURA en Azure
 
-## 4. T11 (R29): PARADA por 0,05 M EUR en el hueco
+**T20 (N11-N12, 29-10)**: 30.533 líneas; bruto 56,876 M EUR, sobrefacturado 48,166, compensado
+48,120, **neto 8,756** (= el de compras), 3.356 filas, 20 obras; 0686 bruto 8,781 neto 0,193;
+>6 meses 0,518; `tras_cierre` 0,470 en 7 obras. Cartera viva 38,560; CP prorrateado −0,0037 (~0).
 
-Hasta las 09:46 UTC Azure no se alcanzaba (la IP pública del puesto no estaba entre las 19 reglas
-del firewall); el líder lo confirmó alcanzable y T11 se corrió tras el `init.sh`, a las 10:43 UTC. Todo SOLO LECTURA: Azure con
-`filas_solo_lectura` (nocturna del 28-10: `mes_ultimo_cierre` máximo 2026-10-01), `iva` y `dvf`
-de Sigrid con `truncated` = False, y el dominio de T5. Scripts (scratchpad): `t11_r29.py` y
-`t11_r29b.py`; salidas `t11_r29.out` y `t11_r29b.out`.
+**T29 (N14, 30-10)**, frente a §10.5 (29-10):
 
-| Medida (21 obras) | Hoy | Spec | ¿Casa? |
-|---|---|---|---|
-| Contratos con `coestr` no vacío y NO reconocido | **0** (36 en el resto de obras) | 0 | sí |
-| Partidas con contrato de OTRA obra | **0** | 0 | sí |
-| Contrato ≠ master 11 en > 0,005, pendiente > 0 | **5** (0696 ×3, 0724, 0676-B) | ≤ 6 (medidas 5) | sí |
-| Partida de venta con pendiente y sin coeficiente (guarda D6) | 0 | 0 | sí |
-| Partidas VENTA / pendiente / con coeficientes | 19.005 / 132,14 / 142,94 M EUR | ~18.997 / ~132,4 / ~143,3 (R30) | sí (−0,2 %: otra nocturna) |
-| Fuentes: CONTRATO / MASTER_CERT / MASTER_VENTA / SIN | 54,44 / 76,94 / 0,76 / 0 M EUR (SIN: 860 partidas con pendiente 0) | — | — |
-| IVA y retención del contrato | ≥ 96 % en 19 obras (0711, 96,0 %); 0608 y 0715, 0 % | ídem | sí |
-| **Σ (real × coef − facturado), con `MEDIA_OBRA`** | **15,60 M EUR** | **15,26-15,55** | **NO (+0,05)** |
-| Suelo de R29 hoy (sin coeficiente a factor 1) | 15,50 (real sin coeficiente 0,97) | 15,26 el 27-10 | — |
-| `venta_pendiente_facturar` (suelo 0 por obra) / facturado por delante | 15,69 / 0,09 (solo 0711) | — | — |
-| Albaranes sin facturar / de más de 6 meses | 56,83 / 22,91 M EUR | 56,9 / 22,9 | sí |
+| Pieza | 21 obras (spec / medido) | 0686 (spec / medido) |
+|---|---|---|
+| Cobrado REALIZADO | 97,4 / **98,30** (+0,9 %) | 30,21 / **30,21** |
+| Pagado sin AGR | 64,0 / **63,99** | 21,96 / **21,96** |
+| AGR con obra | 2,2 / **2,22** | 0,32 / **0,32** |
+| Originales vencidos / pendientes | 8,63 / 2,21 · **8,63 / 2,21** | 1,32 / 0,27 · **1,32 / 0,27** |
+| Personal de los partes | 11,55 / **11,65** (+0,9 %) | 2,07 / **2,13** |
+| CP de lo pagado | ~0 / −0,117 | — / −0,102 |
 
-Por obra (M EUR, hueco): 0676-B 4,85 · 0696 3,13 · 0702 1,49 · 0678 1,43 · 0686 1,30 · 0713 0,83
-· 0710 0,79 · 0694 0,51 · 0693 0,46 · 0697 0,34 · 0707 0,29 · resto ≤ 0,13; 0711, 0,09 por delante.
+La nocturna del 30-10 movió el último cierre de la 0686 (y otras) a 2026-10: por eso el personal
+incluye octubre (0686 +0,065). Saldo con H28 `CON_SALDO`, H29 `ORIGINALES`, sin IVA: **21 obras
+13,91 M EUR (spec 13,18) y 0686 4,70 (4,86)**: la diferencia es el cobro nuevo, el personal de
+octubre y el CP, no el método.
 
-**DECISIÓN DEL HUMANO (2026-10-28, opción b)**: el método no se apartaba, se movió el dato (del
-27-10 al 28-10 el suelo a factor 1 sube 0,24 M EUR). R29 deja las cifras fijas y pasa a ser
-relativo al día con la misma regla: suelo = el hueco con la venta real sin coeficiente a factor 1;
-techo = suelo + 0,26 × esa venta. Con la nocturna del 28-10, **15,50-15,75 y el hueco 15,60:
-pasa**. Cambiado en `requirements.md` (R29), `tasks.md` (T11) y la `acceptance` de
-`features.json` (commit `0be8eab`).
+**T32 (H13, 30-10)**: **16 de 21 obras** con valor SIGRID (0608, 0690, 0699, 0715, 0724 bajo el
+umbral); **0686 2,37 %** (2,36 el 29-10); toda la base 146,52 M EUR, 5,33 % (spec 150,10 / 5,46).
+Observación: 0704 7,52 % (spec 8,33) y 0710 4,13 (4,55): no lo explica la ventana de fechas
+(probado con tres comienzos); quedan fuera del contraste pactado.
+
+**T34 (IVA del saldo, 30-10)**, frente a §10.6: soportado **4,141** M EUR (spec 4,14; 0686 **0,800**,
+spec 0,80); pagado antes de 2026 **1,424** (1,42; 0686 **0,437**, 0,44); repercutido **0,338**
+(0,34; 0686 0,016). `_hasta_4m`: soportado 3,051, repercutido 0,259 (0686 0,676 y 0,016).
+
+**El saldo, recalculado (decisión del humano)**:
+
+| Saldo de partida (M EUR) | 21 obras | 0686 |
+|---|---|---|
+| Spec §10.6 con `COMPENSA_EMPRESA` (base 29-10) | ~16,98 | ~5,64 |
+| Medido 30-10 con `COMPENSA_EMPRESA` (todo el IVA neto: +3,803 / +0,784) | **17,71** | **5,49** |
+| Medido 30-10 con **`MENSUAL_REDEME`** (defecto; `_hasta_4m`: +2,792 / +0,660) | **16,70** | **5,36** |
+| `MENSUAL_REDEME` sobre la base de la spec (13,18 / 4,86) | 15,97 | 5,52 |
+
+Lo que `MENSUAL_REDEME` deja fuera (1,01 M EUR en 21 obras, 0,12 en la 0686) es el IVA de los
+últimos meses aún no devuelto: caja futura, no saldo.
+
+## 4. Verificación semántica del SQL (Postgres 16 desechable, tipos reales de Azure)
+
+`raw` con `double precision` en importes e `integer` en ids y fechas. `09` (sandbox N11): 23
+comprobaciones, 0 fallos. `10` (`sandbox_n14.py`): **14 comprobaciones, 0 fallos**: universo
+COSTE (la obra solo VENTA fuera), cada columna con su filtro (incluida una BAJA de otro estado y un
+AGR antiguo que no cuentan), cuota CP 0,75 y 0,5, personal (proveedor, otra clase y sin obra
+fuera; hasta el cierre; obra sin cierre a 0), el IVA (pago de hoy ni `_4t` ni `_4m`; original de
+2000 y cobro de 2020 en los dos), idempotente en dos vueltas y la guarda (sin `raw.res`, falla sin
+vaciar). El docker se paró al terminar.
 
 ## 5. Fase RED (comando exacto y salida real del fallo)
 
-**R17 (T1) · `.venv/Scripts/python -m pytest tests/test_f150_ingesta.py -k r17 -q`**
-```
-E       AttributeError: 'TableSpec' object has no attribute 'include_columns'. Did you mean: 'exclude_columns'?
-E       TypeError: TableSpec.__init__() got an unexpected keyword argument 'include_columns'
-E       TypeError: TableSpec.__init__() got an unexpected keyword argument 'include_columns'
-E       TypeError: TableSpec.__init__() got an unexpected keyword argument 'include_columns'
-E       AttributeError: 'TableSpec' object has no attribute 'include_columns'. Did you mean: 'exclude_columns'?
-FAILED tests/test_f150_ingesta.py::test_f150_r17_table_spec_tiene_include_columns_vacio_por_defecto
-FAILED tests/test_f150_ingesta.py::test_f150_r17_la_ingesta_trae_solo_las_incluidas_en_el_orden_de_sigrid
-FAILED tests/test_f150_ingesta.py::test_f150_r17_incluir_y_excluir_a_la_vez_falla_antes_de_crear_nada
-```
+Trazas completas en el scratchpad de la sesión; aquí el comando y el resumen real de pytest.
 
-**R25 (T3) · `python -m pytest -q -p no:warnings tests/test_f150_perfil.py -k r25`**
-```
-E       AssertionError: assert 'PERFIL_MESES' in ('DIAS', 'MESES', 'PORCENTAJE', 'BOOLEANO', 'OPCION', 'MAPA_DIAS')
-E         Left contains one more item: "H03: unidad 'PERFIL_MESES' fuera de ['DIAS', 'MESES', 'PORCENTAJE', 'BOOLEANO', 'OPCION', 'MAPA_DIAS']"
-FAILED tests/test_f150_perfil.py::test_f150_r25_un_error_por_cada_fallo - Ass...
-FAILED tests/test_f150_perfil.py::test_f150_r25_la_suma_es_exacta_en_decimal_no_en_float
-63 failed in 1.25s
-```
+- T17: `pytest tests/test_f150_albaranes.py -k r33` con `neto_fifo` como stub →
+  `E       NotImplementedError` … **17 failed in 2.26s**.
+- T18: `pytest tests/test_f150_albaranes.py -k "r34 or r35"` →
+  `E       AssertionError: falta la tabla en 00_setup.sql` … **15 failed, 12 passed, 17 deselected**.
+- T19: `pytest tests/test_f150_albaranes.py tests/test_f150_sql.py -k r36` →
+  `E  AssertionError: assert 'ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS
+  cartera_viva_coste_proporcional NUMERIC(18,2);' in ...` … **7 failed, 25 passed**.
+- T21: `pytest tests/test_f140_hipotesis.py tests/test_f150_receta.py` →
+  `E  AssertionError: assert 'compras.v_pb..._sin_facturar' == 'tesoreria.al...ndientes_neto'` … **4 failed, 176 passed**.
+- T22: `pytest tests/test_f150_diccionario.py` →
+  `E  AssertionError: tesoreria.albaranes_pendientes_neto` … **9 failed, 8 passed**.
+- T27: `pytest tests/test_f150_receta.py tests/test_f150_saldo.py -k "r1 or r39"` →
+  `E       AssertionError: assert 'DEVENGO' == 'SALDO'` … **4 failed**.
+- T28: `pytest tests/test_f150_saldo.py -k r38` →
+  `FAILED ...::test_f150_r38_setup_crea_la_tabla_con_sus_columnas` … **11 failed, 14 passed**.
+- T30: `pytest tests/test_f150_diccionario.py tests/test_f140_diccionario.py tests/test_f150_sql.py
+  tests/test_f150_receta.py tests/test_f150_albaranes.py` →
+  `FAILED ...::test_f150_r40_el_paso_0_da_la_formula_del_saldo` … **12 failed, 235 passed**.
+- T32: `pytest tests/test_f150_iva_isp.py` →
+  `FAILED ...::test_f150_r41_el_umbral_y_el_motivo - AttributeError` … **18 failed in 0.99s**.
+- T33: `pytest tests/test_f150_receta.py tests/test_f140_hipotesis.py tests/test_f140_paso.py
+  tests/test_f140_sql.py` → `FAILED ...::test_f150_r42_h30_cuando_vuelve_el_iva_a_devolver` …
+  **7 failed, 355 passed**.
+- T34: `pytest tests/test_f150_saldo.py tests/test_f150_diccionario.py` →
+  `FAILED ...::test_f150_r43_la_fraccion_de_iva_de_cada_factura` … **14 failed, 56 passed**.
 
-**R1 (T4) · `python -m pytest -q -p no:warnings tests/test_f150_receta.py -k r1`**
-```
-E       AssertionError: assert () == ('DEVENGO', '...', 'IVA', ...)
-E         Left contains one more item: 'H01: campo desconocido paso_receta'
-E       assert [] == ['H01: falta ... paso_receta']
-E         Right contains one more item: 'H01: falta el campo paso_receta'
-14 failed, 1 skipped in 0.50s   (el skip: el parametrize sobre PASOS_RECETA vacío)
-```
+Tras cada implementación, las mismas órdenes en verde; antes de cada commit, las familias del
+diccionario (F-006, F-147), F-037, F-140 y F-150: **1.991 passed, 262 skipped** (T34, 739 s).
 
-**R7, R9, R14, R22 (T5) · `python -m pytest -q -p no:warnings tests/test_f150_contrato.py tests/test_f150_coeficiente.py tests/test_f150_hueco.py -k "r7 or r9 or r14 or r22"`**
-(con los nombres del dominio declarados como esbozos que lanzan `NotImplementedError` o valen vacío)
-```
-E       AssertionError: assert '' == '\r?\n'
-E       AssertionError: assert () == ('CONTRATO', ...VENTA', 'SIN')
-E       AssertionError: assert '' == 'MEDIA_OBRA'
-E   NotImplementedError        (x57: leer_coeficientes_contrato, factor_coeficientes, coeficiente_venta, hueco_facturacion, coeficiente_medio...)
-60 failed, 9 deselected in 3.09s
-```
+## 6. Verificaciones MANUAL pendientes y qué falta
 
-**R12, R14, R20, R23 (T9, SQL de `07`) · `python -m pytest -q -p no:warnings tests/test_f150_sql.py -k "r10 or r11 or r12 or r13 or r14 or r19 or r20 or r23 or r9"`**
-```
-E       ValueError: substring not found          (r12: la guarda de D6 no existe)
-E       assert 'ROUND(d.pendiente_con_coeficientes * pr.importe_mes / d.total_perfil, 2) AS parte_con_coef' in " DO $$ BEGIN IF to_regclass('mart.fact_seguimiento_mensual') ...
-E           assert "SUM(r.importe_con_coef * r.iva_porcentaje) FILTER (WHERE r.fuente_iva = 'CONTRATO') AS iva_bruto" in " DO $$ BEGIN ...
-E       assert 'GREATEST(0, h.venta_real_origen_con_coeficientes - h.facturado_origen) AS venta_pendiente_facturar' in " DO $$ BEGIN ...
-19 failed, 44 passed, 21 deselected in 0.67s
-```
-
-**R21 (T10, `08`) · `python -m pytest tests/test_f150_sql.py -k r21 -q -p no:cacheprovider`**
-```
->       assert dom.CODIGOS_SIGRID == ("H09", "H10", "H11", "H12")
-E       AssertionError: assert ('H09', 'H10', 'H11') == ('H09', 'H10', 'H11', 'H12')
-E         
-E         Right contains one more item: 'H12'
-E         Use -v to get more diff
->       rama = texto[texto.index("'H12'::VARCHAR(3) AS codigo"):]
-E       ValueError: substring not found
->       assert "las 27 hipotesis" in comment
-E       assert 'las 27 hipotesis' in "COMMENT ON TABLE tesoreria.hipotesis_caja_obra IS\n'F-140. El valor de las 23 hipotesis de caja (catalogo tesoreria.h... DEFECTO. Nada se aplica: es el valor que quien consulta debe declarar (R-CAJA-HIPOTESIS). Clave: obra_id, codigo.';\n"
-FAILED tests/test_f150_sql.py::test_f150_r21_h12_es_codigo_sigrid - Assertion...
-FAILED tests/test_f150_sql.py::test_f150_r21_h12_sale_de_la_ficha_de_la_obra_por_cien
-FAILED tests/test_f150_sql.py::test_f150_r21_el_comment_dice_27_y_h12 - asser...
-3 failed, 1 passed, 84 deselected in 0.39s
-```
-
-**R2-R5, R15, R32 (T12, diccionario) · `python -m pytest tests/test_f150_diccionario.py -q -p no:cacheprovider`**
-```
-E       AssertionError: assert 'LA RECETA: DE DEVENGO A CAJA, EN ESTE ORDEN' in '**No disponible para el perfil restringido** ...
-E       AssertionError: assert {'tesoreria.d...ente_partida'} <= {'cierre.fact....presupuesto'}
-E       AssertionError: assert 'las 27 hipotesis (H01-H27)' in '**No disponible para el perfil restringido** ...
-7 failed, 3 passed in 1.05s   (r2, r3 x2, r4, r5, r15, r32; los 3 de docs de T13 ya pasaban)
-```
-
-Tras cada código, las mismas órdenes en verde (salida en los commits de cada tarea).
-
-## 6-7. Verificaciones MANUAL pendientes y qué falta para cerrar
-
-T15 (MANUAL, humano), con su comando exacto y en orden, en `progress/current.md` («F-150 ·
-Despliegue MANUAL, T15»): vuelta atrás, imagen y job, `ingest` de `iva` y `dvf`, `build-tesoreria`,
-R30, diccionario v63, `check-*`, reinicio de `mcp-bbdd` y R31. Review: APROBADO (pasada 2).
-
-## Arreglo del despliegue (29-10)
-
-- **Causa.** T15 paso 4 (`build-tesoreria` en Azure, 09:05 UTC): `function round(double precision,
-  integer) does not exist`, LINE 549 de `07`. La ingesta guarda `raw.dvf.totbas/totiva/totdoc` como
-  `double precision` (`information_schema`) y el CTE `facturado` hacía `SUM(fv.totbas)`.
-- **Cambio** (`d1c2ee1`): `SUM(fv.totbas::NUMERIC(18, 2))`, como `c.totbas` en `05` (F-140).
-  Revisadas contra los tipos de Azure las demás expresiones nuevas de F-150 en `06`-`08`: los
-  otros `raw.*` que se redondean (`raw.iva.iva`) ya llevan cast, `mart`/`stg` son `numeric`.
-- **Test** `test_f150_r23_los_importes_de_raw_dvf_se_castean_a_numeric` (y el patrón de R23
-  ajustado). RED: `python -m pytest tests/test_f150_sql.py -q -k "dvf or facturado"` →
-  `AssertionError: importes de raw.dvf sin ::NUMERIC(18, 2): ['totbas']` · `2 failed, 2 passed`.
-- **Sandbox** (Postgres 16 desechable): `sandbox_f150_double.py` (scratchpad), el §3 con `raw` en
-  `double precision`. SQL de antes: `UndefinedFunction: function round(double precision, integer)
-  does not exist / LINE 549` (el de Azure); de ahora: **66 OK, 0 fallos**. **Lección:** el §3 creó
-  `raw` con `NUMERIC`; en una sandbox, `raw` lleva los tipos de la ingesta (`double precision`).
+- **Redespliegue** (humano): pasos con comando exacto en `progress/current.md`, sección «F-150 ·
+  Redespliegue MANUAL de N11-N15». Incluye `build-tesoreria` (sub-pasos 09 y 10 nuevos), las cifras
+  a comprobar, `publicar-diccionario` v66, los `check-*` y el reinicio del MCP.
+- **R31** con el MCP: la 0686 con y sin saldo, H13 2,37 %, H30 declarada.
+- **Para validar por el humano y AdP**: H30 (`validado: false`) y H13 por obra.
+- Fuera de alcance: la caja del CP (F-154); la caja proyectada (F-151); `R-ALBARAN-ABSURDO`.
+- Falta: review (C1-C4 sobre T17-T35) y despliegue.
 
 ## Evidencias
 
-| Evidencia | Valor real |
-|---|---|
-| `bash harness/init.sh` | T16 (`8500c37`): **verde**, 9.645 passed. **Arreglo 29-10 (`2d30248`): verde**, código 0, «ENTORNO LISTO»: **9.646 passed**, 266 skipped, 2.504 warnings |
-| Tiempo de la suite | 4.832,65 s (1:20:32) en T16; 5.902,04 s (1:38:22) en el arreglo; con cobertura |
-| Tests de F-150 (`tests/test_f150_*.py`) | 281 (los 7 de T12 incluidos); familias del diccionario (F-006, F-14x, F-150): verdes |
-| Cobertura de las líneas cambiadas | **100,0 %** (143/143, umbral 80 %) en T16; en el arreglo, N/A (sin Python de producción frente a `main`) |
-| Tamaño | `PUERTA TAMAÑO`: requirements 148/150, design 249/250, impl 220/220 tras el arreglo |
-| Mutación (`python -m harness.mutacion --feature F-150 --workers 2 --timeout 2400`) | 95 generados, 20 evaluados (muestreo `estandar`, semilla 20260820): 17 muertos, 1 superviviente, 2 timeouts; tras reevaluar en serie, **19 muertos y 1 superviviente, cerrado con un test** (`progress/mutacion_F-150.md`, 15.325,8 s) |
-| Verificación semántica del SQL | 66 comprobaciones en Postgres 16 desechable, 0 fallos (§3) |
-| `ruff` | sin avisos nuevos en los ficheros de F-150 (el único, `UP042` de `StepStatus`, es previo) |
-
-Dos lanzamientos previos de la campaña no cuentan (línea base > 600 s con 4 workers; línea base
-ROJA, que destapó los huecos de D-5). El SQL no se muta: lo cubren `test_f150_sql.py` y el §3.
+PENDIENTE_EVIDENCIAS
