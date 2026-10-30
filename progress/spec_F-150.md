@@ -252,3 +252,160 @@ El implementer paró en T11 (`progress/impl_F-150.md` §1): el hueco de H26 sal�
   1024 rectificativas ya netas en `totbas`, sin marca de anulada; `iva` 1.562 filas, sin `tiemod`.
 
 Tamaños: requirements 148/150, design 249/250, tasks T1-T16. F-150 de `blocked` a `spec_ready`.
+
+## 10. Ajuste del 29-10: albaranes netos (N11), CP fuera (N12), personal (N13), saldo de partida (N14)
+
+Aprobado por el humano el 29-10 (vía líder), con F-150 ya desplegada (`r20261029-1340`). Todo
+medido en SOLO LECTURA en Azure (`_bootstrap_done = True`, `filas_solo_lectura`; nocturna del
+29-10, PostgreSQL 16.15). Universo: las 21 obras de `tesoreria.devengo_corte_obra` (COSTE = VENTA).
+
+### 10.1 · N11, los albaranes pendientes de facturar
+
+| Medida (21 obras, ALBARAN + PROFORMA) | M EUR |
+|---|---|
+| Líneas > 0 (lo que suma la vista) / líneas < 0 | 56,88 / −48,17 (30.533 líneas) |
+| Neto por obra / por (obra, proveedor) con suelo 0 / residuo negativo | 8,71 / **8,76** / −0,05 (20 pares) |
+| Neto por (obra, proveedor, serie) | 8,79 (compensar entre `AC` y `PROF` cambia 0,03) |
+| Por tipo: ALBARAN / PROFORMA / NOTA | +55,52 −48,09 / +1,36 −0,07 / 0 líneas con pendiente |
+| Desde `raw.dca`/`dcapro`/`con` con la fórmula de `compras/01` copiada | idéntico (56,88 / −48,17 / 30.533) |
+| Neto con contrato de compra | 5,49 de 8,76; 2 pares con más de un contrato |
+| Filas de la tabla (obra, proveedor, contrato, mes) con neto > 0 | 638 (630 sin contrato en el grano) |
+
+Por antigüedad (meses hasta 2026-10), bruto / FIFO / LIFO: ≤1 mes 9,37 / **7,96** / 2,69; 1-2
+5,85 / 0,06 / 0,54; 2-6 18,92 / 0,22 / 3,01; 6-12 14,38 / 0,31 / 1,74; >12 8,37 / 0,21 / 0,78.
+**Más de 6 meses con FIFO: 0,52 M EUR** (bruto 22,75; LIFO 2,51). Las negativas están repartidas
+por edades como las positivas (6,52 / 5,30 / 16,36 / 13,54 / 6,44). FIFO deja el neto en sept.
+(5,28) y oct. (2,68): coherente con el 93 % de facturas del mes del albarán (N8); LIFO lo dejaría
+viejo. Neto con mes posterior al último cierre de la obra (`tras_cierre`): **0,47 M EUR en 7
+obras** (cierres: 12 obras en 2026-10, 6 en 2026-09, una en 2026-06, una en 2025-12, una sin real).
+**0686**: vista 8,78; neto 0,19; de más de 6 meses 0,01.
+
+**Hallazgo**: las líneas 588705 y 588733 de `R-ALBARAN-ABSURDO` ya NO están en `raw.dcapro`
+(máximo |`tot`| de toda la base: 1,09 M EUR). El filtro `< 1e8` se queda; la ficha de la vista aún
+dice «68,7 billones» y la regla sigue: retirarla es trabajo aparte (para el humano).
+
+**Decisiones** (`design.md` §5.7 y §9): objeto `tesoreria.albaranes_pendientes_neto`, grano
+(obra, proveedor, contrato, mes) con `NULLS NOT DISTINCT` (precedente `retenciones.saldo_contable`);
+FIFO; solo `AC`/`PROF`; lee `raw` (`compras` se construye DESPUÉS de `tesoreria` en `run-all`:
+leerla daría el pendiente de la víspera y no casaría con `compras.albaran_lineas`); `tras_cierre`
+porque la propia H20 define los albaranes como «ejecutado que no es devengo pendiente»; sin
+contrato, H02 `OTRO` (la vista tampoco traía categoría). `meses_antiguedad` contra el mes del build
+(como `dias_desde_albaran` de la vista). La ficha nueva es recomendada: `PRESUPUESTO_MAX` sube lo
+que mida (alternativa: no recomendada y sin subida; el aviso en la ficha de la vista basta a medias).
+
+### 10.2 · N12, el coste proporcional
+
+Devengo pendiente de COSTE por categoría (21 obras): CD 106,12, CI 12,83, **CP 14,48 M EUR (18
+obras, 246 partidas; 10,9 %)**, OTRO 0; 0686: CP 0,26. Partidas CP: COSTES ESTRUCTURA EMPRESA
+11,58, LEVANTAMIENTO 1,91, COSTES ESTRUCTURA DELEGACIÓN 0,34, SEGURO T.R.C. 0,19 (LEVANTAMIENTO y
+el seguro TRC quizá sean pagos de la obra: para que lo mire el humano; aquí sale todo el CP). En el
+devengo basta la receta y `categoria` (ya publicada): una marca la duplicaría. H02 pierde `CP`.
+
+**La cartera** (pagos PREVISTO vivos de las 21 obras: 38,56 M EUR, 4.666 efectos; 0686: 5,76):
+- la cuenta del efecto es la del PROVEEDOR (410 30,56; 400 7,74; 414; 418): no dice el gasto;
+- por nombre de aseguradora o banco: 0 en la cartera viva; en toda la base, 13 efectos REALIZADO
+  con obra (0,06): los seguros y avales casi nunca llevan obra; «AVAL/PRIMA/COMISI» en el
+  concepto: falsos positivos (SAVAL, SAVALL);
+- por la categoría de las partidas de la FACTURA del efecto (`raw.dcfpro.paride` -> `categoria`):
+  **0,03 M EUR** en la cartera viva (con algo de CP: 0,03; prorrateado, ~0); REALIZADO, 0,55 con
+  algo de CP. 78 efectos (0,58) sin factura: no se pueden clasificar.
+Elegido: la cuota CP de cada efecto por las partidas de su factura (mismo criterio que el devengo),
+publicada en dos columnas de `devengo_corte_obra` COSTE (`design.md` §5.8). Hoy pesa ~0, pero deja
+la regla escrita para F-154 y para la obra que sí impute seguros.
+
+### 10.3 · N13, el personal
+
+Solo textos (receta, `regla`, fichas de `efectos` y `efectos_restringidos_mes`). **N13-b (plazo del
+personal) lo decidió el líder** por la prisa del humano (opción D): sin hipótesis nueva, H02 `CI` y
+un aviso. Opciones que había: A H02 tal cual; B bajar el defecto de CI (mezcla personal y
+alquileres); C H28 + lista manual de partidas de personal + marca en el devengo (cambia el grano
+de `devengo_pendiente_obra_mes`); D aviso. Medido: por NOMBRE de partida (JEFE DE OBRA, ENCARGADO,
+GRUISTA, CAPATAZ, PEÓN, OFICIAL...), 202 partidas CI en 21 obras, **6,03 de 12,83 M EUR de CI**
+pendiente; los códigos no son estándar (`CI.1.2` y `CI.0.02` para JEFE DE OBRA) y `descompuestos`
+no da naturaleza a esas partidas. En la 0686 el nombre falla: 0,02 de 34,81 M EUR de coste real.
+
+### 10.4 · N14, el saldo de partida (SEGUNDA TANDA, no bloquea N11-N13)
+
+Medido: efectos REALIZADO (no BAJA) de las 21 obras: COBRO 97,35 M EUR (258), PAGO 66,21 (5.514);
+**0686: cobrado 30,21, pagado 22,28**. AGR en toda la cartera: REALIZADO con obra 157,01 (8.365) y
+SIN obra **108,72 (11.288)**; PREVISTO sin obra 2,25 (294). `raw.pag.padide` NO enlaza el AGR con
+sus efectos de origen (0 hijos): falta el campo (T28). Coste real a origen hasta el cierre: 134,22 M
+EUR (CP 13,32; personal por nombre 6,90); 0686, 34,81 (personal por nombre 0,02).
+**Preguntas abiertas para el humano**: (1) ¿el saldo de partida con o sin IVA? (los efectos van
+CON IVA y el devengo sin él; el IVA se liquida por empresa); (2) ¿cómo se identifica el coste real
+de personal histórico (lista de partidas, `personal.partes` y sus costes, o la contabilidad)?;
+(3) ¿de dónde sale el enlace AGR -> efectos de origen que usó el líder en la 0686 (64 efectos,
+271.733 EUR)?; (4) ¿las retenciones pendientes se restan del pagado y del cobrado, o se publican
+aparte? Tareas T27-T30 en `tasks.md`.
+
+Tamaños: requirements 150/150, design 249/250 (§3, §4, §5.1-§5.2 y §8 resumidos y enlazados: el
+texto completo de la receta vive ya en la ficha), tasks T1-T30. Rama `feature/F-150-receta-caja`
+avanzada a `main` (`935fdd3`, fast-forward).
+
+### 10.5 · N14 cerrada con las respuestas del humano (29-10)
+
+1. **IVA**: el saldo va CON IVA (los efectos lo llevan). Y es OPCIONAL: H28 `[CON_SALDO, SIN_SALDO]`
+   (defecto `CON_SALDO`); sin saldo, la proyección parte de hoy con la cartera vencida y no pagada.
+2. **Personal histórico** (Sigrid, solo lectura, `truncated` falso): no hay tabla de histórico de
+   coste por recurso, pero NO hace falta: cada línea de parte (`hmores`) guarda su `pre` y su `tot`
+   del momento. En los partes ingeridos el precio medio por recurso y año VARÍA en 458 de 545
+   recursos con más de un año. 0686 en Sigrid: 4.986 líneas, 2.295.755 EUR (fechas 2024-03 a
+   2026-10), igual que `raw.hmores`. Recursos PERSONA internos (`personal.recursos`): 21 obras
+   11,67 M EUR (11,55 hasta el último cierre); 0686 2,13 (2,07 hasta su cierre, 2026-09); los
+   CONSUMO, 0,77, no son personal. **Decisión del líder**: `personal_coste_partes` = Σ `tot` de
+   PERSONA interna hasta el último cierre (lo de después ya es devengo pendiente: no se cuenta dos
+   veces); se da por pagado en su mes. Descartado: recurso actual × horas (pierde el histórico) y
+   el real de los cierres por nombre de partida (en la 0686 solo encuentra 0,02).
+3. **AGR**: por los ORIGINALES (`sentido = 'PAGO'`, `estado_tesoreria = 'BAJA'`, `estado_codigo
+   = 14`, «Agrupados»; 56.503 en toda la cartera, 99,33 M EUR). 21 obras: vencidos (< 29-10)
+   **8,63 M EUR** (3.498, 21 obras), pendientes **2,21** (796, 18 obras); **0686: 1.315.128,62 y
+   271.733,31 (64 efectos)**, lo mismo que midió la conversación. Riesgo de doble conteo: los AGR
+   que CONSERVAN la obra están ya en la cartera de la obra (REALIZADO 2,22, PREVISTO 0,58; 0686
+   0,32 y 0,12): con `ORIGINALES` se dejan fuera. Validación por proveedor (aproximada: un AGR
+   mezcla obras): de los 2,21 pendientes, 1,48 tienen AGR PREVISTO sin obra del mismo tercero que
+   los cubre y 0,59 son de proveedores sin ningún AGR previsto (quizá ya pagados: caso 0722
+   ERCALUM); se declara. H29 `[ORIGINALES, AGR]`, defecto `ORIGINALES`, HIPÓTESIS.
+4. **Retenciones**: efectos propios de la factura; el saldo = efectos REALIZADO (sin las pendientes,
+   que van en la proyección como hoy). No hace falta columna.
+
+**Saldo medido con los defectos** (H28 `CON_SALDO`, H29 `ORIGINALES`, CP ~0): 21 obras ≈ 97,35 −
+63,99 − 8,63 − 11,55 = **13,18 M EUR**; 0686 ≈ 30,21 − 21,96 − 1,32 − 2,07 = **4,86 M EUR**.
+Diseño en `design.md` §5.9 (`tesoreria.saldo_partida_obra`, `10_saldo_partida.sql`, paso SALDO
+delante de los siete, H28 y H29: 29 hipótesis); requisitos R38-R40; tareas T27-T31 (segunda
+tanda, tras T26). Tamaños: requirements 150/150, design 248/250 (§5.3-§5.6 resumidos: hechos).
+
+### 10.6 · N15, el IVA con inversión del sujeto pasivo (humano, 29-10; TERCERA tanda)
+
+**H13 por obra** (`raw.dcfpro`, líneas con obra, factura de los 12 meses hasta el 29-10; las
+columnas de Sigrid son `double precision`: se pasan a `NUMERIC(18,2)`). Toda la base: 150,10 M EUR
+de base y 8,20 de cuota, **5,46 %** (el 5,5 de hoy). Por obra: 0696 4,40 % (19,64 de base); **0686
+2,36 %** (15,93); 0676-B 2,15; 0678 5,31; 0693 4,50; 0710 4,55; 0707 7,61; 0704 8,33; 0702 5,28;
+0713 5,95; 0694 11,68; 0711 7,69; 0723 0,87; **0697 20,90** (0,75); 0720 11,02; 0719 11,46; y con
+poca base 0724 9,25 (0,31), 0699 20,91 (0,24), 0608 y 0715 21,00 (0,02 y 0,00), 0690 sin compras.
+Umbral elegido: **base ≥ 0,5 M EUR en 12 meses** (16 de 21 obras con valor SIGRID; las 5 de abajo,
+DEFECTO 5,5); en SIGRID, como H12. Va en `08` (rama más del bloque SIGRID) y no en un objeto nuevo.
+
+**H30, cuándo vuelve el IVA a devolver** (`contabilidad.mayor`, empresa 1, solo lectura). 472 y
+477 se regularizan cada mes (saldo 0). **4700 (Hacienda deudora por IVA)** lleva un «LIQ. IVA <mes>»
+CADA MES (debe 0,2-0,75 M EUR en 2026) y un «DEVOLUCIÓN IVA <mes>» 3-5 meses después: octubre de
+2025 devuelto en febrero de 2026, noviembre en marzo, diciembre en mayo, enero en abril, febrero en
+junio, marzo en julio, mayo en agosto. Lectura: la empresa 1 liquida mensualmente (lo propio de
+REDEME), sale A DEVOLVER casi todos los meses (el repercutido de otras obras NO lo compensa) y el
+dinero vuelve a los ~4 meses, no el día 20. **Corregido (decisión del humano del 29-10, T33): el
+defecto es `MENSUAL_REDEME`, sin validar; lo que sigue es la propuesta anterior.** El defecto se
+quedaba en `COMPENSA_EMPRESA` (lo de hoy,
+por orden del líder), pero la `fuente_defecto` dice que los libros apuntan a `MENSUAL_REDEME` a 4
+meses: **para validar por el humano y AdP**. `MENSUAL_REDEME` = vuelve a los 4 meses del mes
+liquidado (mediana medida); `ANUAL` = tras la declaración del 4T (febrero del año siguiente).
+
+**IVA de lo pagado y cobrado** (lo que entra en el saldo de N14: PAGO REALIZADO sin AGR + originales
+agrupados vencidos, 8.718 efectos, 72,61 M EUR, todos con factura): **IVA soportado 4,14 M EUR**
+(cuota × importe / `totpag` de su factura); **0686: 0,80 de 23,27**. Pagado antes de 2026 (lo ya
+cubierto por el último 4T): 1,42 y 0,44. Lo cobrado REALIZADO (97,35; 79,00 con su `dvf`) solo
+lleva **0,34 M EUR** de IVA repercutido (0686: 0,02): casi todo es ISP. **Decisión del
+spec-author**: el saldo suma el IVA NETO recuperado (soportado − repercutido), no solo el
+soportado, para que las obras al 21 % no salgan mejor de lo real; con los defectos, el saldo de la
+0686 pasa de ~4,86 a **~5,64 M EUR** y el de las 21 obras de ~13,18 a ~16,98.
+
+Requisitos R41-R43; tareas T32-T35 (tercera tanda, tras T31). Tamaños: requirements 150/150,
+design 249/250 (§1, §4, §7, §8 y la historia de §9 resumidos).

@@ -65,6 +65,12 @@
 --      (`raw.dvf.totbas` por el centro de coste de la obra, rectificativas
 --      incluidas, sin corte de fecha), con suelo 0 y lo facturado por delante
 --      aparte; su IVA y su retencion, por el peso de cada contrato.
+--   6 ter (N12, 29-10). `_dev_cuota_cp`: la parte de COSTE PROPORCIONAL (CP,
+--      estructura: no es caja de la obra) de cada factura de compra de la
+--      cartera de las obras en COSTE = Σ `raw.dcfpro.tot` de sus lineas con
+--      partida de `categoria` CP / Σ de todas (0 si suman 0; un efecto sin
+--      factura, 0). El corte publica, en COSTE, la cartera viva y la emitida
+--      tras el cierre por esa cuota, que el paso 7 de la receta resta.
 --
 -- Las tablas de trabajo son temporales y mueren con la transaccion. Si algo
 -- falla, quedan las tablas de ayer. Cada una lleva su `ANALYZE`: sin
@@ -76,7 +82,7 @@
 --         mart.v_pbi_dim_partida, stg.plan_mensual, stg.presupuesto,
 --         maestro.v_obra_fichas, tesoreria.efectos,
 --         tesoreria.condiciones_contrato_cliente, raw.obrparpar, raw.obr,
---         raw.dvf.
+--         raw.dvf, raw.dcfpro.
 -- Escribe en: tesoreria.devengo_pendiente_partida,
 --             tesoreria.devengo_pendiente_obra_mes,
 --             tesoreria.devengo_corte_obra.
@@ -95,6 +101,7 @@ BEGIN
        OR to_regclass('raw.obrparpar') IS NULL
        OR to_regclass('raw.obr') IS NULL
        OR to_regclass('raw.dvf') IS NULL
+       OR to_regclass('raw.dcfpro') IS NULL
        OR to_regclass('tesoreria.condiciones_contrato_cliente') IS NULL THEN
         RAISE EXCEPTION 'devengo_pendiente: falta una fuente (mart, stg, maestro, raw o tesoreria)';
     END IF;
@@ -575,6 +582,32 @@ FROM neto h;
 ANALYZE _dev_hueco;
 
 -- ---------------------------------------------------------------------------
+-- 6 ter · la cuota de coste proporcional de cada factura de la cartera (N12)
+-- ---------------------------------------------------------------------------
+-- Solo las facturas de los pagos de las obras en COSTE: la categoria de la
+-- partida de cada linea, el mismo criterio que el devengo (la cuenta del efecto
+-- es la del proveedor y el nombre del tercero da falsos positivos). La vista de
+-- partidas va MATERIALIZED: sin ello el planificador la recorre en bucle
+-- (medido en solo lectura el 29-10: 205 s frente a 10 s).
+CREATE TEMP TABLE _dev_cuota_cp ON COMMIT DROP AS
+WITH dp AS MATERIALIZED (
+    SELECT partida_id, categoria FROM mart.v_pbi_dim_partida
+)
+SELECT
+    l.docide AS documento_id,
+    COALESCE(SUM(l.tot::NUMERIC(18, 2)) FILTER (WHERE dp.categoria = 'CP') / NULLIF(SUM(l.tot::NUMERIC(18, 2)), 0), 0) AS cuota_cp
+FROM raw.dcfpro l
+LEFT JOIN dp ON dp.partida_id = NULLIF(l.paride, 0)
+WHERE l.docide IN (
+    SELECT e.documento_id
+    FROM tesoreria.efectos e
+    JOIN _dev_version v ON v.obra_id = e.obra_id AND v.concepto = 'COSTE'
+    WHERE e.sentido = 'PAGO' AND e.documento_id IS NOT NULL
+)
+GROUP BY l.docide;
+ANALYZE _dev_cuota_cp;
+
+-- ---------------------------------------------------------------------------
 -- 6 · el corte por (obra, concepto) y la frontera con la cartera
 -- ---------------------------------------------------------------------------
 TRUNCATE tesoreria.devengo_corte_obra;
@@ -590,7 +623,8 @@ INSERT INTO tesoreria.devengo_corte_obra (
     venta_real_media_obra, facturado_origen, venta_pendiente_facturar,
     facturado_por_delante, iva_pendiente_facturar_contrato,
     base_pendiente_facturar_sin_iva_contrato, retencion_pendiente_facturar_contrato,
-    base_pendiente_facturar_sin_retencion_contrato
+    base_pendiente_facturar_sin_retencion_contrato, cartera_viva_coste_proporcional,
+    cartera_emitida_tras_cierre_coste_proporcional
 )
 SELECT
     v.obra_id                                       AS obra_id,
@@ -626,7 +660,9 @@ SELECT
     hu.iva_pendiente_facturar_contrato              AS iva_pendiente_facturar_contrato,
     hu.base_pendiente_facturar_sin_iva_contrato     AS base_pendiente_facturar_sin_iva_contrato,
     hu.retencion_pendiente_facturar_contrato        AS retencion_pendiente_facturar_contrato,
-    hu.base_pendiente_facturar_sin_retencion_contrato AS base_pendiente_facturar_sin_retencion_contrato
+    hu.base_pendiente_facturar_sin_retencion_contrato AS base_pendiente_facturar_sin_retencion_contrato,
+    CASE WHEN v.concepto = 'COSTE' THEN ROUND(COALESCE(c.cartera_viva_cp, 0), 2) END AS cartera_viva_coste_proporcional,
+    CASE WHEN v.concepto = 'COSTE' THEN ROUND(COALESCE(c.cartera_emitida_tras_cierre_cp, 0), 2) END AS cartera_emitida_tras_cierre_coste_proporcional
 FROM _dev_version v
 LEFT JOIN (
     SELECT
@@ -662,8 +698,12 @@ LEFT JOIN LATERAL (
     -- D16-A: la cartera del sentido del concepto, sin las bajas.
     SELECT
         SUM(e.importe) FILTER (WHERE e.estado_tesoreria = 'PREVISTO' AND NOT e.previsto_antiguo) AS cartera_viva,
-        SUM(e.importe) FILTER (WHERE v.mes_ultimo_cierre IS NULL OR date_trunc('month', e.fecha_emision)::DATE > v.mes_ultimo_cierre) AS cartera_emitida_tras_cierre
+        SUM(e.importe) FILTER (WHERE v.mes_ultimo_cierre IS NULL OR date_trunc('month', e.fecha_emision)::DATE > v.mes_ultimo_cierre) AS cartera_emitida_tras_cierre,
+        -- N12: la parte CP de cada efecto, por la cuota de su factura (VENTA: no se publica).
+        SUM(e.importe * COALESCE(q.cuota_cp, 0)) FILTER (WHERE e.estado_tesoreria = 'PREVISTO' AND NOT e.previsto_antiguo) AS cartera_viva_cp,
+        SUM(e.importe * COALESCE(q.cuota_cp, 0)) FILTER (WHERE v.mes_ultimo_cierre IS NULL OR date_trunc('month', e.fecha_emision)::DATE > v.mes_ultimo_cierre) AS cartera_emitida_tras_cierre_cp
     FROM tesoreria.efectos e
+    LEFT JOIN _dev_cuota_cp q ON q.documento_id = e.documento_id
     WHERE e.obra_id = v.obra_id
       AND e.sentido = CASE v.concepto WHEN 'COSTE' THEN 'PAGO' WHEN 'VENTA' THEN 'COBRO' END
       AND e.estado_tesoreria <> 'BAJA'
@@ -677,4 +717,4 @@ COMMENT ON TABLE tesoreria.devengo_pendiente_obra_mes IS
 'F-140. El pendiente de cada partida repartido en proporcion a su plan restante (al centimo, el resto al ultimo mes; sin perfil, al primer mes pendiente y en importe_retraso_sin_perfil), por (obra, mes, concepto, categoria), con el plan restante de V. Suma = la de devengo_pendiente_partida. F-150, solo en VENTA: el pendiente con coeficientes repartido igual (y su cociente, solo para leer), el IVA y la retencion del contrato de cada partida sobre esa parte (redondeados al final) y las bases sin ellos, sobre las que van H12 y H10. Lo que lleva coeficientes no se suma con el coste ni con la venta sin ellos. Devengo SIN IVA: no es caja. Clave: obra_id, anio_mes, concepto, categoria.';
 
 COMMENT ON TABLE tesoreria.devengo_corte_obra IS
-'F-140. Por (obra, concepto): la version V, su mes, el ultimo cierre, las sumas de devengo_pendiente_partida con lo adelantado, lo retrasado, lo ejecutado sin plan de V y lo pendiente sin perfil, el real a origen hasta el cierre, el plan total de V y la frontera con tesoreria.efectos del sentido del concepto (cartera viva y emitida tras el cierre, CON IVA). F-150, solo en VENTA: el hueco de facturacion de H26, NETO POR OBRA: la venta real a origen con coeficientes (la de partidas sin coeficiente, con la media de la obra, declarada aparte) menos lo facturado (raw.dvf), con suelo 0, lo facturado por delante (que no se cobra) y el IVA y la retencion del hueco por el peso de cada contrato. Clave: obra_id, concepto.';
+'F-140. Por (obra, concepto): la version V, su mes, el ultimo cierre, las sumas de devengo_pendiente_partida con lo adelantado, lo retrasado, lo ejecutado sin plan de V y lo pendiente sin perfil, el real a origen hasta el cierre, el plan total de V y la frontera con tesoreria.efectos del sentido del concepto (cartera viva y emitida tras el cierre, CON IVA). F-150, solo en VENTA: el hueco de facturacion de H26, NETO POR OBRA: la venta real a origen con coeficientes (la de partidas sin coeficiente, con la media de la obra, declarada aparte) menos lo facturado (raw.dvf), con suelo 0, lo facturado por delante (que no se cobra) y el IVA y la retencion del hueco por el peso de cada contrato. F-150, solo en COSTE: la parte de coste proporcional (CP, estructura) de la cartera viva y de la emitida tras el cierre, por la categoria de las partidas de la factura de cada efecto; el CP no es caja de la obra y se resta. Clave: obra_id, concepto.';

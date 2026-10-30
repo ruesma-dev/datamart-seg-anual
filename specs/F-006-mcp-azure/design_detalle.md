@@ -262,6 +262,12 @@ infraestructura.
 > «1248» de la enmienda de F-056). Entran tambien dos funciones de `tesoreria`,
 > `fn_coeficientes` y `fn_coeficientes_reconocidos` (los coeficientes del
 > contrato con el cliente). El inventario pasa a **252 objetos**.
+>
+> **Enmienda del 2026-10-30 (F-150, segunda tanda).** Entran
+> `tesoreria.albaranes_pendientes_neto` (los albaranes pendientes de facturar
+> NETOS por proveedor, N11) y `tesoreria.saldo_partida_obra` (el saldo de
+> partida de cada obra, N14), los dos de consumo. El inventario pasa a **254
+> objetos**.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,

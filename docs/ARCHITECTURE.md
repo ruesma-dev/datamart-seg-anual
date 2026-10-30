@@ -114,7 +114,7 @@ quien consulta, declarando sus hipótesis (regla dura `R-CAJA-HIPOTESIS`).
   `stg.plan_mensual` y `mart.fact_seguimiento_mensual` de la misma noche:
   `build_stg` y `build_mart` van delante, y la reanudación de F-148 lo sabe
   (`LECTURAS_PARA_REANUDAR`).
-- **Las hipótesis**: las 27 (H01-H27 desde F-150) viven en `config/hipotesis_caja.yaml`, que
+- **Las hipótesis**: las 30 (H01-H30 desde F-150) viven en `config/hipotesis_caja.yaml`, que
   mantiene Control de Costes y aprueba el humano; `build_tesoreria` lo valida
   (`infrastructure/config/hipotesis_caja_yaml.py`) justo antes de cargarlo y,
   si tiene errores, el paso queda FAILED con la lista: lo de `01`-`07` (cartera,
@@ -124,7 +124,7 @@ quien consulta, declarando sus hipótesis (regla dura `R-CAJA-HIPOTESIS`).
   catálogo y la sección manual ya cargados y `hipotesis_caja_obra` es la de
   ayer). Se publican en `tesoreria.hipotesis_caja` (catálogo, todas
   `validado` falso hoy), `tesoreria.hipotesis_caja_manual` (la sección `obras`)
-  y `tesoreria.hipotesis_caja_obra` (las 27 en cada obra, con su nivel: MANUAL >
+  y `tesoreria.hipotesis_caja_obra` (las 30 en cada obra, con su nivel: MANUAL >
   SIGRID > DEFECTO; SIGRID para H09-H11, de los contratos con el cliente, y desde
   F-150 H12, el tipo de IVA de la ficha de la obra).
 - Ingesta: `auxcob` y `auxefc` entran a `raw` (78 tablas).
@@ -134,10 +134,11 @@ haber caja proyectada (F-151); lo que cambia es que la IA combina los
 ingredientes SIEMPRE en el mismo orden y con el dato del contrato:
 
 - **La receta** vive en la ficha de `tesoreria.hipotesis_caja` (excepción
-  acotada D1 de `docs/CONVENTIONS.md`): siete pasos (`PASOS_RECETA` del
-  dominio: DEVENGO, DOCUMENTO, COEFICIENTES, PLAZO, RETENCION, IVA, CARTERA) y
+  acotada D1 de `docs/CONVENTIONS.md`): ocho pasos (`PASOS_RECETA` del
+  dominio: SALDO, DEVENGO, DOCUMENTO, COEFICIENTES, PLAZO, RETENCION, IVA,
+  CARTERA; el SALDO es el paso 0) y
   cada hipótesis declara el suyo (`paso_receta`, obligatorio: sin él el YAML no
-  valida). Las 27 incluyen los perfiles `PERFIL_MESES` (pares `[meses, %]` que
+  valida). Las 30 incluyen los perfiles `PERFIL_MESES` (pares `[meses, %]` que
   reparten el importe entero: H03, H08, H24, H25), el hueco de facturación (H26)
   y la antigüedad de los albaranes que dejan de ser caja (H27).
 - **El contrato de cada partida** (`raw.obrparpar.ctride`): `06` lee su
@@ -156,6 +157,29 @@ ingredientes SIEMPRE en el mismo orden y con el dato del contrato:
   contrato.
 - Ingesta: `iva` entera y `dvf` con la lista blanca `include_columns` (9 de sus
   151 columnas): 80 tablas.
+- **Los albaranes netos por proveedor** (N11, 29-10): `09_albaranes_pendientes.sql`,
+  el último sub-paso, publica `tesoreria.albaranes_pendientes_neto`: lo pendiente
+  de facturar de las obras de la receta NETO por (obra, proveedor), con lo
+  sobrefacturado compensando primero lo más antiguo (FIFO, `neto_fifo` del
+  dominio) y suelo 0. **Lee `raw.dca`, `raw.dcapro` y `raw.con`, no `compras`**:
+  `compras` se construye DESPUÉS de `tesoreria` y daría el pendiente de la víspera.
+  La fórmula del pendiente es una **copia deliberada** de la de
+  `compras/01_documentos.sql`, atada por un test que compara el texto (como
+  `tesoreria.fn_fecha` y `fn_serie`).
+- **El coste proporcional no es caja de la obra** (N12): la receta lo excluye por
+  `categoria` (H02 ya no tiene clave `CP`) y `07` publica en `devengo_corte_obra`
+  la parte CP de la cartera de pago, por la categoría de las partidas de la
+  factura de cada efecto (`raw.dcfpro`, también copia deliberada: `compras` aún no
+  está construido). Su caja es F-154. **El personal** (N13) va por el devengo del
+  recurso: la receta no suma nóminas de la cartera.
+- **El saldo de partida** (N14, 30-10): `10_saldo_partida.sql`, tras los
+  albaranes, publica `tesoreria.saldo_partida_obra`, una fila por obra de la
+  receta: lo cobrado y pagado REALIZADO de `tesoreria.efectos` (CON IVA), los
+  pagarés agrupados por sus ORIGINALES (de BAJA con `estado_codigo` 14: H29 lo
+  declara como hipótesis que rompe `R-TESORERIA-ESTADO`), la cuota CP de lo
+  pagado (como en `07`) y el personal por el coste de sus partes (`raw.hmores`,
+  PERSONA interna) hasta el último cierre, para no contarlo dos veces con el
+  devengo. La cuenta del saldo es del paso 0 de la receta (H28).
 
 **`descompuestos` (F-097, 2026-09-28) es de qué se compone cada partida**, por
 ORIGEN, y es el primer esquema del datamart que NO se reconstruye de cero:

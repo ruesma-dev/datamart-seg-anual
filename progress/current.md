@@ -9,6 +9,84 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-30 · F-150 · `in_progress` · T17-T34 hechas (N11-N15) · rama `feature/F-150-receta-caja`
+
+Implementer. Commits `1b3e96a`..`34639c6`; `azure-apps` `c57c52e`, `d3cafe9`, `3ca37bf` (locales,
+sin push). Detalle, contrastes, RED y evidencias: `progress/impl_F-150.md` (la fase 1 pasó a
+`impl_F-150_fase1.md`). Mutación incremental: `progress/mutacion_F-150_n11_n15.md`.
+- **N11** albaranes netos (`09`, 8,76 M EUR); **N12** CP fuera (H02 sin `CP`, cuota CP en `07`);
+  **N13** personal por el recurso; **N14** `tesoreria.saldo_partida_obra` (`10`, paso 0 SALDO,
+  H28, H29); **N15** H13 SIGRID por obra, H30 (defecto `MENSUAL_REDEME`, **decisión del humano
+  del 29-10**, spec corregida) y el IVA del saldo. 30 hipótesis; diccionario **v66**.
+- Saldo de partida medido el 30-10 con los defectos (`MENSUAL_REDEME`): **21 obras 16,70 M EUR,
+  0686 5,36** (con `COMPENSA_EMPRESA`, 17,71 y 5,49). Sin PARADA.
+- Diccionario del árbol hoy: **254 objetos, 2212 columnas, 124 de consumo**, 22 reglas (v66).
+- Siguiente: review; luego el redespliegue MANUAL de abajo (lo autoriza el humano).
+
+### F-150 · Redespliegue MANUAL de N11-N15 (tras APROBADO y merge a `main`; lo hace el humano)
+
+Lectura con `.venv/Scripts/python.exe` desde el puesto (IP en el firewall del Postgres).
+
+0. Anotar el tag que corre HOY el job (vuelta atrás): `az containerapp job show -n
+   caj-datamart-seg-dev -g rg-datamart-seg-dev --query
+   "properties.template.containers[0].image" -o tsv`. Vuelta atrás: `powershell -NoProfile -File
+   infra/85_update_job.ps1 -Tag <tag anotado>`. El DDL nuevo es aditivo (`CREATE TABLE IF NOT
+   EXISTS`, `ADD COLUMN IF NOT EXISTS`): la imagen vieja lo ignora.
+1. Imagen: `powershell -NoProfile -File infra/70_build_image.ps1` (anotar el tag nuevo).
+2. `powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag nuevo>` y comprobar con el `az`
+   del paso 0 que la imagen acaba en `:<tag nuevo>`.
+3. Build (no hace falta ingesta: `raw.dca`, `dcapro`, `dcfpro`, `con`, `hmores`, `res`, `dcf` y
+   `dvf` ya están): `.venv/Scripts/python.exe main.py build-tesoreria`. SUCCESS en los 10
+   sub-pasos (nuevos: `albaranes_pendientes` y `saldo_partida`). Duraciones: `SELECT step, status,
+   finished_at - started_at FROM _meta.etl_runs WHERE step LIKE 'build_tesoreria%' ORDER BY
+   started_at DESC LIMIT 15`.
+4. Cifras, solo lectura (`psql -X -A -c "<consulta>" $dsn`; las del 30-10, ± la variación diaria):
+   - `SELECT count(*), round(sum(importe_pendiente_neto)/1e6,2), round(sum(importe_pendiente_neto)
+     FILTER (WHERE meses_antiguedad > 6)/1e6,2) FROM tesoreria.albaranes_pendientes_neto` →
+     ~3.356, ~8,76, ~0,52.
+   - `SELECT count(*), round(sum(cobrado_realizado)/1e6,2), round(sum(pagado_realizado_sin_agr)/1e6,2),
+     round(sum(agrupados_vencidos)/1e6,2), round(sum(agrupados_pendientes)/1e6,2),
+     round(sum(personal_coste_partes)/1e6,2), round(sum(iva_soportado_pagado)/1e6,3),
+     round(sum(iva_repercutido_cobrado)/1e6,3), round(sum(iva_soportado_pagado_hasta_4m)/1e6,3)
+     FROM tesoreria.saldo_partida_obra` → 21, ~98,3, ~64,0, ~8,63, ~2,21, ~11,65, ~4,14, ~0,34, ~3,05.
+   - La 0686: lo mismo con `WHERE clave_obra = '1-0686'` → ~30,21, ~21,96, ~1,32, ~0,27, ~2,13,
+     ~0,80, ~0,016, ~0,68.
+   - `SELECT count(*) FILTER (WHERE fuente = 'SIGRID'), max(valor::text) FILTER (WHERE clave_obra =
+     '1-0686') FROM tesoreria.hipotesis_caja_obra WHERE codigo = 'H13'` → 16, ~2.37.
+   - `SELECT count(*), count(DISTINCT codigo) FROM tesoreria.hipotesis_caja_obra` → 630, 30.
+   - `SELECT round(sum(cartera_viva_coste_proporcional)/1e6,3) FROM tesoreria.devengo_corte_obra
+     WHERE concepto = 'COSTE'` → ~0.
+5. Diccionario, SOLO con la imagen ya en el job (paso 2): `.venv/Scripts/python.exe main.py
+   publicar-diccionario` (v66, 254 objetos).
+6. `.venv/Scripts/python.exe main.py check-diccionario` → OK; `.venv/Scripts/python.exe main.py
+   check-declarados` → sin faltantes; `.venv/Scripts/python.exe main.py check-unicidad --timeout
+   300` → sin claves duplicadas.
+7. Reiniciar el MCP: `az containerapp show -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --query
+   properties.latestReadyRevisionName -o tsv` y `az containerapp revision restart -g
+   rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --revision <revision> -o none`. `contexto_bbdd()` abre con
+   «Versión 66». Si el `config.yaml` de `mcp-bbdd` lista objetos uno a uno, añadir las dos tablas
+   nuevas (memoria: lista blanca propia).
+8. R31, conversación NUEVA con el MCP: «¿qué caja necesitará la obra 0686 los próximos seis meses,
+   con y sin saldo de partida?» → paso 0 con H28/H29/H30 declaradas (saldo ~5,36 con los
+   defectos), H13 2,37 % de la obra, albaranes netos, CP fuera, las 30 hipótesis con valor y
+   nivel. Anotar el resultado en `progress/impl_F-150.md` §6.
+
+## 2026-10-29 · F-150 · spec AJUSTADA (N11-N14) · `in_progress` · rama `feature/F-150-receta-caja`
+
+Spec-author, a petición del líder (decisiones del humano del 29-10). Detalle y cifras en
+`progress/spec_F-150.md` §10; tareas **T17-T26** para el implementer (primera tanda) y **T27-T30**
+(N14, SEGUNDA TANDA, esperan respuestas del humano).
+- **N11**: `tesoreria.albaranes_pendientes_neto` (neto por obra y proveedor, FIFO, desde `raw`):
+  8,76 M EUR en 21 obras frente a los 56,9 de la vista; >6 meses 0,52; `tras_cierre` 0,47; 0686 0,19.
+- **N12**: CP fuera de la caja de la obra (14,48 M EUR de devengo; cartera CP ~0,03 por la
+  categoría de las partidas de la factura) y fuera de H02; su caja es F-154.
+- **N13**: el personal va por el devengo del recurso; **N13-b** (plazo) decidido por el líder: H02
+  `CI` + aviso, sin hipótesis nueva.
+- **Para validar por el humano**: subir `PRESUPUESTO_MAX` por la ficha recomendada nueva; si
+  LEVANTAMIENTO (1,91) y SEGURO T.R.C. (0,19), que son CP, deben salir de la caja de la obra; retirar
+  `R-ALBARAN-ABSURDO` (sus dos líneas ya no están en `raw.dcapro`, trabajo aparte); y las cuatro
+  preguntas de N14 (IVA del saldo, personal histórico, enlace AGR, retenciones) en §10.4.
+
 ## 2026-10-28 · F-150 · `in_progress` · T1-T14 y T16 hechas, pendiente el review · rama `feature/F-150-receta-caja`
 
 - Commits `5a3b1d2`..`425b5e2` (más el informe); `azure-apps` commit local `044beef` (sin push).
@@ -19,7 +97,7 @@
   30.864. Mutación: 19 muertos y 1 superviviente, cerrado con test.
 - Review 1: RECHAZADO solo por C4 (T15 sin comandos); corregido abajo. Siguiente: review 2; luego
   T15 (MANUAL, humano), en el orden de la subsección siguiente. Detalle: `progress/impl_F-150.md`.
-- Diccionario del árbol hoy: **252 objetos, 2178 columnas, 122 de consumo**, 22 reglas (v63).
+- Diccionario del árbol el 28-10: 252 objetos (v63).
 - **29-10 · arreglo del despliegue (T15, paso 4):** `build-tesoreria` cayó en Azure con
   `round(double precision, integer) does not exist` (07, CTE `facturado`: `raw.dvf.totbas` es
   `double precision`). Arreglo `d1c2ee1` en la rama: `SUM(fv.totbas::NUMERIC(18, 2))` y su test.

@@ -46,6 +46,8 @@ COLUMNAS_NUEVAS: dict[str, tuple[str, ...]] = {
         "venta_pendiente_facturar", "facturado_por_delante", "iva_pendiente_facturar_contrato",
         "base_pendiente_facturar_sin_iva_contrato", "retencion_pendiente_facturar_contrato",
         "base_pendiente_facturar_sin_retencion_contrato",
+        # N12 (29-10): la parte de coste proporcional de la cartera, solo en COSTE.
+        "cartera_viva_coste_proporcional", "cartera_emitida_tras_cierre_coste_proporcional",
     ),
     "tesoreria.hipotesis_caja": ("paso_receta",),
 }
@@ -477,7 +479,8 @@ def test_f150_r23_iva_y_retencion_del_hueco_por_peso_de_contrato() -> None:
 
 def test_f150_r23_las_columnas_del_corte_en_orden_y_null_en_coste() -> None:
     columnas, select = _insert(RUTA_DEVENGO, "tesoreria.devengo_corte_obra")
-    assert columnas[-9:] == list(COLUMNAS_NUEVAS["tesoreria.devengo_corte_obra"])
+    # 9 del hueco (R23) y, detrás, las 2 de la cartera de CP (N12, R36).
+    assert columnas[-11:] == list(COLUMNAS_NUEVAS["tesoreria.devengo_corte_obra"])
     assert ("LEFT JOIN _dev_hueco hu ON hu.obra_id = v.obra_id AND v.concepto = 'VENTA'"
             in select)
 
@@ -501,8 +504,9 @@ def _hipotesis_obra() -> str:
 
 
 def test_f150_r21_h12_es_codigo_sigrid() -> None:
-    """H12 se suma a los códigos que `08` resuelve como SIGRID; H09-H11 siguen."""
-    assert dom.CODIGOS_SIGRID == ("H09", "H10", "H11", "H12")
+    """H12 se suma a los códigos que `08` resuelve como SIGRID; H09-H11 siguen
+    (y N15 suma H13 detrás: `test_f150_iva_isp.py`)."""
+    assert dom.CODIGOS_SIGRID[:4] == ("H09", "H10", "H11", "H12")
     codigos = re.findall(r"'(H[0-9]{2})'::VARCHAR\(3\) AS codigo", _hipotesis_obra())
     assert tuple(codigos) == dom.CODIGOS_SIGRID
 
@@ -510,11 +514,11 @@ def test_f150_r21_h12_es_codigo_sigrid() -> None:
 def test_f150_r21_h12_sale_de_la_ficha_de_la_obra_por_cien() -> None:
     texto = _hipotesis_obra()
     rama = texto[texto.index("'H12'::VARCHAR(3) AS codigo"):]
-    rama = rama[: rama.index(") s ON s.obra_id")]
+    rama = rama[: rama.index("'H13'::VARCHAR(3) AS codigo")]
     assert "FROM raw.obr ob JOIN raw.iva i ON i.ide = NULLIF(ob.ivaide, 0)" in rama
     assert "to_jsonb(ROUND((i.iva * 100)::NUMERIC, 4)) AS valor" in rama
     assert f"'{dom.MOTIVO_H12_FICHA}' AS motivo" in rama
-    assert "SELECT ob.ide AS obra_id" in texto[texto.rindex("UNION ALL"):]
+    assert "SELECT ob.ide AS obra_id, 'H12'::VARCHAR(3) AS codigo" in texto
     assert "condiciones_contrato_cliente" not in rama, "la ficha, no los contratos (N2)"
 
 
@@ -526,8 +530,16 @@ def test_f150_r21_el_orden_y_h10_no_cambian() -> None:
     assert texto.count("FROM tesoreria.condiciones_contrato_cliente k") == 3
 
 
-def test_f150_r21_el_comment_dice_27_y_h12() -> None:
+def test_f150_r21_el_comment_dice_cuantas_y_h12() -> None:
     comment = _sql(RUTA_HIPOTESIS_OBRA)
     comment = comment[comment.index("COMMENT ON TABLE tesoreria.hipotesis_caja_obra"):]
-    assert "las 27 hipotesis" in comment
+    assert f"las {_n_hipotesis()} hipotesis" in comment
     assert "H12" in comment and "ficha de la obra" in comment
+
+
+def _n_hipotesis() -> int:
+    """Cuantas hipotesis tiene el catalogo: los textos dicen ESA cifra (N14 y N15 la suben)."""
+    import yaml as _yaml
+
+    ruta = Path(__file__).resolve().parents[1] / "config" / "hipotesis_caja.yaml"
+    return len(_yaml.safe_load(ruta.read_text(encoding="utf-8"))["hipotesis"])

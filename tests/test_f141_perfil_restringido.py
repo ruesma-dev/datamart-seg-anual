@@ -1529,7 +1529,9 @@ NO_DISPONIBLES = {
                        "condiciones_contrato_compra", "condiciones_contrato_cliente",
                        "devengo_pendiente_partida", "devengo_pendiente_obra_mes",
                        "devengo_corte_obra", "hipotesis_caja", "hipotesis_caja_manual",
-                       "hipotesis_caja_obra"],
+                       "hipotesis_caja_obra",
+                       # F-150 (N11, N14): el esquema entero queda fuera del restringido.
+                       "albaranes_pendientes_neto", "saldo_partida_obra"],
     "personal.yaml": ["recursos", "partes_lineas", "v_pbi_horas_obra_mes", "partes",
                       "recursos_tipos_hora", "usuarios_sigrid"],
 }
