@@ -156,6 +156,21 @@ ingredientes SIEMPRE en el mismo orden y con el dato del contrato:
   contrato.
 - Ingesta: `iva` entera y `dvf` con la lista blanca `include_columns` (9 de sus
   151 columnas): 80 tablas.
+- **Los albaranes netos por proveedor** (N11, 29-10): `09_albaranes_pendientes.sql`,
+  el último sub-paso, publica `tesoreria.albaranes_pendientes_neto`: lo pendiente
+  de facturar de las obras de la receta NETO por (obra, proveedor), con lo
+  sobrefacturado compensando primero lo más antiguo (FIFO, `neto_fifo` del
+  dominio) y suelo 0. **Lee `raw.dca`, `raw.dcapro` y `raw.con`, no `compras`**:
+  `compras` se construye DESPUÉS de `tesoreria` y daría el pendiente de la víspera.
+  La fórmula del pendiente es una **copia deliberada** de la de
+  `compras/01_documentos.sql`, atada por un test que compara el texto (como
+  `tesoreria.fn_fecha` y `fn_serie`).
+- **El coste proporcional no es caja de la obra** (N12): la receta lo excluye por
+  `categoria` (H02 ya no tiene clave `CP`) y `07` publica en `devengo_corte_obra`
+  la parte CP de la cartera de pago, por la categoría de las partidas de la
+  factura de cada efecto (`raw.dcfpro`, también copia deliberada: `compras` aún no
+  está construido). Su caja es F-154. **El personal** (N13) va por el devengo del
+  recurso: la receta no suma nóminas de la cartera.
 
 **`descompuestos` (F-097, 2026-09-28) es de qué se compone cada partida**, por
 ORIGEN, y es el primer esquema del datamart que NO se reconstruye de cero:

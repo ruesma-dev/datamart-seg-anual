@@ -113,7 +113,11 @@ confirmación cubre el plan que se enseñó, no lo que apareció después.
   (F-150): siete pasos en la ficha de `tesoreria.hipotesis_caja`, cada hipótesis
   con su `paso_receta`, y la venta con el coeficiente, el IVA y la retención del
   CONTRATO de cada partida (`coestr` y `raw.iva`; si no, el master 9 u 11), más
-  el hueco de facturación por obra (`raw.dvf`). **`compras/` publica
+  el hueco de facturación por obra (`raw.dvf`). Los albaranes, NETOS por
+  proveedor (`tesoreria.albaranes_pendientes_neto`, FIFO, leído de `raw`: la
+  vista de compras solo suma líneas > 0); el coste proporcional (`CP`) NO es caja
+  de la obra (sale por `categoria`; su caja es F-154) y el personal va por el
+  devengo del recurso, no por las nóminas de la cartera. **`compras/` publica
   también las alarmas de los documentos (F-138)**: `raw.conala` (lista explícita
   de 17 familias, sin empleados) da `compras.documento_alarmas` y la marca
   «liquidatoria» de facturas, albaranes y proformas (`documento_liquidatoria`,
