@@ -1851,6 +1851,13 @@ objetos:
       llevan importes absurdos y se comen la cifra entera; descartandolas son
       **260,6 M€**, que es la respuesta buena. Ver R-ALBARAN-ABSURDO.
 
+      **NO ES LO QUE QUEDA POR FACTURAR** (F-150, N11): la vista trae solo las
+      lineas > 0, y lo sobrefacturado al mismo proveedor (lineas < 0) ya paga
+      otras entregas: el pendiente real es el neto por proveedor, en
+      `tesoreria.albaranes_pendientes_neto` (en las 21 obras de la receta, el
+      2026-10-29: 56,9 M EUR aqui y 8,76 de neto). Para la caja de una obra,
+      usa esa tabla.
+
       **LA OBRA ES DE UNA EMPRESA (F-102).** Cada fila lleva la ficha de obra de la empresa de su documento, y acaba en `empresa_id` y `clave_obra`. **Agregar por `codigo_obra` mezcla empresas** --la UTE dentro de la obra de Ruesma, que no se consolida--: se agrega por `clave_obra`, o por `codigo_obra` junto con `empresa_id`. Medido el 2026-09-23: 2.946 de las 120.415 filas llevan la ficha de una empresa distinta de Ruesma.
     grano: >-
       Una fila por `linea_id` de albaran o proforma con pendiente. **Esta vista

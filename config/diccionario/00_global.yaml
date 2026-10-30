@@ -722,7 +722,15 @@
 # corto) y `R-VENTA-COEFICIENTES` cubre las tres `devengo_*`. `dvf` entra en el
 # punto 4 de `R-SIGRID-CON`. 22 reglas en el YAML, las publicadas no cambian.
 
-version: 63
+# version 64 (F-150, 2026-10-29): ALBARANES NETOS, CP FUERA, PERSONAL POR EL
+# RECURSO. Nace `tesoreria.albaranes_pendientes_neto` (N11): lo pendiente de
+# facturar NETO por (obra, proveedor), FIFO y suelo 0 (8,76 M EUR en las 21
+# obras frente a los 56,9 de las lineas positivas de la vista de compras, que
+# avisa). El coste proporcional no es caja de la obra (N12): H02 pierde `CP`,
+# las fichas del devengo lo dicen y `devengo_corte_obra` publica la parte CP de
+# la cartera. El personal va por el devengo del recurso (N13): la receta, la
+# regla de `R-CAJA-HIPOTESIS` y las fichas de la cartera lo dicen.
+version: 64
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -1111,6 +1119,7 @@ reglas:
       - tesoreria.condiciones_contrato_cliente
       - tesoreria.plazos_forma_pago
       - tesoreria.efectos
+      - tesoreria.albaranes_pendientes_neto
       - mart.fact_seguimiento_mensual
     resumen: >-
       No hay caja proyectada: sigue la receta de la ficha de
@@ -1134,7 +1143,11 @@ reglas:
       liquidacion son hipotesis aparte (H12-H14). No cuentes dos veces lo que
       ya esta en la cartera: lo PREVISTO vivo (`cartera_viva`), lo emitido
       despues del cierre (`cartera_emitida_tras_cierre`) y los albaranes sin
-      facturar (H16, H20, H21).
+      facturar (H16, H20, H21); los albaranes, netos por proveedor
+      (`tesoreria.albaranes_pendientes_neto`). Ojo: el CP no es caja de la obra:
+      excluyelo del devengo y de la cartera y declaralo. El personal va en el
+      devengo como recurso: no sumes nominas de la cartera ni las des por
+      ausentes.
     motivo: >-
       Decision del humano del 2026-10-24/25 (F-140): convertir devengo en caja
       depende de plazos, retenciones, IVA y criterios que Negocio aun no ha

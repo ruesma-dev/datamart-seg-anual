@@ -113,7 +113,11 @@ def test_f150_r3_la_receta_nombra_sus_ingredientes() -> None:
     receta = _receta()
     for ingrediente in (*DEVENGO, "condiciones_contrato_compra", "condiciones_contrato_cliente",
                         "tesoreria.efectos", "cartera_emitida_tras_cierre",
-                        "compras.v_pbi_albaranes_sin_facturar", "importe_pendiente_con_coeficientes",
+                        # N11-N12 (29-10): los albaranes NETOS y la cartera de CP.
+                        "tesoreria.albaranes_pendientes_neto", "importe_pendiente_neto",
+                        "meses_antiguedad", "tras_cierre", "cartera_viva_coste_proporcional",
+                        "cartera_emitida_tras_cierre_coste_proporcional",
+                        "importe_pendiente_con_coeficientes",
                         "pendiente_con_coeficientes", "fuente_coeficiente", "importe_iva_contrato",
                         "importe_retencion_contrato", "venta_pendiente_facturar",
                         "iva_pendiente_facturar_contrato", "retencion_pendiente_facturar_contrato"):
@@ -134,8 +138,12 @@ def test_f150_r4_la_receta_avisa_de_lo_que_no_cubre() -> None:
     assert "revision de precios" in receta and "F-040" in receta
     assert "H13 y H14 estan pendientes de validar con Administracion" in receta
     assert "`facturado_por_delante` NO se cobra" in receta
-    assert "lo de mas de H27 meses NO es caja" in receta and "declara su importe" in receta
-    assert "R-ALBARAN-ABSURDO" in receta
+    assert "las de `meses_antiguedad` mayor que H27 (o sin mes) NO son caja" in receta
+    assert "declara su importe" in receta
+    # N11: el objeto ya excluye las lineas de R-ALBARAN-ABSURDO; la receta no la cita.
+    assert "R-ALBARAN-ABSURDO" not in receta
+    # N12: el CP tampoco es caja de la obra.
+    assert "el coste PROPORCIONAL (`categoria` = `CP`, estructura) NO es caja de la obra" in receta
 
 
 def test_f150_r5_el_resumen_de_r_caja_hipotesis() -> None:
@@ -170,6 +178,91 @@ def test_f150_r32_fichas_al_dia_y_version_63() -> None:
     assert "las 27 hipotesis del catalogo" in _plano(obra["grano"])
     assert "H12" in _plano(obra["descripcion"]) and "ficha de la obra" in _plano(obra["descripcion"])
     glob = yaml.safe_load((DICC / "00_global.yaml").read_text(encoding="utf-8"))
-    assert int(glob["version"]) == 63
+    assert int(glob["version"]) >= 63, "la v63 de F-150; el ajuste del 29-10 la sube (r32_v64)"
     texto = (DICC / "00_global.yaml").read_text(encoding="utf-8")
     assert "# version 63 (F-150, 2026-10-28)" in texto
+
+
+# ===========================================================================
+# R3, R4, R36, R37 · el ajuste del 29-10 (N11-N13, T22)
+# ===========================================================================
+
+
+def test_f150_r36_paso_1_y_paso_7_sacan_el_cp() -> None:
+    tramos = _tramos()
+    assert "exclúyelo y declara su importe" in tramos["DEVENGO"]
+    for columna in ("cartera_viva_coste_proporcional",
+                    "cartera_emitida_tras_cierre_coste_proporcional"):
+        assert columna in tramos["CARTERA"], columna
+
+
+def test_f150_r36_las_fichas_del_devengo_dicen_que_el_cp_no_es_caja() -> None:
+    fichas = _fichas_tesoreria()
+    for nombre in DEVENGO:
+        assert "`CP` no es caja de la obra" in _plano(fichas[nombre.split(".")[1]]["descripcion"])
+
+
+def test_f150_r37_el_personal_va_por_el_devengo_del_recurso() -> None:
+    tramos = _tramos()
+    assert "El PERSONAL de la obra ya está aquí, como coste del RECURSO" in tramos["DEVENGO"]
+    assert "NO sumes pagos de personal de la cartera" in tramos["DEVENGO"]
+    # N13-b: el plazo del personal va con H02 `CI` y un aviso.
+    assert "el personal de la obra va en CI y se paga con H02 `CI`" in tramos["PLAZO"]
+    fichas = _fichas_tesoreria()
+    for nombre in ("efectos", "efectos_restringidos_mes"):
+        texto = _plano(fichas[nombre]["descripcion"])
+        assert "el personal va por el devengo del recurso: no es lo que falta" in texto, nombre
+
+
+def test_f150_r37_la_regla_de_caja_dice_cp_personal_y_albaranes_netos() -> None:
+    regla = _reglas()["R-CAJA-HIPOTESIS"]
+    texto = _plano(regla["regla"])
+    assert "el CP no es caja de la obra" in texto
+    assert "no sumes nominas de la cartera" in texto
+    assert "los albaranes, netos por proveedor" in texto
+    assert "tesoreria.albaranes_pendientes_neto" in regla["ambito"]
+
+
+def test_f150_r34_ficha_de_los_albaranes_netos() -> None:
+    ficha = _fichas_tesoreria()["albaranes_pendientes_neto"]
+    assert ficha["tipo"] == "tabla" and ficha["consumo_recomendado"] is True
+    assert ficha["clave_negocio"] == ["obra_id", "proveedor_id", "contrato_id", "mes_albaran"]
+    columnas = ficha["columnas"]
+    for importe in ("importe_pendiente_bruto", "importe_sobrefacturado", "importe_compensado",
+                    "importe_pendiente_neto"):
+        assert columnas[importe]["agregacion"] == "suma", importe
+    assert columnas["meses_antiguedad"]["agregacion"] == "no_sumable"
+    descripcion = _plano(ficha["descripcion"])
+    assert "Σ `importe_sobrefacturado` − Σ `importe_compensado`" in descripcion, "el residuo"
+    assert ficha["ejemplos_preguntas"][:2] == [
+        "Cuanto queda de verdad por facturar de albaranes en la obra X",
+        "Cuando se pagaran los albaranes pendientes de la obra X",
+    ]
+
+
+def test_f150_r34_la_vista_de_compras_avisa_del_neto() -> None:
+    compras = yaml.safe_load((DICC / "compras.yaml").read_text(encoding="utf-8"))["objetos"]
+    texto = _plano(compras["v_pbi_albaranes_sin_facturar"]["descripcion"])
+    assert "solo las lineas > 0" in texto
+    assert "el pendiente real es el neto por proveedor" in texto
+    assert "`tesoreria.albaranes_pendientes_neto`" in texto
+
+
+def test_f150_r32_version_64_con_su_nota() -> None:
+    glob = yaml.safe_load((DICC / "00_global.yaml").read_text(encoding="utf-8"))
+    assert int(glob["version"]) >= 64
+    texto = (DICC / "00_global.yaml").read_text(encoding="utf-8")
+    assert "# version 64 (F-150, 2026-10-29)" in texto
+
+
+def test_f150_r32_docs_dicen_albaranes_netos_cp_y_personal() -> None:
+    """T23 (N11-N13): ARCHITECTURE explica la copia deliberada de `raw` y CLAUDE.md
+    el mapa (albaranes netos, el CP fuera con F-154, el personal por el recurso)."""
+    arquitectura = _texto(RUTA_ARCHITECTURE)
+    tramo = arquitectura[arquitectura.index("**Los albaranes netos por proveedor** (N11"):]
+    tramo = tramo[: tramo.index("**`descompuestos` (F-097")]
+    for clave in ("raw.dcapro", "raw.dcfpro", "copia deliberada", "neto_fifo", "F-154"):
+        assert clave in tramo, clave
+    claude = _texto(RUTA_CLAUDE)
+    assert "`tesoreria.albaranes_pendientes_neto`" in claude
+    assert "F-154" in claude and "devengo del recurso" in claude

@@ -36,6 +36,12 @@ objetos:
       con su login la consulta devuelve «permission denied», y eso no se rodea:
       responde que el perfil no lo incluye.
 
+      **En la caja de una obra el personal va por el devengo del recurso: no
+      es lo que falta** (F-150, N13). El coste de personal de la obra ya esta
+      en el devengo como coste del RECURSO, con sus cargas sociales: no se
+      suman las nominas, embargos ni cuotas de la cartera ni se dan por
+      ausentes.
+
       **LA CARTERA DE COBROS Y PAGOS** (F-037, fase 1): una fila por EFECTO de
       Sigrid -cada pago a proveedor o acreedor (`raw.pag`, sentido `PAGO`) y
       cada cobro de cliente (`raw.cob`, sentido `COBRO`)-, con su tercero, su
@@ -349,6 +355,12 @@ objetos:
       con su login la consulta devuelve «permission denied», y eso no se rodea:
       responde que el perfil no lo incluye.
 
+      **En la caja de una obra el personal va por el devengo del recurso: no
+      es lo que falta** (F-150, N13). El coste de personal de la obra ya esta
+      en el devengo como coste del RECURSO, con sus cargas sociales: no se
+      suman las nominas, embargos ni cuotas de la cartera ni se dan por
+      ausentes.
+
       **CUANTO LE FALTA A LA CARTERA GENERAL** (F-037): por empresa, sentido,
       ano y mes de vencimiento y estado, cuantos efectos de PERSONAL (nominas,
       embargos, cuotas) no estan en `tesoreria.efectos` (37.053 pagos y 0
@@ -436,6 +448,11 @@ objetos:
       **No disponible para el perfil restringido** (F-141, `R-PERFILES`):
       con su login la consulta devuelve «permission denied», y eso no se rodea:
       responde que el perfil no lo incluye.
+
+      **El `CP` no es caja de la obra** (F-150, N12): el coste proporcional
+      (`categoria` = `CP`, estructura: seguros, avales, levantamiento) es
+      coste de la empresa; en la caja de una obra se excluye por `categoria`
+      y se declara su importe (su caja es F-154).
 
       **EL PUNTO DE PARTIDA DE CUALQUIER PROYECCION DE CAJA DE UNA OBRA**
       (F-140): por obra y concepto (COSTE, VENTA), lo que su ULTIMA version
@@ -695,6 +712,11 @@ objetos:
       con su login la consulta devuelve «permission denied», y eso no se rodea:
       responde que el perfil no lo incluye.
 
+      **El `CP` no es caja de la obra** (F-150, N12): el coste proporcional
+      (`categoria` = `CP`, estructura: seguros, avales, levantamiento) es
+      coste de la empresa; en la caja de una obra se excluye por `categoria`
+      y se declara su importe (su caja es F-154).
+
       **EL DEVENGO PENDIENTE, MES A MES** (F-140): el `pendiente` de cada
       partida repartido en proporcion a su plan de V en los meses posteriores
       al cierre, agregado por obra, mes, concepto y categoria. Es el perfil
@@ -835,6 +857,11 @@ objetos:
       **No disponible para el perfil restringido** (F-141, `R-PERFILES`):
       con su login la consulta devuelve «permission denied», y eso no se rodea:
       responde que el perfil no lo incluye.
+
+      **El `CP` no es caja de la obra** (F-150, N12): el coste proporcional
+      (`categoria` = `CP`, estructura: seguros, avales, levantamiento) es
+      coste de la empresa; en la caja de una obra se excluye por `categoria`
+      y se declara su importe (su caja es F-154).
 
       **EL DEVENGO PENDIENTE DE CADA PARTIDA** (F-140): por obra, partida y
       concepto con plan en la ultima version master (V), el plan desde V, el
@@ -985,6 +1012,122 @@ objetos:
       - Que partidas de la obra X tienen mas coste pendiente
       - Que partidas de la obra X van por encima de su planificacion
 
+  albaranes_pendientes_neto:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **No disponible para el perfil restringido** (F-141, `R-PERFILES`):
+      con su login la consulta devuelve «permission denied», y eso no se rodea:
+      responde que el perfil no lo incluye.
+
+      **LO QUE DE VERDAD QUEDA POR FACTURAR DE LOS ALBARANES DE UNA OBRA**
+      (F-150, N11): por obra, proveedor, contrato de compra y mes del albaran,
+      lo pendiente de facturar NETO por proveedor.
+      `compras.v_pbi_albaranes_sin_facturar` suma solo las lineas con
+      pendiente > 0, pero muchas lineas estan SOBREFACTURADAS (pendiente < 0)
+      y eso ya paga otras entregas del mismo proveedor: el 2026-10-29, en las
+      21 obras de la receta, 56,9 M EUR de lineas positivas y 48,2
+      sobrefacturados dejan 8,76 de neto. Es el ingrediente del paso 7 de la
+      receta (`tesoreria.hipotesis_caja`), con H20 y H27. **No es caja**: SIN
+      IVA, y la fecha de pago la pone H20.
+
+      **COMO SE COMPENSA (FIFO, una suposicion)**: por (obra, proveedor), lo
+      sobrefacturado compensa primero las entregas MAS ANTIGUAS (orden fecha,
+      linea): `importe_compensado` es lo quitado a las lineas positivas y
+      `importe_pendiente_neto` = `importe_pendiente_bruto` −
+      `importe_compensado`. La suma del neto de un (obra, proveedor) es
+      max(0, Σ bruto − Σ sobrefacturado): el residuo sobrefacturado, Σ
+      `importe_sobrefacturado` − Σ `importe_compensado`, no es caja y no se
+      publica como negativo. Sin proveedor, la linea no compensa. Lo avala
+      que el 93 % de las facturas son del mes del albaran: con FIFO el neto
+      queda en los dos ultimos meses (7,96 de 8,76).
+
+      **QUE ENTRA**: las lineas de albaran (serie AC) y proforma (PROF) de
+      las obras de `tesoreria.devengo_corte_obra`, con el pendiente de
+      `compras.albaran_lineas` y sin las lineas de importe absurdo
+      (`R-ALBARAN-ABSURDO`). Se calcula desde `raw` en la misma noche.
+      `tras_cierre`: el mes del albaran es posterior al ultimo cierre de la
+      obra (o la obra no tiene cierre): eso ya esta en el devengo pendiente y
+      no se suma otra vez (0,47 M EUR en 7 obras el 2026-10-29).
+    grano: >-
+      Una fila por (`obra_id`, `proveedor_id`, `contrato_id`, `mes_albaran`)
+      con algo bruto o sobrefacturado; sin proveedor, sin contrato o sin
+      fecha son claves validas (vacias).
+    clave_negocio: [obra_id, proveedor_id, contrato_id, mes_albaran]
+    paso_etl: build_tesoreria
+    refresco: nocturno
+    columnas:
+      obra_id:
+        significado: La obra de la linea del albaran.
+        agregacion: no_sumable
+      empresa_id:
+        significado: Empresa de la obra (`R-CODIGO-POR-EMPRESA`).
+        agregacion: no_sumable
+      clave_obra:
+        significado: La obra como empresa-codigo (1-0686).
+      proveedor_id:
+        significado: >-
+          El proveedor del albaran. Vacio si el albaran no lo tiene: esas lineas
+          no se compensan con nada.
+        agregacion: no_sumable
+        nulo_significa: Albaran sin proveedor.
+      contrato_id:
+        significado: >-
+          El contrato de compra: el de la cabecera del albaran y, si no, el de
+          la linea. Su forma de pago (H01, `tesoreria.condiciones_contrato_compra`)
+          es la del pago; sin contrato, H02 `OTRO`.
+        agregacion: no_sumable
+        nulo_significa: Sin contrato de compra.
+      mes_albaran:
+        significado: Primer dia del mes del albaran. H20 supone la factura a fin de ese mes.
+        nulo_significa: Albaran sin fecha.
+      importe_pendiente_bruto:
+        significado: Σ del pendiente de facturar de las lineas positivas. SIN IVA.
+        unidad: EUR
+        agregacion: suma
+      importe_sobrefacturado:
+        significado: >-
+          Σ |pendiente| de las lineas negativas (facturado de mas). Compensa
+          las positivas del mismo proveedor en la obra. SIN IVA.
+        unidad: EUR
+        agregacion: suma
+      importe_compensado:
+        significado: >-
+          Lo que la compensacion FIFO quita a las lineas positivas de la fila.
+          Entre 0 y el bruto. SIN IVA.
+        unidad: EUR
+        agregacion: suma
+      importe_pendiente_neto:
+        significado: >-
+          Bruto − compensado: lo que de verdad queda por facturar. El
+          ingrediente del paso 7. SIN IVA.
+        unidad: EUR
+        agregacion: suma
+      meses_antiguedad:
+        significado: >-
+          Meses desde `mes_albaran` hasta el mes del build. Mas de H27 (o
+          vacio) no es caja: se excluye y se declara.
+        unidad: meses
+        agregacion: no_sumable
+        nulo_significa: Albaran sin fecha.
+      tras_cierre:
+        significado: >-
+          Verdadero si el mes es posterior al ultimo cierre de la obra (o no hay
+          cierre): ya es devengo pendiente, no se suma en el paso 7.
+    relaciones:
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: La ficha de la obra.
+      - de: contrato_id
+        a: tesoreria.condiciones_contrato_compra.contrato_id
+        cardinalidad: "N:1"
+        porque: La forma de pago del contrato (H01).
+    ejemplos_preguntas:
+      - Cuanto queda de verdad por facturar de albaranes en la obra X
+      - Cuando se pagaran los albaranes pendientes de la obra X
+
   hipotesis_caja:
     tipo: tabla
     capa: consumo
@@ -1019,6 +1162,11 @@ objetos:
       es INCLUIR, suma al cobro del primer mes pendiente la venta ejecutada sin
       facturar (`venta_pendiente_facturar` de `tesoreria.devengo_corte_obra`,
       ya con coeficientes); lo `facturado_por_delante` NO se cobra: declaralo.
+      Solo el coste de la OBRA: el coste PROPORCIONAL (`categoria` = `CP`,
+      estructura) NO es caja de la obra: exclúyelo y declara su importe. El
+      PERSONAL de la obra ya está aquí, como coste del RECURSO con sus cargas
+      sociales: NO sumes pagos de personal de la cartera (nominas, embargos,
+      cuotas de `tesoreria_restringida`) ni digas que faltan.
 
       2. DOCUMENTO: el devengo de cada mes se factura (pago, perfil H03) o se
       certifica (cobro, perfil H08). Su mes es el del IVA del paso 6.
@@ -1038,7 +1186,10 @@ objetos:
       pago del proveedor (H04) y el retraso real (H05); el cobro, a H09
       (`tesoreria.condiciones_contrato_cliente`) y menos la morosidad H22.
       Cada pago y cada cobro se FRACCIONA en meses con H24 (pago) o H25
-      (cobro).
+      (cobro). Los albaranes netos del paso 7, con la forma de pago de su
+      `contrato_id` (H01) y, sin el, H02 `OTRO`. **Aviso**: el personal de la
+      obra va en CI y se paga con H02 `CI`; su plazo real es mensual: si
+      importa, fija H02 `CI` por obra (USUARIO u OBRA) y dilo.
 
       5. RETENCION, sobre la base SIN IVA: en el cobro,
       `importe_retencion_contrato` (y `retencion_pendiente_facturar_contrato`)
@@ -1054,12 +1205,19 @@ objetos:
       la caja.
 
       7. CARTERA, SIN DUPLICAR: suma lo PREVISTO vivo de `tesoreria.efectos`
-      en su vencimiento (H16; el previsto antiguo, H17) y los albaranes sin
-      facturar de `compras.v_pbi_albaranes_sin_facturar` (sin las lineas de
-      `R-ALBARAN-ABSURDO`; H20: la factura, a fin del mes del albaran y el
-      plazo desde ahi; lo de mas de H27 meses NO es caja: excluyelo y declara
-      su importe), y quita del primer mes pendiente lo emitido tras el cierre
-      (H21, `cartera_emitida_tras_cierre`, CON IVA).
+      en su vencimiento (H16; el previsto antiguo, H17) y los albaranes
+      pendientes de facturar NETOS por proveedor (`importe_pendiente_neto` de
+      `tesoreria.albaranes_pendientes_neto`; NUNCA sumes las lineas positivas
+      de `compras.v_pbi_albaranes_sin_facturar`: lo sobrefacturado a un
+      proveedor ya paga sus otras entregas), sin las filas `tras_cierre`, que
+      ya son devengo pendiente. H20: la factura, a fin de `mes_albaran`, y el
+      plazo desde ahi; las de `meses_antiguedad` mayor que H27 (o sin mes) NO
+      son caja: excluyelas y declara su importe. Quita del primer mes
+      pendiente lo emitido tras el cierre (H21, `cartera_emitida_tras_cierre`,
+      CON IVA). De la cartera de PAGO resta lo de CP
+      (`cartera_viva_coste_proporcional` y
+      `cartera_emitida_tras_cierre_coste_proporcional` de
+      `tesoreria.devengo_corte_obra`), y declaralo.
     grano: Una fila por hipotesis, identificada por `codigo` (27).
     clave_negocio: [codigo]
     paso_etl: build_tesoreria
