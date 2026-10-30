@@ -391,7 +391,9 @@ CADA MES (debe 0,2-0,75 M EUR en 2026) y un «DEVOLUCIÓN IVA <mes>» 3-5 meses 
 2025 devuelto en febrero de 2026, noviembre en marzo, diciembre en mayo, enero en abril, febrero en
 junio, marzo en julio, mayo en agosto. Lectura: la empresa 1 liquida mensualmente (lo propio de
 REDEME), sale A DEVOLVER casi todos los meses (el repercutido de otras obras NO lo compensa) y el
-dinero vuelve a los ~4 meses, no el día 20. El defecto se queda en `COMPENSA_EMPRESA` (lo de hoy,
+dinero vuelve a los ~4 meses, no el día 20. **Corregido (decisión del humano del 29-10, T33): el
+defecto es `MENSUAL_REDEME`, sin validar; lo que sigue es la propuesta anterior.** El defecto se
+quedaba en `COMPENSA_EMPRESA` (lo de hoy,
 por orden del líder), pero la `fuente_defecto` dice que los libros apuntan a `MENSUAL_REDEME` a 4
 meses: **para validar por el humano y AdP**. `MENSUAL_REDEME` = vuelve a los 4 meses del mes
 liquidado (mediana medida); `ANUAL` = tras la declaración del 4T (febrero del año siguiente).

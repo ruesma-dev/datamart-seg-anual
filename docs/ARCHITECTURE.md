@@ -114,7 +114,7 @@ quien consulta, declarando sus hipótesis (regla dura `R-CAJA-HIPOTESIS`).
   `stg.plan_mensual` y `mart.fact_seguimiento_mensual` de la misma noche:
   `build_stg` y `build_mart` van delante, y la reanudación de F-148 lo sabe
   (`LECTURAS_PARA_REANUDAR`).
-- **Las hipótesis**: las 29 (H01-H29 desde F-150) viven en `config/hipotesis_caja.yaml`, que
+- **Las hipótesis**: las 30 (H01-H30 desde F-150) viven en `config/hipotesis_caja.yaml`, que
   mantiene Control de Costes y aprueba el humano; `build_tesoreria` lo valida
   (`infrastructure/config/hipotesis_caja_yaml.py`) justo antes de cargarlo y,
   si tiene errores, el paso queda FAILED con la lista: lo de `01`-`07` (cartera,
@@ -124,7 +124,7 @@ quien consulta, declarando sus hipótesis (regla dura `R-CAJA-HIPOTESIS`).
   catálogo y la sección manual ya cargados y `hipotesis_caja_obra` es la de
   ayer). Se publican en `tesoreria.hipotesis_caja` (catálogo, todas
   `validado` falso hoy), `tesoreria.hipotesis_caja_manual` (la sección `obras`)
-  y `tesoreria.hipotesis_caja_obra` (las 29 en cada obra, con su nivel: MANUAL >
+  y `tesoreria.hipotesis_caja_obra` (las 30 en cada obra, con su nivel: MANUAL >
   SIGRID > DEFECTO; SIGRID para H09-H11, de los contratos con el cliente, y desde
   F-150 H12, el tipo de IVA de la ficha de la obra).
 - Ingesta: `auxcob` y `auxefc` entran a `raw` (78 tablas).
@@ -138,7 +138,7 @@ ingredientes SIEMPRE en el mismo orden y con el dato del contrato:
   dominio: SALDO, DEVENGO, DOCUMENTO, COEFICIENTES, PLAZO, RETENCION, IVA,
   CARTERA; el SALDO es el paso 0) y
   cada hipótesis declara el suyo (`paso_receta`, obligatorio: sin él el YAML no
-  valida). Las 29 incluyen los perfiles `PERFIL_MESES` (pares `[meses, %]` que
+  valida). Las 30 incluyen los perfiles `PERFIL_MESES` (pares `[meses, %]` que
   reparten el importe entero: H03, H08, H24, H25), el hueco de facturación (H26)
   y la antigüedad de los albaranes que dejan de ser caja (H27).
 - **El contrato de cada partida** (`raw.obrparpar.ctride`): `06` lee su

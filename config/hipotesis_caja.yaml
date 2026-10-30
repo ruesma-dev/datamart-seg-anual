@@ -519,5 +519,30 @@ hipotesis:
     admite_obra: true
     paso_receta: SALDO
 
+  - codigo: H30
+    sentido: AMBOS
+    descripcion: >-
+      Cuando vuelve a caja el IVA a devolver (el soportado de mas sobre el
+      repercutido: con inversion del sujeto pasivo la obra apenas repercute).
+      MENSUAL_REDEME: vuelve a los 4 meses del mes liquidado (la empresa
+      liquida cada mes). COMPENSA_EMPRESA: se compensa en el mes con el IVA
+      repercutido del resto de la empresa, como supone H14. ANUAL: vuelve tras
+      la declaracion del cuarto trimestre, en febrero del ano siguiente. Se
+      aplica al IVA del saldo de partida (paso 0) y al de la proyeccion.
+    unidad: OPCION
+    valor_defecto: MENSUAL_REDEME
+    opciones: [MENSUAL_REDEME, COMPENSA_EMPRESA, ANUAL]
+    fuente_defecto: >-
+      Decision del humano del 2026-10-29, sobre lo medido en
+      `contabilidad.mayor` (empresa 1, cuenta 4700, Hacienda deudora por IVA):
+      una liquidacion de IVA cada mes y su devolucion de 3 a 5 meses despues
+      (mediana: a los 4 meses). La empresa liquida mensualmente (REDEME), sale a
+      devolver casi todos los meses y el repercutido de otras obras no lo
+      compensa. Pendiente de validar con el humano y AdP.
+    ingrediente: tesoreria.saldo_partida_obra
+    validado: false
+    admite_obra: true
+    paso_receta: IVA
+
 # Valores por obra: ninguno todavia.
 obras: []

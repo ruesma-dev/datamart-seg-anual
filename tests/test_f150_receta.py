@@ -123,7 +123,7 @@ PASO_DE_CADA_CODIGO = {
     **dict.fromkeys(("H03", "H08"), "DOCUMENTO"),
     **dict.fromkeys(("H01", "H02", "H04", "H05", "H09", "H15", "H22", "H24", "H25"), "PLAZO"),
     **dict.fromkeys(("H06", "H07", "H10", "H11"), "RETENCION"),
-    **dict.fromkeys(("H12", "H13", "H14"), "IVA"),
+    **dict.fromkeys(("H12", "H13", "H14", "H30"), "IVA"),
     **dict.fromkeys(("H16", "H17", "H20", "H21", "H27"), "CARTERA"),
 }
 
@@ -235,6 +235,26 @@ def test_f150_r28_h13_pendiente_de_adp_y_h14_mensual() -> None:
     assert h14.valor_defecto == "MENSUAL" and h14.opciones[0] == "MENSUAL"
     assert set(h14.opciones) == {"MENSUAL", "TRIMESTRAL", "NO_MODELAR"}
     assert "dia 20 del mes siguiente" in _texto(h14) and "AdP" in _texto(h14)
+
+
+def test_f150_r42_h30_cuando_vuelve_el_iva_a_devolver() -> None:
+    """N15, decision del humano del 29-10: por defecto MENSUAL_REDEME (vuelve a
+    los 4 meses del mes liquidado, la mediana medida en la 4700), sin validar."""
+    h30 = _catalogo()["H30"]
+    assert (h30.sentido, h30.unidad, h30.paso_receta) == ("AMBOS", "OPCION", "IVA")
+    assert h30.valor_defecto == "MENSUAL_REDEME" and h30.opciones[0] == h30.valor_defecto
+    assert set(h30.opciones) == {"MENSUAL_REDEME", "COMPENSA_EMPRESA", "ANUAL"}
+    assert h30.validado is False and h30.admite_obra is True
+    fuente = " ".join(h30.fuente_defecto.split())
+    for dato in ("4700", "a los 4 meses", "AdP", "Decision del humano del 2026-10-29"):
+        assert dato in fuente, dato
+    descripcion = " ".join(h30.descripcion.split())
+    for opcion in h30.opciones:
+        assert f"{opcion}:" in descripcion, opcion
+
+
+def test_f150_r42_son_30() -> None:
+    assert list(_catalogo()) == [f"H{n:02d}" for n in range(1, 31)]
 
 
 def test_f150_r28_h15_solo_con_varios_vencimientos() -> None:

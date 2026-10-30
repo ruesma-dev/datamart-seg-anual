@@ -393,7 +393,7 @@ def neto_fifo(importes: Sequence[Decimal | None]) -> list[Decimal]:
     UNA obra, en orden (fecha, línea). Una línea negativa está SOBREFACTURADA:
     `N` = Σ |negativos| ya está pagado en otras facturas y compensa las
     positivas empezando por la MÁS ANTIGUA. A cada positiva `p` se le resta
-    `min(p, máx(0, N − Σ positivas anteriores))`; negativas, ceros y `None`
+    `min(p, máx(0, N - Σ positivas anteriores))`; negativas, ceros y `None`
     dan 0. Así ningún resto es < 0 ni > su línea, y Σ restos = máx(0, Σ
     importes): el residuo sobrefacturado no es caja. Es la ventana de
     `09_albaranes_pendientes.sql`, que lleva la misma fórmula.

@@ -430,8 +430,8 @@ ALTERNATIVAS_DEL_DISENO = {
 def test_f140_r1_yaml_real_pasa_la_validacion() -> None:
     leido = lector.cargar_hipotesis_caja(RUTA_YAML)
     assert leido.errores == []
-    # F-150 suma H24-H27 y (N14) H28-H29: son 29
-    assert [h.codigo for h in leido.catalogo] == [f"H{n:02d}" for n in range(1, 30)]
+    # F-150 suma H24-H27, (N14) H28-H29 y (N15) H30: son 30
+    assert [h.codigo for h in leido.catalogo] == [f"H{n:02d}" for n in range(1, 31)]
 
 
 def test_f140_r1_yaml_los_defectos_son_los_del_diseno() -> None:

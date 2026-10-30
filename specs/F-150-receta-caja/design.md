@@ -163,9 +163,10 @@ pagada (H16, H17). En el paso 7, con `ORIGINALES`, resta `cartera_viva_agr_con_o
 originales pendientes a su vencimiento (filtro exacto de arriba en `tesoreria.efectos`).
 (N15) Gana `iva_soportado_pagado` (Σ importe del efecto × `totiva / totpag` de su factura en
 `raw.dcf`, lo pagado de arriba) e `iva_repercutido_cobrado` (Σ × `totiva / totdoc` de `raw.dvf`),
-y las dos `_hasta_4t` (pagado o cobrado antes del 1 de enero del año del build). El saldo SUMA
-`iva_soportado_pagado − iva_repercutido_cobrado` ya recuperado según H30 (`COMPENSA_EMPRESA` o
-`MENSUAL_REDEME`: todo; `ANUAL`: solo `_hasta_4t`).
+y sus `_hasta_4t` (pagado o cobrado antes del 1 de enero del año del build) y `_hasta_4m` (en un mes
+4 o más meses antes del mes del build). El saldo SUMA `iva_soportado_pagado − iva_repercutido_cobrado`
+ya recuperado según H30 (`MENSUAL_REDEME`, el defecto: solo `_hasta_4m`; `COMPENSA_EMPRESA`: todo;
+`ANUAL`: solo `_hasta_4t`).
 
 ## 6. El catálogo (`config/hipotesis_caja.yaml`)
 
@@ -184,7 +185,7 @@ IVA H12, H13, H14 · CARTERA H16, H17, H20, H21, H27.
 | H28 | (N14) NUEVA · Saldo de partida, AMBOS, paso SALDO | OPCION `[CON_SALDO, SIN_SALDO]` | `CON_SALDO` | CON IVA; sin saldo, desde hoy con la cartera vencida |
 | H29 | (N14) NUEVA · Pagarés agrupados, PAGO, paso SALDO | OPCION `[ORIGINALES, AGR]` | `ORIGINALES` | HIPÓTESIS: el AGR pierde la obra; vencido = pagado en su fecha, no vencido = pendiente a su vencimiento (0686: 1,32 y 0,27 M EUR) |
 | H13 | (N15) SIGRID por obra (§5.6 bis); defecto, la empresa | PORCENTAJE | `5.5` | 12 meses, base ≥ 0,5 M EUR: 16 de 21 obras (0686 2,36 %; 0697 20,9 %) |
-| H30 | (N15) NUEVA · Cuándo vuelve el IVA a devolver, AMBOS, paso IVA | OPCION `[COMPENSA_EMPRESA, MENSUAL_REDEME, ANUAL]` | `COMPENSA_EMPRESA` (lo de hoy, H14) | empresa 1: a devolver casi cada mes y devuelto a los 3-5 meses (4700): apunta a `MENSUAL_REDEME` (4 meses); AdP |
+| H30 | (N15) NUEVA · Cuándo vuelve el IVA a devolver, AMBOS, paso IVA | OPCION `[MENSUAL_REDEME, COMPENSA_EMPRESA, ANUAL]` | `MENSUAL_REDEME` (humano, 29-10) | empresa 1: a devolver casi cada mes y devuelto a los 3-5 meses (4700): apunta a `MENSUAL_REDEME` (4 meses); AdP |
 | H27 | NUEVA · Antigüedad máxima de lo pendiente de facturar; (N11) ingrediente y fuente | MESES | `6` | con el neto FIFO, 0,52 de 8,76 M EUR tienen más de 6 meses (bruto: 22,8) |
 
 Todas `validado: false`, `admite_obra: true`; ingrediente de H24/H25 `plazos_forma_pago`, de H26

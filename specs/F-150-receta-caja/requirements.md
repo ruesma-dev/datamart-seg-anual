@@ -144,7 +144,7 @@ Sin caja proyectada: es F-151. **Perfil**: pares `[meses, porcentaje]` que repar
 - R41. (N15, tercera tanda) `08` debe dar a H13 un valor SIGRID por obra = `ROUND(100 × Σ ivacuo / Σ
   tot, 2)` de sus líneas de factura de compra de 12 meses si Σ `tot` ≥ `UMBRAL_BASE_H13` (500.000),
   con `MOTIVO_H13_COMPRAS`; si no, DEFECTO; `iva_efectivo_compra` del dominio da lo mismo (test).
-- R42. (N15) H30 `[COMPENSA_EMPRESA, MENSUAL_REDEME, ANUAL]` (defecto `COMPENSA_EMPRESA`, paso IVA,
-  `validado: false`) debe nacer con el aviso de AdP y lo medido en la contabilidad: 30 hipótesis.
+- R42. (N15) H30 `[MENSUAL_REDEME, COMPENSA_EMPRESA, ANUAL]` (defecto `MENSUAL_REDEME`: humano, 29-10;
+  paso IVA, `validado: false`) debe nacer con el aviso de AdP y lo medido en la 4700: 30 hipótesis.
 - R43. (N15) `saldo_partida_obra` debe publicar `iva_soportado_pagado`, `iva_repercutido_cobrado` y
-  sus `_hasta_4t`, y la receta sumar al saldo el IVA neto ya recuperado según H30 (`design.md` §5.9).
+  sus `_hasta_4t` y `_hasta_4m`, y la receta sumar al saldo el IVA neto ya recuperado según H30 (§5.9).

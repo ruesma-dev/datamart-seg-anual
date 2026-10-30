@@ -107,7 +107,7 @@ confirmación cubre el plan que se enseñó, no lo que apareció después.
   también los INGREDIENTES de la caja futura, no la caja: lo pactado
   (`condiciones_contrato_*`, `plazos_forma_pago`), el devengo pendiente de la
   última versión master descontado por partida (`devengo_*`, lee `stg` y `mart`
-  de la misma noche) y las 29 hipótesis de `config/hipotesis_caja.yaml` (las
+  de la misma noche) y las 30 hipótesis de `config/hipotesis_caja.yaml` (las
   mantiene Control de Costes; si el YAML no valida, el paso falla). Quien pase
   devengo a caja las declara todas (`R-CAJA-HIPOTESIS`) y sigue **la receta**
   (F-150): ocho pasos en la ficha de `tesoreria.hipotesis_caja`, cada hipótesis

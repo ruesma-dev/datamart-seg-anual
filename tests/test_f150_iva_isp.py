@@ -12,7 +12,7 @@ EUR). La marca ISP de Sigrid es falsa en todas: se mide la cuota. El dominio
 from __future__ import annotations
 
 import re
-from decimal import Decimal as D
+from decimal import Decimal as D  # noqa: N817
 from pathlib import Path
 
 import pytest

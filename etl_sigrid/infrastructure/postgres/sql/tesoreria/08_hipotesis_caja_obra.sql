@@ -5,7 +5,7 @@
 --
 -- GRANO: una fila por (obra, codigo) para las obras con devengo pendiente
 -- (`tesoreria.devengo_corte_obra`) y las que tienen algun valor MANUAL, y TODOS
--- los codigos del catalogo (las 29 desde F-150): `R-CAJA-HIPOTESIS` manda declararlas todas
+-- los codigos del catalogo (las 30 desde F-150): `R-CAJA-HIPOTESIS` manda declararlas todas
 -- desde esta tabla (P1-a del review de F-140). La que no admite valor por obra
 -- (`admite_obra` falso, hoy H17) sale siempre con su valor por DEFECTO: ni el
 -- YAML ni Sigrid le dan valor de obra (los dos LEFT JOIN lo exigen).
@@ -145,4 +145,4 @@ LEFT JOIN (
 ) s ON s.obra_id = o.obra_id AND s.codigo = h.codigo AND h.admite_obra;
 
 COMMENT ON TABLE tesoreria.hipotesis_caja_obra IS
-'F-140, F-150. El valor de las 29 hipotesis de caja (catalogo tesoreria.hipotesis_caja; la que no admite valor por obra, siempre DEFECTO) en cada obra con devengo pendiente o con valor manual: MANUAL (seccion obras del YAML), si no SIGRID (H09-H11, solo si todos los contratos con el cliente de la obra dan el mismo valor; H12, el tipo de IVA de la ficha de la obra, que solo cubre las bases sin IVA del contrato; H13, cuota / base de las compras de la obra en 12 meses si la base llega a 0,5 M EUR), si no DEFECTO. nivel OBRA o DEFECTO. Nada se aplica: es el valor que quien consulta debe declarar (R-CAJA-HIPOTESIS). Clave: obra_id, codigo.';
+'F-140, F-150. El valor de las 30 hipotesis de caja (catalogo tesoreria.hipotesis_caja; la que no admite valor por obra, siempre DEFECTO) en cada obra con devengo pendiente o con valor manual: MANUAL (seccion obras del YAML), si no SIGRID (H09-H11, solo si todos los contratos con el cliente de la obra dan el mismo valor; H12, el tipo de IVA de la ficha de la obra, que solo cubre las bases sin IVA del contrato; H13, cuota / base de las compras de la obra en 12 meses si la base llega a 0,5 M EUR), si no DEFECTO. nivel OBRA o DEFECTO. Nada se aplica: es el valor que quien consulta debe declarar (R-CAJA-HIPOTESIS). Clave: obra_id, codigo.';

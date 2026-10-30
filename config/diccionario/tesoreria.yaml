@@ -1253,7 +1253,7 @@ objetos:
       responde que el perfil no lo incluye.
 
       **EL CATALOGO DE HIPOTESIS PARA PASAR DEVENGO A CAJA** (F-140, F-150):
-      las 29 hipotesis (H01-H29) que hay que fijar para convertir el devengo
+      las 30 hipotesis (H01-H30) que hay que fijar para convertir el devengo
       pendiente en cobros y pagos, con su valor por DEFECTO, de que dato sale
       (`fuente_defecto`) y donde esta el dato que la alimenta
       (`ingrediente`): plazos de pago y de cobro, retenciones, IVA y su
@@ -1330,7 +1330,8 @@ objetos:
       `iva_pendiente_facturar_contrato`) es el del contrato (0 % en inversion
       del sujeto pasivo); H12 solo se aplica a las bases `sin_iva_contrato`.
       En el pago, H13. Se cobra o paga con su documento; la liquidacion con
-      Hacienda (repercutido menos soportado) va segun H14. **Aviso**: H13 y
+      Hacienda (repercutido menos soportado) va segun H14, y el IVA a devolver
+      vuelve a caja segun H30. **Aviso**: H13 y
       H14 estan pendientes de validar con Administracion (AdP): dilo al dar
       la caja.
 
@@ -1353,13 +1354,13 @@ objetos:
       `tesoreria.saldo_partida_obra`) a su vencimiento: en `tesoreria.efectos`,
       `sentido` PAGO, `estado_tesoreria` BAJA, `estado_codigo` 14 y
       `fecha_vencimiento` desde hoy.
-    grano: Una fila por hipotesis, identificada por `codigo` (29).
+    grano: Una fila por hipotesis, identificada por `codigo` (30).
     clave_negocio: [codigo]
     paso_etl: build_tesoreria
     refresco: nocturno
     columnas:
       codigo:
-        significado: Codigo de la hipotesis (H01 a H29).
+        significado: Codigo de la hipotesis (H01 a H30).
       sentido:
         significado: A que lado de la caja afecta.
         valores: [PAGO, COBRO, AMBOS]
@@ -1411,7 +1412,7 @@ objetos:
       responde que el perfil no lo incluye.
 
       **EL VALOR DE CADA HIPOTESIS EN CADA OBRA** (F-140): para cada obra con
-      devengo pendiente (o con un valor manual), las 29 hipotesis del catalogo
+      devengo pendiente (o con un valor manual), las 30 hipotesis del catalogo
       con el valor que toca y su NIVEL: es la lista entera que hay que
       declarar. La que no admite valor por obra (H17) va siempre por DEFECTO.
       MANUAL (el de la seccion
@@ -1426,7 +1427,7 @@ objetos:
       USUARIO (`R-CAJA-HIPOTESIS`). **Nada se aplica aqui**: es lo que hay que
       declarar.
     grano: >-
-      Una fila por (`obra_id`, `codigo`): las 29 hipotesis del catalogo en
+      Una fila por (`obra_id`, `codigo`): las 30 hipotesis del catalogo en
       cada obra, 567 filas de 21 obras con F-150 (483 con las 23 de F-140).
     clave_negocio: [obra_id, codigo]
     paso_etl: build_tesoreria
