@@ -276,3 +276,37 @@ def test_f150_r36_h02_sin_la_clave_cp() -> None:
     h = _catalogo()["H02"]
     assert set(h.valor_defecto) == {"CD", "CI", "OTRO"}
     assert "el CP no es caja de la obra" in _texto(h)
+
+
+# ===========================================================================
+# R47, R51 · el personal a fin de mes y el coste por contrato (N16-N17, T41)
+# ===========================================================================
+
+
+def test_f150_r47_el_personal_es_regla_fija_siguen_30() -> None:
+    """N16: el personal se paga el último día del mes de su devengo por REGLA,
+    no por hipótesis: el catálogo no crece."""
+    assert len(_catalogo()) == 30
+
+
+def test_f150_r47_h13_sobre_la_base_sin_personal() -> None:
+    """Las nóminas no llevan IVA y el H13 se mide en facturas: aplicarlo al
+    personal lo inflaría."""
+    texto = _texto(_catalogo()["H13"])
+    assert "SIN personal" in texto and "importe_pendiente_personal" in texto
+
+
+@pytest.mark.parametrize("codigo", ["H01", "H06"])
+def test_f150_r51_h01_y_h06_en_las_filas_con_contrato(codigo: str) -> None:
+    h = _catalogo()[codigo]
+    assert h.ingrediente == "tesoreria.devengo_pendiente_contrato_mes"
+    texto = _texto(h)
+    assert "filas con contrato" in texto and "condiciones_contrato_compra" in texto
+    assert "personal" in texto, "el personal nunca va por contrato"
+
+
+def test_f150_r51_h02_solo_lo_que_no_tiene_contrato() -> None:
+    texto = _texto(_catalogo()["H02"])
+    assert "sin `contrato_id`" in texto
+    assert "el personal, nunca" in texto and "fin de mes" in texto
+    assert "devengo_pendiente_contrato_mes" in texto
