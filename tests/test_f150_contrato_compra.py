@@ -44,6 +44,13 @@ def test_f150_r48_pendiente_de_servir_cero_o_negativo_no_enlaza() -> None:
     assert fracciones_contrato(D("1000"), {7: D("0"), 8: D("0")}) == {}
     assert fracciones_contrato(D("1000"), {7: D("0"), 8: None}) == {}
     assert fracciones_contrato(D("1000"), {7: D("-5"), 8: D("400")}) == {8: D("0.4")}
+    # Mutante superviviente de T44 (`ps >= 0`): el servido entero no aparece ni a 0.
+    assert fracciones_contrato(D("1000"), {7: D("0"), 8: D("400")}) == {8: D("0.4")}
+
+
+def test_f150_r48_un_pendiente_de_centimos_tambien_enlaza() -> None:
+    """Mutante superviviente de T44 (`pendiente <= 1`): 0,50 EUR pendientes se enlazan."""
+    assert fracciones_contrato(D("0.50"), {7: D("1")}) == {7: D("1")}
 
 
 @pytest.mark.parametrize("pendiente", [D("0"), D("-10"), None])
