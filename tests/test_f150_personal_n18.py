@@ -17,6 +17,7 @@ texto (literales = dominio, patrón de F-135): ni red ni BBDD.
 from __future__ import annotations
 
 import re
+from datetime import date, timedelta
 from decimal import Decimal
 from functools import cache
 from pathlib import Path
@@ -414,3 +415,68 @@ def test_f150_r61_la_guarda_de_entrada_de_la_nomina() -> None:
             in entrada)
     assert "raw.apu llega vacia" in entrada
     assert primera_temporal < texto.index("TRUNCATE")
+
+
+# ---------------------------------------------------------------------------
+# R59 · el saldo de partida: el IRPF + SS de los partes del último cierre
+# ---------------------------------------------------------------------------
+
+
+def test_f150_r59_la_columna_con_alter_y_al_final_del_insert() -> None:
+    assert ("ALTER TABLE tesoreria.saldo_partida_obra ADD COLUMN IF NOT EXISTS "
+            "personal_irpf_ss_pendiente NUMERIC(18,2);") in _ejecutable(RUTA_SETUP)
+    columnas, select = _insert(RUTA_SALDO, "tesoreria.saldo_partida_obra")
+    assert columnas[-1] == "personal_irpf_ss_pendiente"
+    assert re.findall(r" AS (\w+)(?=,|$)", re.search(r"SELECT (.*?) FROM ", select).group(1))[-1] \
+        == "personal_irpf_ss_pendiente"
+
+
+def test_f150_r59_los_partes_del_ultimo_cierre_con_el_mismo_filtro() -> None:
+    personal = _sentencia(_sin_comment(RUTA_SALDO), "CREATE TEMP TABLE _sal_personal")
+    assert ("SUM(COALESCE(h.tot, 0)::NUMERIC(18, 2)) FILTER (WHERE date_trunc('month', "
+            "tesoreria.fn_fecha(h.fec))::DATE = o.mes_ultimo_cierre) AS personal_partes_ultimo_cierre"
+            ) in personal
+    # el mismo WHERE que `personal_coste_partes`: una sola lectura de los partes
+    assert personal.count("FROM raw.hmores h") == 1
+
+
+def test_f150_r59_la_condicion_de_fecha_y_la_cuota_de_su_empresa() -> None:
+    _cols, select = _insert(RUTA_SALDO, "tesoreria.saldo_partida_obra")
+    assert ("CASE WHEN o.mes_ultimo_cierre IS NULL THEN NULL "
+            "WHEN (o.mes_ultimo_cierre + INTERVAL '2 month' - INTERVAL '1 day')::DATE >= CURRENT_DATE "
+            "THEN ROUND(COALESCE(p.personal_partes_ultimo_cierre, 0) * COALESCE(rp.cuota_irpf_ss, 0), 2) "
+            "ELSE 0 END AS personal_irpf_ss_pendiente") in select
+    assert "LEFT JOIN tesoreria.reparto_pago_personal rp ON rp.empresa_id = o.empresa_id" in select
+    # fecha_corte es CURRENT_DATE: la condición compara con la misma fecha.
+    assert "CURRENT_DATE AS fecha_corte" in select
+
+
+def test_f150_r59_la_guarda_de_entrada_exige_el_reparto() -> None:
+    texto = _sin_comment(RUTA_SALDO)
+    entrada = texto[: texto.index("CREATE TEMP TABLE")]
+    assert "to_regclass('tesoreria.reparto_pago_personal') IS NULL" in entrada
+
+
+def _fin_mes_siguiente(mes_cierre: date) -> date:
+    """`(mes_ultimo_cierre + INTERVAL '2 month' - INTERVAL '1 day')::DATE`."""
+    anio, mes = divmod(mes_cierre.month + 1, 12)
+    primero_dos_meses = date(mes_cierre.year + anio, mes + 1, 1)
+    return primero_dos_meses - timedelta(days=1)
+
+
+@pytest.mark.parametrize(
+    ("cierre", "corte", "pendiente"),
+    [
+        (date(2026, 10, 1), date(2026, 10, 31), True),    # 16 obras: vence el 30-11
+        (date(2026, 9, 1), date(2026, 10, 31), True),     # 2 obras: vence el 31-10, no antes
+        (date(2026, 9, 1), date(2026, 11, 1), False),     # ya pagado
+        (date(2026, 8, 1), date(2026, 10, 31), False),
+        (date(2026, 11, 1), date(2026, 12, 31), True),    # vence el 31-12
+        (date(2026, 12, 1), date(2027, 1, 31), True),     # cruza el año
+        (date(2026, 12, 1), date(2027, 2, 1), False),
+        (date(2027, 1, 1), date(2027, 2, 28), True),      # febrero no bisiesto
+    ],
+)
+def test_f150_r59_la_condicion_de_fecha(cierre: date, corte: date, pendiente: bool) -> None:
+    """Pendiente SI el último día del mes siguiente al cierre NO es anterior al corte."""
+    assert (_fin_mes_siguiente(cierre) >= corte) is pendiente
