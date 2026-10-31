@@ -1,4 +1,4 @@
-<!-- progress/impl_F-150.md -->
+<!-- progress/impl_F-150_tanda2_3.md -->
 # F-150 · Informe del implementer · segunda y tercera tanda (T17-T35)
 
 La fase 1 (T1-T16, el arreglo del despliegue del 29-10, su RED y sus evidencias) está en
