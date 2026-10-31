@@ -1471,7 +1471,12 @@ objetos:
       estructura) NO es caja de la obra: exclúyelo y declara su importe. El
       PERSONAL de la obra ya está aquí, como coste del RECURSO con sus cargas
       sociales: NO sumes pagos de personal de la cartera (nominas, embargos,
-      cuotas de `tesoreria_restringida`) ni digas que faltan.
+      cuotas de `tesoreria_restringida`) ni digas que faltan. Su parte del
+      devengo es `importe_pendiente_personal` (por partida,
+      `pendiente_personal` y `fuente_personal`) y se paga el ULTIMO DIA del mes
+      de su devengo, sin IVA ni retencion: es una regla, no una hipotesis (N16).
+      Las partidas con `fuente_personal` = `SIN_PARTES` (sin partes de
+      personal hasta el cierre) no llevan personal: si pesan, dilo.
 
       2. DOCUMENTO: el devengo de cada mes se factura (pago, perfil H03) o se
       certifica (cobro, perfil H08). Su mes es el del IVA del paso 6.
@@ -1491,21 +1496,26 @@ objetos:
       pago del proveedor (H04) y el retraso real (H05); el cobro, a H09
       (`tesoreria.condiciones_contrato_cliente`) y menos la morosidad H22.
       Cada pago y cada cobro se FRACCIONA en meses con H24 (pago) o H25
-      (cobro). Los albaranes netos del paso 7, con la forma de pago de su
-      `contrato_id` (H01) y, sin el, H02 `OTRO`. **Aviso**: el personal de la
-      obra va en CI y se paga con H02 `CI`; su plazo real es mensual: si
-      importa, fija H02 `CI` por obra (USUARIO u OBRA) y dilo.
+      (cobro). El coste del paso 1 SIN el personal va por contrato en
+      `tesoreria.devengo_pendiente_contrato_mes`: las filas con `contrato_id`,
+      con la forma de pago de ese contrato (H01, H15) y los dias del proveedor
+      (H04); las de `contrato_id` vacio, con H02 de su `categoria`. Declara la
+      parte enlazada (`pendiente_enlazado_contrato` de
+      `tesoreria.devengo_corte_obra`). Los albaranes netos del paso 7, con la
+      forma de pago de su `contrato_id` (H01) y, sin el, H02 `OTRO`.
 
       5. RETENCION, sobre la base SIN IVA: en el cobro,
       `importe_retencion_contrato` (y `retencion_pendiente_facturar_contrato`)
       ya es la del contrato; H10 solo se aplica a las bases
-      `sin_retencion_contrato`. En el pago, H06. Se devuelve segun H11 o H07.
+      `sin_retencion_contrato`. En el pago, H06 solo en las filas con contrato
+      (su `retencion_garantia_porcentaje`); sin contrato, el valor de H06; el
+      personal, nunca. Se devuelve segun H11 o H07.
 
       6. IVA: en el cobro, `importe_iva_contrato` (y
       `iva_pendiente_facturar_contrato`) es el del contrato (0 % en inversion
       del sujeto pasivo); H12 solo se aplica a las bases `sin_iva_contrato`.
       En el pago, la base por el H13 DE LA OBRA (SIGRID: el IVA efectivo de
-      sus compras), no el de la empresa. Se cobra o paga con su documento; la liquidacion con
+      sus compras), no el de la empresa, sobre la base SIN personal. Se cobra o paga con su documento; la liquidacion con
       Hacienda (repercutido menos soportado) va segun H14, y el IVA a devolver
       vuelve a caja segun H30 (con `MENSUAL_REDEME`, a los 4 meses). **Aviso**: H13 y
       H14 estan pendientes de validar con Administracion (AdP): dilo al dar
