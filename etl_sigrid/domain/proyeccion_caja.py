@@ -451,6 +451,89 @@ def pendiente_personal(pendiente: Decimal, cuota: Decimal) -> Decimal:
 
 
 # ---------------------------------------------------------------------------
+# El personal en DOS tramos: neto en el mes, IRPF + SS en el siguiente
+# (F-150, R53-R55, N18)
+# ---------------------------------------------------------------------------
+
+#: Las cuentas de la nómina (nivel 5, mismos códigos en todas las empresas que
+#: las tienen): el NETO a pagar, el IRPF del trabajo (modelo 111) y la
+#: Seguridad Social (cuota obrera + patronal). Se suman sus ABONOS NORMAL.
+CUENTAS_NOMINA: dict[str, str] = {"NETO": "4652000000", "IRPF": "4751000000", "SS": "4760000000"}
+
+#: La ventana de la cuota: 12 meses que acaban en el último mes con nómina.
+MESES_VENTANA_NOMINA = 12
+
+#: Ese último mes ha de estar entre build - 3 y build - 1; si no, no hay nómina reciente.
+MESES_MAX_SIN_NOMINA = 3
+
+#: Con menos personas con partes en la ventana, la cuota delataría el IRPF de alguien.
+MIN_PERSONAS_REPARTO = 10
+
+FUENTES_REPARTO_PERSONAL: tuple[str, ...] = ("CONTABILIDAD", "CONTABILIDAD_PARCIAL", "DEFECTO")
+
+MOTIVOS_REPARTO_PERSONAL: tuple[str, ...] = (
+    "SIN_NOMINA_RECIENTE", "POCAS_PERSONAS", "CUOTA_FUERA_DE_RANGO")
+
+
+def cuota_irpf_ss(
+    neto: Decimal | None, irpf: Decimal | None, ss: Decimal | None
+) -> Decimal | None:
+    """La parte de la nómina que se paga el mes SIGUIENTE (R53).
+
+    `ROUND((irpf + ss) / (neto + irpf + ss), 6)` si `neto` > 0 y el resultado
+    está en [0, 1]; si no (o falta un dato, o el denominador es 0), `None`: el
+    llamador va al defecto.
+    """
+    if neto is None or irpf is None or ss is None or neto <= 0:
+        return None
+    total = neto + irpf + ss
+    if total == 0:
+        return None
+    cuota = ((irpf + ss) / total).quantize(_SEIS_DECIMALES, rounding=ROUND_HALF_UP)
+    if cuota < 0 or cuota > 1:
+        return None
+    return cuota
+
+
+def reparto_pago_personal(
+    meses_con_nomina: int,
+    personas_con_partes: int,
+    neto: Decimal | None,
+    irpf: Decimal | None,
+    ss: Decimal | None,
+) -> tuple[Decimal, str, str | None]:
+    """(`cuota_irpf_ss`, `fuente`, `motivo`) de una empresa (R54).
+
+    `meses_con_nomina` son los meses de la ventana con abono en la cuenta del
+    NETO (0 si no hay ventana: ningún abono en los `MESES_MAX_SIN_NOMINA` meses
+    anteriores al del build). DEFECTO (cuota 0: todo a fin del mes de devengo,
+    la regla de N16), por este orden: `SIN_NOMINA_RECIENTE`, `POCAS_PERSONAS`
+    (< `MIN_PERSONAS_REPARTO`) o `CUOTA_FUERA_DE_RANGO` (R53 da `None`). Si no,
+    `CONTABILIDAD` con los 12 meses y `CONTABILIDAD_PARCIAL` con 1-11, sin motivo.
+    """
+    if meses_con_nomina <= 0:
+        return _CERO, "DEFECTO", "SIN_NOMINA_RECIENTE"
+    if personas_con_partes < MIN_PERSONAS_REPARTO:
+        return _CERO, "DEFECTO", "POCAS_PERSONAS"
+    cuota = cuota_irpf_ss(neto, irpf, ss)
+    if cuota is None:
+        return _CERO, "DEFECTO", "CUOTA_FUERA_DE_RANGO"
+    if meses_con_nomina >= MESES_VENTANA_NOMINA:
+        return cuota, "CONTABILIDAD", None
+    return cuota, "CONTABILIDAD_PARCIAL", None
+
+
+def partir_personal(importe: Decimal, cuota: Decimal) -> tuple[Decimal, Decimal]:
+    """(`neto`, `irpf_ss`) de un importe de personal (R55).
+
+    `irpf_ss = ROUND(importe x cuota, 2)` y `neto = importe - irpf_ss`: la suma
+    es el importe EXACTO, también con importe 0 o negativo.
+    """
+    irpf_ss = _redondear(importe * cuota)
+    return importe - irpf_ss, irpf_ss
+
+
+# ---------------------------------------------------------------------------
 # El coste pendiente repartido por CONTRATO de compra (F-150, R48, N17)
 # ---------------------------------------------------------------------------
 
