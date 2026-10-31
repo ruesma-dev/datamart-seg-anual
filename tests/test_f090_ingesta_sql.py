@@ -261,7 +261,9 @@ def test_f090_r13_comparativo_id_por_familia() -> None:
         "CASE c.tip WHEN 46 THEN r.con WHEN 12 THEN p.comide END AS comparativo_id"
         in sql
     ), "comparativo: el propio documento; oferta: `comprv.comide`; resto: NULL (R13)"
-    assert "LEFT JOIN raw.comprv p ON p.docide = r.con AND c.tip = 12" in sql, (
+    # F-155: `docide` no es único; la oferta toma su PRIMERA invitación.
+    assert "SELECT DISTINCT ON (q.docide) q.docide, q.comide FROM raw.comprv q" in sql
+    assert ") p ON p.docide = r.con AND c.tip = 12" in sql, (
         "la oferta se une a su comparativo por `comprv.docide` (R13)"
     )
 

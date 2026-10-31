@@ -87,7 +87,13 @@ GROUP BY d.obra_id;
 DROP TABLE IF EXISTS compras.comparativo_oferta_lineas CASCADE;
 CREATE TABLE compras.comparativo_oferta_lineas AS
 WITH lineas_oferta AS (
-    SELECT lp.ide AS linea_oferta_id,
+    -- F-155: una oferta puede estar invitada en DOS comparativos, así que unir
+    -- por `oferta_id` duplicaría la línea. Cada línea va a UNA invitación: la
+    -- del comparativo de su línea del concurso; si ninguna casa (líneas cuya
+    -- `comlin` no existe), la primera (`invitacion_id` menor). Es la misma
+    -- regla con la que 08 suma B por invitación.
+    SELECT DISTINCT ON (lp.ide)
+           lp.ide AS linea_oferta_id,
            o.oferta_id AS oferta_id,
            o.comparativo_id AS comparativo_id,
            lp.comlinide AS comparativo_linea_id,
@@ -103,7 +109,9 @@ WITH lineas_oferta AS (
            o.familia_ficticia AS familia_ficticia
     FROM raw.dcopro lp
     JOIN compras.comparativo_ofertas o ON o.oferta_id = lp.docide
+    LEFT JOIN compras.comparativo_lineas cl ON cl.linea_id = lp.comlinide
     WHERE lp.comlinide > 0
+    ORDER BY lp.ide, COALESCE(o.comparativo_id = cl.comparativo_id, FALSE) DESC, o.invitacion_id
 ),
 objetivo AS (
     -- Las líneas OBJETIVO con porcentaje (83.329 medidas): las únicas que
@@ -237,15 +245,18 @@ WITH objetivas AS (
 ),
 con_porcentaje AS (
     -- Las líneas con porcentaje de cada oferta OBJETIVO: cuántos % distintos
-    -- traen y qué parte de su importe casa con la base.
-    SELECT l.oferta_id AS oferta_id,
+    -- traen y qué parte de su importe casa con la base. Por comparativo Y
+    -- oferta (F-155): la OBJETIVO compartida por dos comparativos no lleva
+    -- al segundo los porcentajes de las líneas del primero.
+    SELECT l.comparativo_id AS comparativo_id,
+           l.oferta_id AS oferta_id,
            count(DISTINCT l.porcentaje_descuento) AS n_porcentajes,
            MAX(l.porcentaje_descuento) AS porcentaje,
            SUM(l.importe_ofertado_linea) AS importe_con_porcentaje,
            COALESCE(SUM(l.importe_ofertado_linea) FILTER (WHERE l.casa_base), 0) AS importe_casa_base
     FROM compras.comparativo_oferta_lineas l
     WHERE l.familia_ficticia = 'OBJETIVO' AND l.porcentaje_descuento IS NOT NULL
-    GROUP BY l.oferta_id
+    GROUP BY l.comparativo_id, l.oferta_id
 )
 SELECT ob.comparativo_id AS comparativo_id,
     ob.oferta_id                            AS oferta_objetivo_id,
@@ -257,7 +268,7 @@ SELECT ob.comparativo_id AS comparativo_id,
     CASE WHEN ab.fase_abc IS NOT NULL THEN 'ABC' ELSE 'ESTUDIOS' END AS base_regla,
     ROUND(100 * cp.importe_casa_base / NULLIF(cp.importe_con_porcentaje, 0), 2) AS pct_importe_casa_base
 FROM objetivas ob
-LEFT JOIN con_porcentaje cp ON cp.oferta_id = ob.oferta_id
+LEFT JOIN con_porcentaje cp ON cp.comparativo_id = ob.comparativo_id AND cp.oferta_id = ob.oferta_id
 LEFT JOIN compras.comparativos cm ON cm.comparativo_id = ob.comparativo_id
 LEFT JOIN _f038_obra_abc ab ON ab.obra_id = cm.obra_id
 WHERE ob.orden = 1;

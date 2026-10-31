@@ -230,7 +230,8 @@ def test_f038_ofertas_r2_columnas_en_su_orden() -> None:
 
 def test_f038_ofertas_r2_grano_una_fila_por_oferta_incluidas_las_ficticias() -> None:
     texto = _ejecutable_08()
-    assert "ALTER TABLE compras.comparativo_ofertas ADD PRIMARY KEY (oferta_id)" in texto
+    # F-155: el grano es la INVITACIÓN; una oferta puede estar en dos comparativos.
+    assert "ALTER TABLE compras.comparativo_ofertas ADD PRIMARY KEY (invitacion_id)" in texto
     bloque = _bloque("comparativo_ofertas")
     assert "FROM raw.comprv p JOIN raw.dco d ON d.ide = p.docide" in bloque
     assert "JOIN raw.con c ON c.ide = d.ide" in bloque
@@ -290,13 +291,17 @@ def test_f038_ofertas_r12_importes_documento_sin_iva_y_lineas() -> None:
     assert "d.totbas::NUMERIC(18, 2) AS importe_ofertado_documento" in proyeccion
     assert "li.importe_lineas AS importe_ofertado_lineas" in proyeccion
     bloque = _bloque("comparativo_ofertas")
-    lineas = re.search(r"LEFT JOIN \( ?(SELECT .*?) ?\) li ON li\.docide = d\.ide", bloque)
+    # F-155: B se suma por INVITACIÓN (`li.invitacion_id = p.ide`).
+    lineas = re.search(
+        r"LEFT JOIN \( ?(SELECT .*?) ?\) li ON li\.invitacion_id = p\.ide", bloque
+    )
     assert lineas is not None, "faltan las líneas agregadas de `raw.dcopro`"
     sub = lineas.group(1)
-    assert "FROM raw.dcopro lp WHERE lp.comlinide > 0 GROUP BY lp.docide" in sub, (
+    assert "FROM raw.dcopro lp JOIN raw.comprv q ON q.docide = lp.docide" in sub
+    assert "WHERE lp.comlinide > 0" in sub, (
         "solo cuentan las líneas de oferta de una línea del comparativo"
     )
-    assert "SUM(lp.tot)::NUMERIC(18, 2) AS importe_lineas" in sub
+    assert "SUM(a.tot)::NUMERIC(18, 2) AS importe_lineas" in sub
 
 
 def test_f038_ofertas_indices() -> None:
@@ -836,8 +841,11 @@ def test_f038_r26_oferta_lineas_grano_lineas_de_comparativo_de_ofertas_de_r2() -
     lineas = _cte_09("comparativo_oferta_lineas", "lineas_oferta")
     assert (
         "FROM raw.dcopro lp JOIN compras.comparativo_ofertas o ON o.oferta_id = lp.docide "
+        "LEFT JOIN compras.comparativo_lineas cl ON cl.linea_id = lp.comlinide "
         "WHERE lp.comlinide > 0" in lineas
     ), "solo las líneas que responden a una línea del comparativo, de ofertas de R2"
+    # F-155: cada línea, a UNA invitación (la de su comparativo).
+    assert "SELECT DISTINCT ON (lp.ide)" in lineas
     for esperado in (
         "lp.ide AS linea_oferta_id",
         "o.oferta_id AS oferta_id",
@@ -1110,7 +1118,7 @@ def test_f038_r31_objetivo_importe_y_porcentaje_solo_si_es_unico() -> None:
         "count(DISTINCT l.porcentaje_descuento) AS n_porcentajes",
         "MAX(l.porcentaje_descuento) AS porcentaje",
         "FROM compras.comparativo_oferta_lineas l WHERE l.familia_ficticia = 'OBJETIVO' "
-        "AND l.porcentaje_descuento IS NOT NULL GROUP BY l.oferta_id",
+        "AND l.porcentaje_descuento IS NOT NULL GROUP BY l.comparativo_id, l.oferta_id",
     ):
         assert esperado in con_porcentaje, esperado
 
@@ -1134,7 +1142,8 @@ def test_f038_r31_objetivo_regla_de_la_obra_y_parte_del_importe_que_casa() -> No
     )
     bloque = _bloque_09("comparativo_objetivo")
     for union in (
-        "LEFT JOIN con_porcentaje cp ON cp.oferta_id = ob.oferta_id",
+        "LEFT JOIN con_porcentaje cp ON cp.comparativo_id = ob.comparativo_id "
+        "AND cp.oferta_id = ob.oferta_id",
         "LEFT JOIN compras.comparativos cm ON cm.comparativo_id = ob.comparativo_id",
         "LEFT JOIN _f038_obra_abc ab ON ab.obra_id = cm.obra_id",
     ):
