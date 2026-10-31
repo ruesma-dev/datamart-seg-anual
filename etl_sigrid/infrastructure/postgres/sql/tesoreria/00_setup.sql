@@ -526,6 +526,12 @@ ALTER TABLE tesoreria.devengo_pendiente_partida ADD COLUMN IF NOT EXISTS iva_por
 ALTER TABLE tesoreria.devengo_pendiente_partida ADD COLUMN IF NOT EXISTS fuente_iva VARCHAR(8);
 ALTER TABLE tesoreria.devengo_pendiente_partida ADD COLUMN IF NOT EXISTS retencion_porcentaje NUMERIC(10,4);
 ALTER TABLE tesoreria.devengo_pendiente_partida ADD COLUMN IF NOT EXISTS fuente_retencion VARCHAR(8);
+-- F-150 (N16, R45): la parte de PERSONAL propio de cada partida de COSTE (partes
+-- hasta el cierre entre lo real a origen, tope 1) y lo pendiente que se paga el
+-- ultimo dia del mes de su devengo. Solo COSTE; en VENTA, NULL.
+ALTER TABLE tesoreria.devengo_pendiente_partida ADD COLUMN IF NOT EXISTS cuota_personal NUMERIC(12,6);
+ALTER TABLE tesoreria.devengo_pendiente_partida ADD COLUMN IF NOT EXISTS pendiente_personal NUMERIC(18,2);
+ALTER TABLE tesoreria.devengo_pendiente_partida ADD COLUMN IF NOT EXISTS fuente_personal VARCHAR(12);
 
 CREATE TABLE IF NOT EXISTS tesoreria.devengo_pendiente_obra_mes (
     obra_id                      INTEGER       NOT NULL,
@@ -552,6 +558,8 @@ ALTER TABLE tesoreria.devengo_pendiente_obra_mes ADD COLUMN IF NOT EXISTS import
 ALTER TABLE tesoreria.devengo_pendiente_obra_mes ADD COLUMN IF NOT EXISTS base_sin_iva_contrato NUMERIC(18,2);
 ALTER TABLE tesoreria.devengo_pendiente_obra_mes ADD COLUMN IF NOT EXISTS importe_retencion_contrato NUMERIC(18,2);
 ALTER TABLE tesoreria.devengo_pendiente_obra_mes ADD COLUMN IF NOT EXISTS base_sin_retencion_contrato NUMERIC(18,2);
+-- F-150 (N16, R46): el personal del mes (mismo reparto que el pendiente). Solo COSTE.
+ALTER TABLE tesoreria.devengo_pendiente_obra_mes ADD COLUMN IF NOT EXISTS importe_pendiente_personal NUMERIC(18,2);
 
 CREATE TABLE IF NOT EXISTS tesoreria.devengo_corte_obra (
     obra_id                       INTEGER       NOT NULL,
@@ -597,6 +605,8 @@ ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS base_pendiente
 -- Solo COSTE.
 ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS cartera_viva_coste_proporcional NUMERIC(18,2);
 ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS cartera_emitida_tras_cierre_coste_proporcional NUMERIC(18,2);
+-- F-150 (N16, R46): el personal pendiente de la obra. Solo COSTE.
+ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS pendiente_personal NUMERIC(18,2);
 
 
 -- ---------------------------------------------------------------------------

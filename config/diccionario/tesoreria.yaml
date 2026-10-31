@@ -694,6 +694,14 @@ objetos:
         unidad: EUR
         agregacion: suma
         nulo_significa: VENTA.
+      pendiente_personal:
+        significado: >-
+          La parte de PERSONAL propio de `pendiente` (suma de la de cada
+          partida). Se paga el ULTIMO DIA del mes de su devengo, sin plazo,
+          retencion ni IVA (regla fija de la receta, F-150, N16).
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: VENTA.
     relaciones:
       - de: obra_id
         a: maestro.obras.obra_id
@@ -840,6 +848,14 @@ objetos:
         unidad: EUR
         agregacion: suma
         nulo_significa: COSTE.
+      importe_pendiente_personal:
+        significado: >-
+          La parte de PERSONAL propio de `importe_pendiente` en el mes (el mismo
+          reparto). Se paga el ULTIMO DIA de ese mes, sin plazo, retencion ni
+          IVA; el resto del coste va por contrato o por H02 (F-150, N16).
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: VENTA.
     relaciones:
       - de: obra_id
         a: maestro.obras.obra_id
@@ -1003,6 +1019,26 @@ objetos:
         significado: CONTRATO si la partida tiene retencion de su contrato; SIN si no (lo cubre H10).
         valores: [CONTRATO, SIN]
         nulo_significa: COSTE.
+      cuota_personal:
+        significado: >-
+          La parte de PERSONAL propio de la partida: coste de sus partes de
+          recursos PERSONA internos hasta el cierre entre su real a origen, con
+          tope 1 (F-150, N16). 0 si no tiene partes o real, y en CP.
+        agregacion: no_sumable
+        nulo_significa: VENTA.
+      pendiente_personal:
+        significado: >-
+          `pendiente` x `cuota_personal` al centimo: se paga el ULTIMO DIA del
+          mes de su devengo (regla fija, sin hipotesis).
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: VENTA.
+      fuente_personal:
+        significado: >-
+          PARTES si la partida tiene partes de personal; SIN_PARTES si no (una
+          obra sin partes no tiene cuota: dilo); CP, coste proporcional, fuera.
+        valores: [PARTES, SIN_PARTES, CP]
+        nulo_significa: VENTA.
     relaciones:
       - de: obra_id
         a: maestro.obras.obra_id

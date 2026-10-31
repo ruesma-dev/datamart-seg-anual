@@ -120,10 +120,9 @@ COLUMNAS_PARTIDA = (
     ("fuente_personal", "VARCHAR(12)"),
 )
 COLUMNAS_OBRA_MES = (("importe_pendiente_personal", "NUMERIC(18,2)"),)
-COLUMNAS_CORTE = (
-    ("pendiente_personal", "NUMERIC(18,2)"),
-    ("pendiente_enlazado_contrato", "NUMERIC(18,2)"),
-)
+#: (`pendiente_enlazado_contrato`, la otra columna nueva del corte, es de N17:
+#: la vigila `tests/test_f150_contrato_compra.py`.)
+COLUMNAS_CORTE = (("pendiente_personal", "NUMERIC(18,2)"),)
 
 
 @cache
@@ -214,7 +213,8 @@ def test_f150_r45_la_fuente_es_la_del_dominio() -> None:
 
 def test_f150_r45_pendiente_personal_redondeado_y_solo_en_coste() -> None:
     texto = _devengo()
-    assert "ROUND(d.pendiente * d.cuota_personal, 2) AS pendiente_personal" in texto
+    assert ("CASE WHEN d.concepto = 'COSTE' THEN ROUND(d.pendiente * d.cuota_personal, 2) END "
+            "AS pendiente_personal") in texto
     # En VENTA las tres columnas van NULL: se calculan solo para COSTE.
     assert "AND d.concepto = 'COSTE'" in texto
 
