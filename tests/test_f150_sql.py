@@ -52,8 +52,8 @@ COLUMNAS_NUEVAS: dict[str, tuple[str, ...]] = {
         "base_pendiente_facturar_sin_retencion_contrato",
         # N12 (29-10): la parte de coste proporcional de la cartera, solo en COSTE.
         "cartera_viva_coste_proporcional", "cartera_emitida_tras_cierre_coste_proporcional",
-        # N16 (31-10): el personal pendiente de la obra, solo en COSTE.
-        "pendiente_personal",
+        # N16 (31-10): el personal pendiente de la obra; N17: lo que va por contrato.
+        "pendiente_personal", "pendiente_enlazado_contrato",
     ),
     "tesoreria.hipotesis_caja": ("paso_receta",),
 }

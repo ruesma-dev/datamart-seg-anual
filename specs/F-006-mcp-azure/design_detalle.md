@@ -268,6 +268,10 @@ infraestructura.
 > NETOS por proveedor, N11) y `tesoreria.saldo_partida_obra` (el saldo de
 > partida de cada obra, N14), los dos de consumo. El inventario pasa a **254
 > objetos**.
+>
+> **Enmienda del 2026-10-31 (F-150, cuarta tanda).** Entra
+> `tesoreria.devengo_pendiente_contrato_mes` (el coste pendiente de la obra por
+> contrato de compra, N17), de consumo. El inventario pasa a **255 objetos**.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,

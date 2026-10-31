@@ -39,6 +39,12 @@ from tests.test_f006_formato import _dicc, _ficha, _regla
 #: fórmula de R17. Solo baja (trinquete: R19 falla si sobra más de
 #: `HOLGURA_TRINQUETE`). Historia, de la más reciente a la más antigua:
 #:
+#: * 31.287 · 2026-10-31, F-150 N17 (diccionario v67 en el arbol), SUBIDO con
+#:   motivo: el coste pendiente por contrato de compra. Enrutado 15.421 (+158:
+#:   la ficha recomendada nueva `tesoreria.devengo_pendiente_contrato_mes` y sus
+#:   dos preguntas, que enrutan «que parte del coste pendiente va por contrato» y
+#:   «a que proveedores pagara la obra X» a ella y no a H02 por categoria);
+#:   reglas 7.424 y bloques 8.442 sin cambio.
 #: * 31.129 · 2026-10-30, F-150 N14 (diccionario v64 en el arbol), SUBIDO con
 #:   motivo: el saldo de partida. Enrutado 15.263 (+114: la ficha recomendada
 #:   nueva `tesoreria.saldo_partida_obra` y sus dos preguntas, que enrutan
@@ -64,7 +70,7 @@ from tests.test_f006_formato import _dicc, _ficha, _regla
 #:   todas las preguntas): 78.057.
 #: * 29.787 · 2026-10-22, F-147 T5: PROVISIONAL, la medida de T2 sobre la v58
 #:   (sin resúmenes todavía: reglas 2.233, enrutado 13.886, bloques 13.668).
-PRESUPUESTO_MAX = 31_129
+PRESUPUESTO_MAX = 31_287
 
 
 def _medir(dicc) -> PresupuestoContexto:

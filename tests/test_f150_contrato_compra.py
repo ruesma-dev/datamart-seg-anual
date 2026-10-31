@@ -208,18 +208,20 @@ def test_f150_r49_ninguna_columna_es_de_caja(columna: str) -> None:
 
 
 def test_f150_r49_lo_pendiente_de_servir_por_contrato_y_partida() -> None:
-    """Por (contrato, partida) y no por línea (las líneas se sirven cruzadas),
+    """(Alias `cl`: `l.tot` es el de `raw.dcfpro` en la cuota CP.) Por (contrato, partida) y no por línea (las líneas se sirven cruzadas),
     suelo 0, `double precision` casteado, el umbral de `R-ALBARAN-ABSURDO`."""
     texto = _devengo()
     assert "CREATE TEMP TABLE _dev_ctr ON COMMIT DROP AS" in texto
-    assert ("GREATEST(0, SUM(l.tot::NUMERIC(18, 2)) - SUM(l.tot::NUMERIC(18, 2) * "
-            "COALESCE(l.canser, 0)::NUMERIC / NULLIF(l.can::NUMERIC, 0))) AS pendiente_servir"
+    # Una línea sin cantidad (`can` 0) no dice qué se sirvió: cuenta entera como
+    # no servida (el `COALESCE` de la segunda suma).
+    assert ("GREATEST(0, SUM(cl.tot::NUMERIC(18, 2)) - COALESCE(SUM(cl.tot::NUMERIC(18, 2) * "
+            "COALESCE(cl.canser, 0)::NUMERIC / NULLIF(cl.can::NUMERIC, 0)), 0)) AS pendiente_servir"
             ) in texto
-    assert "abs(l.tot) < 1e8" in texto and dom.UMBRAL_IMPORTE_ABSURDO == 1e8
-    assert "NULLIF(l.paride, 0) AS partida_id" in texto
-    assert "FROM raw.ctrpro l JOIN raw.ctr c ON c.ide = l.docide" in texto
+    assert "abs(cl.tot) < 1e8" in texto and dom.UMBRAL_IMPORTE_ABSURDO == 1e8
+    assert "NULLIF(cl.paride, 0) AS partida_id" in texto
+    assert "FROM raw.ctrpro cl JOIN raw.ctr c ON c.ide = cl.docide" in texto
     assert "JOIN raw.con k ON k.ide = c.ide" in texto
-    assert "GROUP BY v.obra_id, NULLIF(l.paride, 0), c.ide" in texto
+    assert "GROUP BY v.obra_id, NULLIF(cl.paride, 0), c.ide" in texto
 
 
 def test_f150_r49_misma_obra_vivos_y_con_condiciones() -> None:

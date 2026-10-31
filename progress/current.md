@@ -35,7 +35,7 @@ sin push). Detalle, contrastes, RED y evidencias: `progress/impl_F-150.md` (la f
   del 29-10**, spec corregida) y el IVA del saldo. 30 hipótesis; diccionario **v66**.
 - Saldo de partida medido el 30-10 con los defectos (`MENSUAL_REDEME`): **21 obras 16,70 M EUR,
   0686 5,36** (con `COMPENSA_EMPRESA`, 17,71 y 5,49). Sin PARADA.
-- Diccionario del árbol hoy: **254 objetos, 2212 columnas, 124 de consumo**, 22 reglas (v66).
+- Diccionario del árbol hoy: **255 objetos, 2226 columnas, 125 de consumo**, 22 reglas (v66).
 - Siguiente: review; luego el redespliegue MANUAL de abajo (lo autoriza el humano).
 
 ### F-150 · Redespliegue MANUAL de N11-N15 (tras APROBADO y merge a `main`; lo hace el humano)
