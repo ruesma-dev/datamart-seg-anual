@@ -9,6 +9,33 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-31 · F-155 (HOTFIX) · `spec_ready` · implementada · rama `feature/F-155-ofertas-compartidas`
+
+Implementer. La nocturna del 31-10 cayó dos veces en `build_compras` (`comparativo_ofertas_pkey`,
+`oferta_id` 2796053 duplicada): el COM26/0014 reutiliza las 6 ofertas del 0697.0_0037. Commits
+`66a8dd9`..; `azure-apps` `acb8a75` (local, sin push). Detalle y evidencias: `progress/impl_F-155.md`.
+- Grano de `compras.comparativo_ofertas` = INVITACIÓN (PK `invitacion_id`, única: 72.113 de 72.113);
+  08 (B por invitación), 09 (cada línea a una invitación; objetivo por comparativo y oferta), 14
+  (la oferta compartida toma su primera invitación). Diccionario **v68**.
+- **Estado `spec_ready` y no `in_progress`**: init.sh admite UNA sola `in_progress` y es F-150; no
+  se ha tocado F-150. El líder decide al cerrarla.
+- **PASO MANUAL del humano (Azure; el implementer NO lo lanza)**, desde la rama F-155 en el puesto
+  (usa el código local, no la imagen), fuera de 00:00-03:15 UTC:
+  1. `.venv/Scripts/python.exe main.py build-compras` → esperado: termina OK; los sub-pasos
+     `comparativos`, `comparativos_detalle` y `documento_adjuntos` sin error; `compras.comparativo_ofertas`
+     = 72.113 filas y `compras.comparativo_oferta_lineas` = 792.033 (medido con el `raw` del 31-10;
+     con el SQL viejo eran 792.039 y 09 habría caído también por las 6 líneas duplicadas);
+     `compras.v_estado_documentos` vuelve a existir.
+  2. `.venv/Scripts/python.exe main.py check-declarados` → esperado: código 0 (la vista de F-132 ya
+     está).
+  3. `.venv/Scripts/python.exe main.py check-diccionario` → esperado: código 0. Publicar el
+     diccionario v68 solo con su imagen (la nocturna republica el de la imagen del job).
+  - Opcional: `main.py check-unicidad` → `comparativo_ofertas` 0 duplicados por `invitacion_id`
+    ni por (`comparativo_id`, `oferta_id`).
+  - Para que la nocturna de ESTA noche no vuelva a caer hace falta además la imagen nueva con F-155
+    en el job (memoria «el repositorio en verde no es producción»): sin ella, el build manual
+    deja compras al día pero la nocturna repetirá el fallo.
+
 ## 2026-10-31 · F-150 · `in_progress` · T36-T44 hechas (N16-N17) · rama `feature/F-150-receta-caja`
 
 Implementer. Commits `133a305`..`3efb069` (T36-T43 y T39 bis); `azure-apps` `9488087` (local, sin

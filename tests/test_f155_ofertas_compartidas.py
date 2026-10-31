@@ -156,7 +156,9 @@ CREATE TABLE descompuestos.lineas (obra_id integer, partida_id integer, fase_num
 #: copia). Ofertas 11 (real, la ganadora), 12 (la OBJETIVO) y 13 (real, solo
 #: en 100). La 11 y la 12 están invitadas en LOS DOS: invitaciones 1-2 en 100
 #: y 4-5 en 200. La oferta 11 responde con una línea a cada comparativo (5001
-#: a la línea 1000 de 100, 5004 a la 2000 de 200); la 12, solo al 100.
+#: a la línea 1000 de 100, 5004 a la 2000 de 200); la 12, solo al 100, y
+#: trae además la 5005, cuya línea del concurso (9999) no existe: va a la
+#: PRIMERA invitación de su oferta (la 2, del 100), como las 329 de Azure.
 DATOS = """
 INSERT INTO raw.conest VALUES (1, 12, 6, 'ACE', 'Aceptada definitivamente'),
                               (2, 12, 1, 'ELA', 'En elaboracion'),
@@ -178,7 +180,8 @@ INSERT INTO raw.dcopro VALUES
     (5001, 11, 1000, 0, 'L', 'ud', 10, 4, 40.004, NULL),
     (5002, 12, 1000, 0, 'L', 'ud', 10, 4.5, 45.0, '10%'),
     (5003, 13, 1000, 0, 'L', 'ud', 10, 5, 50.0, NULL),
-    (5004, 11, 2000, 0, 'L', 'ud', 10, 3, 30.0, NULL);
+    (5004, 11, 2000, 0, 'L', 'ud', 10, 3, 30.0, NULL),
+    (5005, 12, 9999, 0, 'L', 'ud', 1, 2, 2.0, NULL);
 INSERT INTO raw.rcg VALUES (9001, 11, 1, 1), (9002, 100, 1, 1);
 INSERT INTO raw.gra VALUES (1, 'G1', 1, 'adjunto', 'login', 20260905, 'oferta.pdf');
 """
@@ -219,7 +222,7 @@ def test_f155_sandbox_una_fila_por_invitacion(sandbox) -> None:
     from decimal import Decimal as D
     assert filas == [
         (1, 100, 11, D("100.25"), D("40.00"), 1),
-        (2, 100, 12, D("90.10"), D("45.00"), 1),
+        (2, 100, 12, D("90.10"), D("47.00"), 2),
         (3, 100, 13, D("120.40"), D("50.00"), 1),
         (4, 200, 11, D("100.25"), D("30.00"), 1),
         (5, 200, 12, D("90.10"), None, 0),
@@ -242,7 +245,9 @@ def test_f155_sandbox_cada_linea_de_oferta_una_vez_y_en_su_comparativo(sandbox) 
     filas = _filas(sandbox, """
         SELECT linea_oferta_id, oferta_id, comparativo_id
         FROM compras.comparativo_oferta_lineas ORDER BY linea_oferta_id""")
-    assert filas == [(5001, 11, 100), (5002, 12, 100), (5003, 13, 100), (5004, 11, 200)]
+    assert filas == [
+        (5001, 11, 100), (5002, 12, 100), (5003, 13, 100), (5004, 11, 200), (5005, 12, 100),
+    ]
 
 
 def test_f155_sandbox_el_objetivo_de_cada_comparativo(sandbox) -> None:
