@@ -44,6 +44,20 @@ Implementer. La nocturna del 31-10 cayó dos veces en `build_compras` (`comparat
     tag anterior), comprobada con el mismo `az containerapp job show`. Ojo: con ese tag la nocturna
     vuelve a caer en `build_compras` mientras siga en Sigrid el COM26/0014.
 
+## 2026-10-31 · F-150 · spec ampliada, QUINTA tanda (N18) · rama `feature/F-150-receta-caja`
+
+Spec-author. Rama avanzada a `main` (`c9e4bbe`, fast-forward). Detalle, mediciones (Azure, solo
+lectura) y pasos MANUAL: `progress/spec_F-150.md` §12 (R53-R62, diseño 12.2, tareas T46-T53; `tasks.md`
+solo apunta allí: requirements y design están en su tope).
+- **N18** (corrige N16): el personal pendiente se parte por una cuota POR EMPRESA de la contabilidad
+  (abonos NORMAL de 12 meses de 4652000000 / 4751000000 / 4760000000, leídos de `raw.apu`, no del
+  mayor de la víspera): neto a fin del mes de devengo, IRPF + SS a fin del mes siguiente. Empresa 1:
+  **0,4419** al mes siguiente. Objeto nuevo `tesoreria.reparto_pago_personal`, solo cuotas (sin importes
+  de nómina; umbral de 10 personas). También el saldo de partida (`personal_irpf_ss_pendiente`).
+- 0686: 0,210 de noviembre → ~0,117 el 30-11 y ~0,093 el 31-12. Σ personal 5,65 intacto.
+- **Para validar el humano** (no bloquean): la cuota medida (55,8 / 15,5 / 28,7) no es su 51 / 15 / 34;
+  el saldo de partida también cambia (~0,12 M EUR); defecto sin contabilidad = N16; umbral 10 personas.
+
 ## 2026-10-31 · F-150 · `in_progress` · T36-T44 hechas (N16-N17) · rama `feature/F-150-receta-caja`
 
 Implementer. Commits `133a305`..`3efb069` (T36-T43 y T39 bis); `azure-apps` `9488087` (local, sin
