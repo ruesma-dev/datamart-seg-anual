@@ -9,6 +9,21 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-31 · F-150 · spec ampliada, CUARTA tanda (N16-N17) · rama `feature/F-150-receta-caja`
+
+Spec-author. Detalle y mediciones (Azure, solo lectura): `progress/spec_F-150.md` §11. Requisitos
+R44-R52, diseño §5.10-§5.11, tareas T36-T45 (T45 redespliegue MANUAL). Topes: 150/150 y 250/250.
+- **N16**: el personal del devengo (cuota por partida = partes PERSONA interna / real, ≤ cierre) se
+  paga el último día del mes, sin IVA, H06 ni plazo; H13 sobre la base sin personal; sigue en 30
+  hipótesis. 0686, noviembre: ~0,21 de 2,60 M EUR; 21 obras: 5,64 de 118,49.
+- **N17**: VIABLE en parte por `raw.ctrpro.paride`: objeto nuevo
+  `tesoreria.devengo_pendiente_contrato_mes`; enlazado 43 % (48,90 de 112,85; 0686 69 %, 1,64 de 2,39);
+  el resto, H02.
+- **Para validar el humano** (no bloquean): las cargas sociales se pagan en realidad al mes siguiente
+  (se aplica su «fin de mes siempre»); la 0715 (sin partes, ~2,08 M EUR de partidas de oficio) va por
+  contrato o H02 hasta que tenga partes.
+- No medir Azure entre 00:00 y ~03:15 UTC: la nocturna recarga `raw` y `mart`.
+
 ## 2026-10-30 · F-150 · `in_progress` · T17-T34 hechas (N11-N15) · rama `feature/F-150-receta-caja`
 
 Implementer. Commits `1b3e96a`..`34639c6`; `azure-apps` `c57c52e`, `d3cafe9`, `3ca37bf` (locales,
