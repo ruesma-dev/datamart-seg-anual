@@ -9,6 +9,19 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-31 · F-150 · `in_progress` · T36-T44 hechas (N16-N17) · rama `feature/F-150-receta-caja`
+
+Implementer. Commits `133a305`..`3efb069` (T36-T43 y T39 bis); `azure-apps` `9488087` (local, sin
+push). Detalle, contraste, sandbox, RED y evidencias: `progress/impl_F-150.md` (T17-T35 pasó a
+`impl_F-150_tanda2_3.md`). Mutación: `progress/mutacion_F-150_n16_n17.md`.
+- **N16**: `07` separa el personal del devengo de COSTE (cuota de los partes sobre el real, tope 1;
+  CP 0): medido 5,65 M EUR en 21 obras, 0686 0,21. Se paga el último día del mes (regla, no hipótesis).
+- **N17**: `tesoreria.devengo_pendiente_contrato_mes`: enlazado 48,90 de 112,84 (0686 1,64 de 2,39).
+- **Desviación (T39 bis)**: solo los (partida, mes) con importe > 0 van a contrato (diseño §5.11 paso
+  3); un mes negativo del plan va entero sin contrato. Sin ella, la 1-0702 (−0,11 EUR en noviembre)
+  habría tumbado `build-tesoreria` por R50 la primera noche. Con ella, 0 negativos medidos.
+- Diccionario **v67** (receta pasos 1, 4, 5, 6; fuera N13-b). Siguiente: review y luego T45.
+
 ## 2026-10-31 · F-150 · spec ampliada, CUARTA tanda (N16-N17) · rama `feature/F-150-receta-caja`
 
 Spec-author. Detalle y mediciones (Azure, solo lectura): `progress/spec_F-150.md` §11. Requisitos
@@ -38,7 +51,10 @@ sin push). Detalle, contrastes, RED y evidencias: `progress/impl_F-150.md` (la f
 - Diccionario del árbol hoy: **255 objetos, 2226 columnas, 125 de consumo**, 22 reglas (v67).
 - Siguiente: review; luego el redespliegue MANUAL de abajo (lo autoriza el humano).
 
-### F-150 · Redespliegue MANUAL de N11-N15 (tras APROBADO y merge a `main`; lo hace el humano)
+### F-150 · Redespliegue MANUAL de N11-N17 (tras APROBADO y merge a `main`; lo hace el humano)
+
+Un solo despliegue para N11-N17 (T45 incluida): los pasos de abajo, con las cifras de N16-N17
+añadidas en el 4, el diccionario v67 en el 5 y la 0686 de noviembre en el 8.
 
 Lectura con `.venv/Scripts/python.exe` desde el puesto (IP en el firewall del Postgres).
 
@@ -50,8 +66,8 @@ Lectura con `.venv/Scripts/python.exe` desde el puesto (IP en el firewall del Po
 1. Imagen: `powershell -NoProfile -File infra/70_build_image.ps1` (anotar el tag nuevo).
 2. `powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag nuevo>` y comprobar con el `az`
    del paso 0 que la imagen acaba en `:<tag nuevo>`.
-3. Build (no hace falta ingesta: `raw.dca`, `dcapro`, `dcfpro`, `con`, `hmores`, `res`, `dcf` y
-   `dvf` ya están): `.venv/Scripts/python.exe main.py build-tesoreria`. SUCCESS en los 10
+3. Build (no hace falta ingesta: `raw.dca`, `dcapro`, `dcfpro`, `con`, `hmores`, `res`, `dcf`,
+   `dvf`, `ctr` y `ctrpro` ya están): `.venv/Scripts/python.exe main.py build-tesoreria`. SUCCESS en los 10
    sub-pasos (nuevos: `albaranes_pendientes` y `saldo_partida`). Duraciones: `SELECT step, status,
    finished_at - started_at FROM _meta.etl_runs WHERE step LIKE 'build_tesoreria%' ORDER BY
    started_at DESC LIMIT 15`.
@@ -71,20 +87,33 @@ Lectura con `.venv/Scripts/python.exe` desde el puesto (IP en el firewall del Po
    - `SELECT count(*), count(DISTINCT codigo) FROM tesoreria.hipotesis_caja_obra` → 630, 30.
    - `SELECT round(sum(cartera_viva_coste_proporcional)/1e6,3) FROM tesoreria.devengo_corte_obra
      WHERE concepto = 'COSTE'` → ~0.
+   - N16-N17 (las del 31-10): `SELECT round(sum(pendiente)/1e6,2), round(sum(pendiente_personal)/1e6,2),
+     round(sum(pendiente_enlazado_contrato)/1e6,2) FROM tesoreria.devengo_corte_obra WHERE concepto =
+     'COSTE'` → ~118,5, ~5,65, ~48,9; con `AND clave_obra = '1-0686'` → ~2,60, ~0,21, ~1,64; y con
+     `AND clave_obra IN ('1-0608', '1-0715')` el enlazado 0.
+   - `SELECT count(*) FILTER (WHERE importe_pendiente < 0), count(DISTINCT contrato_id),
+     round(sum(importe_pendiente)/1e6,2) FROM tesoreria.devengo_pendiente_contrato_mes` → 0,
+     cientos, ~112,8 (el coste sin CP ni personal).
+   - `SELECT fuente_personal, count(*) FROM tesoreria.devengo_pendiente_partida WHERE concepto =
+     'COSTE' GROUP BY 1` → `PARTES`, `SIN_PARTES` y `CP`.
 5. Diccionario, SOLO con la imagen ya en el job (paso 2): `.venv/Scripts/python.exe main.py
-   publicar-diccionario` (v66, 254 objetos).
+   publicar-diccionario` (**v67, 255 objetos**).
 6. `.venv/Scripts/python.exe main.py check-diccionario` → OK; `.venv/Scripts/python.exe main.py
    check-declarados` → sin faltantes; `.venv/Scripts/python.exe main.py check-unicidad --timeout
    300` → sin claves duplicadas.
 7. Reiniciar el MCP: `az containerapp show -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --query
    properties.latestReadyRevisionName -o tsv` y `az containerapp revision restart -g
    rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --revision <revision> -o none`. `contexto_bbdd()` abre con
-   «Versión 66». Si el `config.yaml` de `mcp-bbdd` lista objetos uno a uno, añadir las dos tablas
-   nuevas (memoria: lista blanca propia).
+   «Versión 67». Si el `config.yaml` de `mcp-bbdd` lista objetos uno a uno, añadir las tres tablas
+   nuevas (`albaranes_pendientes_neto`, `saldo_partida_obra`, `devengo_pendiente_contrato_mes`;
+   memoria: lista blanca propia).
 8. R31, conversación NUEVA con el MCP: «¿qué caja necesitará la obra 0686 los próximos seis meses,
    con y sin saldo de partida?» → paso 0 con H28/H29/H30 declaradas (saldo ~5,36 con los
    defectos), H13 2,37 % de la obra, albaranes netos, CP fuera, las 30 hipótesis con valor y
-   nivel. Anotar el resultado en `progress/impl_F-150.md` §6.
+   nivel; y en noviembre el personal (~0,21) el último día del mes, el coste por contrato (~1,64)
+   con H01/H04/H06 y el resto con H02, sin H02 `CI` para el personal. Anotar el resultado en
+   `progress/impl_F-150.md` §6.
+9. `bash harness/init.sh` en verde sobre `main` tras el merge.
 
 ## 2026-10-29 · F-150 · spec AJUSTADA (N11-N14) · `in_progress` · rama `feature/F-150-receta-caja`
 
