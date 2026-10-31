@@ -150,15 +150,13 @@ M2 y M5 sobrevivían con la primera miniatura (no había línea sin `comlin`): p
 
 ## 7. Verificaciones MANUAL pendientes (el humano; Azure)
 
-En `progress/current.md` (sección F-155), con el comando exacto y lo esperado:
-1. `.venv/Scripts/python.exe main.py build-compras` → OK; `comparativo_ofertas` 72.113 filas,
-   `comparativo_oferta_lineas` 792.033, `compras.v_estado_documentos` existe otra vez.
-2. `.venv/Scripts/python.exe main.py check-declarados` → código 0.
-3. `.venv/Scripts/python.exe main.py check-diccionario` → código 0.
-4. Opcional `main.py check-unicidad`: 0 duplicados por `invitacion_id` y por (`comparativo_id`,
-   `oferta_id`).
-5. **Imagen nueva del job con F-155** antes de la nocturna: sin ella, la de esta noche vuelve a
-   caer aunque el build manual deje compras al día. Y publicar el diccionario v68 con su imagen.
+En `progress/current.md` (sección F-155), con los comandos exactos, lo esperado y la vuelta
+atrás (corregido tras `progress/review_F-155.md`). Orden: merge y push (humano) → imagen
+(`infra/70_build_image.ps1`) → job (`infra/85_update_job.ps1 -Tag <tag>`, comprobado con
+`az containerapp job show`) → `build-compras` (72.113 ofertas, 792.033 líneas) →
+`check-declarados` (sin faltantes) → `publicar-diccionario` (v68) → `check-diccionario` (OK; **antes
+de publicar devuelve 1**, compara el hash publicado con el del árbol) → reinicio del MCP. Vuelta
+atrás: tag anterior `r20261031-0933`. Opcional: `check-unicidad`.
 
 ## 8. Fuera del alcance
 
