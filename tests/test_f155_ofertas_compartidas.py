@@ -121,11 +121,10 @@ DSN = os.environ.get("F155_SANDBOX_DSN")
 #: Las tablas de `raw` que leen 00, 08, 09 y 14, con los TIPOS de la ingesta
 #: (leídos de `information_schema.columns` en Azure el 2026-10-31): ids y
 #: fechas `integer`, importes y cantidades `double precision`, textos
-#: `character varying`. Solo las columnas que esos ficheros nombran.
+#: `character varying`. Solo las columnas que esos ficheros nombran. Va en una
+#: BASE NUEVA que el fixture crea y borra: nunca se tira un esquema (el veto de
+#: `tests/test_f067_reset.py`).
 RAW_DDL = """
-DROP SCHEMA IF EXISTS raw CASCADE; DROP SCHEMA IF EXISTS compras CASCADE;
-DROP SCHEMA IF EXISTS compras_restringida CASCADE;
-DROP SCHEMA IF EXISTS maestro CASCADE; DROP SCHEMA IF EXISTS descompuestos CASCADE;
 CREATE SCHEMA raw; CREATE SCHEMA maestro; CREATE SCHEMA descompuestos;
 CREATE TABLE raw.conest (ide integer, tip integer, est integer, cod varchar, res varchar);
 CREATE TABLE raw.con (ide integer, tip integer, cod varchar, res varchar, fec integer, est integer);
@@ -196,18 +195,33 @@ STUB_COMPRAS = (
 def sandbox():
     if not DSN:
         pytest.skip("sin F155_SANDBOX_DSN: la sandbox SQL de F-155 no se ejecuta")
-    import psycopg
+    import uuid
 
-    with psycopg.connect(DSN, autocommit=True) as conexion:
-        conexion.execute(RAW_DDL)
-        conexion.execute(DATOS)
-        conexion.execute(_sql("00_setup.sql"))
-        conexion.execute(STUB_COMPRAS)
-        for fichero in ("08_comparativos.sql", "09_comparativos_detalle.sql",
-                        "14_documento_adjuntos.sql"):
-            with conexion.transaction():
-                conexion.execute(_sql(fichero))
-        yield conexion
+    import psycopg
+    from psycopg.conninfo import make_conninfo
+
+    base = f"f155_sandbox_{uuid.uuid4().hex[:8]}"
+    with psycopg.connect(DSN, autocommit=True) as admin:
+        admin.execute(f'CREATE DATABASE "{base}"')
+    try:
+        with psycopg.connect(make_conninfo(DSN, dbname=base), autocommit=True) as conexion:
+            yield from _construir(conexion)
+    finally:
+        with psycopg.connect(DSN, autocommit=True) as admin:
+            admin.execute(f'DROP DATABASE IF EXISTS "{base}" WITH (FORCE)')
+
+
+def _construir(conexion):
+    """`raw` con el caso, `00_setup.sql` y 08, 09 y 14 reales, cada uno en su transacción."""
+    conexion.execute(RAW_DDL)
+    conexion.execute(DATOS)
+    conexion.execute(_sql("00_setup.sql"))
+    conexion.execute(STUB_COMPRAS)
+    for fichero in ("08_comparativos.sql", "09_comparativos_detalle.sql",
+                    "14_documento_adjuntos.sql"):
+        with conexion.transaction():
+            conexion.execute(_sql(fichero))
+    yield conexion
 
 
 def _filas(conexion, sql: str) -> list[tuple]:
