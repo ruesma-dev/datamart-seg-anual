@@ -180,6 +180,17 @@ ingredientes SIEMPRE en el mismo orden y con el dato del contrato:
   pagado (como en `07`) y el personal por el coste de sus partes (`raw.hmores`,
   PERSONA interna) hasta el último cierre, para no contarlo dos veces con el
   devengo. La cuenta del saldo es del paso 0 de la receta (H28).
+- **El personal a fin de mes y el coste por contrato** (N16-N17, 31-10): `07`
+  separa del devengo de COSTE la parte de PERSONAL de cada partida (cuota = coste
+  de sus partes, `raw.hmores` + `raw.res` con el mismo filtro que `10`, sobre su
+  coste real, tope 1; CP fuera), que se paga el último día del mes de su
+  devengo por regla fija. El resto, sin CP, se reparte entre los contratos de
+  compra de la obra que tienen la partida (`raw.ctrpro.paride`, sin Terminados
+  ni Rescindidos de `raw.ctr`/`raw.con`) por lo que les queda por servir, con
+  redondeo acumulado (la suma cuadra al céntimo y el resto nunca es negativo),
+  y se publica en `tesoreria.devengo_pendiente_contrato_mes` (una guarda `DO`
+  exige que cuadre con `devengo_pendiente_obra_mes`). Lo que no enlaza va en la
+  fila de `contrato_id` vacío, con H02 de su categoría.
 
 **`descompuestos` (F-097, 2026-09-28) es de qué se compone cada partida**, por
 ORIGEN, y es el primer esquema del datamart que NO se reconstruye de cero:
