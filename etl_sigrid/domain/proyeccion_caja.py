@@ -451,6 +451,59 @@ def pendiente_personal(pendiente: Decimal, cuota: Decimal) -> Decimal:
 
 
 # ---------------------------------------------------------------------------
+# El coste pendiente repartido por CONTRATO de compra (F-150, R48, N17)
+# ---------------------------------------------------------------------------
+
+
+def fracciones_contrato(
+    pendiente: Decimal | None, pendientes_servir: Mapping[int, Decimal | None]
+) -> dict[int, Decimal]:
+    """La parte del pendiente de una partida que va por cada contrato (R48, N17).
+
+    `pendiente` es el devengo de COSTE de la partida sin personal (ni CP);
+    `pendientes_servir`, lo contratado y aún no servido de cada contrato de
+    compra con esa partida (por (contrato, partida), suelo 0). Solo cuentan
+    los contratos con pendiente de servir > 0: `S` = su suma. Lo ENLAZADO es
+    `min(pendiente, S)` (lo contratado de más no es devengo; lo devengado de
+    más no tiene contrato) y la fracción de cada contrato `c` es `enlazado /
+    pendiente x ps_c / S`, sin redondear (Σ fracciones ≤ 1). Sin pendiente
+    > 0 o sin `S` > 0, `{}`: todo va sin contrato (H02).
+    """
+    if pendiente is None or pendiente <= 0:
+        return {}
+    vivos = {c: ps for c, ps in pendientes_servir.items() if ps is not None and ps > 0}
+    total = sum(vivos.values(), _CERO)
+    if total <= 0:
+        return {}
+    enlazado = min(pendiente, total)
+    return {c: enlazado / pendiente * ps / total for c, ps in vivos.items()}
+
+
+def repartir_por_contratos(
+    importe: Decimal, fracciones: Mapping[int, Decimal]
+) -> dict[int | None, Decimal]:
+    """Reparte un importe (una partida en un mes) entre sus contratos (R48).
+
+    Al céntimo y por ACUMULADO en orden de contrato: el contrato `c` recibe
+    `ROUND(importe x Σ f hasta c, 2) - ROUND(importe x Σ f hasta el anterior,
+    2)`, y la clave `None` (sin contrato) el resto, `importe - ROUND(importe x
+    Σ f, 2)`. Así, con `importe` ≥ 0, ningún trozo es negativo, el resto es ≥ 0
+    (0 si Σ f = 1) y la suma es el importe EXACTO; el `ROUND` contrato a
+    contrato podría pasarse en céntimos y dejar un resto negativo.
+    """
+    reparto: dict[int | None, Decimal] = {}
+    acumulada = _CERO
+    anterior = _CERO
+    for contrato in sorted(fracciones):
+        acumulada += fracciones[contrato]
+        hasta_aqui = _redondear(importe * acumulada)
+        reparto[contrato] = hasta_aqui - anterior
+        anterior = hasta_aqui
+    reparto[None] = importe - anterior
+    return reparto
+
+
+# ---------------------------------------------------------------------------
 # Lo que no se publica (R16)
 # ---------------------------------------------------------------------------
 
