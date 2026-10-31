@@ -526,6 +526,12 @@ ALTER TABLE tesoreria.devengo_pendiente_partida ADD COLUMN IF NOT EXISTS iva_por
 ALTER TABLE tesoreria.devengo_pendiente_partida ADD COLUMN IF NOT EXISTS fuente_iva VARCHAR(8);
 ALTER TABLE tesoreria.devengo_pendiente_partida ADD COLUMN IF NOT EXISTS retencion_porcentaje NUMERIC(10,4);
 ALTER TABLE tesoreria.devengo_pendiente_partida ADD COLUMN IF NOT EXISTS fuente_retencion VARCHAR(8);
+-- F-150 (N16, R45): la parte de PERSONAL propio de cada partida de COSTE (partes
+-- hasta el cierre entre lo real a origen, tope 1) y lo pendiente que se paga el
+-- ultimo dia del mes de su devengo. Solo COSTE; en VENTA, NULL.
+ALTER TABLE tesoreria.devengo_pendiente_partida ADD COLUMN IF NOT EXISTS cuota_personal NUMERIC(12,6);
+ALTER TABLE tesoreria.devengo_pendiente_partida ADD COLUMN IF NOT EXISTS pendiente_personal NUMERIC(18,2);
+ALTER TABLE tesoreria.devengo_pendiente_partida ADD COLUMN IF NOT EXISTS fuente_personal VARCHAR(12);
 
 CREATE TABLE IF NOT EXISTS tesoreria.devengo_pendiente_obra_mes (
     obra_id                      INTEGER       NOT NULL,
@@ -552,6 +558,8 @@ ALTER TABLE tesoreria.devengo_pendiente_obra_mes ADD COLUMN IF NOT EXISTS import
 ALTER TABLE tesoreria.devengo_pendiente_obra_mes ADD COLUMN IF NOT EXISTS base_sin_iva_contrato NUMERIC(18,2);
 ALTER TABLE tesoreria.devengo_pendiente_obra_mes ADD COLUMN IF NOT EXISTS importe_retencion_contrato NUMERIC(18,2);
 ALTER TABLE tesoreria.devengo_pendiente_obra_mes ADD COLUMN IF NOT EXISTS base_sin_retencion_contrato NUMERIC(18,2);
+-- F-150 (N16, R46): el personal del mes (mismo reparto que el pendiente). Solo COSTE.
+ALTER TABLE tesoreria.devengo_pendiente_obra_mes ADD COLUMN IF NOT EXISTS importe_pendiente_personal NUMERIC(18,2);
 
 CREATE TABLE IF NOT EXISTS tesoreria.devengo_corte_obra (
     obra_id                       INTEGER       NOT NULL,
@@ -597,6 +605,11 @@ ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS base_pendiente
 -- Solo COSTE.
 ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS cartera_viva_coste_proporcional NUMERIC(18,2);
 ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS cartera_emitida_tras_cierre_coste_proporcional NUMERIC(18,2);
+-- F-150 (N16, R46): el personal pendiente de la obra. Solo COSTE.
+ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS pendiente_personal NUMERIC(18,2);
+-- F-150 (N17, R49): lo pendiente de coste de la obra que va por CONTRATO de compra
+-- (la suma de las filas con contrato de `devengo_pendiente_contrato_mes`). Solo COSTE.
+ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS pendiente_enlazado_contrato NUMERIC(18,2);
 
 
 -- ---------------------------------------------------------------------------
@@ -656,3 +669,26 @@ CREATE TABLE IF NOT EXISTS tesoreria.saldo_partida_obra (
     iva_repercutido_cobrado_hasta_4m        NUMERIC(18,2) NOT NULL,
     PRIMARY KEY (obra_id)
 );
+
+
+-- ---------------------------------------------------------------------------
+-- F-150 (N17, R49): el coste pendiente de la obra repartido por CONTRATO de compra
+--
+-- Una fila por (obra, mes, categoria, contrato) de las obras de la receta en
+-- COSTE: el pendiente sin coste proporcional (CP) ni personal, repartido entre
+-- los contratos de compra de cada partida por lo que les queda por servir. La
+-- fila sin contrato (`contrato_id` NULL) es el resto, que va con H02. La llena
+-- `07_devengo_pendiente.sql`. Sin contrato es clave valida: `NULLS NOT DISTINCT`.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS tesoreria.devengo_pendiente_contrato_mes (
+    obra_id            INTEGER       NOT NULL,
+    empresa_id         INTEGER,
+    clave_obra         VARCHAR(40),
+    anio_mes           DATE          NOT NULL,
+    categoria          VARCHAR(8),
+    contrato_id        INTEGER,
+    importe_pendiente  NUMERIC(18,2) NOT NULL,
+    num_partidas       INTEGER       NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_tes_devengo_pendiente_contrato_mes ON tesoreria.devengo_pendiente_contrato_mes (obra_id, anio_mes, categoria, contrato_id) NULLS NOT DISTINCT;

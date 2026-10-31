@@ -35,9 +35,11 @@ H14 y H30, de AdP. **F-154**: la caja de ESTRUCTURA (el CP). Ni `sigrid-api` ni 
   `test_f066_ingesta_raw.py` (80), `test_f147_presupuesto_contexto.py` (N11, con su motivo).
 - `docs/CONVENTIONS.md`, `docs/ARCHITECTURE.md`, `CLAUDE.md` (mapa) y
   `azure-apps/datamart_seg_anual.md` (consume `iva` y `dvf`; publica los albaranes netos).
+- (N16-N17) `07` (§5.10-§5.11) y `00_setup.sql` (columnas y tabla nuevas); YAML: textos de H01, H02,
+  H06 y H13 (siguen 30); `tesoreria.yaml`, `00_global.yaml` (`version` 67); `test_f140_sql.py`.
 
 **Crear**: `tests/test_f150_{receta,coeficiente,contrato,hueco,ingesta,perfil,sql,diccionario,
-albaranes,saldo}.py`; `sql/tesoreria/09_albaranes_pendientes.sql` (N11), `10_saldo_partida.sql` (N14).
+albaranes,saldo,personal,contrato_compra}.py`; `sql/tesoreria/09_albaranes_pendientes.sql` (N11), `10_saldo_partida.sql` (N14).
 
 **No se tocan**: `sql/stg/*`, `sql/mart/*`, `sql/compras/*` (N11 COPIA la fórmula, §5.7), `01`-
 `05`, permisos (el esquema ya se concede entero; `raw` no), `main.py`, `domain/diccionario.py`,
@@ -46,25 +48,20 @@ contrato (N7), ni columna nueva para CP (N12: ya está `categoria`).
 
 ## 3. La receta (en la ficha de `tesoreria.hipotesis_caja`)
 
-El texto vive en la `descripcion` de la ficha (T12; `describir_tabla` la sirve entera y F-147 no
-la mide) y R2-R4 fijan sus piezas: siete pasos (DEVENGO, DOCUMENTO, COEFICIENTES, PLAZO,
-RETENCION, IVA, CARTERA), cada hipótesis en el suyo. El ajuste del 29-10 cambia tres tramos:
-
-- **Paso 1 (N12, N13).** «Solo el coste de la OBRA: el coste PROPORCIONAL (`categoria` = `CP`,
-  estructura) NO es caja de la obra: exclúyelo y declara su importe. El PERSONAL de la obra ya
-  está aquí, como coste del RECURSO con sus cargas sociales: NO sumes pagos de personal de la
-  cartera (nóminas, embargos, cuotas de `tesoreria_restringida`) ni digas que faltan.»
-- **Paso 4 (N11).** Los albaranes netos, con la forma de pago de su `contrato_id` (H01) y, sin
-  él, H02 `OTRO`. (N13-b) **Aviso**: el personal de la obra va en CI y se paga con H02 `CI`;
-  su plazo real es mensual: si importa, fija H02 `CI` por obra (USUARIO u OBRA) y dilo.
-- **Paso 7 (N11).** «... y los albaranes pendientes de facturar NETOS por proveedor
-  (`importe_pendiente_neto` de `tesoreria.albaranes_pendientes_neto`; NUNCA sumes las líneas
-  positivas de `compras.v_pbi_albaranes_sin_facturar`: lo sobrefacturado a un proveedor ya paga
-  sus otras entregas). Sin las filas `tras_cierre`, que ya son devengo pendiente. H20: la factura,
-  a fin de `mes_albaran`, y el plazo desde ahí; las de `meses_antiguedad` > H27 (o sin mes) NO son
-  caja: exclúyelas y declara su importe.» Sale la mención a `R-ALBARAN-ABSURDO` (el objeto ya
-  excluye esas líneas). (N12) De la cartera de PAGO resta lo de CP: `cartera_viva_coste_proporcional`
-  y `cartera_emitida_tras_cierre_coste_proporcional` de `devengo_corte_obra` (COSTE), y decláralo.
+El texto vive en la `descripcion` de la ficha (`describir_tabla` la sirve entera; F-147 no la mide)
+y R2-R4 fijan sus piezas: ocho pasos (SALDO, DEVENGO, DOCUMENTO, COEFICIENTES, PLAZO, RETENCION,
+IVA, CARTERA), cada hipótesis en el suyo. Lo que ya está escrito (N11-N15: CP fuera, personal por
+el RECURSO, albaranes netos, saldo, IVA de la obra) es la ficha v66. La CUARTA tanda (N16-N17) cambia:
+- **Paso 1.** «El PERSONAL (`importe_pendiente_personal`) se paga el ÚLTIMO DÍA del mes de su
+  devengo, sin documento, plazo, fraccionamiento, retención ni IVA: es una regla, no una hipótesis.
+  Una obra sin partes no tiene cuota de personal (`fuente_personal` `SIN_PARTES`): dilo.»
+- **Paso 4.** Sale el aviso N13-b. «El resto del coste de la obra va por
+  `tesoreria.devengo_pendiente_contrato_mes`: las filas con `contrato_id`, con la forma de pago de
+  ese contrato (H01, H15) y los días del proveedor (H04); las de `contrato_id` vacío, con H02 de
+  su `categoria`. Declara la parte enlazada (`pendiente_enlazado_contrato` del corte).»
+- **Paso 5.** «H06 solo en las filas con contrato (su `retencion_garantia_porcentaje`); sin
+  contrato, el valor de H06; el personal, nunca.» **Paso 6.** «El H13 de la obra, sobre la base
+  SIN personal (las nóminas no llevan IVA y el H13 se mide en facturas).»
 
 ## 4. Dominio (`domain/proyeccion_caja.py`, sin infraestructura)
 
@@ -79,6 +76,10 @@ RETENCION, IVA, CARTERA), cada hipótesis en el suyo. El ajuste del 29-10 cambia
   `acumulado_previo` = Σ de los positivos anteriores; negativos y `None` -> 0. Es la fórmula de la
   ventana de `09` (§5.7) y los tests la comparan. `SERIES_ALBARAN_PENDIENTE = ("AC", "PROF")` y
   `UMBRAL_IMPORTE_ABSURDO = 1e8` (literales del SQL).
+
+- **(N16) `cuota_personal(personal, real) -> Decimal`** (R44) y **(N17) `fracciones_contrato(pendiente,
+  pendientes_servir: Mapping[int, Decimal]) -> dict[int, Decimal]`** y **`repartir_por_contratos(importe,
+  fracciones) -> dict[int | None, Decimal]`** (R48); `FUENTES_PERSONAL = ("PARTES", "SIN_PARTES", "CP")`.
 
 El SQL lleva los literales del dominio (regex, códigos, fuentes, `9`, `11`, `ROUND(…, 6)`, orden
 del `COALESCE`, `GREATEST(0, …)`, motivo de H12, series, umbral) y los tests los comparan (F-135).
@@ -107,34 +108,13 @@ sus líneas (`obride`) con factura (`raw.con.fec`) en los 12 meses hasta el buil
 si no, DEFECTO (5,5, la empresa). Dominio: `iva_efectivo_compra(base, cuota)` -> `Decimal | None`.
 Receta, paso 6: el IVA del pago = base × el H13 DE LA OBRA, no el de la empresa.
 
-**5.7 · `09_albaranes_pendientes.sql` (N11).** Tabla en `00_setup.sql`:
-`tesoreria.albaranes_pendientes_neto` (`obra_id`, `empresa_id`, `clave_obra`, `proveedor_id`,
-`contrato_id`, `mes_albaran` DATE, `importe_pendiente_bruto`, `importe_sobrefacturado`,
-`importe_compensado`, `importe_pendiente_neto` NUMERIC(18,2), `meses_antiguedad` INTEGER,
-`tras_cierre` BOOLEAN) con `UNIQUE (obra_id, proveedor_id, contrato_id, mes_albaran) NULLS NOT
-DISTINCT` (precedente: `retenciones.saldo_contable`). `09`, una transacción, con guarda de entrada
-(`raw.dca`, `raw.dcapro`, `raw.con`, `tesoreria.devengo_corte_obra`):
-1. **Universo**: las obras de `tesoreria.devengo_corte_obra` con `concepto = 'COSTE'` (su
-   `empresa_id`, `clave_obra` y `mes_ultimo_cierre`).
-2. **Líneas** `_alb_linea`: `raw.dcapro d JOIN raw.dca a ON a.ide = d.docide JOIN raw.con c ON
-   c.ide = a.ide`, obra `NULLIF(d.obride, 0)` en el universo, `tesoreria.fn_serie(c.cod) IN ('AC',
-   'PROF')`; proveedor `NULLIF(a.entide, 0)`; fecha `tesoreria.fn_fecha(c.fec)`; contrato
-   `COALESCE(NULLIF(a.ctride, 0), CASE WHEN d.docoritip = 44 THEN NULLIF(d.docoriide, 0) END)`;
-   pendiente = el `CASE` de `importe_pendiente_facturar` de `compras/01_documentos.sql` COPIADO
-   letra a letra (un test compara el texto normalizado); solo `pendiente <> 0`, `abs(tot) < 1e8` y
-   `abs(pendiente) < 1e8` (`R-ALBARAN-ABSURDO`). No lee `compras`: se construye DESPUÉS (main.py).
-3. **FIFO** (R33): `N` = Σ |negativos| por (obra, proveedor); en las positivas, ventana `SUM(p)
-   OVER (PARTITION BY obra_id, proveedor_id ORDER BY fecha NULLS FIRST, linea_id)` y `compensado =
-   LEAST(p, GREATEST(0, N − (acumulado − p)))`. Sin proveedor: `N` = 0 (no compensa ni se compensa).
-4. `TRUNCATE` + `INSERT` agrupando por (obra, proveedor, contrato, `date_trunc('month', fecha)`):
-   bruto, sobrefacturado (Σ |negativos|), compensado y neto; `meses_antiguedad` = meses entre
-   `mes_albaran` y `date_trunc('month', CURRENT_DATE)` (NULL sin fecha); `tras_cierre` =
-   `mes_ultimo_cierre IS NULL OR mes_albaran > mes_ultimo_cierre`. Filas con bruto o
-   sobrefacturado > 0.
-5. **Guarda** `DO` (R35): por (obra, proveedor) con proveedor, Σ neto = `GREATEST(0, Σ bruto − Σ
-   sobrefacturado)`; sin proveedor, Σ neto = Σ bruto; ningún compensado fuera de [0, bruto]. Si
-   no, `RAISE` con el recuento: la transacción se deshace y quedan las filas de ayer.
-`COMMENT ON TABLE` con el qué y la clave. Coste medido en solo lectura: 5-15 s (30.533 líneas).
+**5.7 · `09_albaranes_pendientes.sql` (N11; hecho, T18).** Tabla `tesoreria.albaranes_pendientes_neto`
+(R34; `UNIQUE (obra_id, proveedor_id, contrato_id, mes_albaran) NULLS NOT DISTINCT`), una transacción
+con guarda de entrada: universo = obras de `devengo_corte_obra` COSTE; líneas de `raw.dcapro`/`dca`/
+`con` (`AC`/`PROF`, contrato de cabecera o de línea 44, el `CASE` del pendiente COPIADO de
+`compras/01`, `abs` < 1e8); FIFO por (obra, proveedor) con la ventana de `neto_fifo` (R33); agrupado
+por (obra, proveedor, contrato, mes) con `meses_antiguedad` y `tras_cierre`; guarda R35. Detalle: el
+`COMMENT` y la cabecera de `09`. Coste medido: 5-15 s.
 
 **5.8 · `07`, la cartera de CP (N12).** `devengo_corte_obra` gana, en COSTE (NULL en VENTA),
 `cartera_viva_coste_proporcional` y `cartera_emitida_tras_cierre_coste_proporcional` (NUMERIC(18,2),
@@ -168,11 +148,39 @@ y sus `_hasta_4t` (pagado o cobrado antes del 1 de enero del año del build) y `
 ya recuperado según H30 (`MENSUAL_REDEME`, el defecto: solo `_hasta_4m`; `COMPENSA_EMPRESA`: todo;
 `ANUAL`: solo `_hasta_4t`).
 
+**5.10 · `07`, el personal del devengo (N16, CUARTA tanda).** `_dev_real` pasa a COSTE y VENTA
+(misma fuente). `_dev_personal`: por (obra, partida) de COSTE, Σ `raw.hmores.tot::NUMERIC(18,2)` de
+`raw.res` `cla = 1 AND COALESCE(prvide, 0) = 0` (el filtro de `_sal_personal` de `10`; un test compara
+el texto) con mes ≤ `mes_ultimo_cierre`. En `_dev_partida` (COSTE): `cuota_personal` (R44, `CASE`
+literal del dominio; `CP` -> 0), `pendiente_personal` y `fuente_personal`. En `_dev_reparto`,
+`parte_personal` con el mismo patrón que `parte_con_coef` (el último mes absorbe el redondeo) ->
+`importe_pendiente_personal`; el corte, `pendiente_personal`; la guarda de la suma, también el
+personal. Elegido por MEDIDA (§11 del informe): Σ partes / Σ real a origen de LA PARTIDA (el 95 % del
+personal histórico cae en 248 partidas CI con cuota ~1). Descartados: el descompuesto del master
+(las partidas de personal no tienen líneas `MANO_OBRA`: daría 0 en CI y 1,42 de subcontrata en CD) y
+el nombre de la partida (no estándar; en la 0686 no encuentra nada). Guarda de entrada: `raw.res`.
+
+**5.11 · `07`, el coste por contrato (N17).** Tabla nueva en `00_setup.sql`:
+`tesoreria.devengo_pendiente_contrato_mes` (`obra_id`, `empresa_id`, `clave_obra`, `anio_mes`,
+`categoria`, `contrato_id` NULL = sin contrato, `importe_pendiente` NUMERIC(18,2), `num_partidas`;
+`UNIQUE (obra_id, anio_mes, categoria, contrato_id) NULLS NOT DISTINCT`). En `07`, tras el reparto:
+1. `_dev_ctr`: por (obra, partida, contrato), `GREATEST(0, Σ tot − Σ tot × canser / NULLIF(can, 0))`
+   de `raw.ctrpro` (`::NUMERIC`, `abs(tot)` < 1e8, `NULLIF(paride, 0)`) JOIN `raw.ctr c` (`c.obride` =
+   la obra) JOIN `raw.con` (`est NOT IN (8, 9)`: Terminado, Rescindido) y solo contratos de
+   `tesoreria.condiciones_contrato_compra` (H01 necesita su forma de pago). Por (contrato, partida) y
+   no por línea: las líneas se sirven cruzadas (0686: 12,18 por línea frente a 3,36 neto).
+2. Fracciones (R48) sobre `np` = `pendiente − pendiente_personal` de cada partida COSTE no `CP`.
+3. Cada fila de `_dev_reparto` (partida, mes) con `np` > 0: su importe sin personal × la fracción
+   de cada contrato, al céntimo, y el resto a la fila sin contrato (`repartir_por_contratos`).
+4. `TRUNCATE` + `INSERT` agrupando por (obra, mes, `categoria`, contrato); guarda R50 (`RAISE` con
+   el recuento). El corte gana `pendiente_enlazado_contrato` (Σ de las filas con contrato).
+Guarda de entrada: `raw.ctrpro`, `raw.ctr`, `raw.con`. Lo contratado pendiente de servir que supera
+el devengo (15,34 M EUR) NO se publica: no es devengo.
+
 ## 6. El catálogo (`config/hipotesis_caja.yaml`)
 
-`paso_receta` de las 27: DEVENGO H18, H19, H23, H26 · DOCUMENTO H03, H08 · COEFICIENTES ninguna
-(es dato) · PLAZO H01, H02, H04, H05, H09, H15, H22, H24, H25 · RETENCION H06, H07, H10, H11 ·
-IVA H12, H13, H14 · CARTERA H16, H17, H20, H21, H27.
+`paso_receta` de las 30: SALDO H28, H29 · DEVENGO H18, H19, H23, H26 · DOCUMENTO H03, H08 · PLAZO
+H01, H02, H04, H05, H09, H15, H22, H24, H25 · RETENCION H06, H07, H10, H11 · IVA H12-H14, H30 · CARTERA el resto.
 
 | Código | Cambio | Unidad | Defecto | `fuente_defecto` |
 |---|---|---|---|---|
@@ -186,11 +194,13 @@ IVA H12, H13, H14 · CARTERA H16, H17, H20, H21, H27.
 | H29 | (N14) NUEVA · Pagarés agrupados, PAGO, paso SALDO | OPCION `[ORIGINALES, AGR]` | `ORIGINALES` | HIPÓTESIS: el AGR pierde la obra; vencido = pagado en su fecha, no vencido = pendiente a su vencimiento (0686: 1,32 y 0,27 M EUR) |
 | H13 | (N15) SIGRID por obra (§5.6 bis); defecto, la empresa | PORCENTAJE | `5.5` | 12 meses, base ≥ 0,5 M EUR: 16 de 21 obras (0686 2,36 %; 0697 20,9 %) |
 | H30 | (N15) NUEVA · Cuándo vuelve el IVA a devolver, AMBOS, paso IVA | OPCION `[MENSUAL_REDEME, COMPENSA_EMPRESA, ANUAL]` | `MENSUAL_REDEME` (humano, 29-10) | empresa 1: a devolver casi cada mes y devuelto a los 3-5 meses (4700): apunta a `MENSUAL_REDEME` (4 meses); AdP |
+| H01 / H06 | (N17) ingrediente también `devengo_pendiente_contrato_mes`; texto: «las filas con contrato» | igual | igual | cobertura medida (§11) |
+| H02 | (N17) «solo lo que NO tiene contrato: las filas sin `contrato_id`; el personal, nunca (fin de mes)» | igual | igual | igual |
+| H13 | (N16) «sobre la base SIN personal» | igual | igual | igual |
 | H27 | NUEVA · Antigüedad máxima de lo pendiente de facturar; (N11) ingrediente y fuente | MESES | `6` | con el neto FIFO, 0,52 de 8,76 M EUR tienen más de 6 meses (bruto: 22,8) |
 
-Todas `validado: false`, `admite_obra: true`; ingrediente de H24/H25 `plazos_forma_pago`, de H26
-`devengo_corte_obra`, de H20/H27 (N11) `tesoreria.albaranes_pendientes_neto`. H20 dice además «neto
-por proveedor; los `tras_cierre` ya son devengo». Textos de H10, H12-H15 como en la v63.
+Todas `validado: false`, `admite_obra: true`; ingredientes: H24/H25 `plazos_forma_pago`, H26
+`devengo_corte_obra`, H20/H27 `albaranes_pendientes_neto` («neto por proveedor; `tras_cierre` es devengo»).
 
 ## 7. El diccionario y el presupuesto de F-147
 
@@ -200,51 +210,41 @@ medida) gana el CP fuera, el personal por el devengo del recurso y los albaranes
 preguntas cortas: «Cuanto queda de verdad por facturar de albaranes en la obra X», «Cuando se
 pagaran los albaranes pendientes de la obra X»); aviso en `compras.v_pbi_albaranes_sin_facturar`
 (solo líneas > 0); `devengo_*`: «`CP` no es caja de la obra»; `efectos` y `efectos_restringidos_mes`:
-el personal va por el devengo. `version` 64 con su nota; `PRESUPUESTO_MAX` sube EXACTAMENTE lo que
+el personal va por el devengo. `version` 64 con su nota; (N16-N17) `version` 67: `regla` con el
+personal a fin de mes y el coste por contrato, ficha NUEVA de `devengo_pendiente_contrato_mes`
+(recomendada, 2 preguntas cortas) y columnas nuevas de las `devengo_*`; `PRESUPUESTO_MAX` sube EXACTAMENTE lo que
 mida la ficha nueva, con su línea de historia.
 
 ## 8. Despliegue (MANUAL, tras el review) y riesgos
 
 Imagen y job; `ingest` de `iva` y `dvf` ANTES de `build-tesoreria`; R30; `publicar-diccionario`
-con la imagen ya en el job; `check-*`; MCP reiniciado; R31. Vuelta atrás: `r20261029-1340`.
+con la imagen ya en el job; `check-*`; MCP reiniciado; R31. Vuelta atrás: `r20261030-2125` (N16-N17).
 **Riesgos.** (1) La IA no abre la ficha: `resumen` y `regla` la nombran. (2) Doble fraccionamiento
 (`30 60 90` y H24). (3) `dvf` no marca anuladas; H21 casa por emisión (F-040). (4) La fórmula del
 pendiente vive en `compras/01` y `09` (la ata un test). (5) FIFO es SUPOSICIÓN (lo avala el 93 % de
 facturas del mes del albarán). (6) Las líneas de `R-ALBARAN-ABSURDO` ya no están en `raw.dcapro`:
 retirar la regla es otro trabajo. (7) El CP incluye LEVANTAMIENTO (1,91) y SEGURO T.R.C. (0,19).
+(8, N16) Una obra sin partes no tiene cuota (0715: ~2,1 M EUR de partidas CI con nombre de oficio,
+sin un parte); la receta lo avisa. (9, N17) `canser` es de Sigrid: si se sirve sin marcarlo, el
+enlace sobra (cota: lo enlazado nunca pasa del devengo sin personal de la partida).
 
 ## 9. Decisiones
 
-**Cerradas antes del 29-10** (detalle en `progress/spec_F-150.md` §7-§9): D1, D3-D7, D10; H26,
-H24/H25, H14 `MENSUAL`, H21 como riesgo; N1 coeficiente contrato > master 9 > master 11; N2 IVA del
-contrato y H12 solo para la base sin él; N3 lo mismo con la retención y H10; N4 bases `SIN`; N5
-avisos; N6 `include_columns`; N7 H13 por contrato, fuera; N8 H20 y H27; N9 hueco NETO POR OBRA; N10
-gramática real de `coestr`.
+**Cerradas antes del 29-10** (`progress/spec_F-150.md` §7-§9): D1, D3-D7, D10, H14, H21, H24-H26;
+N1-N10 (coeficiente, IVA y retención del contrato, bases `SIN`, avisos, `include_columns`, H20/H27,
+hueco NETO POR OBRA, gramática de `coestr`).
 
-**N11-N13, aprobadas por el humano el 29-10** (medido: `progress/spec_F-150.md` §10):
-- **N11 · Albaranes NETOS por (obra, proveedor), suelo 0**: objeto propio con grano (obra,
-  proveedor, contrato, mes) para fechar H20/H27; FIFO; `AC`/`PROF` (NOTA: 0 en las 21 obras);
-  desde `raw` (`compras` se construye después: daría el pendiente de AYER); solo las obras de la
-  receta; `tras_cierre` por la propia H20. Descartado: columnas del corte (sin fecha) y LIFO.
-- **N12 · El CP no es caja de la obra** (ni en el devengo ni en la cartera): en el devengo, por
-  `categoria` (ya publicada; una marca la duplicaría) y fuera de H02; en la cartera, la parte CP
-  de cada efecto por la categoría de las partidas de su factura (§5.8), en dos columnas del corte
-  (no en `tesoreria.efectos`: se construye antes y `compras.vencimientos` fija sus columnas). Su
-  caja, F-154.
-- **N13 · El personal va por el devengo del RECURSO**: la receta no suma nóminas de la cartera ni
-  las da por ausentes (textos, sin columnas). **N13-b, plazo del personal (decisión del líder,
-  29-10, por la prisa del humano; opción D del informe §10)**: sin hipótesis nueva; va con H02
-  `CI` y un aviso en la receta. El personal no se identifica limpio en el devengo (por nombre de
-  partida, ~6,03 M EUR de los 12,83 de CI; ni código estándar ni naturaleza en `descompuestos`).
-- **N14 · SEGUNDA TANDA, el saldo de partida (paso 0; respuestas del humano del 29-10, §10.5)**:
-  CON IVA y opcional (H28); AGR por sus ORIGINALES como hipótesis (H29: rompe
-  `R-TESORERIA-ESTADO` a propósito y se declara; con `ORIGINALES` los AGR con obra no se suman
-  para no contarlos dos veces); retenciones, efectos propios; personal: **decisión del líder**,
-  `raw.hmores.tot` de recursos PERSONA internos hasta el último cierre (Sigrid guarda el precio de
-  cada parte: varía por año en 458 de 545 recursos; no hay otra tabla de histórico). §5.9.
-- **N15 · TERCERA TANDA, el IVA con inversión del sujeto pasivo (humano, 29-10; §10.6)**: H13
-  SIGRID por obra con umbral de base (§5.6 bis; la marca ISP de Sigrid es falsa); H30 nueva para
-  cuándo vuelve el IVA a devolver (`MENSUAL_REDEME` = a los 4 meses del mes liquidado, la mediana
-  medida; `ANUAL` = tras el 4T, en febrero); y el saldo suma el IVA neto ya recuperado (§5.9).
-  **Decisión del spec-author**: simétrico (resta también el repercutido cobrado, 0,34 M EUR: si no,
-  las obras al 21 % saldrían mejor de lo real). Tareas T32-T35, tras T31.
+**N11-N15, aprobadas por el humano el 29-10** (medido: `progress/spec_F-150.md` §10): **N11**
+albaranes NETOS por (obra, proveedor), FIFO, suelo 0, objeto propio desde `raw` (`compras` se
+construye después); **N12** el CP no es caja de la obra: en el devengo por `categoria`, en la cartera
+por las partidas de la factura de cada efecto (§5.8), su caja es F-154; **N13** el personal va por el
+devengo del RECURSO, no por las nóminas (N13-b, H02 `CI` con aviso, SUSTITUIDA por N16); **N14** el
+saldo de partida CON IVA y opcional (H28), los AGR por sus ORIGINALES (H29, hipótesis que rompe
+`R-TESORERIA-ESTADO`), el personal por `raw.hmores.tot` PERSONA interna hasta el cierre; **N15** H13
+SIGRID por obra con umbral, H30 para la vuelta del IVA y el saldo con el IVA neto recuperado
+(simétrico, decisión del spec-author).
+**N16-N17, CUARTA tanda (humano, 31-10: «el pago de salarios es a fin de mes siempre»; «arréglalo
+todo ya»; medido en `progress/spec_F-150.md` §11)**: **N16** el personal se paga a fin de mes, regla
+fija y no hipótesis; cuota por partida de partes sobre real (§5.10). **N17** VIABLE en parte: el
+enlace partida -> contrato existe (`raw.ctrpro.paride`, 32.386 líneas en las 21 obras) y cubre el
+43 % del coste sin personal ni CP (0686: 69 %); el resto, H02. Tareas T36-T45, tras T35.

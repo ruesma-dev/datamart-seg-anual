@@ -1,177 +1,137 @@
 <!-- progress/impl_F-150.md -->
-# F-150 · Informe del implementer · segunda y tercera tanda (T17-T35)
+# F-150 · Informe del implementer · cuarta tanda (T36-T45): personal a fin de mes y coste por contrato
 
-La fase 1 (T1-T16, el arreglo del despliegue del 29-10, su RED y sus evidencias) está en
-[`impl_F-150_fase1.md`](impl_F-150_fase1.md); la PARADA de T11, en `impl_F-150_parada_T11.md`.
-Este informe cubre el ajuste del 29-10 (N11-N13), el saldo de partida (N14) y el IVA con
-inversión del sujeto pasivo (N15). Rama `feature/F-150-receta-caja`, sin push.
+Tandas anteriores: fase 1 (T1-T16) en [`impl_F-150_fase1.md`](impl_F-150_fase1.md); N11-N15
+(T17-T35) en [`impl_F-150_tanda2_3.md`](impl_F-150_tanda2_3.md). Spec: R44-R52, `design.md`
+§5.10-§5.11, `progress/spec_F-150.md` §11. Rama `feature/F-150-receta-caja` (desde `b98c830`), sin push.
 
 ## 1. Qué cambió (un commit por tarea)
 
 | Tarea | Commit | Qué |
 |---|---|---|
-| T17 | `1b3e96a` | Dominio: `neto_fifo`, `SERIES_ALBARAN_PENDIENTE`, `UMBRAL_IMPORTE_ABSURDO` (R33) |
-| T18 | `5864298` | `tesoreria.albaranes_pendientes_neto` (00_setup + `09_albaranes_pendientes.sql`), sub-paso `albaranes_pendientes` (R34, R35) |
-| T19 | `98b050e` | `07`: cuota CP de la cartera de pago (`cartera_viva_coste_proporcional`, `cartera_emitida_tras_cierre_coste_proporcional`) (R36) |
-| T20 | `3389999` | Contraste de solo lectura en Azure de `09` y de la cuota CP; la vista de partidas `MATERIALIZED` (205 s → 10 s) |
-| T21 | `6f227ac` | YAML: H02 sin `CP`; H20/H27 con los albaranes netos (N11, N12) |
-| T22 | `ea73489` | Diccionario v64: receta, ficha nueva, CP fuera, personal por el recurso (R3, R4, R34, R36, R37) |
-| T23 | `514e965` | ARCHITECTURE, CLAUDE.md; `azure-apps` `c57c52e` |
-| T27 | `23ad2bd` | `PASOS_RECETA` con `SALDO` delante (ocho); H28 y H29 (R39) |
-| T28-T29 | `ac3b1b2` | `tesoreria.saldo_partida_obra` (00_setup + `10_saldo_partida.sql`), sub-paso `saldo_partida`, ficha, inventario 254, presupuesto F-147 31.129; contraste (R38) |
-| T30 | `ea47886` | Receta paso 0 SALDO y paso 7 con los originales; regla; recuentos 29 derivados del YAML en los tests; v65; `azure-apps` `d3cafe9` (R40) |
-| T32 | `500a4ea` | H13 SIGRID por obra: `iva_efectivo_compra`, `UMBRAL_BASE_H13`, `MOTIVO_H13_COMPRAS`, rama en `08` (R41) |
-| T33 | `1c84fd9` | H30 (defecto `MENSUAL_REDEME`, decisión del humano) y la spec corregida (R42) |
-| T34 | `34639c6` | El IVA del saldo (6 columnas), receta paso 0 y 6, fichas, v66; `azure-apps` `3ca37bf` (R43) |
-| T35 | `9777534`, `5f02555`, `c255396` | Informe y pasos MANUAL; lista de F-141 con las fichas nuevas; mutación incremental (T24/T31/T35 juntas) |
+| T36 | `133a305` | Dominio: `cuota_personal`, `fuente_personal`, `pendiente_personal`, `FUENTES_PERSONAL` (R44) |
+| T37 | `fa7ac48` | `07`: `_dev_personal` (partes PERSONA interna hasta el cierre, mismo filtro que `10`), cuota por partida COSTE (CP → 0), personal en el reparto; columnas en `00_setup` y fichas (R45, R46) |
+| T38 | `aad4236` | Dominio: `fracciones_contrato`, `repartir_por_contratos` (R48) |
+| T39 | `7026120` | `tesoreria.devengo_pendiente_contrato_mes` (00_setup + `07` §5 bis), guarda R50, `pendiente_enlazado_contrato` en el corte, ficha nueva (R49, R50) |
+| T39 bis | `3efb069` | Solo los (partida, mes) con importe > 0 van a contrato: un mes negativo, entero sin contrato (§3) |
+| T40 | — | Contraste de solo lectura en Azure y sandbox (§3, §4); marcada en `f79669d` |
+| T41 | `9fe7ba1` | `hipotesis_caja.yaml`: H01, H02, H06 y H13; H01/H06 con el ingrediente nuevo; siguen 30 (R47, R51) |
+| T42 | `a71b37c` | Receta pasos 1, 4, 5 y 6 (fuera N13-b), `R-CAJA-HIPOTESIS` (ámbito y regla), diccionario **v67** (R47, R51) |
+| T43 | `f79669d` | `ARCHITECTURE.md`, `CLAUDE.md`; `azure-apps` `9488087` (local, sin push) |
+| T44 | (este informe) | Mutación incremental: `progress/mutacion_F-150_n16_n17.md` |
 
-Ficheros de producción tocados: `etl_sigrid/domain/proyeccion_caja.py`,
-`etl_sigrid/application/steps/build_tesoreria_step.py`, `sql/tesoreria/00_setup.sql`, `07`, `08`,
-`09_albaranes_pendientes.sql` (nuevo), `10_saldo_partida.sql` (nuevo), `config/hipotesis_caja.yaml`,
-`config/diccionario/{00_global,tesoreria,compras}.yaml`. Tests nuevos: `test_f150_albaranes.py`,
-`test_f150_saldo.py`, `test_f150_iva_isp.py`; ampliados los de F-037, F-140, F-147 y F-150.
+Producción tocada: `etl_sigrid/domain/proyeccion_caja.py`, `sql/tesoreria/00_setup.sql`,
+`sql/tesoreria/07_devengo_pendiente.sql`, `config/hipotesis_caja.yaml`,
+`config/diccionario/{00_global,tesoreria}.yaml`. Tests nuevos: `test_f150_personal.py`,
+`test_f150_contrato_compra.py`; ampliados `test_f150_{sql,receta,diccionario}.py`,
+`test_f140_sql.py`, `test_f141_perfil_restringido.py`, `test_f147_presupuesto_contexto.py`.
+Sin tablas de Sigrid nuevas: `raw.hmores`, `res`, `ctrpro`, `ctr` y `con` ya se ingieren.
 
 ## 2. Decisiones y desviaciones (justificadas)
 
-1. **Decisión del humano (29-10), N15**: H30 por defecto `MENSUAL_REDEME` (vuelve a los 4 meses del
-   mes liquidado; mediana de la 4700), `validado: false`; el saldo suma el IVA NETO recuperado
-   (soportado − repercutido). La spec decía `COMPENSA_EMPRESA`: corregida en `requirements.md` R42/R43,
-   `design.md` §5.9 y §6 y `spec_F-150.md` §10.6 (T33). El defecto es un dato del YAML: ni el SQL ni
-   el dominio lo nombran (test `test_f150_r43_el_sql_no_elige_h30`).
-2. **Columnas `_hasta_4m`** (desviación de §5.9, que solo traía `_hasta_4t`): sin ellas
-   `MENSUAL_REDEME` no se puede aplicar. Pagado o cobrado en un mes 4 o más meses antes del mes del
-   build (aritmética de meses con `date_part`, sin `interval`).
-3. **Columna extra `agrupados_vencidos_coste_proporcional`**: la parte CP de los originales vencidos
-   va aparte para que, con H29 = `AGR`, el CP del saldo siga siendo exacto. Fórmula de la receta: CP
-   = `pagado_coste_proporcional` (+ esa columna con `ORIGINALES`).
-4. **Paso 0**: la receta numera SALDO como 0 (los pasos 1-7 conservan su número). El tramo del
-   SALDO nombra también H30 (el IVA recuperado): el test r2 lo admite de forma explícita.
-5. **H13, 12 meses sin aritmética de fechas** (el test de F-140 la prohíbe en `08`):
-   `fn_fecha(c.fec) <= CURRENT_DATE AND date_part('year', age(CURRENT_DATE, fn_fecha(c.fec))) = 0`.
-   La medida `ROUND(100 * x.cuota / x.base, 2)` es la segunda cuenta tolerada en `08` (como el ×100
-   de H12): mide un porcentaje, no aplica una hipótesis. El motivo dice «entre» y no «/» por eso.
-6. `09`: el `COMMENT` va en `09` y no en `00_setup`; `tras_cierre` con `COALESCE(..., FALSE)`; la
-   vista de partidas como CTE `MATERIALIZED` (también en `10`).
-7. **Recuentos de hipótesis**: los tests leen la cifra del YAML (`_n_hipotesis()`) en vez de repetir
-   27/29/30. **Inventario F-006**: enmienda en `design_detalle.md` (254 objetos); el guardián pasaba
-   antes por coincidencia de subcadena.
-8. El `init.sh` inicial de esta sesión se saltó (verde en `289fedb`, urgencia del líder); el final sí.
-9. Lint: corregidos los avisos de ruff de mis ficheros (`zip(strict=True)`, signos «−»/«×»).
+1. **Redondeo por ACUMULADO** en `repartir_por_contratos` (R48 decía `ROUND(importe × f, 2)` por
+   contrato): el ROUND contrato a contrato puede pasarse en céntimos (0,335 + 0,335 + 0,329 de
+   1 EUR → 1,01) y dejar un resto negativo, que R48 prohíbe. Por acumulado en orden de contrato la
+   suma es exacta y el resto ≥ 0 (test `..._el_round_contrato_a_contrato_dejaria_resto_negativo`).
+2. **Mes negativo o cero → entero sin contrato** (T39 bis, `design.md` §5.11 paso 3 «con `np` > 0»;
+   mi T39 repartía todo mes ≠ 0). Lo destapó el contraste: el 31-10 la 1-0702 (partida 387660,
+   noviembre, CI) tenía −0,11 EUR en el plan de V; repartido daba 4 trozos negativos (−0,02, −0,06,
+   −0,01, −0,02) y **R50 habría tumbado `build-tesoreria` esa noche**. Con la regla del diseño:
+   **0 grupos negativos** (mínimo +0,13 EUR) en las 21 obras, medido en solo lectura. La guarda R50
+   sigue intacta: si un día la fila SIN contrato de un grupo queda negativa, falla (sandbox §4).
+3. **Línea con `can` = 0** cuenta entera como no servida (`COALESCE(..., 0)` de la segunda suma).
+4. **Excepción a R18 de F-140** (`test_f140_sql.py`): `07` lee `raw.hmores` (2 veces, agregado por
+   partida, igual que `10`/N14); el mart ya expone el coste real por partida. Test con su porqué.
+5. Alias `cl` para `raw.ctrpro` (el test r36 caza `l.tot` sin cast: es el de `raw.dcfpro`).
+6. `_dev_real` calcula los dos conceptos (antes solo VENTA); `_dev_contrato` y el hueco filtran
+   `concepto = 'VENTA'` (test r23 actualizado).
+7. Las fichas de las columnas nuevas entraron en T37/T39 (no en T42) para que cada commit pasara la
+   puerta del diccionario; la nota de dependencia de `mart.fact_seguimiento_mensual` (F-042) en la
+   ficha nueva; F-141: la tabla nueva en la lista del perfil restringido; `PRESUPUESTO_MAX`
+   31.287 (+158) con su línea de historia; inventario F-006: 255 objetos (enmienda en
+   `design_detalle.md`).
 
-**PARADA**: ninguna. Las cifras de T29 y T34 están dentro del 5 % (§3).
+**PARADA (R52)**: ninguna; todas las cifras dentro del 5 % (§3).
 
-## 3. Contrastes de SOLO LECTURA en Azure
+## 3. Contraste de SOLO LECTURA en Azure (T40, 31-10, 03:30 y 04:50 UTC)
 
-**T20 (N11-N12, 29-10)**: 30.533 líneas; bruto 56,876 M EUR, sobrefacturado 48,166, compensado
-48,120, **neto 8,756** (= el de compras), 3.356 filas, 20 obras; 0686 bruto 8,781 neto 0,193;
->6 meses 0,518; `tras_cierre` 0,470 en 7 obras. Cartera viva 38,560; CP prorrateado −0,0037 (~0).
+`_bootstrap_done = True` y `filas_solo_lectura`, los `SELECT` de §5.10-§5.11 sin `INSERT`.
 
-**T29 (N14, 30-10)**, frente a §10.5 (29-10):
-
-| Pieza | 21 obras (spec / medido) | 0686 (spec / medido) |
+| Pieza | Spec §11 | Medido |
 |---|---|---|
-| Cobrado REALIZADO | 97,4 / **98,30** (+0,9 %) | 30,21 / **30,21** |
-| Pagado sin AGR | 64,0 / **63,99** | 21,96 / **21,96** |
-| AGR con obra | 2,2 / **2,22** | 0,32 / **0,32** |
-| Originales vencidos / pendientes | 8,63 / 2,21 · **8,63 / 2,21** | 1,32 / 0,27 · **1,32 / 0,27** |
-| Personal de los partes | 11,55 / **11,65** (+0,9 %) | 2,07 / **2,13** |
-| CP de lo pagado | ~0 / −0,117 | — / −0,102 |
+| Personal del devengo, 21 obras (M EUR) | ~5,64 de 118,49 | **5,65** de 118,49 (+0,2 %) |
+| Personal 0686 | ~0,21 de 2,60 | **0,21** de 2,60 |
+| Partidas con cuota > 0 / a 1 / partes sin real | — | 268 / 184 / 3 |
+| Coste sin CP ni personal enlazado por contrato | ~48,9 de 112,85 (43 %) | **48,90 de 112,84 (43,3 %)** |
+| 0686 enlazado | ~1,64 de 2,39 (69 %) | **1,64 de 2,39 (68,6 %)** |
+| 0608 y 0715 | 0 | **0** y **0** |
+| Partidas con varios contratos | — | 1.371 |
+| Grupos (obra, mes, cat., contrato) negativos | — | 4 con el T39; **0** con T39 bis |
 
-La nocturna del 30-10 movió el último cierre de la 0686 (y otras) a 2026-10: por eso el personal
-incluye octubre (0686 +0,065). Saldo con H28 `CON_SALDO`, H29 `ORIGINALES`, sin IVA: **21 obras
-13,91 M EUR (spec 13,18) y 0686 4,70 (4,86)**: la diferencia es el cobro nuevo, el personal de
-octubre y el CP, no el método.
-
-**T32 (H13, 30-10)**: **16 de 21 obras** con valor SIGRID (0608, 0690, 0699, 0715, 0724 bajo el
-umbral); **0686 2,37 %** (2,36 el 29-10); toda la base 146,52 M EUR, 5,33 % (spec 150,10 / 5,46).
-Observación: 0704 7,52 % (spec 8,33) y 0710 4,13 (4,55): no lo explica la ventana de fechas
-(probado con tres comienzos); quedan fuera del contraste pactado.
-
-**T34 (IVA del saldo, 30-10)**, frente a §10.6: soportado **4,141** M EUR (spec 4,14; 0686 **0,800**,
-spec 0,80); pagado antes de 2026 **1,424** (1,42; 0686 **0,437**, 0,44); repercutido **0,338**
-(0,34; 0686 0,016). `_hasta_4m`: soportado 3,051, repercutido 0,259 (0686 0,676 y 0,016).
-
-**El saldo, recalculado (decisión del humano)**:
-
-| Saldo de partida (M EUR) | 21 obras | 0686 |
-|---|---|---|
-| Spec §10.6 con `COMPENSA_EMPRESA` (base 29-10) | ~16,98 | ~5,64 |
-| Medido 30-10 con `COMPENSA_EMPRESA` (todo el IVA neto: +3,803 / +0,784) | **17,71** | **5,49** |
-| Medido 30-10 con **`MENSUAL_REDEME`** (defecto; `_hasta_4m`: +2,792 / +0,660) | **16,70** | **5,36** |
-| `MENSUAL_REDEME` sobre la base de la spec (13,18 / 4,86) | 15,97 | 5,52 |
-
-Lo que `MENSUAL_REDEME` deja fuera (1,01 M EUR en 21 obras, 0,12 en la 0686) es el IVA de los
-últimos meses aún no devuelto: caja futura, no saldo.
+Las mismas cifras con la variante `l.sql` de la spec (48,90). Sin negativos hoy en `obra_mes`.
 
 ## 4. Verificación semántica del SQL (Postgres 16 desechable, tipos reales de Azure)
 
-`raw` con `double precision` en importes e `integer` en ids y fechas. `09` (sandbox N11): 23
-comprobaciones, 0 fallos. `10` (`sandbox_n14.py`): **14 comprobaciones, 0 fallos**: universo
-COSTE (la obra solo VENTA fuera), cada columna con su filtro (incluida una BAJA de otro estado y un
-AGR antiguo que no cuentan), cuota CP 0,75 y 0,5, personal (proveedor, otra clase y sin obra
-fuera; hasta el cierre; obra sin cierre a 0), el IVA (pago de hoy ni `_4t` ni `_4m`; original de
-2000 y cobro de 2020 en los dos), idempotente en dos vueltas y la guarda (sin `raw.res`, falla sin
-vaciar). El docker se paró al terminar.
+`sandbox_n16_n17.py` (docker `postgres:16`, `raw` con `double precision` en importes y
+cantidades, `integer` en ids y fechas, `smallint` en `res.cla`), con el dominio como oráculo:
+**37 comprobaciones OK, 0 fallos**. Cuota/pendiente/fuente por partida (partes ≥ real → 1; CP → 0;
+sin partes; partes sin real; proveedor, máquina y otra obra fuera; partes tras el cierre fuera),
+personal por obra-mes, contrato-mes = dominio (contratos vivos 501/502/506/507; Terminado,
+Rescindido, otra obra y sin condiciones fuera; línea sin partida y línea absurda > 1e8 fuera),
+corte (personal 533,33, enlazado 4.006,66), suma = pendiente sin CP ni personal, **idempotente**
+(2 vueltas), **mes negativo de −100** (vuelta 3: la 202 de noviembre sin trozos de contrato, la fila
+sin contrato ≥ 0, todo = dominio), **guarda R50** (mes de −500: la fila sin contrato de
+CD-noviembre < 0 → `RAISE` «1 importes negativos» y las filas de ayer intactas, 14) y guarda de
+entrada (sin `raw.ctrpro`, falla).
 
 ## 5. Fase RED (comando exacto y salida real del fallo)
 
-Trazas completas en el scratchpad de la sesión; aquí el comando y el resumen real de pytest.
+Desde la raíz del repo; trazas completas en el scratchpad de la sesión (`red_t*.txt`).
 
-- T17: `pytest tests/test_f150_albaranes.py -k r33` con `neto_fifo` como stub →
-  `E       NotImplementedError` … **17 failed in 2.26s**.
-- T18: `pytest tests/test_f150_albaranes.py -k "r34 or r35"` →
-  `E       AssertionError: falta la tabla en 00_setup.sql` … **15 failed, 12 passed, 17 deselected**.
-- T19: `pytest tests/test_f150_albaranes.py tests/test_f150_sql.py -k r36` →
-  `E  AssertionError: assert 'ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS
-  cartera_viva_coste_proporcional NUMERIC(18,2);' in ...` … **7 failed, 25 passed**.
-- T21: `pytest tests/test_f140_hipotesis.py tests/test_f150_receta.py` →
-  `E  AssertionError: assert 'compras.v_pb..._sin_facturar' == 'tesoreria.al...ndientes_neto'` … **4 failed, 176 passed**.
-- T22: `pytest tests/test_f150_diccionario.py` →
-  `E  AssertionError: tesoreria.albaranes_pendientes_neto` … **9 failed, 8 passed**.
-- T27: `pytest tests/test_f150_receta.py tests/test_f150_saldo.py -k "r1 or r39"` →
-  `E       AssertionError: assert 'DEVENGO' == 'SALDO'` … **4 failed**.
-- T28: `pytest tests/test_f150_saldo.py -k r38` →
-  `FAILED ...::test_f150_r38_setup_crea_la_tabla_con_sus_columnas` … **11 failed, 14 passed**.
-- T30: `pytest tests/test_f150_diccionario.py tests/test_f140_diccionario.py tests/test_f150_sql.py
-  tests/test_f150_receta.py tests/test_f150_albaranes.py` →
-  `FAILED ...::test_f150_r40_el_paso_0_da_la_formula_del_saldo` … **12 failed, 235 passed**.
-- T32: `pytest tests/test_f150_iva_isp.py` →
-  `FAILED ...::test_f150_r41_el_umbral_y_el_motivo - AttributeError` … **18 failed in 0.99s**.
-- T33: `pytest tests/test_f150_receta.py tests/test_f140_hipotesis.py tests/test_f140_paso.py
-  tests/test_f140_sql.py` → `FAILED ...::test_f150_r42_h30_cuando_vuelve_el_iva_a_devolver` …
-  **7 failed, 355 passed**.
-- T34: `pytest tests/test_f150_saldo.py tests/test_f150_diccionario.py` →
-  `FAILED ...::test_f150_r43_la_fraccion_de_iva_de_cada_factura` … **14 failed, 56 passed**.
+- T36 (R44): `python -m pytest tests/test_f150_personal.py -k r44 -q -p no:cacheprovider` →
+  `E       NotImplementedError` … **14 failed, 1 passed, 24 deselected in 0.98s**.
+- T37 (R45, R46): `python -m pytest tests/test_f150_personal.py -k "r45 or r46" -q -p no:cacheprovider` →
+  `E  AssertionError: assert 'ALTER TABLE tesoreria.devengo_pendiente_partida ADD COLUMN IF NOT EXISTS
+  cuota_personal NUMERIC(12,6);' in ' CREATE SCHEMA IF NOT EXISTS tesoreria; ...'` … **18 failed, 6 passed**.
+- T38 (R48): `python -m pytest tests/test_f150_contrato_compra.py -k r48 -q -p no:cacheprovider` →
+  `__ test_f150_r48_sin_contratos_nada_enlazado __` `E       NotImplementedError` … **21 failed, 22 deselected**.
+- T39 (R49, R50): `python -m pytest tests/test_f150_contrato_compra.py -k "r49 or r50" -q -p no:cacheprovider` →
+  `E       AssertionError: falta la tabla en 00_setup.sql` … **13 failed, 9 passed, 21 deselected**.
+- T39 bis: `python -m pytest tests/test_f150_contrato_compra.py -q -p no:cacheprovider` →
+  `E  AssertionError: assert {1: Decimal('...imal('-0.03')} == {None: Decimal('-0.11')}` /
+  `E    Left contains 2 more items: {1: Decimal('-0.06'), 2: Decimal('-0.02')}` … **4 failed, 42 passed**.
+- T41 (R47, R51): `python -m pytest tests/test_f150_receta.py -k "r47 or r51" -q -p no:cacheprovider` →
+  `E  AssertionError: assert 'tesoreria.co...ntrato_compra' == 'tesoreria.de..._contrato_mes'` …
+  **4 failed, 1 passed, 42 deselected**.
+- T42 (R47, R51): `python -m pytest tests/test_f150_diccionario.py -q -p no:cacheprovider` →
+  `E  AssertionError: assert 'se paga con H02 `CI`' not in ' 4. PLAZO: ...BRA) y dilo.'` …
+  **8 failed, 26 passed in 8.39s**.
 
-Tras cada implementación, las mismas órdenes en verde; antes de cada commit, las familias del
-diccionario (F-006, F-147), F-037, F-140 y F-150: **1.991 passed, 262 skipped** (T34, 739 s).
+Tras cada implementación, las mismas órdenes en verde; antes de cada commit, las familias F-140 y
+F-150 (958 passed tras T39 bis) y, tras T42, las del diccionario (F-006, F-147, F-141, F-037,
+F-138, F-128, F-140, F-150): **4.745 passed, 266 skipped** (820 s).
 
 ## 6. Verificaciones MANUAL pendientes y qué falta
 
-- **Redespliegue** (humano): pasos con comando exacto en `progress/current.md`, sección «F-150 ·
-  Redespliegue MANUAL de N11-N15». Incluye `build-tesoreria` (sub-pasos 09 y 10 nuevos), las cifras
-  a comprobar, `publicar-diccionario` v66, los `check-*` y el reinicio del MCP.
-- **R31** con el MCP: la 0686 con y sin saldo, H13 2,37 %, H30 declarada.
-- **Para validar por el humano y AdP**: H30 (`validado: false`) y H13 por obra.
-- Fuera de alcance: la caja del CP (F-154); la caja proyectada (F-151); `R-ALBARAN-ABSURDO`.
-- Falta: review (C1-C4 sobre T17-T35) y despliegue.
+- **T45, redespliegue** (humano, tras APROBADO y merge): pasos con comando exacto en
+  `progress/current.md`, sección «F-150 · Redespliegue MANUAL de N11-N17». Sustituye a la de
+  N11-N15 (mismo despliegue; añade las cifras de N16-N17 y el diccionario v67).
+- **R31** con el MCP en la 0686: personal ~0,21 a fin de mes, ~1,64 por contrato con H01, el
+  resto con H02, sin H02 `CI` para el personal.
+- **Para validar por el humano** (no bloquean, de la spec): las cargas sociales se pagan en
+  realidad al mes siguiente (se aplica «fin de mes siempre»); la 0715 (sin partes) va por contrato
+  o H02 hasta que tenga partes.
+- Fuera de alcance: la caja proyectada (F-151), la caja del CP (F-154), lo contratado pendiente de
+  servir que supera el devengo (15,34 M EUR: no es devengo).
+- Falta: review (C1-C4 sobre T36-T44) y el despliegue.
 
 ## Evidencias
 
 | Evidencia | Valor real |
 |---|---|
-| `bash harness/init.sh` (una vez, al final, sobre `c255396`) | **verde**, código 0, «ENTORNO LISTO. Puedes trabajar.»: **9.813 passed**, 268 skipped, 2.570 warnings |
-| Tiempo de la suite | 4.108,94 s (1:08:28), con cobertura |
-| Cobertura de las líneas cambiadas | `PUERTA COBERTURA`: **100,0 %** (21/21, umbral 80 %, nivel estandar; diff desde `935fdd35ee`) |
-| Tamaño | `PUERTA TAMAÑO`: requirements 150/150, design 250/250, impl 161/220, review 140/140 |
-| Mutación incremental (`python -m harness.mutacion --feature F-150 --base 0659528 --max-mutantes 8 --workers 3 --timeout 3000`) | 78 líneas de producción, 17 mutantes generados, **8 evaluados: 8 muertos, 0 supervivientes, 0 timeouts** (9.754,7 s; `progress/mutacion_F-150_n11_n15.md`). Sin superviviente que analizar |
-| Verificación semántica del SQL | `09`: 23 OK; `10`: 14 OK, 0 fallos (Postgres 16, tipos de Azure) |
-| `ruff` | 276 avisos de deuda previa (no bloquea); los de mis ficheros, corregidos |
-
-Muestra reducida a 8 (el tope del nivel es 20): cada mutante corre la suite entera (~38 min con
-3 workers) y la campaña de 20 de la fase 1 tardó 4 h 15 min; los 78 renglones son `neto_fifo`,
-`iva_efectivo_compra`, constantes y la lista de sub-pasos. Dos lanzamientos previos no cuentan:
-línea base > 600 s con 4 workers, y línea base ROJA por `test_f141_r28_ninguna_otra_ficha_lleva_el_aviso`
-(las dos fichas nuevas de `tesoreria` faltaban en su lista; corregido en `5f02555`, no lo habían
-cazado las familias que corrí antes de cada commit). El SQL no se muta: lo cubren los tests de
-literales y las sandboxes (§4).
+| `bash harness/init.sh` (al final, sobre `cc3d955`) | **verde**, código 0, «ENTORNO LISTO. Puedes trabajar.»: **9.924 passed**, 269 skipped, 2.570 warnings |
+| Tiempo de la suite | 2.931,90 s (0:48:51), con cobertura |
+| Cobertura de las líneas cambiadas | `PUERTA COBERTURA`: **100,0 %** (35/35, umbral 80 %, nivel estandar; diff desde `1cf5197a79`) |
+| Tamaño | `PUERTA TAMAÑO`: requirements 150/150, design 250/250, impl 136/220, review 125/140 |
+| Mutación incremental (`python -m harness.mutacion --feature F-150 --base b98c830 --max-mutantes 8 --workers 3 --timeout 3000`, sobre `ddbc54f`) | 98 líneas de `proyeccion_caja.py`, 33 generados, **8 evaluados: 6 muertos, 2 supervivientes, 0 timeouts** (6.888,7 s). Los 2 eran huecos reales (pendiente entre 0 y 1 EUR; contrato servido con fracción 0): dos tests nuevos en `ae255e7`, comprobados con el mutante aplicado (1 failed cada uno). Análisis en `progress/mutacion_F-150_n16_n17.md`. El SQL no se muta: lo cubren los literales y la sandbox |
+| Verificación semántica del SQL | `07`: 37 OK, 0 fallos (Postgres 16, tipos de Azure) |

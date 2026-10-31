@@ -1,20 +1,19 @@
 # F-150 · La receta de la caja (fase 1)
 
-Mediciones: `progress/spec_F-150.md` §8-§10 e `impl_F-150.md` §1-§3. Decisiones: `design.md` §9.
-**Objetivo**: que la IA pase el devengo de una obra a caja SIEMPRE en el mismo orden (la receta),
-con los coeficientes, el IVA y la retención del CONTRATO de cada partida (`raw.obrparpar.ctride`).
-Sin caja proyectada: es F-151. **Perfil**: pares `[meses, porcentaje]` que reparten un importe entero.
+Mediciones: `progress/spec_F-150.md` §8-§11 e `impl_F-150.md`. Decisiones: `design.md` §9. **Objetivo**:
+que la IA pase el devengo de una obra a caja SIEMPRE en el mismo orden (la receta), con los datos del
+CONTRATO de cada partida. Sin caja proyectada (F-151). **Perfil**: pares `[meses, porcentaje]`.
 
 ## La receta (D1, D7, N5)
 - R1. Cada hipótesis debe declarar `paso_receta` (uno de `PASOS_RECETA`); SI falta o no es válido,
   ENTONCES `validar_catalogo` da error; el YAML asigna cada código al paso de `design.md` §6.
 - R2. La ficha de `tesoreria.hipotesis_caja` debe contener la receta: los pasos numerados en el orden
   de `PASOS_RECETA` y, en cada tramo, los códigos de ese paso (test que cruza YAML y ficha).
-- R3. La receta debe nombrar sus ingredientes (las tres `devengo_*` y sus columnas nuevas de R14,
-  R20, R23 y R36, las dos `condiciones_contrato_*`, `tesoreria.efectos`, `cartera_emitida_tras_cierre`
-  y `tesoreria.albaranes_pendientes_neto`) y decir: COSTE se paga y VENTA se cobra; los perfiles reparten el importe entero; la retención
-  va sobre la base sin IVA; el devengo va sin IVA; nunca un coeficiente medio de obra; H10 y H12
-  solo sobre la base sin dato del contrato; redondear solo al final (test por frases clave).
+- R3. La receta debe nombrar sus ingredientes (las `devengo_*` y sus columnas de R14, R20, R23, R36,
+  R45-R46 y R49, las `condiciones_contrato_*`, `tesoreria.efectos` y `albaranes_pendientes_neto`) y
+  decir: COSTE se paga y VENTA se cobra; los perfiles reparten el importe entero; retención sobre la
+  base sin IVA; devengo sin IVA; nunca un coeficiente medio de obra; H10 y H12 solo sobre la base sin
+  dato del contrato; redondear solo al final (test por frases clave).
 - R4. (N5) La receta debe AVISAR de lo que no cubre: la revisión de precios y lo certificado fuera
   del coeficiente (F-040); H13/H14 pendientes de AdP; lo facturado por delante y los albaranes de
   más de H27 meses o `tras_cierre` no son caja (se declaran); el CP tampoco (N12, va a F-154).
@@ -24,13 +23,10 @@ Sin caja proyectada: es F-151. **Perfil**: pares `[meses, porcentaje]` que repar
 - R6. (D1) `docs/CONVENTIONS.md` y `ARCHITECTURE.md`: una receta puede ir en una ficha; los valores, en el YAML.
 
 ## El coeficiente por partida (N1, D3, D4, D6)
-
-- R7. (N10) `leer_coeficientes_contrato(texto)` (dominio) debe leer `coestr` por líneas
-  `CODIGO|etiqueta|valor||base` y clasificar POR CÓDIGO según `CLASE_POR_CODIGO` (`design.md` §4,
-  `impl_F-150.md` §1.2; `RET*` -> `retencion`, que NO es coeficiente); vacío o `NULL` -> sin dato;
-  SI un código es desconocido o un valor no es número, ENTONCES no reconocido (falla cerrado).
-  `factor_coeficientes` = `ROUND((1 + (gg + bi + otros) / 100) × (1 + baja / 100), 6)` (1,19;
-  baja en CASCADA: 1,038) si está reconocido y tiene algún coeficiente; si no, `None`.
+- R7. (N10) `leer_coeficientes_contrato(texto)` (dominio) lee `coestr` por líneas `CODIGO|etiqueta|
+  valor||base` y clasifica POR CÓDIGO (`CLASE_POR_CODIGO`, §4; `RET*` es retención); vacío o `NULL`,
+  sin dato; código desconocido o valor no numérico, no reconocido. `factor_coeficientes` = `ROUND((1
+  + (gg + bi + otros) / 100) × (1 + baja / 100), 6)` si está reconocido y tiene alguno; si no, `None`.
 - R8. `tesoreria.condiciones_contrato_cliente` debe publicar `coeficientes_texto`, `_reconocidos`,
   `coeficiente_gg`, `_bi`, `_otros`, `_baja`, `coeficiente_contrato` y `retencion_coestr`, con
   funciones SQL de literales iguales al dominio (test, patrón de `fn_plazo_dias`).
@@ -52,7 +48,6 @@ Sin caja proyectada: es F-151. **Perfil**: pares `[meses, porcentaje]` que repar
   coste, lo ejecutado ni la venta sin ellos.
 
 ## El IVA y la retención por partida (N2, N3, N4)
-
 - R16. `tables_sigrid.yaml` debe ingerir `raw.iva` entero y la CABECERA de `raw.dvf`, sin `tiemod`;
   fichas en `raw.yaml`; `TOTAL_TABLAS` = 80. R17. CUANDO una tabla declare `include_columns`, la
   ingesta debe traer solo esas; SI declara también `exclude_columns` o una no existe, ENTONCES falla.
@@ -67,7 +62,6 @@ Sin caja proyectada: es F-151. **Perfil**: pares `[meses, porcentaje]` que repar
   `raw.iva`, × 100) con su motivo literal; MANUAL > SIGRID > DEFECTO y H10 de F-140, sin cambios.
 
 ## La venta ejecutada pendiente de facturar (N6, H26)
-
 - R22. (N9) `hueco_facturacion(real_con_coeficientes, facturado)` (dominio) debe devolver
   `(pendiente, por_delante)`, ≥ 0 y al céntimo (lo facturado por delante nunca se cobra); y
   `coeficiente_medio(pares)` = Σ (real × coef) / Σ real a 6 decimales, `None` si Σ real es 0.
@@ -81,7 +75,6 @@ Sin caja proyectada: es F-151. **Perfil**: pares `[meses, porcentaje]` que repar
   las dos `admite_obra: true`, `validado: false`: 27 hipótesis.
 
 ## El catálogo y el reparto en varios meses (D5)
-
 - R25. El dominio debe admitir `PERFIL_MESES`: pares `[meses, porcentaje]` no vacíos, `meses` entero
   0-120 estrictamente creciente, `porcentaje` > 0, ≤ 100 y ≤ 2 decimales, suma exacta 100; SI no,
   ENTONCES un error por fallo, en `valor_defecto` y en `obras`.
@@ -95,56 +88,63 @@ Sin caja proyectada: es F-151. **Perfil**: pares `[meses, porcentaje]` que repar
   `[FIN_MES_ALBARAN, EXCLUIR]`; (N11) H20 y H27, ingrediente `tesoreria.albaranes_pendientes_neto`.
 
 ## Verificación, diccionario y documentación
-
-- R29. (Hecho, T11) ANTES de la receta, contraste en solo lectura en las 21 obras: `coestr` no
-  reconocido 0, contrato de otra obra 0, ≤ 6 partidas con coeficiente del contrato ≠ master 11 y
-  el hueco dentro del rango del día (suelo a factor 1, techo + 0,26 × la venta sin coeficiente).
-- R30. Contraste MANUAL tras el build frente a `impl_F-150.md` §2 y R29: 18.997 partidas VENTA,
-  pendiente ~132,4 y con coeficientes ~143,3 M EUR, cada coeficiente con su fuente, IVA y retención
-  del contrato en ≥ 96 % del pendiente de 19 obras, 0 fallos de las guardas y la duración. (N11-N12,
-  29-10) Albaranes de las 21 obras: bruto ~56,9, sobrefacturado ~48,2, neto ~8,76 (0686: ~0,19),
-  de más de 6 meses ~0,52 y `tras_cierre` ~0,47 M EUR; CP pendiente ~14,5; cartera viva CP ~0,03.
-- R31. CUANDO se pregunte al MCP, en conversación nueva, por la caja de una obra con coeficientes,
-  debe seguir los siete pasos (coeficientes, IVA y retención del contrato, hueco de H26, albaranes
-  NETOS y los de más de H27 meses aparte, sin CP, sin nóminas, avisos de R4) y declarar las 27
-  hipótesis: MANUAL (humano; la 0686 y otra obra).
-- R32. Fichas al día (`paso_receta`, columnas, «27», `raw.iva`, `raw.dvf`, N11-N13), diccionario v64
-  (`PRESUPUESTO_MAX` sube solo lo que mida la ficha nueva), `CLAUDE.md`, `docs/ARCHITECTURE.md` y
-  `azure-apps/datamart_seg_anual.md`; `bash harness/init.sh` en verde (pytest, cobertura, mutación).
+- R29. (Hecho, T11; `impl_F-150.md` §2) Contraste previo de solo lectura en las 21 obras: `coestr`
+  no reconocido 0, contrato de otra obra 0, ≤ 6 partidas contrato ≠ master 11, hueco en su rango.
+- R30. Contraste MANUAL tras cada build frente a `impl_F-150.md` §2 y las tablas de T20, T29, T34 y
+  T40 (cifras de cada tanda), con 0 fallos de las guardas y la duración.
+- R31. CUANDO se pregunte al MCP, en conversación nueva, por la caja de una obra, debe seguir los ocho
+  pasos de la receta y declarar las 30 hipótesis: MANUAL (humano; la 0686 y otra obra).
+- R32. Fichas, `version` del diccionario (`PRESUPUESTO_MAX` sube solo lo que midan las fichas nuevas),
+  `CLAUDE.md`, `docs/` y `azure-apps/datamart_seg_anual.md` al día; `init.sh` en verde.
 
 ## Albaranes netos, CP y personal (N11-N13, 29-10)
-
-- R33. (N11) `neto_fifo(importes)` (dominio) debe recibir los pendientes de un (obra, proveedor)
-  en orden (fecha, línea) y devolver, por posición, el resto de cada positiva cuando Σ |negativas|
-  compensa primero las MÁS ANTIGUAS; negativas y `None` dan 0, ningún resto < 0 ni > su línea, y
-  Σ = max(0, Σ importes) al céntimo.
-- R34. (N11) `tesoreria.albaranes_pendientes_neto` debe publicar, para las obras de
-  `devengo_corte_obra` (COSTE), una fila por (obra, proveedor, contrato, `mes_albaran`) con bruto
-  (Σ > 0), sobrefacturado (Σ |< 0|), compensado (R33), neto, `meses_antiguedad` (al mes del build)
-  y `tras_cierre`, leyendo `raw` (series `AC`/`PROF`, fórmula del pendiente IGUAL a la de
-  `compras/01`, `abs(tot)` y `abs(pendiente)` < 1e8); sin proveedor, la línea no compensa.
-- R35. SI en un (obra, proveedor) Σ neto ≠ max(0, Σ bruto − Σ sobrefacturado), o un compensado
-  sale de [0, bruto], ENTONCES `09` falla con su recuento y quedan las filas de ayer.
-- R36. (N12) La receta y las fichas de las `devengo_*` deben decir que `CP` NO es caja de la obra
-  (se excluye por `categoria` y se declara); H02 pierde la clave `CP`; y `devengo_corte_obra`
-  (COSTE) debe publicar `cartera_viva_coste_proporcional` y
-  `cartera_emitida_tras_cierre_coste_proporcional` (la parte CP de cada efecto por las partidas
-  de su factura, `design.md` §5.8), que el paso 7 resta.
+- R33. (N11) `neto_fifo(importes)` (dominio): los pendientes de un (obra, proveedor) en orden (fecha,
+  línea); Σ |negativas| compensa primero las positivas MÁS ANTIGUAS; negativas y `None` dan 0,
+  ningún resto < 0 ni > su línea, y Σ = max(0, Σ importes) al céntimo.
+- R34. (N11) `tesoreria.albaranes_pendientes_neto`: una fila por (obra de `devengo_corte_obra` COSTE,
+  proveedor, contrato, `mes_albaran`) con bruto, sobrefacturado, compensado (R33), neto,
+  `meses_antiguedad` y `tras_cierre`, desde `raw` (`AC`/`PROF`, el pendiente de `compras/01`, < 1e8).
+- R35. SI en un (obra, proveedor) Σ neto ≠ max(0, Σ bruto − Σ sobrefacturado) o un compensado sale
+  de [0, bruto], ENTONCES `09` falla con su recuento y quedan las filas de ayer.
+- R36. (N12) Receta y fichas de las `devengo_*`: `CP` NO es caja de la obra (fuera por `categoria`,
+  declarado); H02 sin `CP`; `devengo_corte_obra` (COSTE) publica `cartera_viva_coste_proporcional`
+  y `cartera_emitida_tras_cierre_coste_proporcional` (§5.8), que el paso 7 resta.
 - R37. (N13) La receta, la `regla` de `R-CAJA-HIPOTESIS` y las fichas de `tesoreria.efectos` y
   `efectos_restringidos_mes` deben decir que el personal entra por el devengo del RECURSO: no se
-  suman nóminas de la cartera ni se dan por ausentes; y avisar de que va con H02 `CI` (N13-b).
-- R38. (N14, segunda tanda) `tesoreria.saldo_partida_obra` debe publicar por obra del universo, CON
-  IVA y con `fecha_corte`, las columnas de `design.md` §5.9: lo cobrado y pagado REALIZADO (sin
-  AGR), los AGR con obra, los ORIGINALES agrupados (`estado_codigo = 14`) vencidos y pendientes, la
-  cuota CP de lo pagado y `personal_coste_partes` (`raw.hmores.tot`, PERSONA interna, ≤ cierre).
-- R39. (N14) H28 `[CON_SALDO, SIN_SALDO]` (defecto `CON_SALDO`) y H29 `[ORIGINALES, AGR]` (defecto
-  `ORIGINALES`) deben nacer en el paso nuevo `SALDO` (primero de `PASOS_RECETA`): 29 hipótesis.
-- R40. (N14) La receta debe dar la fórmula del saldo del paso 0 (§5.9), decir que H29 es HIPÓTESIS
-  que rompe `R-TESORERIA-ESTADO` a propósito, y que las retenciones entran al cobrarse o pagarse.
-- R41. (N15, tercera tanda) `08` debe dar a H13 un valor SIGRID por obra = `ROUND(100 × Σ ivacuo / Σ
-  tot, 2)` de sus líneas de factura de compra de 12 meses si Σ `tot` ≥ `UMBRAL_BASE_H13` (500.000),
-  con `MOTIVO_H13_COMPRAS`; si no, DEFECTO; `iva_efectivo_compra` del dominio da lo mismo (test).
-- R42. (N15) H30 `[MENSUAL_REDEME, COMPENSA_EMPRESA, ANUAL]` (defecto `MENSUAL_REDEME`: humano, 29-10;
-  paso IVA, `validado: false`) debe nacer con el aviso de AdP y lo medido en la 4700: 30 hipótesis.
-- R43. (N15) `saldo_partida_obra` debe publicar `iva_soportado_pagado`, `iva_repercutido_cobrado` y
-  sus `_hasta_4t` y `_hasta_4m`, y la receta sumar al saldo el IVA neto ya recuperado según H30 (§5.9).
+  suman nóminas de la cartera ni se dan por ausentes. (El aviso N13-b de H02 `CI` lo sustituye R47.)
+- R38. (N14) `tesoreria.saldo_partida_obra`: por obra del universo, CON IVA y con `fecha_corte`, las
+  columnas de §5.9 (cobrado y pagado REALIZADO sin AGR, AGR con obra, ORIGINALES agrupados vencidos y
+  pendientes, cuota CP de lo pagado y `personal_coste_partes`: PERSONA interna, ≤ cierre).
+- R39. (N14) H28 `[CON_SALDO, SIN_SALDO]` y H29 `[ORIGINALES, AGR]` (defectos los primeros) nacen en
+  el paso nuevo `SALDO`, primero de `PASOS_RECETA`: 29 hipótesis.
+- R40. (N14) La receta da la fórmula del saldo del paso 0 (§5.9), dice que H29 rompe
+  `R-TESORERIA-ESTADO` a propósito y que las retenciones entran al cobrarse o pagarse.
+- R41. (N15) `08` da a H13 un valor SIGRID por obra = `ROUND(100 × Σ ivacuo / Σ tot, 2)` de sus
+  facturas de compra de 12 meses si Σ `tot` ≥ `UMBRAL_BASE_H13` (500.000), con `MOTIVO_H13_COMPRAS`;
+  si no, DEFECTO; `iva_efectivo_compra` del dominio da lo mismo (test).
+- R42. (N15) H30 `[MENSUAL_REDEME, COMPENSA_EMPRESA, ANUAL]` (defecto `MENSUAL_REDEME`, paso IVA,
+  `validado: false`) nace con el aviso de AdP y lo medido en la 4700: 30 hipótesis.
+- R43. (N15) `saldo_partida_obra` publica `iva_soportado_pagado`, `iva_repercutido_cobrado` y sus
+  `_hasta_4t` y `_hasta_4m`; la receta suma al saldo el IVA neto ya recuperado según H30 (§5.9).
+## Personal a fin de mes y coste por contrato (N16-N17, cuarta tanda, 31-10; `design.md` §5.10-§5.11)
+- R44. (N16) `cuota_personal(personal, real)` (dominio) = `min(1, ROUND(personal / real, 6))` si los dos > 0;
+  si no, 0. R45. `devengo_pendiente_partida` publica, en COSTE (NULL en VENTA), `cuota_personal`,
+  `pendiente_personal` = `ROUND(pendiente × cuota, 2)` y `fuente_personal` (`PARTES`, `SIN_PARTES`,
+  `CP` con cuota 0); personal = Σ `raw.hmores.tot` PERSONA interna (el filtro de `10`) ≤ cierre.
+- R46. `devengo_pendiente_obra_mes` publica `importe_pendiente_personal` (COSTE; mismo reparto) y el
+  corte `pendiente_personal` y `pendiente_enlazado_contrato`; la guarda de la suma mira el personal.
+- R47. Receta y `regla`: el personal se paga el ÚLTIMO día del mes de su devengo, sin H03, plazo,
+  H24, H06 ni IVA (regla fija: siguen 30 hipótesis); el H13 va sobre la base sin personal; sale N13-b.
+- R48. (N17) `fracciones_contrato(pendiente, pendientes_servir)` (dominio): enlazado = min(pendiente,
+  Σ ps > 0), fracción de c = enlazado / pendiente × ps_c / Σ ps; `repartir_por_contratos(importe,
+  fracciones)` da `ROUND(importe × f, 2)` por contrato y el resto, ≥ 0, a `None` (sin contrato).
+- R49. `tesoreria.devengo_pendiente_contrato_mes`: una fila por (obra, mes, `categoria`, contrato o
+  NULL) con el pendiente de COSTE sin CP ni personal repartido por R48 entre los contratos de
+  compra de la partida (`raw.ctrpro.paride`, misma obra, no Terminado ni Rescindido, en
+  `condiciones_contrato_compra`), con lo pendiente de servir por (contrato, partida) (`canser`).
+- R50. SI Σ por obra de R49 ≠ Σ (`importe_pendiente` − `importe_pendiente_personal`) sin CP, o hay
+  un importe < 0, ENTONCES `07` falla con su recuento antes de vaciar nada.
+- R51. Receta (pasos 4-5), H01, H02 y H06: con contrato, H01/H15/H04 y la retención del contrato;
+  sin él, H02 por `categoria` y H06; el corte declara la parte enlazada.
+- R52. Contraste de SOLO LECTURA (T40) antes del diccionario: personal ~5,64 M EUR (0686 ~0,21);
+  enlazado ~48,9 de 112,85 (43 %; 0686 ~1,64 de 2,39); si se aparta > 5 %, PARADA.

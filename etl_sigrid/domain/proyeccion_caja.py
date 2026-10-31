@@ -412,6 +412,104 @@ def neto_fifo(importes: Sequence[Decimal | None]) -> list[Decimal]:
 
 
 # ---------------------------------------------------------------------------
+# El personal del devengo de COSTE (F-150, R44, N16)
+# ---------------------------------------------------------------------------
+
+#: De dónde sale la cuota de personal de una partida de COSTE: sus PARTES
+#: (`raw.hmores` de recursos PERSONA internos), ninguno (`SIN_PARTES`) o el
+#: coste proporcional (`CP`, estructura: fuera de la caja de la obra, cuota 0).
+FUENTES_PERSONAL: tuple[str, ...] = ("PARTES", "SIN_PARTES", "CP")
+
+
+def cuota_personal(personal: Decimal | None, real: Decimal | None) -> Decimal:
+    """La parte de PERSONAL de una partida de COSTE, a 6 decimales (R44, N16).
+
+    `min(1, ROUND(personal / real, 6))` si los dos son > 0: el coste de los
+    partes hasta el cierre entre lo real a origen de la partida (el exceso,
+    partes editados tras el cierre, no pasa de 1). Si no, 0: una partida sin
+    partes o sin real no tiene cuota (se dice, no se adivina).
+    """
+    if personal is None or real is None or personal <= 0 or real <= 0:
+        return _CERO
+    return min(Decimal(1), (personal / real).quantize(_SEIS_DECIMALES, rounding=ROUND_HALF_UP))
+
+
+def fuente_personal(categoria: str | None, personal: Decimal | None) -> str:
+    """`CP` si la partida es de coste proporcional; `PARTES` si tiene partes
+    (personal > 0); si no, `SIN_PARTES` (R45)."""
+    if categoria == "CP":
+        return "CP"
+    if personal is not None and personal > 0:
+        return "PARTES"
+    return "SIN_PARTES"
+
+
+def pendiente_personal(pendiente: Decimal, cuota: Decimal) -> Decimal:
+    """`ROUND(pendiente x cuota, 2)` (R45): lo que se paga el último día del
+    mes de su devengo."""
+    return _redondear(pendiente * cuota)
+
+
+# ---------------------------------------------------------------------------
+# El coste pendiente repartido por CONTRATO de compra (F-150, R48, N17)
+# ---------------------------------------------------------------------------
+
+
+def fracciones_contrato(
+    pendiente: Decimal | None, pendientes_servir: Mapping[int, Decimal | None]
+) -> dict[int, Decimal]:
+    """La parte del pendiente de una partida que va por cada contrato (R48, N17).
+
+    `pendiente` es el devengo de COSTE de la partida sin personal (ni CP);
+    `pendientes_servir`, lo contratado y aún no servido de cada contrato de
+    compra con esa partida (por (contrato, partida), suelo 0). Solo cuentan
+    los contratos con pendiente de servir > 0: `S` = su suma. Lo ENLAZADO es
+    `min(pendiente, S)` (lo contratado de más no es devengo; lo devengado de
+    más no tiene contrato) y la fracción de cada contrato `c` es `enlazado /
+    pendiente x ps_c / S`, sin redondear (Σ fracciones ≤ 1). Sin pendiente
+    > 0 o sin `S` > 0, `{}`: todo va sin contrato (H02).
+    """
+    if pendiente is None or pendiente <= 0:
+        return {}
+    vivos = {c: ps for c, ps in pendientes_servir.items() if ps is not None and ps > 0}
+    total = sum(vivos.values(), _CERO)
+    if total <= 0:
+        return {}
+    enlazado = min(pendiente, total)
+    return {c: enlazado / pendiente * ps / total for c, ps in vivos.items()}
+
+
+def repartir_por_contratos(
+    importe: Decimal, fracciones: Mapping[int, Decimal]
+) -> dict[int | None, Decimal]:
+    """Reparte un importe (una partida en un mes) entre sus contratos (R48).
+
+    Al céntimo y por ACUMULADO en orden de contrato: el contrato `c` recibe
+    `ROUND(importe x Σ f hasta c, 2) - ROUND(importe x Σ f hasta el anterior,
+    2)`, y la clave `None` (sin contrato) el resto, `importe - ROUND(importe x
+    Σ f, 2)`. Así, con `importe` ≥ 0, ningún trozo es negativo, el resto es ≥ 0
+    (0 si Σ f = 1) y la suma es el importe EXACTO; el `ROUND` contrato a
+    contrato podría pasarse en céntimos y dejar un resto negativo.
+
+    Solo se reparte un importe > 0 (design §5.11 paso 3): un mes negativo o
+    cero del plan va ENTERO sin contrato; repartido, daría trozos negativos a
+    cada contrato (la guarda R50 tumbaría la noche).
+    """
+    if importe <= 0:
+        return {None: importe}
+    reparto: dict[int | None, Decimal] = {}
+    acumulada = _CERO
+    anterior = _CERO
+    for contrato in sorted(fracciones):
+        acumulada += fracciones[contrato]
+        hasta_aqui = _redondear(importe * acumulada)
+        reparto[contrato] = hasta_aqui - anterior
+        anterior = hasta_aqui
+    reparto[None] = importe - anterior
+    return reparto
+
+
+# ---------------------------------------------------------------------------
 # Lo que no se publica (R16)
 # ---------------------------------------------------------------------------
 

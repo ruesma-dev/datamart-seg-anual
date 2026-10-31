@@ -409,3 +409,83 @@ soportado, para que las obras al 21 % no salgan mejor de lo real; con los defect
 
 Requisitos R41-R43; tareas T32-T35 (tercera tanda, tras T31). Tamaños: requirements 150/150,
 design 249/250 (§1, §4, §7, §8 y la historia de §9 resumidos).
+
+## 11. CUARTA tanda: N16 (personal a fin de mes) y N17 (coste por contrato) · 31-10
+
+Origen: la prueba R31 (MCP, obra 0686, 30-10). Orden del humano: «arréglalo todo ya». Medido en
+SOLO LECTURA en Azure (`_bootstrap_done = True`, `filas_solo_lectura`, transacción READ ONLY): devengo
+de la nocturna del 30-10 (redespliegue `r20261030-2125`) y `raw` de la ingesta del 31-10 (terminada a
+las 00:39 UTC). **Ojo**: una consulta lanzada a las 00:02 UTC devolvió 0 filas de `raw.con` porque la
+nocturna lo estaba recargando: no medir entre 00:00 y ~00:45 UTC (ni `mart` entre ~01:35 y ~03:10).
+
+### 11.1 · N16, el personal del devengo
+
+**0686, noviembre de 2026** (su último mes: la obra termina ahí, dato del humano): CD 2,18 + CI 0,42 =
+**2,60 M EUR** (+ CP 0,26, fuera). **Personal: ~0,21 M EUR (8 %)**, en 31 partidas (23 con cuota 1):
+JEFE DE GRUPO, ENCARGADO, TÉCNICO PREVENCIÓN, JEFE DE OBRA, TÉCNICO BIM, ADMINISTRATIVO, CAPATACES,
+JEFES DE PRODUCCIÓN... (todas `CI.1.*`). 21 obras: **5,64 de 118,49 M EUR** de coste sin CP (5,62 en CI,
+de 13,07 de CI; 0,02 en CD); 268 partidas con cuota > 0, 184 a 1; 3 con partes y sin real (cuota 0).
+
+Cómo identificar el personal en el devengo del master (comparado):
+| Método | Resultado | Veredicto |
+|---|---|---|
+| **A · cuota histórica por partida**: Σ `raw.hmores.tot` (PERSONA interna, `res.cla = 1`, sin `prvide`, ≤ cierre) / Σ real COSTE de la partida (`mart.fact_seguimiento_mensual`, ≤ cierre), tope 1 | 11,44 de 11,65 M EUR de partes caen en 248 partidas CI del devengo (cuota ~1,00-1,09: la diferencia es la edición de partes tras el cierre); 0,09 en 23 de CD, 0,11 en 12 de CP, 0,02 en partidas fuera del devengo | **ELEGIDO**: mismo criterio que N13/N14, Sigrid-real, por partida |
+| B · descompuesto del master V (`descompuestos.lineas`, `tipo_elemento` = `MANO_OBRA`) | CI: 0,00 (las partidas de personal no tienen líneas `MANO_OBRA`); CD: 1,42, que es mano de obra de SUBCONTRATA, no personal propio; 16.599 de 20.802 partidas con descompuesto | descartado |
+| C · nombre de la partida | no estándar; en la 0686 no encontraba nada en el real (§10.3) | descartado |
+
+Límite de A: una partida sin partes no tiene cuota. 76 partidas CI con nombre de oficio y sin un solo
+parte suman **2,08 M EUR**, casi todo la **0715** (último cierre 2026-06, sin empezar: CAPATAZ 0,18,
+ENCARGADO 0,14, AYTE. JEFE DE OBRA 0,14, GRUISTA 0,11...) y algún VIGILANTE (subcontrata). No se
+adivina: van por contrato o H02 y la receta avisa (`fuente_personal` `SIN_PARTES`).
+
+**Decisiones del spec-author** (cerradas sin preguntar, por la orden del humano): (a) regla fija,
+sin hipótesis: el catálogo sigue en 30; (b) el personal no lleva IVA y **el H13 de la obra se aplica
+a la base SIN personal** (el H13 se mide en facturas, que no incluyen nóminas: aplicarlo al personal lo
+inflaría); (c) sin H06, sin documento (H03), sin plazo ni fraccionamiento (H24): último día del mes
+de su devengo; (d) el CP entero queda fuera, también su personal (0,11, cuota 0, fuente `CP`); (e) el
+aviso N13-b (H02 `CI`) desaparece; (f) las cargas sociales se pagan en realidad el mes siguiente: el
+humano dijo «a fin de mes siempre», y así va (anotado por si AdP lo matiza).
+
+### 11.2 · N17, el enlace partida -> contrato de compra
+
+**Existe**: `raw.ctrpro.paride` (líneas de contrato con partida; la obra en `raw.ctr.obride`). En las 21
+obras: 32.386 líneas con partida del devengo (156,47 M EUR contratados), 1.049 con partida fuera del
+devengo (5,72) y 59 sin partida (0,13). Estados (`raw.con.est`, tipo 44): Firmado 1.289 contratos
+(145,61), Pdt. envío de firma 71 (8,69), Recibido 67 (5,31), Enviado 41 (1,84), Rescindido 7 (0,84),
+Terminado 6 (0,01): fuera los dos últimos. (`raw.dncpro.adjctride`, la planificación adjudicada, da el
+mismo enlace por otra vía; no hace falta.)
+
+**Lo pendiente de servir** (`canser`, cantidad servida de Sigrid): contrastado con los albaranes
+enlazados a la línea (`dcapro.docoritip = 44`, `linoriide`): contratado 161,34, servido por `canser`
+84,89, albaranado 75,83, factura directa 0,02. Coherente. **Por línea no sirve**: las líneas se sirven
+cruzadas (0686: Σ de restos positivos por línea 12,18 frente a 3,36 neto por contrato); se calcula por
+(contrato, partida) con suelo 0.
+
+**Cobertura** (coste pendiente sin CP ni personal, `enlazado = min(pendiente, Σ pendiente de servir)`):
+| Obra | sin CP ni personal | enlazado | % |
+|---|---|---|---|
+| **21 obras** | 112,85 | **48,90** | **43,3** |
+| sin 0608 y 0715 (sin contratos: 3,09 y 18,36) | 91,40 | 48,90 | 53,5 |
+| **0686** | 2,39 | **1,64** | **68,6** |
+| 0702 / 0707 / 0693 | 5,01 / 8,47 / 0,14 | 3,82 / 6,55 / 0,10 | 76 / 77 / 71 |
+| 0720 | 14,05 | 2,39 | 17,0 |
+1.371 partidas con varios contratos con pendiente (13,72 enlazados): se reparten por su pendiente de
+servir. Lo contratado pendiente de servir que supera el devengo de la partida: 15,34 M EUR (no se
+publica: no es devengo). Si se enlazara TODO el pendiente de cualquier partida con contrato (aunque
+esté servido), la cobertura sería 61,94 (55 %): descartado, el exceso sobre lo contratado no tiene
+contrato (modificados, contratos nuevos). **Formas de pago de lo enlazado**: 150 días 42,65 M EUR, 90
+días 23,09, 120 días 21,89, 30 días 0,85, 60 días 0,53 (retención de garantía 5 % casi en todos): H02
+a 120 días lo deformaba de verdad. **Veredicto: N17 VIABLE (parcial)**: lo que no enlaza sigue en H02.
+
+**0686, noviembre, con N16-N17**: personal ~0,21 a fin de mes; ~1,64 por contrato (H01, H04, H06 del
+contrato); ~0,75 con H02 por categoría; CP 0,26 fuera.
+
+### 11.3 · Diseño y tamaños
+
+Diseño en `design.md` §3, §5.10-§5.11, §6, §7, §9 (todo dentro de `07`, sin sub-paso nuevo: el reparto
+por mes vive en sus tablas temporales); objeto nuevo `tesoreria.devengo_pendiente_contrato_mes`.
+Requisitos R44-R52; tareas T36-T45 (T45 MANUAL). Para caber se resumieron R3, R7, R29-R43 y §3, §5.7,
+§6 y §9 del diseño (lo resumido ya estaba hecho; el detalle vive en el SQL y en este informe).
+Tamaños: requirements 150/150, design 250/250. **Sin decisiones abiertas que bloqueen**; para validar
+el humano: (f) de 11.1 (cargas sociales al mes siguiente) y si la 0715 debe llevar el personal por
+nombre (2,08 M EUR) cuando empiece a tener partes (hoy, H02/contrato).
