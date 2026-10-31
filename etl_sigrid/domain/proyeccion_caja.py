@@ -412,6 +412,45 @@ def neto_fifo(importes: Sequence[Decimal | None]) -> list[Decimal]:
 
 
 # ---------------------------------------------------------------------------
+# El personal del devengo de COSTE (F-150, R44, N16)
+# ---------------------------------------------------------------------------
+
+#: De dónde sale la cuota de personal de una partida de COSTE: sus PARTES
+#: (`raw.hmores` de recursos PERSONA internos), ninguno (`SIN_PARTES`) o el
+#: coste proporcional (`CP`, estructura: fuera de la caja de la obra, cuota 0).
+FUENTES_PERSONAL: tuple[str, ...] = ("PARTES", "SIN_PARTES", "CP")
+
+
+def cuota_personal(personal: Decimal | None, real: Decimal | None) -> Decimal:
+    """La parte de PERSONAL de una partida de COSTE, a 6 decimales (R44, N16).
+
+    `min(1, ROUND(personal / real, 6))` si los dos son > 0: el coste de los
+    partes hasta el cierre entre lo real a origen de la partida (el exceso,
+    partes editados tras el cierre, no pasa de 1). Si no, 0: una partida sin
+    partes o sin real no tiene cuota (se dice, no se adivina).
+    """
+    if personal is None or real is None or personal <= 0 or real <= 0:
+        return _CERO
+    return min(Decimal(1), (personal / real).quantize(_SEIS_DECIMALES, rounding=ROUND_HALF_UP))
+
+
+def fuente_personal(categoria: str | None, personal: Decimal | None) -> str:
+    """`CP` si la partida es de coste proporcional; `PARTES` si tiene partes
+    (personal > 0); si no, `SIN_PARTES` (R45)."""
+    if categoria == "CP":
+        return "CP"
+    if personal is not None and personal > 0:
+        return "PARTES"
+    return "SIN_PARTES"
+
+
+def pendiente_personal(pendiente: Decimal, cuota: Decimal) -> Decimal:
+    """`ROUND(pendiente x cuota, 2)` (R45): lo que se paga el último día del
+    mes de su devengo."""
+    return _redondear(pendiente * cuota)
+
+
+# ---------------------------------------------------------------------------
 # Lo que no se publica (R16)
 # ---------------------------------------------------------------------------
 
