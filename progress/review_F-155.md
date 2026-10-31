@@ -103,3 +103,24 @@ CORRECTO y en orden seguro**: ver Cambios requeridos · [x] dobles: la sandbox u
   exigir que su salida imprima el número de línea del fichero mutado.
 - `CHECKPOINTS.md` C4: un paso MANUAL que mande ejecutar `check-diccionario` debe ir DESPUÉS de
   `publicar-diccionario` cuando la feature sube la versión.
+
+## Pasada 2 · Revisión incremental desde 0fbcb95 (HEAD 11f33b0)
+
+**Veredicto: APPROVED.** El delta (`git diff --stat 0fbcb95..HEAD`) solo cambia `progress/current.md` y
+`progress/impl_F-155.md`, que son Markdown. No toca código, SQL, YAML ni tests, así que no relanzo init.sh:
+vale el verde de la pasada 1 (9932 passed). Lo aprobado en la pasada 1 sigue sin cambios.
+
+Los dos cambios pedidos están resueltos, y lo he comprobado contra el repositorio:
+1. `check-diccionario` se ejecuta en el paso 6, DESPUÉS de `publicar-diccionario` (paso 5). El documento avisa
+   de que antes devuelve 1 y cita `main.py` 990-1015.
+2. El orden es el que se pidió: merge → imagen → job → build → check-declarados → publicar → check-diccionario → reinicio
+   del MCP. También trae los comandos exactos y la vuelta atrás. Verificado:
+   - `infra/85_update_job.ps1` admite `-Tag`.
+   - `infra/70_build_image.ps1` genera un tag fechado.
+   - El job `caj-datamart-seg-dev` y el grupo `rg-datamart-seg-dev` coinciden con `infra/env`.
+   - `rg-mcp-bbdd-dev` y `ca-mcp-bbdd-dev` coinciden con `mcp-bbdd/infra/env/dev.json`.
+   - No hay secretos: solo nombres de recursos, ningún ID ni IP.
+
+Checkpoint C4 «MANUAL listadas»: queda **[x]**. El resto de checkpoints sigue como en la pasada 1.
+Hay una nota que no bloquea: `70_build_image.ps1` construye con `acr build` desde la carpeta local, así que
+hay que lanzarlo con `main` ya fusionado y el árbol limpio. El paso 0 ya lo ordena así.
