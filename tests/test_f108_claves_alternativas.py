@@ -78,6 +78,9 @@ DECLARADAS = {
     # F-085 (2026-10-07, design §7 aprobado por el humano): el login del usuario
     # de Sigrid, unico sin distinguir mayusculas (233 de 233, medido).
     "personal.usuarios_sigrid": (("login",),),
+    # F-155 (2026-10-31, hotfix): la clave es la invitacion; el par
+    # (comparativo, oferta) tambien es unico (72.113 de 72.113, medido).
+    "compras.comparativo_ofertas": (("comparativo_id", "oferta_id"),),
 }
 
 #: Cuantas comprobaciones de clave alternativa hace `check-unicidad`: una por

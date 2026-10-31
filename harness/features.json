@@ -2461,6 +2461,24 @@
       "priority": 8,
       "status": "pending",
       "sdd": true
+    },
+    {
+      "id": "F-155",
+      "title": "Hotfix: ofertas compartidas entre comparativos rompen build_compras",
+      "description": "La nocturna del 2026-10-31 falló dos veces en `build_compras` (sub-paso `comparativos`): `could not create unique index \"comparativo_ofertas_pkey\" DETAIL: Key (oferta_id)=(2796053) is duplicated`. Compras se quedó en el 30-10 y `compras.v_estado_documentos` (13_estado_documentos.sql, F-132) no existe (check-declarados KO). Causa medida en solo lectura: en Sigrid se creó el comparativo COM26/0014 (`raw.comprv.comide` 2865169) reutilizando las 6 MISMAS ofertas (docide 2795986, 2796015, 2796032, 2796039, 2796053, 2799121) del 0697.0_0037 (comide 2793682); `raw.comprv` 72.113 filas y 72.107 `docide` distintos. `compras.comparativo_ofertas` (08_comparativos.sql) tenía PRIMARY KEY (oferta_id) = `dco.ide`.",
+      "acceptance": [
+        "El grano de `compras.comparativo_ofertas` es la INVITACIÓN (una oferta dentro de un comparativo): clave `invitacion_id` (= `raw.comprv.ide`), medida única en solo lectura; si no lo fuese, (`comparativo_id`, `oferta_id`)",
+        "Revisados TODOS los consumidores que suponen `oferta_id` único y corregidos para que una oferta compartida por dos comparativos no duplique importes ni filas: la oferta ganadora de `compras.comparativos` (08), `09_comparativos_detalle.sql`, `14_documento_adjuntos.sql` y cualquier SQL, vista o test que una por `oferta_id`, más la clave declarada en el diccionario (`config/diccionario/compras.yaml`) y `check-unicidad`",
+        "Test que reproduce el caso (una oferta en dos comparativos) en RED antes y en verde después, con sandbox SQL local (Postgres desechable) y los tipos reales de `raw` (double precision; nada de ROUND sin cast a NUMERIC)",
+        "Azure SOLO LECTURA: el build en Azure lo lanza el humano; queda como paso MANUAL en `progress/current.md` con el comando exacto (`.venv/Scripts/python.exe main.py build-compras`, luego `main.py check-declarados` y `main.py check-diccionario`) y lo esperado",
+        "Si el diccionario cambia, versión nueva; `bash harness/init.sh` en verde al final"
+      ],
+      "status": "spec_ready",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 1,
+      "branch": "feature/F-155-ofertas-compartidas",
+      "notes": "2026-10-31: HOTFIX urgente autorizado por el humano («lanza»), registrado e implementado el mismo día en su rama desde `main` (1d65ca1). Estado `spec_ready` y no `in_progress` porque init.sh admite UNA sola feature in_progress y F-150 lo está (pendiente solo de su cierre tras la nocturna); no se toca F-150. Implementación y evidencias en `progress/impl_F-155.md`; el build en Azure es MANUAL del humano (`progress/current.md`)."
     }
   ]
 }

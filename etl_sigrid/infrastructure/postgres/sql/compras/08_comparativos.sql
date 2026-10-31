@@ -3,8 +3,10 @@
 -- F-038 (2026-10-04) · EL COMPARATIVO DE OFERTAS, Fase 1.
 --
 -- Construye:
---   · compras.comparativo_ofertas — una fila por oferta INVITADA (raw.comprv,
---     cuyo docide es único), incluidas las FICTICIAS marcadas como tales.
+--   · compras.comparativo_ofertas — una fila por INVITACIÓN (raw.comprv: una
+--     oferta dentro de un comparativo; clave `invitacion_id` = `comprv.ide`),
+--     incluidas las FICTICIAS marcadas como tales. `docide` NO es único: una
+--     oferta puede estar invitada en dos comparativos (F-155).
 --   · compras.comparativos        — una fila por comparativo (raw.com), con
 --     las cuatro magnitudes de importe, el ahorro del concurso, el contrato,
 --     el estado, la actividad y la fecha de aprobación.
@@ -29,6 +31,13 @@
 --     cabecera del contrato (56 %): un contrato sale de varios comparativos
 --     (3.960 contratos), así que el enlace bueno es N:1 desde el comparativo.
 --     Ningún comparativo tiene dos contratos (0): la guarda de abajo lo exige.
+--   · UNA OFERTA PUEDE ESTAR EN DOS COMPARATIVOS (F-155, 2026-10-31): el
+--     COM26/0014 se creó reutilizando las 6 ofertas del 0697.0_0037 y la
+--     nocturna cayó con la clave `oferta_id` duplicada. El grano es la
+--     invitación; `oferta_id` se repite y quien una por ella une TAMBIÉN por
+--     `comparativo_id`. Cada línea de oferta (`dcopro`) va a UNA invitación:
+--     la del comparativo de su línea del concurso (`comlin.comide`) y, si
+--     ninguna casa, la primera (`comprv.ide` menor). La misma regla en 09.
 --   · LA FECHA DE APROBACIÓN solo existe en los estados de firma: es la de la
 --     última firma cuando `con.est` es el estado final (`estfin`) de su
 --     circuito; en EN ELABORACIÓN o PROPUESTO no existe y se publica NULL.
@@ -58,7 +67,9 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------
--- OFERTAS · una fila por oferta invitada, TODAS, con la ficticia marcada.
+-- OFERTAS · una fila por invitación (oferta dentro de un comparativo), TODAS,
+-- con la ficticia marcada. La oferta compartida sale una vez por comparativo
+-- con el MISMO importe de documento (A): es la que se ofertó en cada uno.
 -- ---------------------------------------------------------------------------
 DROP TABLE IF EXISTS compras.comparativo_ofertas CASCADE;
 CREATE TABLE compras.comparativo_ofertas AS
@@ -90,21 +101,33 @@ JOIN raw.dco d ON d.ide = p.docide
 JOIN raw.con c ON c.ide = d.ide
 -- B: solo las líneas de oferta que responden a una línea del comparativo.
 -- `tot = can × pre` en las 786.710 líneas: el precio ya es neto.
+-- F-155: B es de la INVITACIÓN. Cada línea va a una sola: la del comparativo
+-- de su línea del concurso; si ninguna casa (líneas sin `comlin`), la primera.
+-- Con una sola invitación por oferta (todas salvo las compartidas) es lo
+-- mismo que sumar por documento.
 LEFT JOIN (
-    SELECT lp.docide,
-           SUM(lp.tot)::NUMERIC(18, 2) AS importe_lineas,
+    SELECT a.invitacion_id,
+           SUM(a.tot)::NUMERIC(18, 2) AS importe_lineas,
            count(*) AS n_lineas
-    FROM raw.dcopro lp
-    WHERE lp.comlinide > 0
-    GROUP BY lp.docide
-) li ON li.docide = d.ide
+    FROM (
+        SELECT DISTINCT ON (lp.ide) q.ide AS invitacion_id, lp.tot
+        FROM raw.dcopro lp
+        JOIN raw.comprv q ON q.docide = lp.docide
+        LEFT JOIN raw.comlin cl ON cl.ide = lp.comlinide
+        WHERE lp.comlinide > 0
+        ORDER BY lp.ide, COALESCE(q.comide = cl.comide, FALSE) DESC, q.ide
+    ) a
+    GROUP BY a.invitacion_id
+) li ON li.invitacion_id = p.ide
 CROSS JOIN LATERAL (
     SELECT compras.fn_familia_ficticia(d.entcif, d.entres) AS familia
 ) ff
 -- La traducción por la PAREJA (12, est), con su guarda de grano dentro.
 LEFT JOIN LATERAL compras.fn_estado_documento(12, c.est) est ON TRUE;
 
-ALTER TABLE compras.comparativo_ofertas ADD PRIMARY KEY (oferta_id);
+-- F-155: la clave es la invitación; `oferta_id` se repite (índice, no clave).
+ALTER TABLE compras.comparativo_ofertas ADD PRIMARY KEY (invitacion_id);
+CREATE INDEX idx_com_cof_ofe ON compras.comparativo_ofertas (oferta_id);
 CREATE INDEX idx_com_cof_cmp ON compras.comparativo_ofertas (comparativo_id);
 CREATE INDEX idx_com_cof_prv ON compras.comparativo_ofertas (proveedor_id);
 CREATE INDEX idx_com_cof_fam ON compras.comparativo_ofertas (familia_ficticia);
@@ -136,6 +159,8 @@ WITH ofertas AS (
 ganadora AS (
     -- La ganadora SOLO si es única (R15): con dos, no se elige una y la
     -- ganadora y sus importes quedan a NULL (`n_ofertas_ganadoras` lo dice).
+    -- Va por `comparativo_id` y el grano es la invitación (F-155): una oferta
+    -- compartida da una fila en cada comparativo, nunca dos en el mismo.
     SELECT o.comparativo_id, o.oferta_id, o.proveedor_id, o.proveedor_nombre,
            o.importe_ofertado_documento, o.importe_ofertado_lineas
     FROM compras.comparativo_ofertas o

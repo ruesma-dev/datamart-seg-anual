@@ -77,8 +77,10 @@ WITH base AS (
         END::TEXT                               AS familia,
         c.cod                                   AS codigo_documento,
         -- R13: el comparativo es el propio documento; la oferta, el de su fila
-        -- de `comprv` (`docide` es único: el LEFT JOIN no multiplica), como
-        -- `compras.comparativo_ofertas`; NULL en el resto de familias.
+        -- de `comprv`; NULL en el resto de familias. F-155: `docide` NO es
+        -- único (una oferta puede estar invitada en dos comparativos): la
+        -- oferta compartida toma el de su PRIMERA invitación (`comprv.ide`
+        -- menor), y el índice sigue teniendo una fila por enlace.
         CASE c.tip WHEN 46 THEN r.con WHEN 12 THEN p.comide END
                                                 AS comparativo_id,
         g.ide                                   AS grafico_id,
@@ -95,7 +97,11 @@ WITH base AS (
     FROM      raw.rcg r
     JOIN      raw.con c ON c.ide = r.con AND c.tip IN (12, 14, 15, 44, 46)  -- FAMILIAS_ADJUNTOS
     JOIN      raw.gra g ON g.ide = r.gra                                     -- R11
-    LEFT JOIN raw.comprv p ON p.docide = r.con AND c.tip = 12                -- R13
+    LEFT JOIN (                                                              -- R13, F-155
+        SELECT DISTINCT ON (q.docide) q.docide, q.comide
+        FROM raw.comprv q
+        ORDER BY q.docide, q.ide
+    ) p ON p.docide = r.con AND c.tip = 12
 )
 SELECT
     b.adjunto_id,

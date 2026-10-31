@@ -3227,7 +3227,9 @@ objetos:
           elige: la ganadora y sus importes quedan a NULL.
         agregacion: suma
       oferta_ganadora_id:
-        significado: La oferta ganadora, si es unica (`compras.comparativo_ofertas.oferta_id`).
+        significado: >-
+          La oferta ganadora, si es unica (`compras.comparativo_ofertas.oferta_id`,
+          unida tambien por `comparativo_id`: F-155).
         nulo_significa: Ninguna ganadora, o mas de una (`n_ofertas_ganadoras`).
         agregacion: no_sumable
       proveedor_ganador_id:
@@ -3381,9 +3383,19 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
-      TODAS las ofertas de cada comparativo, una fila por oferta, con su
-      proveedor, su importe SIN IVA, su estado (rechazada, aceptada,
-      pendiente...) y si es FICTICIA.
+      TODAS las ofertas de cada comparativo, una fila por INVITACION (una
+      oferta dentro de un comparativo), con su proveedor, su importe SIN IVA,
+      su estado (rechazada, aceptada, pendiente...) y si es FICTICIA.
+
+      **UNA OFERTA PUEDE ESTAR EN DOS COMPARATIVOS** (F-155): el 2026-10-30 se
+      creo el COM26/0014 reutilizando las 6 ofertas del 0697.0_0037, y la
+      misma oferta sale una vez en cada uno, con el MISMO importe de documento.
+      `oferta_id` NO identifica la fila: se une por `oferta_id` Y
+      `comparativo_id` (o por `invitacion_id`). Sumar
+      `importe_ofertado_documento` de toda la tabla sin agrupar por
+      comparativo cuenta dos veces la oferta compartida. Las lineas de una
+      oferta compartida van a UNA invitacion: la del comparativo de su linea
+      del concurso.
 
       **LAS OFERTAS FICTICIAS.** Dentro de un comparativo hay ofertas de
       proveedores INVENTADOS por la propia Ruesma --el OBJETIVO, la OFICINA
@@ -3408,17 +3420,25 @@ objetos:
       invitado (`comprv.prvide`) solo esta al 18 % y unir por el pierde el 82
       % de las ofertas.
     grano: >-
-      Una fila por oferta invitada (`raw.comprv`, cuyo documento de oferta es
-      unico), incluidas las ficticias. `oferta_id` es clave primaria declarada.
-    clave_negocio: [oferta_id]
+      Una fila por invitacion (`raw.comprv`: una oferta dentro de un
+      comparativo), incluidas las ficticias. `invitacion_id` es clave primaria
+      declarada; (`comparativo_id`, `oferta_id`) tambien es unica. `oferta_id`
+      SOLA no: 6 ofertas estan en dos comparativos (F-155, 2026-10-31).
+    clave_negocio: [invitacion_id]
+    claves_alternativas: [[comparativo_id, oferta_id]]
     paso_etl: build_compras
     refresco: nocturno
     columnas:
       oferta_id:
-        significado: Identificador del documento de oferta en Sigrid (`dco.ide` = `con.ide`).
+        significado: >-
+          Identificador del documento de oferta en Sigrid (`dco.ide` =
+          `con.ide`). NO es unico: una oferta invitada en dos comparativos
+          sale dos veces (F-155).
         agregacion: no_sumable
       invitacion_id:
-        significado: Identificador de la invitacion al proveedor (`comprv.ide`).
+        significado: >-
+          Identificador de la invitacion al proveedor (`comprv.ide`): la
+          oferta DENTRO de un comparativo. Clave de la tabla (F-155).
         agregacion: no_sumable
       comparativo_id:
         significado: Comparativo al que pertenece la oferta.
@@ -3502,15 +3522,20 @@ objetos:
         porque: Para la cabecera del comparativo, su obra, su actividad y su contrato.
       - de: oferta_id
         a: compras.comparativo_oferta_lineas.oferta_id
-        cardinalidad: "1:N"
-        porque: Para las lineas de la oferta, con su descuento y, en el OBJETIVO, su base.
+        cardinalidad: "N:N"
+        porque: >-
+          Para las lineas de la oferta, con su descuento y, en el OBJETIVO, su
+          base. Se une por `oferta_id` Y `comparativo_id`: una oferta puede
+          estar en dos comparativos y cada linea va a uno solo (F-155).
       - de: oferta_id
         a: compras.documento_adjuntos.documento_id
-        cardinalidad: "1:N"
+        cardinalidad: "N:N"
         porque: >-
           Para los ficheros adjuntos de la oferta (la oferta del proveedor;
           a veces el concurso en Excel). Los tiene el 25,1 % de las ofertas
-          (F-090).
+          (F-090). Una oferta en dos comparativos (F-155) repite sus ficheros
+          en cada fila: filtrar antes `familia = 'OFERTA'` y unir tambien por
+          `comparativo_id` (el de su primera invitacion).
     ejemplos_preguntas:
       - Que proveedores ofertaron en el comparativo X y cuanto
       - Que ofertas son ficticias en el comparativo X
@@ -3765,8 +3790,11 @@ objetos:
     relaciones:
       - de: oferta_id
         a: compras.comparativo_ofertas.oferta_id
-        cardinalidad: "N:1"
-        porque: Para el proveedor, el estado y el importe de documento de la oferta.
+        cardinalidad: "N:N"
+        porque: >-
+          Para el proveedor, el estado y el importe de documento de la oferta.
+          Se une por `oferta_id` Y `comparativo_id`: por `oferta_id` sola, la
+          oferta compartida por dos comparativos duplica la linea (F-155).
       - de: comparativo_linea_id
         a: compras.comparativo_lineas.linea_id
         cardinalidad: "N:1"
@@ -3849,8 +3877,11 @@ objetos:
         porque: Para la obra, la actividad, el contrato y las demas magnitudes del comparativo.
       - de: oferta_objetivo_id
         a: compras.comparativo_ofertas.oferta_id
-        cardinalidad: "N:1"
-        porque: Para la oferta OBJETIVO como oferta, con su estado y su fecha.
+        cardinalidad: "N:N"
+        porque: >-
+          Para la oferta OBJETIVO como oferta, con su estado y su fecha. Se
+          une por `oferta_objetivo_id` = `oferta_id` Y por `comparativo_id`: la
+          OBJETIVO puede estar en dos comparativos (F-155).
     ejemplos_preguntas:
       - Cual es el coste objetivo del comparativo X y con que porcentaje
       - En que comparativos de la obra X el objetivo no casa con su base
@@ -4634,8 +4665,11 @@ objetos:
         porque: Los ficheros del propio comparativo, filtrando antes `familia = 'COMPARATIVO'`.
       - de: documento_id
         a: compras.comparativo_ofertas.oferta_id
-        cardinalidad: "N:1"
-        porque: Los ficheros de una oferta, filtrando antes `familia = 'OFERTA'`.
+        cardinalidad: "N:N"
+        porque: >-
+          Los ficheros de una oferta, filtrando antes `familia = 'OFERTA'` y
+          uniendo tambien por `comparativo_id`: una oferta puede estar en dos
+          comparativos (F-155) y aqui lleva el de su primera invitacion.
       - de: documento_id
         a: compras.albaranes.albaran_id
         cardinalidad: "N:1"
