@@ -433,6 +433,12 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
     comparativo con dos contratos hace fallar el build (guarda `RAISE
     EXCEPTION`, hoy 0 casos). La fecha de aprobación es la de la última firma
     solo cuando `con.est` es el `estfin` de su circuito.
+  - **Una oferta puede estar en dos comparativos (F-155).** El grano de
+    `comparativo_ofertas` es la INVITACIÓN (`invitacion_id` = `comprv.ide`);
+    `oferta_id` se repite (COM26/0014 reutilizó las 6 ofertas del
+    0697.0_0037 y tumbó la nocturna del 31-10). Cada línea de oferta va a UNA
+    invitación, la del comparativo de su `comlin`; quien una por `oferta_id`
+    une también por `comparativo_id`.
   - **Fase 2 (`09_comparativos_detalle.sql`): `dcopro.dto` es TEXTO** con coma
     decimal y negativos (recargos), convertido por `compras.fn_porcentaje_dto`
     con el patrón del dominio. La base del coste objetivo lee

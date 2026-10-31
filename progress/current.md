@@ -9,6 +9,41 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-31 · F-155 (HOTFIX) · `spec_ready` · implementada · rama `feature/F-155-ofertas-compartidas`
+
+Implementer. La nocturna del 31-10 cayó dos veces en `build_compras` (`comparativo_ofertas_pkey`,
+`oferta_id` 2796053 duplicada): el COM26/0014 reutiliza las 6 ofertas del 0697.0_0037. Commits
+`66a8dd9`..; `azure-apps` `acb8a75` (local, sin push). Detalle y evidencias: `progress/impl_F-155.md`.
+- Grano de `compras.comparativo_ofertas` = INVITACIÓN (PK `invitacion_id`, única: 72.113 de 72.113);
+  08 (B por invitación), 09 (cada línea a una invitación; objetivo por comparativo y oferta), 14
+  (la oferta compartida toma su primera invitación). Diccionario **v68**.
+- **Estado `spec_ready` y no `in_progress`**: init.sh admite UNA sola `in_progress` y es F-150; no
+  se ha tocado F-150. El líder decide al cerrarla.
+- **PASO MANUAL del humano (Azure; el implementer NO lo lanza)**, corregido tras la review
+  (`progress/review_F-155.md`). Fuera de 00:00-03:15 UTC. En ESTE orden:
+  0. Merge de la rama a `main` y `git push` (humano).
+  1. `powershell -NoProfile -File infra/70_build_image.ps1` → anotar el **tag** que imprime.
+  2. `powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag>` y comprobar la imagen del job:
+     `az containerapp job show -n caj-datamart-seg-dev -g rg-datamart-seg-dev --query "properties.template.containers[0].image" -o tsv`
+     → debe acabar en `:<tag>`. Sin esto, la nocturna repite el fallo aunque el build manual vaya bien.
+  3. `.venv/Scripts/python.exe main.py build-compras` → termina OK; sub-pasos `comparativos`,
+     `comparativos_detalle` y `documento_adjuntos` sin error; `compras.comparativo_ofertas` = 72.113
+     filas y `compras.comparativo_oferta_lineas` = 792.033 (`raw` del 31-10; con el SQL viejo,
+     792.039 y 09 habría caído también).
+  4. `.venv/Scripts/python.exe main.py check-declarados` → sin faltantes (`compras.v_estado_documentos`
+     vuelve a existir), código 0.
+  5. `.venv/Scripts/python.exe main.py publicar-diccionario` → publica la **v68**.
+  6. `.venv/Scripts/python.exe main.py check-diccionario` → OK. **OJO: ANTES del paso 5 devuelve 1**
+     (`main.py` 990-1015 compara el hash publicado con el del árbol): no es un fallo del hotfix.
+  7. Reinicio del MCP (cachea el diccionario hasta reiniciar):
+     `az containerapp show -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --query properties.latestReadyRevisionName -o tsv`
+     y `az containerapp revision restart -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --revision <revision> -o none`.
+  - Opcional: `.venv/Scripts/python.exe main.py check-unicidad` → `comparativo_ofertas` sin
+    duplicados por `invitacion_id` ni por (`comparativo_id`, `oferta_id`).
+  - **Vuelta atrás**: `powershell -NoProfile -File infra/85_update_job.ps1 -Tag r20261031-0933` (el
+    tag anterior), comprobada con el mismo `az containerapp job show`. Ojo: con ese tag la nocturna
+    vuelve a caer en `build_compras` mientras siga en Sigrid el COM26/0014.
+
 ## 2026-10-31 · F-150 · `in_progress` · T36-T44 hechas (N16-N17) · rama `feature/F-150-receta-caja`
 
 Implementer. Commits `133a305`..`3efb069` (T36-T43 y T39 bis); `azure-apps` `9488087` (local, sin

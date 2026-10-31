@@ -143,7 +143,9 @@ def test_f090_r19_cada_documento_apunta_al_indice(objeto: str) -> None:
     hacia = [r for r in relaciones if r["a"] == "compras.documento_adjuntos.documento_id"]
     assert len(hacia) == 1, f"compras.{objeto} no apunta a su índice de adjuntos"
     assert hacia[0]["de"] == DOCUMENTOS[objeto]
-    assert hacia[0]["cardinalidad"] == "1:N"
+    # F-155: una oferta puede estar en dos comparativos, `oferta_id` no es única.
+    esperada = "N:N" if objeto == "comparativo_ofertas" else "1:N"
+    assert hacia[0]["cardinalidad"] == esperada
 
 
 # ===========================================================================

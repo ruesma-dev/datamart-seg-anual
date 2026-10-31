@@ -751,7 +751,14 @@
 # servir (`raw.ctrpro`); H01/H04/H06 en las filas con contrato, H02 en el
 # resto. `devengo_corte_obra` gana `pendiente_personal` y
 # `pendiente_enlazado_contrato`. Sale el aviso N13-b (H02 `CI` del personal).
-version: 67
+# version 68 (F-155, 2026-10-31, hotfix): UNA OFERTA PUEDE ESTAR EN DOS
+# COMPARATIVOS. En Sigrid se creo el COM26/0014 con las 6 ofertas del
+# 0697.0_0037 y la nocturna cayo en `build_compras` con la clave `oferta_id`
+# duplicada. `compras.comparativo_ofertas` pasa a una fila por INVITACION:
+# clave `invitacion_id` (`comprv.ide`) y alternativa (`comparativo_id`,
+# `oferta_id`). Las relaciones que prometian `oferta_id` unica pasan a `N:N`
+# con el `porque` diciendo que se une tambien por `comparativo_id`.
+version: 68
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 

@@ -80,7 +80,8 @@ def _texto(nombre: str) -> str:
     ("nombre", "clave", "columnas"),
     [
         ("compras.comparativos", ("comparativo_id",), COLUMNAS_COMPARATIVOS),
-        ("compras.comparativo_ofertas", ("oferta_id",), COLUMNAS_OFERTAS),
+        # F-155: la clave es la invitación (una oferta puede estar en dos comparativos).
+        ("compras.comparativo_ofertas", ("invitacion_id",), COLUMNAS_OFERTAS),
     ],
 )
 def test_f038_r24_ficha_con_grano_clave_y_todas_sus_columnas(
@@ -394,13 +395,13 @@ def test_f038_r30_las_columnas_de_la_base_dicen_su_nulo() -> None:
         ("compras.comparativo_lineas", "partida_id",
          "descompuestos.lineas.partida_id", "N:N"),
         ("compras.comparativo_oferta_lineas", "oferta_id",
-         "compras.comparativo_ofertas.oferta_id", "N:1"),
+         "compras.comparativo_ofertas.oferta_id", "N:N"),  # F-155
         ("compras.comparativo_oferta_lineas", "comparativo_linea_id",
          "compras.comparativo_lineas.linea_id", "N:1"),
         ("compras.comparativo_objetivo", "comparativo_id",
          "compras.comparativos.comparativo_id", "1:1"),
         ("compras.comparativo_objetivo", "oferta_objetivo_id",
-         "compras.comparativo_ofertas.oferta_id", "N:1"),
+         "compras.comparativo_ofertas.oferta_id", "N:N"),  # F-155
         ("compras.comparativo_firmas", "comparativo_id",
          "compras.comparativos.comparativo_id", "N:1"),
         ("compras.comparativos", "comparativo_id",
