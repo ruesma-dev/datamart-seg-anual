@@ -3,7 +3,7 @@
 
 Implementer, 2026-10-31. Rama `feature/F-155-ofertas-compartidas` desde `main` (`1d65ca1`).
 `sdd=false`, rigor `estandar`. Commits `66a8dd9` (T1), `dc758b7` (T2), `5cb92c5` (T3),
-`f1d7d06` (T4), `e51868d` (T5) y el de este informe. `azure-apps` `acb8a75` (local, sin push).
+`f1d7d06` (T4), `e51868d` (T5), `b1676db` (T6) y el de este informe. `azure-apps` `acb8a75` (local, sin push).
 
 ## 1. Qué pasó y causa (medido en Azure, SOLO LECTURA, `_bootstrap_done = True`)
 
@@ -34,6 +34,7 @@ La nocturna del 31-10 cayó dos veces en `build_compras` (`comparativo_ofertas_p
 | `docs/ARCHITECTURE.md` | Viñeta F-155 en el bloque de F-038 |
 | `tests/test_f155_ofertas_compartidas.py` (nuevo) | 8 estáticos + 5 de sandbox |
 | `tests/test_f038_sql.py`, `test_f038_diccionario.py`, `test_f090_diccionario.py`, `test_f090_ingesta_sql.py` | Ajustados a la nueva verdad (PK, B por invitación, `DISTINCT ON`, objetivo, relaciones `N:N`, R13 de 14) |
+| `tests/test_f108_claves_alternativas.py` | T6: la alternativa nueva en `DECLARADAS` (init.sh la cazó: 10 frente a 9) |
 | `harness/features.json` | F-155 registrada |
 | `progress/current.md` | Sección F-155 con el PASO MANUAL |
 | `progress/mutacion_sql_F-155.py` (nuevo) | Mutación manual del SQL contra la sandbox |
@@ -172,11 +173,25 @@ En `progress/current.md` (sección F-155), con el comando exacto y lo esperado:
 |---|---|
 | Tests de F-155 (con sandbox, `F155_SANDBOX_DSN`) | **13 passed** en 3,42 s |
 | Tests relacionados sin sandbox (f038, f090, f139, f006, f155) | 1287 passed, 268 skipped en 51,5 s |
-| Suite completa (`bash harness/init.sh`) | ver bloque siguiente |
+| Suite completa (`bash harness/init.sh`) | **9932 passed, 274 skipped**, 0 failed, en 1 h 01 min 20 s |
 | Cobertura de líneas cambiadas | N/A: F-155 no cambia líneas Python de producción (solo SQL, YAML y tests); la puerta de init.sh mide además la feature `in_progress` (F-150) |
 | Mutantes generados / supervivientes | `harness.mutacion`: alcance vacío (0 líneas Python). SQL manual: **7 generados, 7 muertos, 0 supervivientes** |
 | Medidas en Azure (solo lectura) | §1; impacto de B: solo las 6 invitaciones del COM26/0014 cambian de 72.113 |
 
 ### Resultado de `bash harness/init.sh` (tal cual, al terminar)
 
-PENDIENTE_INIT
+Tercera pasada, sobre `b1676db` (2026-10-31, ~13:55 UTC):
+
+```
+9932 passed, 274 skipped, 2570 warnings in 3680.42s (1:01:20)
+[OK] pytest en verde (con medición de cobertura)
+[OK] PUERTA COBERTURA: N/A (F-155 no cambia líneas Python de producción frente a main)
+[OK] PUERTA TAMAÑO: F-155 dentro de los topes (impl 183/220)
+[OK] Rama actual: feature/F-155-ofertas-compartidas
+ENTORNO LISTO. Puedes trabajar.
+```
+
+Las dos primeras pasadas cayeron con 1 fallo cada una y se arreglaron (T5: el veto de
+`DROP SCHEMA compras` de `test_f067_reset`; T6: `test_f108` cuenta las claves alternativas
+declaradas). La sandbox se salta en init.sh (sin `F155_SANDBOX_DSN`); el contenedor `f155pg`
+(puerto 55155) queda arrancado para que el reviewer la repita.
