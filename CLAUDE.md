@@ -117,7 +117,10 @@ confirmación cubre el plan que se enseñó, no lo que apareció después.
   proveedor (`tesoreria.albaranes_pendientes_neto`, FIFO, leído de `raw`: la
   vista de compras solo suma líneas > 0); el coste proporcional (`CP`) NO es caja
   de la obra (sale por `categoria`; su caja es F-154) y el personal va por el
-  devengo del recurso, no por las nóminas de la cartera. El paso 0 es el SALDO
+  devengo del recurso, no por las nóminas de la cartera, y se paga el último día
+  del mes de su devengo (N16: `importe_pendiente_personal`); el resto del coste
+  va por contrato de compra en `tesoreria.devengo_pendiente_contrato_mes` (N17:
+  H01/H04/H06 con contrato, H02 sin él). El paso 0 es el SALDO
   de partida (`tesoreria.saldo_partida_obra`, CON IVA, H28): los pagarés AGR por
   sus originales de BAJA (H29, rompe `R-TESORERIA-ESTADO` a propósito) y el
   personal por el coste de sus partes hasta el cierre. **`compras/` publica

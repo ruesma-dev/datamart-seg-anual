@@ -36,10 +36,14 @@ COLUMNAS_NUEVAS: dict[str, tuple[str, ...]] = {
         "contrato_cliente_id", "coeficiente_venta", "fuente_coeficiente", "coeficiente_master",
         "pendiente_con_coeficientes", "iva_porcentaje", "fuente_iva", "retencion_porcentaje",
         "fuente_retencion",
+        # N16 (31-10): el personal de la partida, solo en COSTE.
+        "cuota_personal", "pendiente_personal", "fuente_personal",
     ),
     "tesoreria.devengo_pendiente_obra_mes": (
         "importe_pendiente_con_coeficientes", "coeficiente_venta", "importe_iva_contrato",
         "base_sin_iva_contrato", "importe_retencion_contrato", "base_sin_retencion_contrato",
+        # N16 (31-10): el personal del mes, solo en COSTE.
+        "importe_pendiente_personal",
     ),
     "tesoreria.devengo_corte_obra": (
         "venta_real_origen_con_coeficientes", "venta_real_media_obra", "facturado_origen",
@@ -48,6 +52,8 @@ COLUMNAS_NUEVAS: dict[str, tuple[str, ...]] = {
         "base_pendiente_facturar_sin_retencion_contrato",
         # N12 (29-10): la parte de coste proporcional de la cartera, solo en COSTE.
         "cartera_viva_coste_proporcional", "cartera_emitida_tras_cierre_coste_proporcional",
+        # N16 (31-10): el personal pendiente de la obra; N17: lo que va por contrato.
+        "pendiente_personal", "pendiente_enlazado_contrato",
     ),
     "tesoreria.hipotesis_caja": ("paso_receta",),
 }
@@ -335,7 +341,8 @@ def test_f150_r11_r19_las_columnas_de_la_partida_solo_en_venta() -> None:
     assert ("ROUND(GREATEST(0, d.plan_desde_version - d.ejecutado_intervalo) "
             "* c.coeficiente_venta, 2) AS pendiente_con_coeficientes") in texto
     columnas, _select = _insert(RUTA_DEVENGO, "tesoreria.devengo_pendiente_partida")
-    assert columnas[-9:] == list(COLUMNAS_NUEVAS["tesoreria.devengo_pendiente_partida"])
+    nuevas = COLUMNAS_NUEVAS["tesoreria.devengo_pendiente_partida"]
+    assert columnas[-len(nuevas):] == list(nuevas)
 
 
 def test_f150_r19_fuente_del_iva_y_de_la_retencion() -> None:
@@ -408,7 +415,8 @@ def test_f150_r20_iva_y_retencion_de_la_obra_mes_redondeados_al_final() -> None:
 
 def test_f150_r14_r20_las_columnas_del_mes_en_orden() -> None:
     columnas, _select = _insert(RUTA_DEVENGO, "tesoreria.devengo_pendiente_obra_mes")
-    assert columnas[-6:] == list(COLUMNAS_NUEVAS["tesoreria.devengo_pendiente_obra_mes"])
+    nuevas = COLUMNAS_NUEVAS["tesoreria.devengo_pendiente_obra_mes"]
+    assert columnas[-len(nuevas):] == list(nuevas)
 
 
 # ===========================================================================
@@ -420,8 +428,12 @@ def test_f150_r23_lo_real_a_origen_hasta_el_cierre_por_partida() -> None:
     texto = _devengo()
     assert (
         "JOIN mart.fact_seguimiento_mensual f ON f.obra_id = v.obra_id AND f.concepto = v.concepto "
-        "AND f.tipo_dato = 'REAL' AND f.anio_mes <= v.mes_ultimo_cierre WHERE v.concepto = 'VENTA'"
+        "AND f.tipo_dato = 'REAL' AND f.anio_mes <= v.mes_ultimo_cierre "
+        "GROUP BY v.obra_id, v.concepto, f.partida_id"
     ) in texto
+    # N16: `_dev_real` cubre los dos conceptos; el hueco y el contrato leen solo la venta.
+    assert "SELECT obra_id, partida_id FROM _dev_real WHERE concepto = 'VENTA'" in texto
+    assert texto.count("WHERE r.concepto = 'VENTA'") == 2
 
 
 def test_f150_r23_la_media_de_la_obra_como_el_dominio() -> None:
@@ -479,8 +491,9 @@ def test_f150_r23_iva_y_retencion_del_hueco_por_peso_de_contrato() -> None:
 
 def test_f150_r23_las_columnas_del_corte_en_orden_y_null_en_coste() -> None:
     columnas, select = _insert(RUTA_DEVENGO, "tesoreria.devengo_corte_obra")
-    # 9 del hueco (R23) y, detrás, las 2 de la cartera de CP (N12, R36).
-    assert columnas[-11:] == list(COLUMNAS_NUEVAS["tesoreria.devengo_corte_obra"])
+    # 9 del hueco (R23), detrás las 2 de la cartera de CP (N12, R36) y las de N16-N17.
+    nuevas = COLUMNAS_NUEVAS["tesoreria.devengo_corte_obra"]
+    assert columnas[-len(nuevas):] == list(nuevas)
     assert ("LEFT JOIN _dev_hueco hu ON hu.obra_id = v.obra_id AND v.concepto = 'VENTA'"
             in select)
 

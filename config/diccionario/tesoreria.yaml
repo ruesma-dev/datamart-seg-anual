@@ -694,6 +694,23 @@ objetos:
         unidad: EUR
         agregacion: suma
         nulo_significa: VENTA.
+      pendiente_personal:
+        significado: >-
+          La parte de PERSONAL propio de `pendiente` (suma de la de cada
+          partida). Se paga el ULTIMO DIA del mes de su devengo, sin plazo,
+          retencion ni IVA (regla fija de la receta, F-150, N16).
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: VENTA.
+      pendiente_enlazado_contrato:
+        significado: >-
+          Lo que de `pendiente` (sin CP ni personal) va por CONTRATO de compra:
+          las filas con contrato de `devengo_pendiente_contrato_mes`, que se
+          pagan con H01, H04 y H06 de su contrato. El resto, con H02. Declaralo
+          (F-150, N17).
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: VENTA.
     relaciones:
       - de: obra_id
         a: maestro.obras.obra_id
@@ -840,6 +857,14 @@ objetos:
         unidad: EUR
         agregacion: suma
         nulo_significa: COSTE.
+      importe_pendiente_personal:
+        significado: >-
+          La parte de PERSONAL propio de `importe_pendiente` en el mes (el mismo
+          reparto). Se paga el ULTIMO DIA de ese mes, sin plazo, retencion ni
+          IVA; el resto del coste va por contrato o por H02 (F-150, N16).
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: VENTA.
     relaciones:
       - de: obra_id
         a: maestro.obras.obra_id
@@ -1003,6 +1028,26 @@ objetos:
         significado: CONTRATO si la partida tiene retencion de su contrato; SIN si no (lo cubre H10).
         valores: [CONTRATO, SIN]
         nulo_significa: COSTE.
+      cuota_personal:
+        significado: >-
+          La parte de PERSONAL propio de la partida: coste de sus partes de
+          recursos PERSONA internos hasta el cierre entre su real a origen, con
+          tope 1 (F-150, N16). 0 si no tiene partes o real, y en CP.
+        agregacion: no_sumable
+        nulo_significa: VENTA.
+      pendiente_personal:
+        significado: >-
+          `pendiente` x `cuota_personal` al centimo: se paga el ULTIMO DIA del
+          mes de su devengo (regla fija, sin hipotesis).
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: VENTA.
+      fuente_personal:
+        significado: >-
+          PARTES si la partida tiene partes de personal; SIN_PARTES si no (una
+          obra sin partes no tiene cuota: dilo); CP, coste proporcional, fuera.
+        valores: [PARTES, SIN_PARTES, CP]
+        nulo_significa: VENTA.
     relaciones:
       - de: obra_id
         a: maestro.obras.obra_id
@@ -1011,6 +1056,91 @@ objetos:
     ejemplos_preguntas:
       - Que partidas de la obra X tienen mas coste pendiente
       - Que partidas de la obra X van por encima de su planificacion
+
+  devengo_pendiente_contrato_mes:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **No disponible para el perfil restringido** (F-141, `R-PERFILES`):
+      con su login la consulta devuelve «permission denied», y eso no se rodea:
+      responde que el perfil no lo incluye.
+
+      **EL COSTE PENDIENTE DE LA OBRA POR CONTRATO DE COMPRA** (F-150, N17):
+      por obra, mes, categoria y contrato, el devengo pendiente de COSTE SIN el
+      coste proporcional (CP: no es caja de la obra) ni el PERSONAL (que se
+      paga el ultimo dia del mes de su devengo: `importe_pendiente_personal`
+      de `devengo_pendiente_obra_mes`). Cada partida se reparte entre los
+      contratos de compra de la obra que la tienen (las lineas del contrato,
+      `raw.ctrpro.paride`; ni Terminados ni Rescindidos) por lo que les queda
+      por SERVIR, hasta su pendiente. Las filas con `contrato_id` se pagan con
+      la forma de pago del contrato (H01, H15), los dias del proveedor (H04) y
+      su retencion de garantia (H06), en
+      `tesoreria.condiciones_contrato_compra`. La fila de `contrato_id`
+      vacio es el RESTO, sin contrato: va con H02 de su `categoria`. Es el
+      ingrediente de los pasos 4 y 5 de la receta (`tesoreria.hipotesis_caja`).
+      **No es caja**: devengo SIN IVA.
+
+      **CUANTO CUBRE**: medido el 2026-10-31 en las 21 obras de la receta, 48,9
+      de 112,85 M EUR (43 %; 0686: 1,64 de 2,39). Lo que no enlaza es devengo
+      sin contrato (modificados, contratos por firmar, obras sin contratos como
+      la 0608 y la 0715). Lo contratado pendiente de servir que supera el
+      devengo no se publica: no es devengo. Declara la parte enlazada
+      (`pendiente_enlazado_contrato` de `devengo_corte_obra`).
+
+      **Lee `mart.fact_seguimiento_mensual`** (a traves del reparto del devengo
+      pendiente) y se construyo despues de F-042: el duplicado de filas que ese
+      build corrigio no le alcanza.
+    grano: >-
+      Una fila por (`obra_id`, `anio_mes`, `categoria`, `contrato_id`) con
+      importe; `contrato_id` vacio es la fila sin contrato.
+    clave_negocio: [obra_id, anio_mes, categoria, contrato_id]
+    paso_etl: build_tesoreria
+    refresco: nocturno
+    columnas:
+      obra_id:
+        significado: La obra del devengo.
+        agregacion: no_sumable
+      empresa_id:
+        significado: Empresa de la obra (`R-CODIGO-POR-EMPRESA`).
+        agregacion: no_sumable
+      clave_obra:
+        significado: La obra como empresa-codigo (1-0686).
+      anio_mes:
+        significado: Primer dia del mes del devengo (el reparto de `devengo_pendiente_obra_mes`).
+      categoria:
+        significado: >-
+          Categoria de las partidas (CD, CI, OTRO); nunca CP. Sin contrato, es
+          la clave de H02.
+        valores: [CD, CI, OTRO]
+      contrato_id:
+        significado: >-
+          El contrato de compra (`tesoreria.condiciones_contrato_compra`) por
+          el que se paga este trozo: H01, H04 y H06 de ese contrato.
+        agregacion: no_sumable
+        nulo_significa: Sin contrato (el resto de la partida), que va con H02.
+      importe_pendiente:
+        significado: >-
+          El pendiente sin CP ni personal de ese mes que va por ese contrato
+          (o sin contrato), al centimo. SIN IVA. Suma por obra = la de
+          `devengo_pendiente_obra_mes` sin CP ni personal.
+        unidad: EUR
+        agregacion: suma
+      num_partidas:
+        significado: Partidas que aportan a la fila.
+        agregacion: no_sumable
+    relaciones:
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: La ficha de la obra.
+      - de: contrato_id
+        a: tesoreria.condiciones_contrato_compra.contrato_id
+        cardinalidad: "N:1"
+        porque: La forma de pago y la retencion del contrato (H01, H06).
+    ejemplos_preguntas:
+      - Que parte del coste pendiente de la obra X va por contrato
+      - A que proveedores pagara la obra X lo que queda por ejecutar
 
   albaranes_pendientes_neto:
     tipo: tabla
@@ -1341,7 +1471,12 @@ objetos:
       estructura) NO es caja de la obra: exclúyelo y declara su importe. El
       PERSONAL de la obra ya está aquí, como coste del RECURSO con sus cargas
       sociales: NO sumes pagos de personal de la cartera (nominas, embargos,
-      cuotas de `tesoreria_restringida`) ni digas que faltan.
+      cuotas de `tesoreria_restringida`) ni digas que faltan. Su parte del
+      devengo es `importe_pendiente_personal` (por partida,
+      `pendiente_personal` y `fuente_personal`) y se paga el ULTIMO DIA del mes
+      de su devengo, sin IVA ni retencion: es una regla, no una hipotesis (N16).
+      Las partidas con `fuente_personal` = `SIN_PARTES` (sin partes de
+      personal hasta el cierre) no llevan personal: si pesan, dilo.
 
       2. DOCUMENTO: el devengo de cada mes se factura (pago, perfil H03) o se
       certifica (cobro, perfil H08). Su mes es el del IVA del paso 6.
@@ -1361,21 +1496,26 @@ objetos:
       pago del proveedor (H04) y el retraso real (H05); el cobro, a H09
       (`tesoreria.condiciones_contrato_cliente`) y menos la morosidad H22.
       Cada pago y cada cobro se FRACCIONA en meses con H24 (pago) o H25
-      (cobro). Los albaranes netos del paso 7, con la forma de pago de su
-      `contrato_id` (H01) y, sin el, H02 `OTRO`. **Aviso**: el personal de la
-      obra va en CI y se paga con H02 `CI`; su plazo real es mensual: si
-      importa, fija H02 `CI` por obra (USUARIO u OBRA) y dilo.
+      (cobro). El coste del paso 1 SIN el personal va por contrato en
+      `tesoreria.devengo_pendiente_contrato_mes`: las filas con `contrato_id`,
+      con la forma de pago de ese contrato (H01, H15) y los dias del proveedor
+      (H04); las de `contrato_id` vacio, con H02 de su `categoria`. Declara la
+      parte enlazada (`pendiente_enlazado_contrato` de
+      `tesoreria.devengo_corte_obra`). Los albaranes netos del paso 7, con la
+      forma de pago de su `contrato_id` (H01) y, sin el, H02 `OTRO`.
 
       5. RETENCION, sobre la base SIN IVA: en el cobro,
       `importe_retencion_contrato` (y `retencion_pendiente_facturar_contrato`)
       ya es la del contrato; H10 solo se aplica a las bases
-      `sin_retencion_contrato`. En el pago, H06. Se devuelve segun H11 o H07.
+      `sin_retencion_contrato`. En el pago, H06 solo en las filas con contrato
+      (su `retencion_garantia_porcentaje`); sin contrato, el valor de H06; el
+      personal, nunca. Se devuelve segun H11 o H07.
 
       6. IVA: en el cobro, `importe_iva_contrato` (y
       `iva_pendiente_facturar_contrato`) es el del contrato (0 % en inversion
       del sujeto pasivo); H12 solo se aplica a las bases `sin_iva_contrato`.
       En el pago, la base por el H13 DE LA OBRA (SIGRID: el IVA efectivo de
-      sus compras), no el de la empresa. Se cobra o paga con su documento; la liquidacion con
+      sus compras), no el de la empresa, sobre la base SIN personal. Se cobra o paga con su documento; la liquidacion con
       Hacienda (repercutido menos soportado) va segun H14, y el IVA a devolver
       vuelve a caja segun H30 (con `MENSUAL_REDEME`, a los 4 meses). **Aviso**: H13 y
       H14 estan pendientes de validar con Administracion (AdP): dilo al dar

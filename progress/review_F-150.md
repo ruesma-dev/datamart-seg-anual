@@ -1,125 +1,129 @@
 <!-- progress/review_F-150.md -->
-Revisión incremental desde 935fdd3 (pasada 4) · `git diff 935fdd3..1c54b31` · HEAD `1c54b31`
+Revisión incremental desde b98c830 (pasada 5) · `git diff b98c830..de4c40b` · HEAD `de4c40b`
 
 # F-150 · Review · la receta de la caja
 
-**Veredicto: APROBADO** (pasada 4: N11-N15, T17-T35, R33-R43). Pasadas 1-3 (fase 1, hasta el
-hotfix `f51b041`/`289fedb`) aprobadas y resumidas al final; el delta no las invalida (no cambia
-firmas de la fase 1; `07` y `08` solo añaden ramas y columnas).
+**Veredicto: APROBADO** (pasada 5: cuarta tanda N16-N17, T36-T45, R44-R52). Pasadas 1-4 aprobadas
+(la 4, N11-N15, ya en `main`) y resumidas al final; el delta no las invalida: no cambia firmas
+públicas de tandas anteriores; en `07` solo amplía `_dev_real` a COSTE (con `concepto = 'VENTA'`
+añadido en `_dev_contrato` y el hueco, que leen lo de antes) y añade columnas, tablas y guardas.
 
 **Nivel de rigor:** `estandar` (declarado en `features.json`): fase RED en los requisitos
 centrales, cobertura de lo cambiado ≥ 80 %, mutación con supervivientes analizados.
 
-## Pasada 4 · lo que se verificó
+## Pasada 5 · lo que se verificó
 
-- **`bash harness/init.sh` ejecutado por mí sobre `1c54b31`:** **verde**, exit 0, «ENTORNO LISTO»:
-  9.813 passed, 268 skipped (5.783 s); `PUERTA COBERTURA` `[OK]` 100 % (21/21, diff desde
-  `935fdd35ee`); `PUERTA TAMAÑO` `[OK]`. Coincide con lo que declara el implementer.
-- **Alcance:** dominio (`neto_fifo`, `iva_efectivo_compra`, constantes, `PASOS_RECETA` con SALDO,
-  `CODIGOS_SIGRID` con H13), dos sub-pasos nuevos en `build_tesoreria_step.py`, `00_setup`, `07`
-  (cuota CP), `08` (rama H13), `09` y `10` nuevos, YAML de hipótesis (30), diccionario v66,
-  ARCHITECTURE, CLAUDE.md, tests. Coincide con `design.md` y con el informe. Hexagonal respetada:
-  dominio puro, SQL en `sql/tesoreria/NN_`, la secuencia en `application`.
-- **`double precision` de `raw` (el fallo de `d1c2ee1`), SQL nuevo leído línea a línea:**
-  - `09`: el único `ROUND` es `ROUND((COALESCE(l.tot,0) * (1 - canfac/can))::NUMERIC, 2)`; las
-    otras ramas, `::NUMERIC(18,2)`; `abs(x.tot) < 1e8` no exige numeric. Correcto.
-  - `10`: todos los `l.tot`, `h.tot`, `totiva`, `totpag`, `totdoc` llevan `::NUMERIC(18, 2)`; los
-    ocho `ROUND(..., 2)` son sobre `tesoreria.efectos.importe` (`NUMERIC(18,2)`, `00_setup:100`)
-    por cuotas ya numeric. Correcto.
-  - `07`: los dos `ROUND` nuevos, sobre `efectos.importe × cuota_cp` (numeric). `08`: `ROUND(100 *
-    cuota / base, 2)` con `tot` e `ivacuo` casteados. Correcto.
-  - Los tests de repositorio son de TEXTO (fijan cada cast y prohíben `l.tot`/`h.tot` sin él:
-    `test_f150_saldo.py:183,195`, `test_f150_albaranes.py:349`, `test_f150_iva_isp.py:96`). La
-    ejecución real con `raw` en `double precision` está en las sandboxes del implementer (Postgres
-    16 desechable: `09` 23 OK, `10` 14 OK, `impl_F-150.md` §4), fuera del repo como en la fase 1;
-    los contrastes de solo lectura en Azure (§3) ejecutaron `09` y `10` sobre los tipos reales.
-- **Decisiones del humano, respetadas:**
-  - N11: `_alb_fifo` particiona por `(obra_id, proveedor_id)`, orden `(fecha NULLS FIRST,
-    linea_id)`, compensa lo más antiguo; sin proveedor no compensa; guarda R35 dentro de la
-    transacción. `neto_fifo` del dominio es la misma fórmula.
-  - N12: H02 sin `CP`; cuota CP de la cartera (`07`) y del saldo (`10`) por la categoría de la
-    partida de cada línea de `raw.dcfpro`; la receta lo resta y lo declara (F-154 fuera).
-  - N13: el saldo usa `raw.hmores.tot` de recursos PERSONA internos hasta el cierre y la cartera
-    GENERAL (sin nóminas); la receta prohíbe sumar nóminas.
-  - H28 `[CON_SALDO, SIN_SALDO]` defecto `CON_SALDO`; H29 `[ORIGINALES, AGR]` con los originales
-    `BAJA` + `estado_codigo = 14` (y la ruptura de `R-TESORERIA-ESTADO` declarada); retenciones
-    como efectos propios (receta paso 0 y `COMMENT` de `10`).
-  - N15: H13 SIGRID por obra con `base >= 500000` (= `UMBRAL_BASE_H13`, test `iva_isp:113`), si no
-    DEFECTO (valor NULL cae al defecto en el `CASE` de `08`); H30 `MENSUAL_REDEME` por defecto, con
-    `_hasta_4m`; el paso 0 suma el IVA NETO recuperado (soportado − repercutido) según H30.
-- **Diccionario:** v66; fichas de `albaranes_pendientes_neto` y `saldo_partida_obra` con el aviso
-  de `R-PERFILES`; ambas en `NO_DISPONIBLES` de F-141 (`5f02555`). `azure-apps` `3ca37bf` al día.
-- **Sin secretos:** barrido del diff, solo `127.0.0.1:55432` (contenedor local). Ni `GRANT` ni
-  `DROP` de tablas reales. Primera línea con ruta en ficheros nuevos; sin `print`.
-- **MANUAL:** el redespliegue de N11-N15 está en `current.md` con comandos exactos (paso 0 de
-  vuelta atrás, imagen, `build-tesoreria`, cifras esperadas, `publicar-diccionario` v66, `check-*`,
-  MCP). T15/T25/T31/T35 abiertas solo por ese despliegue MANUAL, como en la fase 1.
+- **`bash harness/init.sh` ejecutado por mí sobre `de4c40b`:** **verde**, exit 0, «ENTORNO LISTO»:
+  9.924 passed, 269 skipped (3.009 s); `PUERTA COBERTURA` `[OK]` 100 % (35/35, diff desde
+  `1cf5197a79`); `PUERTA TAMAÑO` `[OK]`. Coincide con lo que declara el implementer.
+- **Alcance = `design.md` §5.10-§5.11:** dominio (`cuota_personal`, `fuente_personal`,
+  `pendiente_personal`, `fracciones_contrato`, `repartir_por_contratos`), `00_setup` (columnas
+  aditivas y tabla `devengo_pendiente_contrato_mes` con índice único `NULLS NOT DISTINCT`), `07`
+  (§2 quinquies, §4, §5, §5 bis, corte), YAML de hipótesis, diccionario v67, ARCHITECTURE,
+  CLAUDE.md, tests. Hexagonal respetada: dominio puro, SQL en `sql/tesoreria/`.
+- **`double precision` de `raw`:** `_dev_personal` suma `h.tot::NUMERIC(18, 2)`; `_dev_ctr` castea
+  `cl.tot`, `canser` y `can` antes de operar; `abs(cl.tot) < 1e8` no exige numeric. Los `ROUND`
+  nuevos van sobre numeric (`pe.personal` ya casteado / `real_origen` del mart; `pendiente ×
+  cuota`; fracciones numeric). Sandbox del implementer con tipos de Azure: 37 OK (§4 del informe).
+- **Tablas raw:** `hmores`, `res`, `ctrpro`, `ctr` y `con` ya están en `config/tables_sigrid.yaml`
+  (l. 20, 270, 385, 606, 651); no hace falta ingesta nueva y `current.md` lo dice en el paso 3 del
+  redespliegue MANUAL de N11-N17, con comandos exactos. Guarda de entrada de `07` ampliada.
+- **Cuadre del reparto por contrato (leído línea a línea):** `_dev_ctr` agrega por (contrato,
+  partida) con suelo 0 (`GREATEST(0, …)`), misma obra, `k.est NOT IN (8, 9)` y solo contratos con
+  condiciones publicadas. Fracción = `LEAST(np, S)/np × ps/S` con `np` = pendiente − personal, sin
+  CP. El reparto mensual por ACUMULADO en orden de `contrato_id` y el resto (`importe_np −
+  ROUND(importe_np × Σf, 2)`) a `contrato_id` NULL: la suma por (partida, mes) es exacta y la
+  última acumulada del window coincide con `e.total_fraccion` (suma numeric exacta). Meses ≤ 0
+  enteros sin contrato (T39 bis, = `design` §5.11 paso 3). Guarda R50 dentro de la transacción
+  (el `TRUNCATE` vuelve atrás con el `RAISE`), por obra y con negativos. La desviación de R48
+  (ROUND por acumulado en vez de contrato a contrato) está justificada y testada: el literal de R48
+  podía dejar un resto negativo que el propio R48 prohíbe.
+- **Personal:** cuota solo en COSTE, CP → 0, `LEAST(1, ROUND(personal/real, 6))` = dominio; filtro
+  de `_dev_personal` igual al de `10` (test de texto). Reparto con su residuo al último mes y la
+  guarda de la suma ampliada. Receta y fichas: fin de mes, sin IVA ni retención ni H06, H13 sobre
+  la base SIN personal (`importe_pendiente_personal`); N13-b fuera. **Catálogo: 30 hipótesis**
+  (contado en el YAML).
+- **Contraste Azure (R52, solo lectura):** personal 5,65 (spec ~5,64), 0686 0,21; enlazado 48,90 de
+  112,84 (43,3 %), 0686 1,64 de 2,39; 0608 y 0715 a 0. Dentro del 5 %: sin PARADA.
+- **Diccionario y ecosistema:** v67 con su nota; ficha nueva y columnas; tabla en el ámbito de
+  `R-CAJA-HIPOTESIS` y en la lista F-141 (`test_f141_perfil_restringido.py:1535`);
+  `PRESUPUESTO_MAX` con historia; inventario F-006 enmendado. `azure-apps` `9488087` (local).
+- **Sin secretos ni `print`**; primera línea con ruta en los ficheros nuevos.
 
 ### Observaciones (no bloquean)
 
-1. Con H29 = `AGR`, el IVA del saldo sigue contando el de los originales vencidos (los AGR no son
-   factura y no tienen fracción): aproximación razonable, pero la ficha podría decirlo.
-2. `08` lleva el umbral 500000 como literal; lo ata al dominio el test de texto, no el código.
-3. Tasks: T24/T31/T35 marcan la mutación e `init.sh` hechos; queda solo el despliegue.
+1. La guarda R50 filtra `obra_mes` con `categoria <> 'CP'` (un `categoria` NULL queda fuera),
+   mientras `_dev_fraccion`/`_dev_ctr_reparto` usan `COALESCE(categoria, '') <> 'CP'` (lo meten).
+   Una partida del plan ausente de `stg.partidas` tumbaría la noche por descuadre. Hoy
+   `stg.partidas` siempre da categoría (`ELSE 'OTRO'`) y el fallo sería ruidoso, no silencioso;
+   conviene unificar a `COALESCE` en una próxima tanda.
+2. `_dev_ctr_reparto` descarta las filas con `pendiente = 0`; si un residuo dejara personal ≠ 0 en
+   un mes con pendiente 0 (solo posible con pesos negativos en el plan), la guarda R50 saltaría.
+   Mismo carácter: ruidoso; la sandbox (mes de −100 y −500) cubre los negativos conocidos.
+3. T44 cita `progress/mutacion_F-150.md` como verificación; el fichero real es
+   `mutacion_F-150_n16_n17.md` (el informe lo enlaza bien).
 
-## Mutación (C4 bis) · `progress/mutacion_F-150_n11_n15.md`
+## Mutación (C4 bis) · `progress/mutacion_F-150_n16_n17.md`
 
-- **Recálculo puro** (`alcance_de_feature('F-150', base='0659528')` + `generar_mutantes`): **78
-  líneas** (20 + 58) y **17 mutantes**, igual que el informe. Con la semilla `20260820` la muestra
-  de 8 sale entera en `neto_fifo` (`:401` ×3, `:405` ×3, `:409`, `:410`).
-- **Campaña no reejecutada:** 9.754,7 s según el informe (> 60 s).
-- **RM1:** medido en `5f02555`; hasta HEAD solo cambian `progress/` y `tasks.md`. Alcance igual.
-- **RM2:** base ~2.280 s (3 workers), media 1.219,3 s, `8 × 1.219,3 = 9.754` = tiempo total.
-  Coherente; ningún salto de orden de magnitud.
-- **RM3:** los dos equivalentes posibles del generador (`:401 x <= 0` y `:405 x < 0`, el cero no
-  cambia nada) NO están en la muestra. Ningún equivalente sale muerto.
-- **RM4 (copia `git archive` en el scratchpad, ya borrada):** sin mutar, 69 passed en
-  `test_f150_albaranes.py` + `test_f150_iva_isp.py`; `:405 x <= 1` → 3 failed; y un no muestreado,
-  `:408 a_compensar + acumulado` → 8 failed.
+- **Recálculo puro** (`alcance_de_feature('F-150', base='b98c830', rama='ddbc54f')` +
+  `generar_mutantes`): **98 líneas** (414-511 de `proyeccion_caja.py`) y **33 mutantes**, igual
+  que el informe. Los dos supervivientes existen tal cual (`:472 <= 0→<= 1` [entero], `:474 >
+  0→>= 0` [comparacion]).
+- **Campaña no reejecutada:** 6.888,7 s según el informe (> 60 s).
+- **RM1:** medido en `ddbc54f`; hasta HEAD cambian `progress/`, `tasks.md` y un test, nada de
+  producción. **RM2:** bases ~1.555 s (3 workers), media 861,1 s, `8 × 861,1 = 6.888,7`; media <
+  base por `-x`, sin salto de orden de magnitud. **RM3:** ningún equivalente sale muerto (los dos
+  supervivientes no son equivalentes: cambian la salida del dominio).
+- **RM4 (copia `git archive` en el scratchpad, ya borrada):** sin mutar, 84 passed en
+  `test_f150_contrato_compra.py` + `test_f150_personal.py`; los dos supervivientes con los tests
+  nuevos → 1 failed cada uno; y dos no supervivientes elegidos por mí, `repartir_por_contratos`
+  `importe <= 0 → < 0` y `cuota_personal` `real <= 0 → < 0` → 1 failed cada uno.
 - **RM5:** N/A, rigor `estandar`. **RM6:** no se quitó ninguna guarda.
-- Sin «CAMPAÑA NO VÁLIDA», 0 «Sin veredicto». Muestra de 8 (tope 20) justificada por coste en el
-  informe; el SQL no se muta y lo cubren textos y sandboxes.
+- Sin «CAMPAÑA NO VÁLIDA», 0 «Sin veredicto». Muestra de 8 (semilla del nivel); el SQL no se muta
+  y lo cubren los tests de texto y la sandbox.
 
-## Checkpoints (pasada 4)
+## Checkpoints (pasada 5)
 
 - **C1:** `[x]` `init.sh` código 0 (ejecutado por mí) · `[x]` ficheros base.
 - **C2:** `[x]` una sola `in_progress` · `[x]` rama `feature/F-150-receta-caja` · `[x]`
-  `current.md` al día · `history.md`: N/A, la feature no es `done` (falta el despliegue MANUAL).
+  `current.md` al día (redespliegue N11-N17) · `history.md`: N/A, la feature no es `done` (falta
+  el despliegue MANUAL).
 - **C3:** `[x]` hexagonal · `[x]` primera línea con ruta · `[x]` sin `print`, TODO, secretos ni
-  dependencias nuevas · `[x]` semántica de Sigrid (pendiente con la fórmula de `compras/01`
-  copiada y comparada por test; `R-ALBARAN-ABSURDO` a 1e8; personal por `hmores.tot`).
+  dependencias nuevas · `[x]` semántica de Sigrid (`hmores.tot` con el filtro de `10`; contratos 8
+  y 9 fuera; `R-ALBARAN-ABSURDO` a 1e8; CP fuera de la caja).
 - **C3 bis:** N/A, el delta no toca `docs/referencia/`.
-- **C4:** `[x]` trazabilidad (tabla) · `[x]` sin red ni BBDD en los tests · `[x]` MANUAL con su
+- **C4:** `[x]` trazabilidad (tabla) · `[x]` sin red ni BBDD en los tests · `[x]` MANUAL (T45) con
   comando exacto en `current.md` · `[x]` dobles: comprobación automática de `init.sh`.
-- **C4 bis:** `[x]` rigor declarado · `[x]` RED con salida real para T17-T34 (`impl_F-150.md` §5)
-  · `[x]` cobertura `[OK]` (ver la línea de `init.sh` arriba) · `[x]` mutación verificada · `[x]`
-  «Evidencias» con los cuatro números.
+- **C4 bis:** `[x]` rigor declarado · `[x]` RED con salida real para T36-T42 (`impl_F-150.md` §5)
+  · `[x]` cobertura `[OK]` · `[x]` mutación verificada (arriba) · `[x]` «Evidencias» con los
+  cuatro números.
 - **C4 ter:** N/A, no existe `harness/rutas_sensibles.json` (solo el `.ejemplo`).
-- **C5:** `[x]` T17-T23, T27-T30, T32-T34 `[x]` con su commit `F-150 Tn`; T24/T25/T31/T35 abiertas
-  solo por el despliegue MANUAL · `[x]` árbol limpio · `[x]` `features.json` al día.
+- **C5:** `[x]` T36-T44 `[x]` con su commit `F-150 Tn`; T45 (y T15/T25/T31/T35) abiertas solo por
+  el despliegue MANUAL del humano · `[x]` árbol limpio · `[x]` `features.json` al día.
 
-## Cobertura · requisito → test (pasada 4)
+## Cobertura · requisito → test (pasada 5)
 
-| Req. | Tests (`tests/test_f150_*.py`, nº) |
+| Req. | Tests (nº de `test_f150_rNN_*`) |
 |---|---|
-| R33-R35 | `albaranes` r33 (13), r34 (16), r35 (2) + sandbox `09` |
-| R36-R37 | `albaranes`/`sql`/`diccionario` r36 (9), r37 (2) |
-| R38-R40 | `saldo` r38 (12), `receta`/`saldo` r39 (4), `diccionario` r40 (4) + sandbox `10` |
-| R41-R43 | `iva_isp` r41 (10), `receta` r42 (2), `saldo`/`diccionario` r43 (6) |
+| R44-R46 | `personal` r44 (9), r45 (10), r46 (4) + sandbox `07` |
+| R47 | `receta`/`diccionario` r47 (7) |
+| R48-R50 | `contrato_compra` r48 (17), r49 (13), r50 (1) + sandbox (guarda con mes de −500) |
+| R51 | `receta`/`diccionario` r51 (4) |
+| R52 | contraste de solo lectura en Azure (T40), tabla en `impl_F-150.md` §3 |
 
-## Pasadas 1-3 · resumen
+## Pasadas 1-4 · resumen
 
-- **Pasada 1** (`6efddfe`): rechazo solo por C4 (MANUAL sin comando exacto en `current.md`).
-  `init.sh` verde (9.645 passed), sandbox `sandbox_f150.py` reejecutada (66 OK), Azure en solo
-  lectura, catálogo 27 hipótesis, mutación 20 mutantes con RM1-RM6 verificados (RM4 en `:227`,
-  `:485`, `:498`).
-- **Pasada 2** (`7eed62e`): APROBADO; C4 MANUAL corregido; `init.sh` verde (9.645 passed).
-- **Pasada 3** (`289fedb`): APROBADO; hotfix `SUM(fv.totbas::NUMERIC(18, 2))` en `07` con su RED
-  reproducido; ninguna otra columna `double precision` de `raw` en función solo numeric.
+- **Pasada 1** (`6efddfe`): rechazo solo por C4 (MANUAL sin comando exacto). Sandbox 66 OK, Azure
+  en solo lectura, catálogo 27, mutación 20 mutantes con RM1-RM6.
+- **Pasada 2** (`7eed62e`): APROBADO. **Pasada 3** (`289fedb`): APROBADO; hotfix
+  `totbas::NUMERIC(18, 2)` en `07`.
+- **Pasada 4** (`1c54b31`, N11-N15): APROBADO; `init.sh` 9.813 passed; casts de `raw` en `09`,
+  `10`, `07`, `08` leídos línea a línea; mutación 17 mutantes recalculados, RM4 en `:405`, `:408`.
 
 ## Automejora (propuesta, no aplicada)
 
 1. `CHECKPOINTS.md` C4 bis: cuando el SQL nuevo lea `raw`, exigir que la sandbox con tipos de
-   Azure (`double precision`) viva en el repo (p. ej. `tests/sandbox/`, marcada y saltada sin
-   Docker) en vez de en el scratchpad: hoy el reviewer no puede reejecutarla si no se la pasan.
-2. `implementer.md` (y `arnes-base`): «MANUAL a `current.md` CON su comando exacto» (pasada 1).
+   Azure viva en el repo (p. ej. `tests/sandbox/`, saltada sin Docker): hoy el reviewer no puede
+   reejecutarla (pasadas 4 y 5).
+2. `reviewer.md`: en guardas de cuadre SQL, comprobar que los dos lados filtran con la misma
+   semántica de NULL (observación 1 de la pasada 5).

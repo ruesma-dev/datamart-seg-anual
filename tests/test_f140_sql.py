@@ -435,7 +435,17 @@ def test_f140_r6_ningun_valor_de_hipotesis_se_aplica(ruta: Path) -> None:
      r"raw\.hmores\b", r"\bpersonal\."],
 )
 def test_f140_r18_lo_de_personal_no_se_lee(ruta: Path, prohibido: str) -> None:
-    assert not re.search(prohibido, _sin_comment_on(ruta)), f"{ruta.name}: {prohibido}"
+    texto = _sin_comment_on(ruta)
+    if ruta == RUTA_DEVENGO and prohibido == r"raw\.hmores\b":
+        # F-150 (N16, R45, 31-10): `07` lee `raw.hmores` para la CUOTA de personal
+        # de cada partida de coste, SUMADA por (obra, partida) y sin nombre, NIF
+        # ni recurso: lo mismo que ya publica `mart` como coste real de esa
+        # partida (los partes son su coste). Mismo precedente que el saldo de
+        # partida (`10`, N14). Fuera de esa suma, nada de `hmores`.
+        assert texto.count("raw.hmores") == 2, "la guarda de entrada y _dev_personal"
+        assert "FROM raw.hmores h JOIN raw.res r ON r.ide = h.reside" in texto
+        return
+    assert not re.search(prohibido, texto), f"{ruta.name}: {prohibido}"
 
 
 @pytest.mark.parametrize("ruta", NUEVOS, ids=lambda r: r.name)

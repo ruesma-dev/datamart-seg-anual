@@ -741,7 +741,17 @@
 # MENSUAL_REDEME, decision del humano del 29-10): 30 hipotesis.
 # `tesoreria.saldo_partida_obra` gana el IVA soportado y repercutido de lo
 # pagado y cobrado, en total y ya recuperado (_hasta_4t, _hasta_4m).
-version: 66
+# version 67 (F-150, 2026-10-31): EL PERSONAL A FIN DE MES Y EL COSTE POR
+# CONTRATO (N16-N17). El devengo de COSTE separa el personal (cuota de los
+# partes sobre el real de la partida: `cuota_personal`, `pendiente_personal`,
+# `fuente_personal`, `importe_pendiente_personal`), que se paga el ultimo dia
+# del mes de su devengo por regla fija. Nace
+# `tesoreria.devengo_pendiente_contrato_mes`: el resto del coste sin CP
+# repartido entre los contratos de compra de cada partida por lo pendiente de
+# servir (`raw.ctrpro`); H01/H04/H06 en las filas con contrato, H02 en el
+# resto. `devengo_corte_obra` gana `pendiente_personal` y
+# `pendiente_enlazado_contrato`. Sale el aviso N13-b (H02 `CI` del personal).
+version: 67
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -1124,6 +1134,7 @@ reglas:
       - tesoreria.devengo_corte_obra
       - tesoreria.devengo_pendiente_obra_mes
       - tesoreria.devengo_pendiente_partida
+      - tesoreria.devengo_pendiente_contrato_mes
       - tesoreria.hipotesis_caja
       - tesoreria.hipotesis_caja_obra
       - tesoreria.condiciones_contrato_compra
@@ -1159,7 +1170,10 @@ reglas:
       (`tesoreria.albaranes_pendientes_neto`). Ojo: el CP no es caja de la obra:
       excluyelo del devengo y de la cartera y declaralo. El personal va en el
       devengo como recurso: no sumes nominas de la cartera ni las des por
-      ausentes. Y el saldo de partida (paso 0) va CON IVA
+      ausentes; el personal se paga el ultimo dia del mes de su devengo
+      (regla, no hipotesis). El resto del coste va por contrato de compra
+      (`tesoreria.devengo_pendiente_contrato_mes`: con contrato, sus
+      condiciones; sin el, H02). Y el saldo de partida (paso 0) va CON IVA
       (`tesoreria.saldo_partida_obra`) y es opcional (H28); los pagares
       agrupados cuentan por sus originales o por el AGR (H29) y el IVA neto ya
       recuperado, segun H30: declaralas.

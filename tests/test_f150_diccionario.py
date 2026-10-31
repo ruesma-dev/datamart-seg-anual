@@ -219,8 +219,9 @@ def test_f150_r37_el_personal_va_por_el_devengo_del_recurso() -> None:
     tramos = _tramos()
     assert "El PERSONAL de la obra ya está aquí, como coste del RECURSO" in tramos["DEVENGO"]
     assert "NO sumes pagos de personal de la cartera" in tramos["DEVENGO"]
-    # N13-b: el plazo del personal va con H02 `CI` y un aviso.
-    assert "el personal de la obra va en CI y se paga con H02 `CI`" in tramos["PLAZO"]
+    # N13-b (H02 `CI` con un aviso) lo SUSTITUYE N16 (31-10): el personal se paga
+    # a fin de mes por regla fija (test r47).
+    assert "se paga con H02 `CI`" not in tramos["PLAZO"]
     fichas = _fichas_tesoreria()
     for nombre in ("efectos", "efectos_restringidos_mes"):
         texto = _plano(fichas[nombre]["descripcion"])
@@ -349,3 +350,65 @@ def test_f150_r32_version_66_con_su_nota() -> None:
     glob = yaml.safe_load((DICC / "00_global.yaml").read_text(encoding="utf-8"))
     assert int(glob["version"]) >= 66
     assert "# version 66 (F-150, 2026-10-30)" in (DICC / "00_global.yaml").read_text(encoding="utf-8")
+
+
+# ===========================================================================
+# R47, R51 · el personal a fin de mes y el coste por contrato (N16-N17, T42)
+# ===========================================================================
+
+
+def test_f150_r47_el_paso_1_paga_el_personal_a_fin_de_mes() -> None:
+    tramo = _plano(_tramos()["DEVENGO"])
+    assert "`importe_pendiente_personal`" in tramo
+    assert "se paga el ULTIMO DIA del mes de su devengo" in tramo
+    assert "es una regla, no una hipotesis" in tramo
+    assert "`SIN_PARTES`" in tramo and "dilo" in tramo
+
+
+def test_f150_r47_el_paso_6_aplica_el_h13_sin_personal() -> None:
+    tramo = _plano(_tramos()["IVA"])
+    assert "sobre la base SIN personal" in tramo
+
+
+def test_f150_r51_el_paso_4_va_por_contrato_y_declara_lo_enlazado() -> None:
+    tramo = _plano(_tramos()["PLAZO"])
+    assert "`tesoreria.devengo_pendiente_contrato_mes`" in tramo
+    assert "las filas con `contrato_id`" in tramo and "`contrato_id` vacio" in tramo
+    assert "`pendiente_enlazado_contrato`" in tramo
+
+
+def test_f150_r51_el_paso_5_h06_solo_con_contrato() -> None:
+    tramo = _plano(_tramos()["RETENCION"])
+    assert "H06 solo en las filas con contrato" in tramo
+    assert "el personal, nunca" in tramo
+
+
+def test_f150_r47_r51_la_receta_nombra_los_ingredientes_nuevos() -> None:
+    receta = _receta()
+    for ingrediente in ("importe_pendiente_personal", "fuente_personal",
+                        "tesoreria.devengo_pendiente_contrato_mes",
+                        "pendiente_enlazado_contrato"):
+        assert ingrediente in receta, ingrediente
+
+
+def test_f150_r47_r51_la_regla_de_caja_dice_fin_de_mes_y_contrato() -> None:
+    regla = _reglas()["R-CAJA-HIPOTESIS"]
+    texto = _plano(regla["regla"])
+    assert "el personal se paga el ultimo dia del mes de su devengo" in texto
+    assert "por contrato de compra" in texto
+    assert "tesoreria.devengo_pendiente_contrato_mes" in regla["ambito"]
+
+
+def test_f150_r47_r51_ficha_del_coste_por_contrato() -> None:
+    ficha = _fichas_tesoreria()["devengo_pendiente_contrato_mes"]
+    assert ficha["consumo_recomendado"] is True
+    assert ficha["clave_negocio"] == ["obra_id", "anio_mes", "categoria", "contrato_id"]
+    assert len(ficha["ejemplos_preguntas"]) == 2
+    texto = _plano(ficha["descripcion"])
+    assert "48,9" in texto and "1,64" in texto and "H02" in texto
+
+
+def test_f150_r32_version_67_con_su_nota() -> None:
+    glob = yaml.safe_load((DICC / "00_global.yaml").read_text(encoding="utf-8"))
+    assert int(glob["version"]) >= 67
+    assert "# version 67 (F-150, 2026-10-31)" in (DICC / "00_global.yaml").read_text(encoding="utf-8")

@@ -63,14 +63,19 @@ hipotesis:
     descripcion: >-
       Plazo de pago de lo que tiene contrato de compra: el de la forma de pago
       del contrato (su formula, leida en dias de cada vencimiento y de la
-      retencion).
+      retencion). Se aplica a las filas con contrato de
+      `tesoreria.devengo_pendiente_contrato_mes` (F-150, N17), con la forma de
+      pago de ese contrato en `tesoreria.condiciones_contrato_compra`; el
+      personal nunca (se paga a fin de mes).
     unidad: OPCION
     valor_defecto: CONTRATO
     opciones: [CONTRATO]
     fuente_defecto: >-
       La forma de pago pactada en el contrato (`raw.ctr.pagide`), presente en
-      19.161 de 19.170 contratos.
-    ingrediente: tesoreria.condiciones_contrato_compra
+      19.161 de 19.170 contratos. Lo enlazado por contrato, medido el
+      2026-10-31: 48,9 de 112,85 M EUR del coste pendiente sin CP ni personal
+      (43 %; 0686 1,64 de 2,39), casi todo a 150, 90 o 120 dias.
+    ingrediente: tesoreria.devengo_pendiente_contrato_mes
     validado: false
     admite_obra: true
     paso_receta: PLAZO
@@ -79,8 +84,10 @@ hipotesis:
     sentido: PAGO
     descripcion: >-
       Plazo de pago, en dias, de lo que NO tiene contrato, por categoria de la
-      partida (CD, CI, OTRO). Sin CP: el CP no es caja de la obra (coste de
-      estructura, F-154): se excluye del devengo y se declara.
+      partida (CD, CI, OTRO): solo las filas sin `contrato_id` de
+      `tesoreria.devengo_pendiente_contrato_mes` (F-150, N17); el personal,
+      nunca (se paga a fin de mes, N16). Sin CP: el CP no es caja de la obra
+      (coste de estructura, F-154): se excluye del devengo y se declara.
     unidad: MAPA_DIAS
     valor_defecto: {CD: 120, CI: 120, OTRO: 120}
     fuente_defecto: >-
@@ -138,14 +145,17 @@ hipotesis:
   - codigo: H06
     sentido: PAGO
     descripcion: >-
-      Porcentaje de retencion de garantia que se descuenta al proveedor: el del
-      contrato (clases 4 y 5); sin contrato, este valor.
+      Porcentaje de retencion de garantia que se descuenta al proveedor: en
+      las filas con contrato de `tesoreria.devengo_pendiente_contrato_mes`, el
+      de ese contrato (`retencion_garantia_porcentaje` de
+      `tesoreria.condiciones_contrato_compra`, clases 4 y 5); sin contrato,
+      este valor; el personal, nunca (F-150, N16-N17).
     unidad: PORCENTAJE
     valor_defecto: 0
     fuente_defecto: >-
       Con contrato, `retencion_garantia_porcentaje` (5 % en 6.304 contratos);
       sin contrato no hay retencion pactada.
-    ingrediente: tesoreria.condiciones_contrato_compra
+    ingrediente: tesoreria.devengo_pendiente_contrato_mes
     validado: false
     admite_obra: true
     paso_receta: RETENCION
@@ -251,7 +261,10 @@ hipotesis:
       POR OBRA (SIGRID, F-150 N15): cuota / base de las lineas de factura de
       compra de la obra en los 12 meses hasta el build, si su base llega a
       0,5 M EUR; si no, el defecto de la empresa. Con inversion del sujeto
-      pasivo la cuota es 0: una obra con mucha ISP tiene un H13 bajo.
+      pasivo la cuota es 0: una obra con mucha ISP tiene un H13 bajo. Se
+      aplica sobre la base SIN personal (`importe_pendiente_personal` de
+      `tesoreria.devengo_pendiente_obra_mes`, F-150 N16): las nominas no
+      llevan IVA y el H13 se mide en facturas.
     unidad: PORCENTAJE
     valor_defecto: 5.5
     fuente_defecto: >-
