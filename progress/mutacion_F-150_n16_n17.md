@@ -42,18 +42,24 @@ Cada superviviente es una línea que ningún test comprueba de verdad, o una mut
 - Original: `if pendiente is None or pendiente <= 0:`
 - Mutado:   `if pendiente is None or pendiente <= 1:`
 
-#### Análisis (PENDIENTE del implementer)
+#### Análisis
 
-> Por qué ningún test lo caza: PENDIENTE.
-> Decisión: ¿test nuevo o mutante equivalente justificado?
+> Por qué ningún test lo caza: los tests probaban pendientes de 0, negativos y >= 7; ninguno
+> entre 0 y 1 EUR, donde el mutante devuelve `{}` (nada enlazado). **Hueco real**, no equivalente.
+> Decisión: test nuevo `test_f150_r48_un_pendiente_de_centimos_tambien_enlaza` (0,50 EUR con un
+> contrato → fracción 1). Comprobado a mano con el mutante aplicado: 1 failed.
 
 ### 2. `etl_sigrid/domain/proyeccion_caja.py:474` [comparacion]
 
 - Original: `vivos = {c: ps for c, ps in pendientes_servir.items() if ps is not None and ps > 0}`
 - Mutado:   `vivos = {c: ps for c, ps in pendientes_servir.items() if ps is not None and ps >= 0}`
 
-#### Análisis (PENDIENTE del implementer)
+#### Análisis
 
-> Por qué ningún test lo caza: PENDIENTE.
-> Decisión: ¿test nuevo o mutante equivalente justificado?
+> Por qué ningún test lo caza: con `ps >= 0` un contrato ya servido entra con fracción 0. Los
+> tests probaban ps 0 solo cuando TODOS eran 0 (total 0 → `{}`) y un negativo junto a uno vivo.
+> En el SQL no cambia ningún importe (trozo de 0), pero sí el resultado del dominio: **hueco
+> real** en la definición («el servido no se lleva nada»). Decisión: aserción nueva en
+> `test_f150_r48_pendiente_de_servir_cero_o_negativo_no_enlaza` (`{7: 0, 8: 400}` → `{8: 0,4}`).
+> Comprobado a mano con el mutante aplicado: 1 failed.
 

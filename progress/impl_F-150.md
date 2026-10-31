@@ -132,5 +132,5 @@ F-138, F-128, F-140, F-150): **4.745 passed, 266 skipped** (820 s).
 | `bash harness/init.sh` | PENDIENTE_INIT |
 | Tiempo de la suite | PENDIENTE_TIEMPO |
 | Cobertura de las líneas cambiadas | PENDIENTE_COBERTURA |
-| Mutación incremental | PENDIENTE_MUTACION |
+| Mutación incremental (`python -m harness.mutacion --feature F-150 --base b98c830 --max-mutantes 8 --workers 3 --timeout 3000`, sobre `ddbc54f`) | 98 líneas de `proyeccion_caja.py`, 33 generados, **8 evaluados: 6 muertos, 2 supervivientes, 0 timeouts** (6.888,7 s). Los 2 eran huecos reales (pendiente entre 0 y 1 EUR; contrato servido con fracción 0): dos tests nuevos en `ae255e7`, comprobados con el mutante aplicado (1 failed cada uno). Análisis en `progress/mutacion_F-150_n16_n17.md`. El SQL no se muta: lo cubren los literales y la sandbox |
 | Verificación semántica del SQL | `07`: 37 OK, 0 fallos (Postgres 16, tipos de Azure) |
