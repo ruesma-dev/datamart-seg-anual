@@ -490,7 +490,13 @@ def repartir_por_contratos(
     Σ f, 2)`. Así, con `importe` ≥ 0, ningún trozo es negativo, el resto es ≥ 0
     (0 si Σ f = 1) y la suma es el importe EXACTO; el `ROUND` contrato a
     contrato podría pasarse en céntimos y dejar un resto negativo.
+
+    Solo se reparte un importe > 0 (design §5.11 paso 3): un mes negativo o
+    cero del plan va ENTERO sin contrato; repartido, daría trozos negativos a
+    cada contrato (la guarda R50 tumbaría la noche).
     """
+    if importe <= 0:
+        return {None: importe}
     reparto: dict[int | None, Decimal] = {}
     acumulada = _CERO
     anterior = _CERO

@@ -137,6 +137,15 @@ def test_f150_r48_invariantes(importe, ps, pendiente) -> None:
     assert all(v == v.quantize(D("0.01")) for v in r.values()), "al céntimo"
 
 
+@pytest.mark.parametrize("importe", [D("-0.11"), D("0.00"), D("-1234.56")])
+def test_f150_r48_un_mes_negativo_o_cero_va_entero_sin_contrato(importe) -> None:
+    """design §5.11 paso 3: solo se reparten los (partida, mes) con importe > 0.
+    Un mes NEGATIVO del plan de V (medido el 31-10: la 1-0702, partida 387660,
+    noviembre, -0,11) daría trozos negativos a cada contrato y R50 tumbaría la
+    noche: va entero a la fila sin contrato."""
+    assert repartir_por_contratos(importe, {1: D("0.5"), 2: D("0.25")}) == {None: importe}
+
+
 def test_f150_r48_no_modifica_la_entrada() -> None:
     ps = {1: D("10"), 2: D("20")}
     f = fracciones_contrato(D("15"), ps)
@@ -256,6 +265,11 @@ def test_f150_r49_el_reparto_por_acumulado_como_el_dominio() -> None:
             "a.fraccion), 2) AS importe") in texto
     assert ("r.importe_np - COALESCE(ROUND(r.importe_np * e.total_fraccion, 2), 0) "
             "AS importe") in texto
+    # Solo los (partida, mes) con importe > 0 van a contrato (design §5.11 paso 3);
+    # un mes negativo o cero, entero a la fila sin contrato.
+    assert "JOIN r ON r.obra_id = f.obra_id AND r.partida_id = f.partida_id AND r.importe_np > 0" in texto
+    assert ("LEFT JOIN e ON e.obra_id = r.obra_id AND e.partida_id = r.partida_id "
+            "AND r.importe_np > 0") in texto
 
 
 def test_f150_r49_lo_repartido_es_el_mes_sin_personal() -> None:

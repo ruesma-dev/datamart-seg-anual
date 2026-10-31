@@ -598,7 +598,10 @@ END $$;
 --    min(np, Σ pendiente de servir > 0), repartido por su pendiente de servir.
 -- 3. `_dev_ctr_reparto`: cada (partida, mes) del reparto, sin su personal, x
 --    las fracciones, al centimo por ACUMULADO en orden de contrato
---    (`repartir_por_contratos`); el resto, a la fila sin contrato.
+--    (`repartir_por_contratos`); el resto, a la fila sin contrato. Solo los
+--    (partida, mes) con importe > 0: un mes NEGATIVO del plan de V (la 1-0702
+--    tenia uno el 31-10, -0,11) va ENTERO sin contrato; repartido, daria trozos
+--    negativos a cada contrato y la guarda R50 tumbaria la noche.
 -- 4. `TRUNCATE` + `INSERT` por (obra, mes, categoria, contrato) y la guarda de
 --    R50, que tumba la transaccion entera.
 -- Lo contratado pendiente de servir que supera el devengo NO se publica: no es
@@ -656,7 +659,7 @@ WITH r AS (
     SELECT f.obra_id, f.partida_id, f.contrato_id, f.fraccion, r.anio_mes,
            SUM(f.fraccion) OVER (PARTITION BY f.obra_id, f.partida_id, r.anio_mes ORDER BY f.contrato_id) AS acumulada
     FROM _dev_fraccion f
-    JOIN r ON r.obra_id = f.obra_id AND r.partida_id = f.partida_id
+    JOIN r ON r.obra_id = f.obra_id AND r.partida_id = f.partida_id AND r.importe_np > 0
 )
 , e AS (
     SELECT obra_id, partida_id, SUM(fraccion) AS total_fraccion
@@ -671,7 +674,7 @@ UNION ALL
 SELECT r.obra_id, r.anio_mes, r.categoria, NULL::INTEGER, r.partida_id,
        r.importe_np - COALESCE(ROUND(r.importe_np * e.total_fraccion, 2), 0) AS importe
 FROM r
-LEFT JOIN e ON e.obra_id = r.obra_id AND e.partida_id = r.partida_id;
+LEFT JOIN e ON e.obra_id = r.obra_id AND e.partida_id = r.partida_id AND r.importe_np > 0;
 ANALYZE _dev_ctr_reparto;
 
 TRUNCATE tesoreria.devengo_pendiente_contrato_mes;
