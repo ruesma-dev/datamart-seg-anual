@@ -23,7 +23,13 @@
 --   4. `_sal_personal`: el coste del personal de los partes (`raw.hmores.tot`,
 --      el precio de cada parte, sin IVA) de los recursos PERSONA internos
 --      (`raw.res.cla` 1, sin proveedor) hasta el ultimo cierre de la obra: lo
---      de despues ya es devengo pendiente y no se cuenta dos veces.
+--      de despues ya es devengo pendiente y no se cuenta dos veces. N18
+--      (31-10): y aparte, los partes del `mes_ultimo_cierre`, cuya parte de
+--      IRPF + Seguridad Social (la cuota de su empresa en
+--      `tesoreria.reparto_pago_personal`, de `07`) se paga el ultimo dia del
+--      mes SIGUIENTE al cierre: `personal_irpf_ss_pendiente` la publica si esa
+--      fecha no es anterior a `fecha_corte` (aun no pagada); si no, 0. Sin
+--      cierre, NULL.
 --   5. `_sal_iva_doc` (N15, R43): la fraccion de IVA de cada factura, cuota
 --      entre total a pagar (`raw.dcf`) o entre total (`raw.dvf`). El IVA de
 --      lo pagado (sin AGR mas los originales vencidos) y de lo cobrado es el
@@ -37,7 +43,8 @@
 -- pendientes van en la proyeccion (la cartera viva).
 --
 -- Lee de: tesoreria.devengo_corte_obra, tesoreria.efectos, raw.dcfpro,
---         mart.v_pbi_dim_partida, raw.hmores, raw.res, raw.dcf, raw.dvf.
+--         mart.v_pbi_dim_partida, raw.hmores, raw.res, raw.dcf, raw.dvf,
+--         tesoreria.reparto_pago_personal.
 -- Escribe en: tesoreria.saldo_partida_obra.
 -- ============================================================================
 
@@ -51,7 +58,8 @@ BEGIN
        OR to_regclass('raw.hmores') IS NULL
        OR to_regclass('raw.res') IS NULL
        OR to_regclass('raw.dcf') IS NULL
-       OR to_regclass('raw.dvf') IS NULL THEN
+       OR to_regclass('raw.dvf') IS NULL
+       OR to_regclass('tesoreria.reparto_pago_personal') IS NULL THEN
         RAISE EXCEPTION 'saldo_partida: falta una fuente (tesoreria, raw.dcfpro, raw.hmores, raw.res, raw.dcf, raw.dvf o mart.v_pbi_dim_partida)';
     END IF;
 END $$;
@@ -100,7 +108,9 @@ ANALYZE _sal_cuota_cp;
 -- 4 · el personal de los partes, hasta el ultimo cierre
 -- ---------------------------------------------------------------------------
 CREATE TEMP TABLE _sal_personal ON COMMIT DROP AS
-SELECT o.obra_id, SUM(COALESCE(h.tot, 0)::NUMERIC(18, 2)) AS personal_coste_partes
+SELECT o.obra_id, SUM(COALESCE(h.tot, 0)::NUMERIC(18, 2)) AS personal_coste_partes,
+       -- N18 (R59): los partes del ultimo mes cerrado, cuyo IRPF + SS se paga el mes siguiente.
+       SUM(COALESCE(h.tot, 0)::NUMERIC(18, 2)) FILTER (WHERE date_trunc('month', tesoreria.fn_fecha(h.fec))::DATE = o.mes_ultimo_cierre) AS personal_partes_ultimo_cierre
 FROM raw.hmores h JOIN raw.res r ON r.ide = h.reside
 JOIN _sal_obra o ON o.obra_id = NULLIF(h.obride, 0)
 WHERE r.cla = 1 AND COALESCE(r.prvide, 0) = 0
@@ -132,7 +142,8 @@ INSERT INTO tesoreria.saldo_partida_obra (
     personal_coste_partes,
     iva_soportado_pagado, iva_repercutido_cobrado,
     iva_soportado_pagado_hasta_4t, iva_repercutido_cobrado_hasta_4t,
-    iva_soportado_pagado_hasta_4m, iva_repercutido_cobrado_hasta_4m
+    iva_soportado_pagado_hasta_4m, iva_repercutido_cobrado_hasta_4m,
+    personal_irpf_ss_pendiente
 )
 SELECT
     o.obra_id                                           AS obra_id,
@@ -154,7 +165,10 @@ SELECT
     ROUND(COALESCE(s.iva_soportado_pagado_hasta_4t, 0), 2) AS iva_soportado_pagado_hasta_4t,
     ROUND(COALESCE(s.iva_repercutido_cobrado_hasta_4t, 0), 2) AS iva_repercutido_cobrado_hasta_4t,
     ROUND(COALESCE(s.iva_soportado_pagado_hasta_4m, 0), 2) AS iva_soportado_pagado_hasta_4m,
-    ROUND(COALESCE(s.iva_repercutido_cobrado_hasta_4m, 0), 2) AS iva_repercutido_cobrado_hasta_4m
+    ROUND(COALESCE(s.iva_repercutido_cobrado_hasta_4m, 0), 2) AS iva_repercutido_cobrado_hasta_4m,
+    -- N18 (R59): el IRPF + SS de los partes del ultimo cierre, si vence (fin del mes
+    -- siguiente al cierre) en la fecha de corte o despues: aun no esta pagado.
+    CASE WHEN o.mes_ultimo_cierre IS NULL THEN NULL WHEN (o.mes_ultimo_cierre + INTERVAL '2 month' - INTERVAL '1 day')::DATE >= CURRENT_DATE THEN ROUND(COALESCE(p.personal_partes_ultimo_cierre, 0) * COALESCE(rp.cuota_irpf_ss, 0), 2) ELSE 0 END AS personal_irpf_ss_pendiente
 FROM _sal_obra o
 LEFT JOIN (
     SELECT
@@ -178,7 +192,8 @@ LEFT JOIN (
     LEFT JOIN _sal_iva_doc d ON d.documento_id = e.documento_id AND d.sentido = e.sentido
     GROUP BY e.obra_id
 ) s ON s.obra_id = o.obra_id
-LEFT JOIN _sal_personal p ON p.obra_id = o.obra_id;
+LEFT JOIN _sal_personal p ON p.obra_id = o.obra_id
+LEFT JOIN tesoreria.reparto_pago_personal rp ON rp.empresa_id = o.empresa_id;
 
 COMMENT ON TABLE tesoreria.saldo_partida_obra IS
-'F-150. El saldo de partida (paso 0 de la receta) de cada obra de devengo_corte_obra a fecha_corte (el dia del build), CON IVA: lo cobrado y lo pagado REALIZADO de tesoreria.efectos (sin los pagares agrupados AGR), los AGR realizados y vivos que conservan la obra, los efectos ORIGINALES agrupados (de BAJA con estado 14) vencidos y pendientes, la parte de coste proporcional (CP, no es caja de la obra) de lo pagado y de los originales vencidos, y el coste del personal de sus partes (raw.hmores, recursos PERSONA internos, hasta el ultimo cierre, sin IVA), y el IVA soportado de lo pagado y el repercutido de lo cobrado (por la fraccion de IVA de su factura), en total, antes del 1 de enero (_hasta_4t) y hasta 4 meses antes del mes del build (_hasta_4m). La cuenta la hace la receta con H28, H29 y H30. Clave: obra_id.';
+'F-150. El saldo de partida (paso 0 de la receta) de cada obra de devengo_corte_obra a fecha_corte (el dia del build), CON IVA: lo cobrado y lo pagado REALIZADO de tesoreria.efectos (sin los pagares agrupados AGR), los AGR realizados y vivos que conservan la obra, los efectos ORIGINALES agrupados (de BAJA con estado 14) vencidos y pendientes, la parte de coste proporcional (CP, no es caja de la obra) de lo pagado y de los originales vencidos, y el coste del personal de sus partes (raw.hmores, recursos PERSONA internos, hasta el ultimo cierre, sin IVA; N18: personal_irpf_ss_pendiente es la parte IRPF + Seguridad Social de los partes del ultimo mes cerrado, por la cuota de su empresa en reparto_pago_personal, que vence el ultimo dia del mes siguiente al cierre y aun no esta pagada a fecha_corte: 0 si ya vencio, NULL sin cierre; lo pagado del personal es personal_coste_partes menos ella), y el IVA soportado de lo pagado y el repercutido de lo cobrado (por la fraccion de IVA de su factura), en total, antes del 1 de enero (_hasta_4t) y hasta 4 meses antes del mes del build (_hasta_4m). La cuenta la hace la receta con H28, H29 y H30. Clave: obra_id.';

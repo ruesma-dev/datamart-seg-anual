@@ -758,7 +758,18 @@
 # clave `invitacion_id` (`comprv.ide`) y alternativa (`comparativo_id`,
 # `oferta_id`). Las relaciones que prometian `oferta_id` unica pasan a `N:N`
 # con el `porque` diciendo que se une tambien por `comparativo_id`.
-version: 68
+# version 69 (F-150, 2026-10-31): EL PERSONAL EN DOS TRAMOS (N18; corrige el
+# fin de mes de N16). El neto se paga el ultimo dia del mes de su devengo y el
+# IRPF + la Seguridad Social el del mes siguiente, por la cuota de la empresa
+# medida en su contabilidad (abonos NORMAL de 12 meses de 4652000000,
+# 4751000000 y 4760000000; empresa 1: 0,4419). Nace
+# `tesoreria.reparto_pago_personal` (solo cuotas: las cuentas son
+# restringidas). `devengo_pendiente_obra_mes` gana `importe_personal_neto` e
+# `importe_personal_irpf_ss`, `devengo_corte_obra` `pendiente_personal_irpf_ss`
+# y `saldo_partida_obra` `personal_irpf_ss_pendiente` (el IRPF + SS de los
+# partes del ultimo cierre, aun sin pagar). Receta pasos 0 y 1 y la regla de
+# `R-CAJA-HIPOTESIS`.
+version: 69
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -1142,6 +1153,7 @@ reglas:
       - tesoreria.devengo_pendiente_obra_mes
       - tesoreria.devengo_pendiente_partida
       - tesoreria.devengo_pendiente_contrato_mes
+      - tesoreria.reparto_pago_personal
       - tesoreria.hipotesis_caja
       - tesoreria.hipotesis_caja_obra
       - tesoreria.condiciones_contrato_compra
@@ -1177,8 +1189,10 @@ reglas:
       (`tesoreria.albaranes_pendientes_neto`). Ojo: el CP no es caja de la obra:
       excluyelo del devengo y de la cartera y declaralo. El personal va en el
       devengo como recurso: no sumes nominas de la cartera ni las des por
-      ausentes; el personal se paga el ultimo dia del mes de su devengo
-      (regla, no hipotesis). El resto del coste va por contrato de compra
+      ausentes; el personal se paga en dos tramos (regla, no hipotesis): el
+      neto el ultimo dia del mes de su devengo y el IRPF + SS el del mes
+      siguiente, por la cuota de su empresa (`tesoreria.reparto_pago_personal`:
+      declara su `fuente`). El resto del coste va por contrato de compra
       (`tesoreria.devengo_pendiente_contrato_mes`: con contrato, sus
       condiciones; sin el, H02). Y el saldo de partida (paso 0) va CON IVA
       (`tesoreria.saldo_partida_obra`) y es opcional (H28); los pagares

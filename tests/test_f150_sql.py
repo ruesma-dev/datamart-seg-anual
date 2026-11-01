@@ -44,6 +44,8 @@ COLUMNAS_NUEVAS: dict[str, tuple[str, ...]] = {
         "base_sin_iva_contrato", "importe_retencion_contrato", "base_sin_retencion_contrato",
         # N16 (31-10): el personal del mes, solo en COSTE.
         "importe_pendiente_personal",
+        # N18 (31-10): sus dos tramos, solo en COSTE.
+        "importe_personal_neto", "importe_personal_irpf_ss",
     ),
     "tesoreria.devengo_corte_obra": (
         "venta_real_origen_con_coeficientes", "venta_real_media_obra", "facturado_origen",
@@ -54,6 +56,8 @@ COLUMNAS_NUEVAS: dict[str, tuple[str, ...]] = {
         "cartera_viva_coste_proporcional", "cartera_emitida_tras_cierre_coste_proporcional",
         # N16 (31-10): el personal pendiente de la obra; N17: lo que va por contrato.
         "pendiente_personal", "pendiente_enlazado_contrato",
+        # N18 (31-10): la parte IRPF + SS del personal pendiente.
+        "pendiente_personal_irpf_ss",
     ),
     "tesoreria.hipotesis_caja": ("paso_receta",),
 }

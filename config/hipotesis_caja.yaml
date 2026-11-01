@@ -66,7 +66,8 @@ hipotesis:
       retencion). Se aplica a las filas con contrato de
       `tesoreria.devengo_pendiente_contrato_mes` (F-150, N17), con la forma de
       pago de ese contrato en `tesoreria.condiciones_contrato_compra`; el
-      personal nunca (se paga a fin de mes).
+      personal nunca (se paga en dos tramos: el neto a fin de mes y el IRPF +
+      SS a fin del mes siguiente, N18).
     unidad: OPCION
     valor_defecto: CONTRATO
     opciones: [CONTRATO]
@@ -86,7 +87,8 @@ hipotesis:
       Plazo de pago, en dias, de lo que NO tiene contrato, por categoria de la
       partida (CD, CI, OTRO): solo las filas sin `contrato_id` de
       `tesoreria.devengo_pendiente_contrato_mes` (F-150, N17); el personal,
-      nunca (se paga a fin de mes, N16). Sin CP: el CP no es caja de la obra
+      nunca (se paga en dos tramos: el neto a fin de mes y el IRPF + SS a fin
+      del mes siguiente, N16 y N18). Sin CP: el CP no es caja de la obra
       (coste de estructura, F-154): se excluye del devengo y se declara.
     unidad: MAPA_DIAS
     valor_defecto: {CD: 120, CI: 120, OTRO: 120}
@@ -149,7 +151,8 @@ hipotesis:
       las filas con contrato de `tesoreria.devengo_pendiente_contrato_mes`, el
       de ese contrato (`retencion_garantia_porcentaje` de
       `tesoreria.condiciones_contrato_compra`, clases 4 y 5); sin contrato,
-      este valor; el personal, nunca (F-150, N16-N17).
+      este valor; el personal, nunca: se paga en dos tramos, el neto a fin de
+      mes y el IRPF + SS a fin del mes siguiente (F-150, N16-N18).
     unidad: PORCENTAJE
     valor_defecto: 0
     fuente_defecto: >-

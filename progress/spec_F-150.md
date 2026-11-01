@@ -489,3 +489,242 @@ Requisitos R44-R52; tareas T36-T45 (T45 MANUAL). Para caber se resumieron R3, R7
 Tamaños: requirements 150/150, design 250/250. **Sin decisiones abiertas que bloqueen**; para validar
 el humano: (f) de 11.1 (cargas sociales al mes siguiente) y si la 0715 debe llevar el personal por
 nombre (2,08 M EUR) cuando empiece a tener partes (hoy, H02/contrato).
+
+## 12. QUINTA tanda: N18, el personal en dos tramos (neto en el mes, IRPF + SS en el siguiente) · 31-10
+
+Aprobado por el humano (PARADA 1 hecha por el líder, 31-10); **corrige N16** (§11.1, decisión (f)).
+Medido en SOLO LECTURA en Azure el 31-10 entre las 19:45 y las 20:05 UTC (`_bootstrap_done = True`,
+`filas_solo_lectura`, transacción READ ONLY): `raw` de la ingesta del 31-10 y `contabilidad_restringida`
+y `tesoreria` de la nocturna del 31-10. La addenda vive aquí porque `requirements.md` (150/150) y
+`design.md` (250/250) están en su tope; `tasks.md` solo gana una línea que apunta a §12.3.
+
+### 12.0 · Lo medido
+
+**Cuentas** (`contabilidad_restringida.plan_cuentas`, empresa 1; nivel 5, las únicas con apuntes):
+
+| Código | Nombre | ¿Entra? |
+|---|---|---|
+| 4652000000 | Nóminas Pdtes de Pago | **SÍ** (neto) |
+| 4652000001 / 0002 / 9999 | Remuneraciones consejo / bonus / UTES | no: no es el personal de los partes |
+| 4650000000 | Previsión Pagas Extras | no: abona la prorrata cada mes y carga a 4652 en junio y diciembre: contarla duplicaría |
+| 4751000000 | H.P. Acree. Reten. Trabajo | **SÍ** (IRPF del trabajo, modelo 111) |
+| 4751000001 a 0006 y 9999 | IRPF alquileres, profesionales, autónomos, préstamos, no residentes, dividendos, UTE | no: no son nómina |
+| 4760000000 | Seguridad Social Acreedora | **SÍ** (cuota obrera + patronal) |
+| 4760000001 / 9999 | Recargo prestaciones / UTES | no |
+
+4751000000 es solo trabajo: los profesionales tienen su subcuenta (…0002) y en la empresa 1 todos sus
+abonos de 12 meses llevan concepto «NÓMINA …» o «ATRASOS» (abajo). 4760000000 lleva obrera + patronal: su
+abono de 12 meses (3,97 M EUR) supera el cargo a 6420000000 «Seg. Social a cargo Empresa» (3,36) en
+~0,61, la cuota obrera (~6 % de los 10,63 de sueldos, 6400000000). Los códigos son los mismos en las
+empresas 13, 18, 22 y 28; la 39 no tiene 4652 (usa 4650): sin 4652 va al defecto (12.2, punto 3).
+
+**Qué se suma: el ABONO (haber) de los apuntes NORMAL** (sin cierre, apertura ni regularización: las
+cuentas son acreedoras y la apertura de enero abona el saldo de diciembre: 40,7 / 280,4 / 312,8 miles).
+Abonos NORMAL de la empresa 1 por concepto, oct-25 a sep-26 (miles de EUR): 4652 «NÓMINA …» 7.713,1 +
+«ATRASOS» 2,1; 4751 «NÓMINA …» 2.142,5 + «ATRASOS» 0,4; 4760 «NÓMINA …» 3.965,0 + «AJUSTE SEGUROS
+SOCIALES» 24,6 + «BONIFICACIÓN FORMACIÓN» −23,5. Es el devengo de la nómina y nada más: no hace falta
+filtrar por concepto. 12 de 12 meses con abono en las tres; junio y diciembre llevan la paga extra (4652
+~1.040, 4751 ~282). **Octubre de 2026 aún NO está contabilizado** (abono 0 en las tres el 31-10).
+
+| 12 meses oct-25..sep-26, empresa 1 | miles EUR | cuota |
+|---|---|---|
+| 4652000000 (neto) | 7.715,3 | **0,5581** |
+| 4751000000 (IRPF) | 2.143,0 | 0,1550 |
+| 4760000000 (SS obrera + patronal) | 3.966,1 | 0,2869 |
+| **IRPF + SS (mes siguiente)** | 6.109,1 | **0,4419** |
+| Σ (≈ 6400 + 6420: 13.984) | 13.824,4 | 1 |
+
+Desde `raw.apu` + `raw.con` con la clase de `02_mayor.sql` sale lo mismo al décimo (7.715,3 / 2.143,0 /
+3.966,1) en **~15 s** (seq scan de `raw.apu`, 2,17 M filas, sin índice por cuenta). **No reproduce el
+51 / 15 / 34 del humano** (quizá medido sobre pagos o sobre otra ventana): con los abonos, 55,8 / 15,5 /
+28,7. Para validar el humano; no bloquea (el reparto sale de la contabilidad, como se aprobó).
+
+**Universo**: el devengo de COSTE es solo de la empresa 1 (21 obras; personal 5,648 M EUR en 158 filas
+obra-mes, de 2026-01 a 2028-05). **0686**: todo su personal pendiente en 2026-11 (0,2104 M EUR): con
+0,4419, **0,0930 el 31-12-2026** y 0,1174 el 30-11-2026. Personas: 273 recursos PERSONA internos con
+partes entre oct-25 y sep-26.
+
+**El saldo de partida (paso 0) también cambia** (consecuencia de N18, 12.2 punto 5): `personal_coste_partes`
+da por pagado el IRPF + SS del último mes cerrado, que se paga al mes siguiente. Con `fecha_corte`
+31-10: 16 obras con cierre 2026-10 (partes de octubre 0,2414 → IRPF + SS pendiente **~0,107**) y 2 con
+cierre 2026-09 (0,0378 → ~0,017; vence el 31-10, que no es «antes de» la fecha de corte); 0686 (hoy con
+cierre 2026-10): partes de octubre 0,0654 → **~0,029**.
+
+### 12.1 · Requisitos (EARS; sustituyen lo que R45-R47 dicen del día de pago; R44, R46 y R50 siguen)
+
+- R53. `cuota_irpf_ss(neto, irpf, ss)` (dominio) = `ROUND((irpf + ss) / (neto + irpf + ss), 6)` SI
+  `neto` > 0 y el resultado está en [0, 1]; si no, `None` (el llamador va al defecto).
+- R54. `reparto_pago_personal(...)` (dominio) devuelve (`cuota_irpf_ss`, `fuente`, `motivo`):
+  `CONTABILIDAD` con 12 meses con abono en 4652000000; `CONTABILIDAD_PARCIAL` con 1-11; `DEFECTO`
+  (cuota 0: todo a fin del mes de devengo, lo de N16) SI no hay abono en 4652000000 en los 3 meses
+  anteriores al del build (`SIN_NOMINA_RECIENTE`), SI hay menos de `MIN_PERSONAS_REPARTO` = 10 personas
+  con partes en la ventana (`POCAS_PERSONAS`) o SI R53 da `None` (`CUOTA_FUERA_DE_RANGO`).
+- R55. `partir_personal(importe, cuota)` (dominio): `irpf_ss = ROUND(importe × cuota, 2)` y
+  `neto = importe − irpf_ss`; la suma es exacta al céntimo, también con importe 0 o negativo.
+- R56. `tesoreria.reparto_pago_personal`: una fila por empresa del devengo de COSTE, con `mes_desde`,
+  `mes_hasta` (la ventana), `meses_con_nomina`, `personas_con_partes`, `cuota_neto`, `cuota_irpf_ss`
+  (`cuota_neto` = 1 − `cuota_irpf_ss`), `fuente`, `motivo` y `fecha_calculo`. NINGUNA columna de
+  importe (test: ningún nombre casa con `importe|debe|haber|saldo|total|eur`).
+- R57. La ventana: `mes_hasta` = el último mes ANTERIOR al del build con abono NORMAL ≠ 0 en
+  4652000000 de la empresa, si cae entre build − 3 y build − 1; `mes_desde` = `mes_hasta` − 11. Solo
+  cuentan los abonos NORMAL (fuera `cla` 3, −1 y 1 y los conceptos de cierre, apertura y regularización,
+  con los MISMOS literales que `02_mayor.sql`, comparados por test) de 4652000000, 4751000000 y
+  4760000000 exactas.
+- R58. `devengo_pendiente_obra_mes` publica, en COSTE (NULL en VENTA), `importe_personal_neto` e
+  `importe_personal_irpf_ss` por R55 con la cuota de su empresa; neto + irpf_ss =
+  `importe_pendiente_personal` fila a fila (la guarda de la suma de `07` lo mira y falla con la obra y
+  el mes). `devengo_corte_obra` (COSTE) publica `pendiente_personal_irpf_ss` (Σ de la obra).
+- R59. `saldo_partida_obra` publica `personal_irpf_ss_pendiente` = la parte IRPF + SS (R55) de los
+  partes del `mes_ultimo_cierre` (mismo filtro que `personal_coste_partes`) SI el último día del mes
+  siguiente al cierre NO es anterior a `fecha_corte`; si no, 0. NULL sin cierre.
+- R60. Receta y `regla` de `R-CAJA-HIPOTESIS`: el personal se paga en DOS tramos:
+  `importe_personal_neto` el último día del mes de su devengo e `importe_personal_irpf_ss` el último día
+  del mes SIGUIENTE (aunque la obra ya no devengue ese mes); sin IVA, retención, H03, plazo ni H24. Paso
+  0: lo pagado del personal es `personal_coste_partes` − `personal_irpf_ss_pendiente`, que se paga el
+  último día del mes siguiente al cierre. Es regla fija: el catálogo sigue en 30 hipótesis. La caja
+  declara la `fuente` de `reparto_pago_personal` y, si es `DEFECTO`, lo dice.
+- R61. SI `raw.apu` llega vacía o `raw.con` no trae ninguna de las tres cuentas, `07` falla con su
+  motivo (guarda de entrada) ANTES de vaciar nada: nunca un defecto silencioso para todas las empresas.
+- R62. Contraste de SOLO LECTURA antes del diccionario: empresa 1 `CONTABILIDAD`, cuota ~0,442
+  (± 0,02), 12 meses, ~273 personas; Σ personal 5,65 M EUR intacto; Σ `importe_personal_irpf_ss` ~2,50;
+  0686 2026-11: ~0,093 IRPF + SS y ~0,117 neto; saldo ~0,12 M EUR en ~18 obras, 0686 ~0,029.
+
+### 12.2 · Diseño
+
+**1. Se lee `raw`, no `contabilidad_restringida`.** `run-all` construye `tesoreria` antes que
+`contabilidad`. Se lee `raw.apu` + `raw.con` (la cuenta: `con.tip = 17`, `cod`, `emp`) de la ingesta de
+la MISMA noche. Por qué no el mayor de la víspera: (a) en una base vacía (`run-all --full` desde cero o
+la sandbox de T49) `contabilidad_restringida.mayor` aún no existe cuando corre `tesoreria` y el build
+fallaría: una dependencia hacia atrás que `run-all` no declara; (b) `02_mayor.sql` hace `DROP TABLE …
+CASCADE` cada noche; (c) es el precedente de N11 (§10.1: `tesoreria` lee `raw` de lo que se construye
+después); (d) cuesta ~15 s (medido) dentro de los ~210 s de `07`. De `02_mayor.sql` se copia solo la
+clase NORMAL (`cla` 3 / −1 / 1 y tres `ILIKE`) y un test compara los literales con los de `02`
+(precedente: `_dev_personal` y `_sal_personal`). SALDO_INICIAL no importa (es apertura: fuera igual).
+Descartado mover `contabilidad` delante de `tesoreria`: cambia el orden de quince pasos por 15 s.
+
+**2. Los datos restringidos no salen.** Los abonos de nómina son de cuentas CR (`R-PERFILES`). Las
+sumas viven SOLO en la temporal `_dev_nomina` (`ON COMMIT DROP`); `tesoreria.reparto_pago_personal`
+(esquema GENERAL) lleva solo cocientes a 6 decimales, meses, recuentos y fuente (R56: test de nombres
+de columna y del `INSERT`, que no publica ninguna suma). Umbral de agregación: con menos de 10 personas
+con partes, la cuota delataría el tipo de IRPF de alguien: `DEFECTO`, `POCAS_PERSONAS` (R54). Solo se
+calculan las empresas del devengo de COSTE (hoy, la 1). Las columnas por obra-mes son el personal ya
+publicado (N16, de partes) partido por esa cuota: no añaden nada de nómina.
+
+**3. Granularidad y defecto.** Una cuota por EMPRESA (la nómina contable es de la empresa; por obra no
+hay). Con 1-11 meses, `CONTABILIDAD_PARCIAL`, y se aplica (un cociente no necesita el año; la paga extra
+pesa más o menos: se declara). Sin nómina reciente, sin 4652 (empresa 39), con pocas personas o con la
+cuota fuera de [0, 1] → `DEFECTO`: cuota 0, todo a fin del mes de devengo (la regla de N16, la más
+pesimista para la caja: paga antes). Se declara en la fila (`fuente`, `motivo`) y la receta obliga a
+decirlo. Pagas extra: como están (prorrateadas en el coste de los partes; los abonos de junio y
+diciembre entran en la ventana de 12 meses y la cuota es anual).
+
+**4. Dónde: en `07`** (sub-paso 2 sexies, misma transacción; sin sub-paso nuevo).
+- `_dev_nomina` (temporal): por empresa del devengo, mes y cuenta, Σ `hab::NUMERIC(18,2)` NORMAL de las
+  tres cuentas de los meses build − 15 a build − 1 (lo que basta para R57).
+- `_dev_personas`: por empresa, recursos distintos PERSONA internos (el filtro de `_dev_personal`) con
+  partes en la ventana, por la empresa de la obra (`maestro.v_obra_fichas`).
+- `TRUNCATE` + `INSERT` de `tesoreria.reparto_pago_personal` con R53-R54 (literales = dominio).
+- Paso 5: `importe_personal_irpf_ss` = `ROUND(importe_pendiente_personal × cuota_irpf_ss, 2)` e
+  `importe_personal_neto` = la resta (R55), por `empresa_id`; la guarda de la suma añade la igualdad
+  fila a fila. Paso 6: `pendiente_personal_irpf_ss` del corte.
+- Guarda de entrada (R61) junto a las de `raw.res` y `raw.ctrpro`. Cabecera de `07`: `raw.apu` en «Lee de».
+`00_setup.sql`: `CREATE TABLE IF NOT EXISTS tesoreria.reparto_pago_personal` (PK `empresa_id`,
+`COMMENT`) y `ADD COLUMN IF NOT EXISTS` de las columnas. Ninguna casa con `PATRON_COLUMNA_DE_CAJA`.
+
+**5. `10_saldo_partida.sql`** (corre después de `07` y lee `tesoreria.reparto_pago_personal`):
+`_sal_personal` gana los partes del `mes_ultimo_cierre`; `personal_irpf_ss_pendiente` por R59, con
+`(mes_ultimo_cierre + INTERVAL '2 month' − INTERVAL '1 day')::DATE >= fecha_corte`. Columna nueva en
+`00_setup.sql`.
+
+**6. Dominio** (`etl_sigrid/domain/proyeccion_caja.py`): `CUENTAS_NOMINA` (`NETO` 4652000000, `IRPF`
+4751000000, `SS` 4760000000), `MESES_VENTANA_NOMINA` = 12, `MESES_MAX_SIN_NOMINA` = 3,
+`MIN_PERSONAS_REPARTO` = 10, `FUENTES_REPARTO_PERSONAL`, `MOTIVOS_REPARTO_PERSONAL`, `cuota_irpf_ss`,
+`reparto_pago_personal` y `partir_personal`. El SQL usa los mismos literales (test).
+
+**7. Diccionario y textos** (versión **69**: la 68 es de F-155, ya en `main` y en esta rama):
+- ficha NUEVA de `tesoreria.reparto_pago_personal` (no recomendada: es ingrediente; sin subida de
+  `PRESUPUESTO_MAX`): dice que no lleva importes y por qué (`R-PERFILES`);
+- `devengo_pendiente_obra_mes`: `importe_personal_neto`, `importe_personal_irpf_ss` y el texto de
+  `importe_pendiente_personal` (dos tramos); `devengo_corte_obra`: `pendiente_personal_irpf_ss` y el
+  texto de `pendiente_personal`; `devengo_pendiente_partida.pendiente_personal`: texto;
+  `saldo_partida_obra`: `personal_irpf_ss_pendiente` y la descripción;
+- receta de `tesoreria.hipotesis_caja`: paso 0 (lo pagado del personal menos lo pendiente) y paso 1 (dos
+  tramos, el mes siguiente aunque la obra ya no devengue, la `fuente`); `regla` de `R-CAJA-HIPOTESIS`;
+- `config/hipotesis_caja.yaml`: el «se paga a fin de mes» del personal en H01, H02 y H06 → dos tramos (N18);
+- `docs/ARCHITECTURE.md` (`07` lee `raw.apu`, cuentas CR, y publica solo cuotas), `CLAUDE.md` (mapa:
+  «se paga el último día del mes de su devengo (N16)» → dos tramos) y `azure-apps/datamart_seg_anual.md`
+  (objeto y columnas nuevas; commit local allí, sin push).
+
+**Qué NO se toca**: `contabilidad/*`, el orden de `run-all`, `cuota_personal` y el reparto por partida
+de N16, N17 (R50 igual: el personal total no cambia), el catálogo de hipótesis, `tesoreria_restringida`.
+**Límite de microservicio**: dentro (ingrediente de tesorería del datamart; nada de otro servicio).
+
+### 12.3 · Tareas (QUINTA tanda; tras T44, en esta rama; RED primero en R53-R55 y R58)
+
+- [x] T46: dominio (12.2 punto 6) con su RED primero: `cuota_irpf_ss` (neto 0, negativos, cuota > 1, redondeo a 6), `reparto_pago_personal` (12 / 1-11 / 0 meses, 9 y 10 personas, cuota fuera de rango), `partir_personal` (0, negativo, céntimos, Σ exacta)  |  Verificación: `pytest tests/test_f150_personal_n18.py -k "r53 or r54 or r55"`
+- [x] T47: `00_setup.sql` (tabla y columnas) y `07` (12.2 punto 4: `_dev_nomina`, `_dev_personas`, `reparto_pago_personal`, columnas de los pasos 5 y 6, guarda fila a fila, guarda de entrada R61, `COMMENT`); tests de literales (cuentas, clase = `02_mayor.sql`, 12 / 3 / 10 = dominio), de nombres sin importes (R56) y `test_f140_sql.py` (columnas)  |  Verificación: `pytest tests/test_f150_personal_n18.py -k "r56 or r57 or r58 or r61" tests/test_f150_sql.py tests/test_f140_sql.py`
+- [x] T48: `10_saldo_partida.sql` y `00_setup.sql` (`personal_irpf_ss_pendiente`, R59) con test de la condición de fecha  |  Verificación: `pytest tests/test_f150_saldo.py tests/test_f150_personal_n18.py -k r59`
+- [x] T49: contraste de SOLO LECTURA en Azure de los `SELECT` de T47-T48 (sin `INSERT`) frente a R62 y 12.0, fuera de 00:00-03:15 UTC; y el build de `07` y `10` contra la sandbox con los tipos reales de `raw` (`raw.apu.hab` es `double precision`); si algo se aparta > 5 %, PARADA  |  Verificación: tabla en `progress/impl_F-150.md`
+- [x] T50: diccionario y textos (12.2 punto 7), `version` 69 con su nota, `test_f150_diccionario.py` y `test_f150_receta.py` (dos tramos; 30 hipótesis)  |  Verificación: `pytest tests/test_f150_diccionario.py tests/test_f150_receta.py tests/test_f140_hipotesis.py -k "r60 or r2 or r37"` y la puerta del diccionario de `bash harness/init.sh`
+- [x] T51: `docs/ARCHITECTURE.md`, `CLAUDE.md` y `azure-apps/datamart_seg_anual.md` (commit local allí)  |  Verificación: `pytest tests/test_f150_diccionario.py -k docs`
+- [x] T52: mutación incremental sobre `cuota_irpf_ss`, `reparto_pago_personal` y `partir_personal`, y `bash harness/init.sh` en verde  |  Verificación: `python -m harness.mutacion --feature F-150` y `bash harness/init.sh`
+- [ ] T53 (MANUAL, humano): redespliegue de 12.4 y R62 en Azure  |  Verificación: resultados en `progress/impl_F-150.md`
+
+Todos los tests propuestos corren SIN red ni BBDD (dominio y texto del SQL); lo que exige BBDD es T49
+(solo lectura y sandbox) y T53 (humano).
+
+### 12.4 · Pasos MANUAL (tras APROBADO y merge a `main`; lo hace el humano; fuera de 00:00-03:15 UTC)
+
+Si el redespliegue de N11-N17 (T45, `progress/current.md`) aún no se ha hecho, se hace UNO solo con la
+imagen que ya lleva N18: los pasos de T45 con estas cifras añadidas y la v69 en lugar de la v67.
+
+0. Anotar el tag que corre hoy el job (vuelta atrás): `az containerapp job show -n caj-datamart-seg-dev
+   -g rg-datamart-seg-dev --query "properties.template.containers[0].image" -o tsv`. El DDL es aditivo
+   (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`): la imagen vieja lo ignora.
+1. `powershell -NoProfile -File infra/70_build_image.ps1` → anotar el tag nuevo.
+2. `powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag nuevo>` y el `az` del paso 0 → debe
+   acabar en `:<tag nuevo>`. Sin esto, la nocturna rehace la tesorería con la imagen vieja.
+3. `.venv/Scripts/python.exe main.py build-tesoreria` (sin ingesta: `raw.apu` y `raw.con` ya están) →
+   SUCCESS en los 10 sub-pasos.
+4. Cifras, solo lectura, cada consulta con `.venv/Scripts/python.exe -c "import main, sys; pg = main._get_pg(); pg._bootstrap_done = True; print(pg.filas_solo_lectura(sys.argv[1], 120))" "<consulta>"` (transacción READ ONLY):
+   - `SELECT empresa_id, mes_desde, mes_hasta, meses_con_nomina, personas_con_partes, cuota_irpf_ss,
+     fuente FROM tesoreria.reparto_pago_personal` → `1`, ventana de 12 meses que acaba en 2026-09 o
+     2026-10 (según esté contabilizado octubre), `12`, ~273, ~0,44, `CONTABILIDAD`.
+   - `SELECT round(sum(importe_pendiente_personal)/1e6,3), round(sum(importe_personal_neto)/1e6,3),
+     round(sum(importe_personal_irpf_ss)/1e6,3), count(*) FILTER (WHERE importe_personal_neto +
+     importe_personal_irpf_ss <> importe_pendiente_personal) FROM tesoreria.devengo_pendiente_obra_mes
+     WHERE concepto = 'COSTE'` → ~5,65, ~3,15, ~2,50, 0.
+   - Lo mismo con `AND clave_obra = '1-0686' AND anio_mes = '2026-11-01'` → ~0,210, ~0,117, ~0,093.
+   - `SELECT count(*) FILTER (WHERE personal_irpf_ss_pendiente > 0),
+     round(sum(personal_irpf_ss_pendiente)/1e6,3) FROM tesoreria.saldo_partida_obra` → ~18, ~0,12
+     (0686 ~0,029; cambia con los cierres y con `fecha_corte`).
+5. `.venv/Scripts/python.exe main.py publicar-diccionario` (SOLO con la imagen ya en el job) → **v69**.
+6. `.venv/Scripts/python.exe main.py check-diccionario` → OK (antes del paso 5 devuelve 1);
+   `.venv/Scripts/python.exe main.py check-declarados` → sin faltantes;
+   `.venv/Scripts/python.exe main.py check-unicidad --timeout 300` → sin claves duplicadas.
+7. Reiniciar el MCP: `az containerapp show -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --query
+   properties.latestReadyRevisionName -o tsv` y `az containerapp revision restart -g rg-mcp-bbdd-dev
+   -n ca-mcp-bbdd-dev --revision <revision> -o none`.
+8. R31 por el MCP, 0686: personal de noviembre ~0,12 el 30-11 y ~0,09 el 31-12, con la `fuente` declarada.
+
+- **Vuelta atrás** (desde el puesto, en este orden):
+  1. Job: `powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag del paso 0>`, comprobado con
+     el `az` del paso 0 (debe acabar en `:<tag del paso 0>`).
+  2. Diccionario: `publicar-diccionario` publica las fichas del ÁRBOL local, no las de la imagen, así
+     que se publica desde el `main` de antes del merge de N18: `git switch --detach <sha del merge de
+     N18>^1` (el primer padre del merge; hoy `c9e4bbe` si `main` no se mueve antes), luego
+     `.venv/Scripts/python.exe main.py publicar-diccionario` (→ **v68**, 255 objetos) y
+     `git switch main`. Si no se hace, la nocturna siguiente lo republica igualmente desde la imagen
+     vieja del job (la v68), pero hasta entonces el MCP serviría la v69 sobre datos de la imagen vieja.
+  3. MCP: el reinicio del paso 7 → `contexto_bbdd()` abre con «Versión 68».
+  4. Qué queda en Azure y se deja así, sin escribir en producción: la tabla
+     `tesoreria.reparto_pago_personal` y las 4 columnas nuevas (`importe_personal_neto`,
+     `importe_personal_irpf_ss`, `pendiente_personal_irpf_ss`, `personal_irpf_ss_pendiente`) siguen,
+     porque el DDL es aditivo y la imagen vieja no las borra. La tabla conserva los datos del último
+     build de N18 y queda sin ficha en la v68 (fuera de la superficie del MCP); las 4 columnas se
+     quedan a NULL en cuanto la imagen vieja reconstruya sus tablas (no las rellena).
+
+**Para validar el humano** (no bloquean): (1) la cuota medida es 0,442 (55,8 / 15,5 / 28,7), no el
+~49 % de su 51 / 15 / 34; (2) el saldo de partida (paso 0) también se corrige (R59: ~0,12 M EUR que hoy
+se dan por pagados y vencen a fin del mes siguiente al cierre); (3) el defecto sin contabilidad es N16
+(todo en el mes), no la cuota de otra empresa; (4) el umbral de 10 personas.

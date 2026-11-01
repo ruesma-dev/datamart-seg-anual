@@ -305,6 +305,15 @@ def test_f150_r51_h01_y_h06_en_las_filas_con_contrato(codigo: str) -> None:
     assert "personal" in texto, "el personal nunca va por contrato"
 
 
+@pytest.mark.parametrize("codigo", ["H01", "H02", "H06"])
+def test_f150_r60_el_personal_en_dos_tramos_en_h01_h02_h06(codigo: str) -> None:
+    """N18: el «se paga a fin de mes» del personal pasa a dos tramos; sigue
+    siendo regla fija (el catálogo no crece: 30)."""
+    texto = _texto(_catalogo()[codigo])
+    assert "dos tramos" in texto and "el IRPF + SS a fin del mes siguiente" in texto, codigo
+    assert len(_catalogo()) == 30
+
+
 def test_f150_r51_h02_solo_lo_que_no_tiene_contrato() -> None:
     texto = _texto(_catalogo()["H02"])
     assert "sin `contrato_id`" in texto

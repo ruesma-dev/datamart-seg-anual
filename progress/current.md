@@ -44,6 +44,93 @@ Implementer. La nocturna del 31-10 cayó dos veces en `build_compras` (`comparat
     tag anterior), comprobada con el mismo `az containerapp job show`. Ojo: con ese tag la nocturna
     vuelve a caer en `build_compras` mientras siga en Sigrid el COM26/0014.
 
+## 2026-11-01 · F-150 · `in_progress` · T46-T52 hechas (N18) · rama `feature/F-150-receta-caja`
+
+Implementer. Detalle: `progress/impl_F-150.md` (N16-N17 pasa a `impl_F-150_tanda4.md`). Commits
+`bfd8b6f` (T46) `46054a8` (T47) `a046650` (T48) `8af41ab` (T49) `2f854e8` (T50) `b86b322` (T51);
+`azure-apps` `499defb` (local, sin push).
+- `07` lee `raw.apu` (abonos NORMAL de las 3 cuentas de nómina, 12 meses) y publica
+  `tesoreria.reparto_pago_personal` (solo cuotas); la obra-mes parte el personal en
+  `importe_personal_neto` + `importe_personal_irpf_ss` (guarda fila a fila); `10` publica
+  `personal_irpf_ss_pendiente`. Diccionario **v69**; H01/H02/H06 en dos tramos (siguen 30).
+- Azure (solo lectura, 31-10): cuota empresa 1 **0,441909** (`CONTABILIDAD`, 12 meses); 5,6481 →
+  3,1521 + 2,4959, 0 descuadres; 0686 nov. 0,2104 → 0,1174 + 0,0930; saldo 0,1234 en 17 obras.
+  **Personas 245, no ~273**: 273 es todas las empresas; 245 las de obras de la empresa 1 (lo que
+  dice el diseño). No cambia nada (umbral 10). Sandbox: 61 OK, 0 fallos.
+- Desviaciones justificadas en el informe §2 (dos excepciones acotadas en guardas de F-140).
+- Diccionario del árbol hoy: **256 objetos, 2240 columnas, 125 de consumo** (v69).
+- Siguiente: review (C1-C4 sobre T46-T52); luego T53, abajo (lo hace el humano).
+
+### F-150 · Redespliegue MANUAL de N18 (T53; tras APROBADO y merge a `main`; lo hace el humano)
+
+N11-N17 ya está en `main` y desplegado (el 31-10 la obra-mes de Azure ya tenía
+`importe_pendiente_personal`; el MCP sirve la v68 de F-155): este despliegue es solo el de N18.
+Fuera de 00:00-03:15 UTC. Lectura con `.venv/Scripts/python.exe` desde el puesto.
+
+0. Anotar el tag que corre hoy el job (vuelta atrás): `az containerapp job show -n caj-datamart-seg-dev
+   -g rg-datamart-seg-dev --query "properties.template.containers[0].image" -o tsv`. El DDL es aditivo
+   (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`): la imagen vieja lo ignora.
+1. `powershell -NoProfile -File infra/70_build_image.ps1` → anotar el tag nuevo.
+2. `powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag nuevo>` y el `az` del paso 0 → debe
+   acabar en `:<tag nuevo>`. Sin esto, la nocturna rehace la tesorería con la imagen vieja.
+3. `.venv/Scripts/python.exe main.py build-tesoreria` (sin ingesta: `raw.apu` y `raw.con` ya están) →
+   SUCCESS en los 10 sub-pasos (el del devengo, ~18 s más).
+4. Cifras, solo lectura, cada consulta con `.venv/Scripts/python.exe -c "import main, sys; pg = main._get_pg(); pg._bootstrap_done = True; print(pg.filas_solo_lectura(sys.argv[1], 120))" "<consulta>"` (transacción READ ONLY; las del 31-10):
+   - `SELECT empresa_id, mes_desde, mes_hasta, meses_con_nomina, personas_con_partes, cuota_irpf_ss,
+     fuente FROM tesoreria.reparto_pago_personal` → `1`, 2025-10..2026-09 (o ..2026-10 si octubre ya
+     está contabilizado), `12`, **~245** (no 273: ver arriba), ~0,4419, `CONTABILIDAD`.
+   - `SELECT round(sum(importe_pendiente_personal)/1e6,3), round(sum(importe_personal_neto)/1e6,3),
+     round(sum(importe_personal_irpf_ss)/1e6,3), count(*) FILTER (WHERE importe_personal_neto +
+     importe_personal_irpf_ss <> importe_pendiente_personal) FROM tesoreria.devengo_pendiente_obra_mes
+     WHERE concepto = 'COSTE'` → ~5,65, ~3,15, ~2,50, 0.
+   - Lo mismo con `AND clave_obra = '1-0686' AND anio_mes = '2026-11-01'` → ~0,210, ~0,117, ~0,093.
+   - `SELECT count(*) FILTER (WHERE personal_irpf_ss_pendiente > 0),
+     round(sum(personal_irpf_ss_pendiente)/1e6,3) FROM tesoreria.saldo_partida_obra` → ~17, ~0,12
+     (0686 ~0,029; cambia con los cierres y con la fecha).
+5. `.venv/Scripts/python.exe main.py publicar-diccionario` (SOLO con la imagen ya en el job) → **v69,
+   256 objetos**.
+6. `.venv/Scripts/python.exe main.py check-diccionario` → OK; `.venv/Scripts/python.exe main.py
+   check-declarados` → sin faltantes; `.venv/Scripts/python.exe main.py check-unicidad --timeout 300`
+   → sin claves duplicadas.
+7. Reiniciar el MCP: `az containerapp show -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --query
+   properties.latestReadyRevisionName -o tsv` y `az containerapp revision restart -g rg-mcp-bbdd-dev
+   -n ca-mcp-bbdd-dev --revision <revision> -o none` → `contexto_bbdd()` abre con «Versión 69». Si el
+   `config.yaml` de `mcp-bbdd` lista objetos uno a uno, añadir `tesoreria.reparto_pago_personal`.
+8. R31 por el MCP, 0686: personal de noviembre ~0,117 el 30-11 y ~0,093 el 31-12, con la `fuente`
+   declarada. Anotar el resultado en `progress/impl_F-150.md` §6.
+9. `bash harness/init.sh` en verde sobre `main` tras el merge.
+
+- **Vuelta atrás** (desde el puesto, en este orden):
+  1. Job: `powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag del paso 0>`, comprobado con
+     el `az` del paso 0 (debe acabar en `:<tag del paso 0>`).
+  2. Diccionario: `publicar-diccionario` publica las fichas del ÁRBOL local, no las de la imagen, así
+     que se publica desde el `main` de antes del merge de N18: `git switch --detach <sha del merge de
+     N18>^1` (el primer padre del merge; hoy `c9e4bbe` si `main` no se mueve antes), luego
+     `.venv/Scripts/python.exe main.py publicar-diccionario` (→ **v68**, 255 objetos) y
+     `git switch main`. Si no se hace, la nocturna siguiente lo republica igualmente desde la imagen
+     vieja del job (la v68), pero hasta entonces el MCP serviría la v69 sobre datos de la imagen vieja.
+  3. MCP: el reinicio del paso 7 → `contexto_bbdd()` abre con «Versión 68».
+  4. Qué queda en Azure y se deja así, sin escribir en producción: la tabla
+     `tesoreria.reparto_pago_personal` y las 4 columnas nuevas (`importe_personal_neto`,
+     `importe_personal_irpf_ss`, `pendiente_personal_irpf_ss`, `personal_irpf_ss_pendiente`) siguen,
+     porque el DDL es aditivo y la imagen vieja no las borra. La tabla conserva los datos del último
+     build de N18 y queda sin ficha en la v68 (fuera de la superficie del MCP); las 4 columnas se
+     quedan a NULL en cuanto la imagen vieja reconstruya sus tablas (no las rellena).
+
+## 2026-10-31 · F-150 · spec ampliada, QUINTA tanda (N18) · rama `feature/F-150-receta-caja`
+
+Spec-author. Rama avanzada a `main` (`c9e4bbe`, fast-forward). Detalle, mediciones (Azure, solo
+lectura) y pasos MANUAL: `progress/spec_F-150.md` §12 (R53-R62, diseño 12.2, tareas T46-T53; `tasks.md`
+solo apunta allí: requirements y design están en su tope).
+- **N18** (corrige N16): el personal pendiente se parte por una cuota POR EMPRESA de la contabilidad
+  (abonos NORMAL de 12 meses de 4652000000 / 4751000000 / 4760000000, leídos de `raw.apu`, no del
+  mayor de la víspera): neto a fin del mes de devengo, IRPF + SS a fin del mes siguiente. Empresa 1:
+  **0,4419** al mes siguiente. Objeto nuevo `tesoreria.reparto_pago_personal`, solo cuotas (sin importes
+  de nómina; umbral de 10 personas). También el saldo de partida (`personal_irpf_ss_pendiente`).
+- 0686: 0,210 de noviembre → ~0,117 el 30-11 y ~0,093 el 31-12. Σ personal 5,65 intacto.
+- **Para validar el humano** (no bloquean): la cuota medida (55,8 / 15,5 / 28,7) no es su 51 / 15 / 34;
+  el saldo de partida también cambia (~0,12 M EUR); defecto sin contabilidad = N16; umbral 10 personas.
+
 ## 2026-10-31 · F-150 · `in_progress` · T36-T44 hechas (N16-N17) · rama `feature/F-150-receta-caja`
 
 Implementer. Commits `133a305`..`3efb069` (T36-T43 y T39 bis); `azure-apps` `9488087` (local, sin

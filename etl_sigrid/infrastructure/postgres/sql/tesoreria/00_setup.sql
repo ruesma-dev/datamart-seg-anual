@@ -692,3 +692,36 @@ CREATE TABLE IF NOT EXISTS tesoreria.devengo_pendiente_contrato_mes (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_tes_devengo_pendiente_contrato_mes ON tesoreria.devengo_pendiente_contrato_mes (obra_id, anio_mes, categoria, contrato_id) NULLS NOT DISTINCT;
+
+
+-- ---------------------------------------------------------------------------
+-- F-150 (N18, R56): el REPARTO del pago del personal de cada empresa
+--
+-- Una fila por empresa del devengo de COSTE: la cuota de la nomina que se paga
+-- el mes SIGUIENTE (IRPF + Seguridad Social) y la que se paga en el mes (el
+-- neto), de los abonos NORMAL de 12 meses de sus cuentas de nomina. SOLO
+-- cocientes, meses y recuentos: las sumas son de cuentas restringidas
+-- (`R-PERFILES`) y no salen de la temporal de `07`, que la llena.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS tesoreria.reparto_pago_personal (
+    empresa_id           INTEGER       PRIMARY KEY,
+    mes_desde            DATE,
+    mes_hasta            DATE,
+    meses_con_nomina     INTEGER       NOT NULL,
+    personas_con_partes  INTEGER       NOT NULL,
+    cuota_neto           NUMERIC(12,6) NOT NULL,
+    cuota_irpf_ss        NUMERIC(12,6) NOT NULL,
+    fuente               VARCHAR(24)   NOT NULL,
+    motivo               VARCHAR(24),
+    fecha_calculo        DATE          NOT NULL
+);
+
+-- F-150 (N18, R58): el personal del mes en sus dos tramos (neto en el mes, IRPF +
+-- SS el mes siguiente). Solo COSTE.
+ALTER TABLE tesoreria.devengo_pendiente_obra_mes ADD COLUMN IF NOT EXISTS importe_personal_neto NUMERIC(18,2);
+ALTER TABLE tesoreria.devengo_pendiente_obra_mes ADD COLUMN IF NOT EXISTS importe_personal_irpf_ss NUMERIC(18,2);
+-- F-150 (N18, R58): la parte IRPF + SS del personal pendiente de la obra. Solo COSTE.
+ALTER TABLE tesoreria.devengo_corte_obra ADD COLUMN IF NOT EXISTS pendiente_personal_irpf_ss NUMERIC(18,2);
+-- F-150 (N18, R59): la parte IRPF + SS de los partes del ultimo mes cerrado, que
+-- se paga a fin del mes siguiente al cierre (aun no pagada a fecha_corte).
+ALTER TABLE tesoreria.saldo_partida_obra ADD COLUMN IF NOT EXISTS personal_irpf_ss_pendiente NUMERIC(18,2);
