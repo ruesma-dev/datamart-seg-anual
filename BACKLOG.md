@@ -3,19 +3,16 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **143 features**, 75 abiertas (1 en curso, 2 con la spec lista, 0 bloqueadas y 72 en backlog) y 68 terminadas.
+Resumen: **143 features**, 73 abiertas (0 en curso, 1 con la spec lista, 0 bloqueadas y 72 en backlog) y 70 terminadas.
 
 ## En curso
 
-| # | Feature | Prioridad | Rigor | Rama |
-|---|---|---|---|---|
-| F-150 | La receta de la caja (fase 1): el procedimiento de devengo a caja en el diccionario, el coeficiente de venta por partida y los reparto en varios meses | 1 | estandar | `feature/F-150-receta-caja` |
+_Ninguna feature en curso._
 
 ## Spec lista
 
 | # | Feature | Prioridad | Rigor | Rama |
 |---|---|---|---|---|
-| F-155 | Hotfix: ofertas compartidas entre comparativos rompen build_compras | 1 | estandar | `feature/F-155-ofertas-compartidas` |
 | F-111 | Los nombres de partida se resuelven por codigo en los niveles del arbol y en la dimension de costes indirectos: 10.593 filas con un escalon con el nombre de otra partida | 18 | estandar | `feature/F-111-nombres-partida-por-ancestro` |
 
 ## Bloqueadas
@@ -128,6 +125,8 @@ _Ninguna feature bloqueada._
 | F-147 | Presupuesto del contexto del MCP: reglas con resumen corto y detalle bajo demanda, y una puerta que impida que `contexto_bbdd` crezca en silencio | 1 | estandar |
 | F-148 | Robustez de la nocturna: la causa del «connection timeout expired» de las 00:0x en `ingest_raw.obrparpre`, reanudar en vez de repetir desde la ingesta, y permisos que no dependan del final | 1 | critico |
 | F-149 | Lo que sirve el MCP no nombra reglas que no se publican: fuera las citas a `R-SIGRID-CON` del bloque de convenciones y de las fichas de `compras` | 1 | estandar |
+| F-150 | La receta de la caja (fase 1): el procedimiento de devengo a caja en el diccionario, el coeficiente de venta por partida y los reparto en varios meses | 1 | estandar |
+| F-155 | Hotfix: ofertas compartidas entre comparativos rompen build_compras | 1 | estandar |
 | F-009 | Inventario del entorno Azure existente | 2 | documental |
 | F-042 | La clave de mart.fact_seguimiento_mensual esta rota: 8.778 combinaciones duplicadas | 2 | critico |
 | F-056 | El mayor y el plan de cuentas como arbol: stg y mart sobre la contabilidad (raw por F-066) | 2 | critico |
@@ -173,18 +172,6 @@ _Ninguna feature bloqueada._
 | F-142 | Que cualquier IA pueda leer los adjuntos: `abrir_adjunto` devuelve el contenido CONVERTIDO (texto por página, o imagen si es un escaneo) de PDF y ofimática, también Word 97 y Excel antiguos, y el original a petición | 74 | estandar |
 
 ## Detalle
-
-### F-150 · La receta de la caja (fase 1): el procedimiento de devengo a caja en el diccionario, el coeficiente de venta por partida y los reparto en varios meses
-
-estado **en curso** · prioridad 1 · rigor `estandar` · SDD sí · rama `feature/F-150-receta-caja`
-
-Pedida por el humano el 2026-10-26, nace de la P2 de la review de F-140 y de su conversación sobre cómo se construye la caja. F-140 publica los ingredientes y las 23 hipótesis, pero no el ORDEN en que se aplican: la IA improvisa la secuencia en cada conversación. QUÉ SE HACE: (1) la RECETA, el procedimiento ordenado de devengo a caja (devengo del mes, desfase a certificación o factura, venta con coeficientes, plazo de cobro o pago, retención y su devolución, IVA y su liquidación, cartera viva y emitido tras el cierre sin duplicar), publicada en la ficha de `tesoreria.hipotesis_caja` y no en el resumen de la regla, para no subir el presupuesto de F-147; `R-CAJA-HIPOTESIS` remite a ella. (2) EL COEFICIENTE DE VENTA POR PARTIDA: el devengo de VENTA de F-140 sale de `mart`, SIN coeficientes, y lo que se certifica y se cobra va CON ellos (`R-VENTA-COEFICIENTES`). El humano propone sacarlos del ámbito de CERTIFICACIÓN. Medido el 2026-10-26 (solo lectura, versión master vigente de cada obra): el master de certificación (ámbito 9) existe en 121 de 126 obras; 40 obras con coeficiente en el 9 y 41 en el venta (11), ninguna con coeficiente solo en uno; el ratio con/sin coincide por partida en 69.022 de 85.909 partidas comunes; lo normal es 1,19 en toda la obra y en 13 obras conviven partidas a 1,000 con otras a 1,19-1,26 (una obra a 0,967), así que un coeficiente medio de obra falla en las mixtas. El 9 casi no está planificado en el tiempo (planificación en 7.178 de 85.914 partidas; fecha de planificación en 199 de 3.115 versiones) y su importe difiere del de venta en 26.678 partidas (743,6 frente a 772,3 M EUR sin coeficientes): el spec-author decide si el 9 da solo el coeficiente (importe con/sin por partida, con el 11 de respaldo) o también el importe a certificar, con el perfil temporal del 11. Se publica como columna (`coeficiente_venta`) en `tesoreria.devengo_pendiente_partida` y su agregado por obra-mes. (3) REPARTO EN VARIOS MESES: tanto el cobro como el pago pueden partirse en varios meses y empezar varios meses después (p. ej. formas de pago con varios vencimientos, o una certificación cobrada en dos plazos). Hoy H03/H08 son un único desfase y H02/H09 un único plazo: el catálogo debe admitir un perfil de reparto (lista de desfase en meses y porcentaje) por sentido, con defecto y valor por obra, y la receta debe aplicarlo. FUERA: la función que calcula la caja (F-151); validar las hipótesis con Control de Costes.
-
-### F-155 · Hotfix: ofertas compartidas entre comparativos rompen build_compras
-
-estado **spec lista** · prioridad 1 · rigor `estandar` · SDD no · rama `feature/F-155-ofertas-compartidas`
-
-La nocturna del 2026-10-31 falló dos veces en `build_compras` (sub-paso `comparativos`): `could not create unique index "comparativo_ofertas_pkey" DETAIL: Key (oferta_id)=(2796053) is duplicated`. Compras se quedó en el 30-10 y `compras.v_estado_documentos` (13_estado_documentos.sql, F-132) no existe (check-declarados KO). Causa medida en solo lectura: en Sigrid se creó el comparativo COM26/0014 (`raw.comprv.comide` 2865169) reutilizando las 6 MISMAS ofertas (docide 2795986, 2796015, 2796032, 2796039, 2796053, 2799121) del 0697.0_0037 (comide 2793682); `raw.comprv` 72.113 filas y 72.107 `docide` distintos. `compras.comparativo_ofertas` (08_comparativos.sql) tenía PRIMARY KEY (oferta_id) = `dco.ide`.
 
 ### F-040 · El lado de ingresos: ventas, certificaciones y clientes
 
@@ -773,6 +760,18 @@ Pedida por el humano el 2026-10-23 con PRIORIDAD MÁXIMA: «hay que ver la razó
 estado **terminada** · prioridad 1 · rigor `estandar` · SDD no · rama `feature/F-149-mcp-sin-reglas-no-publicadas`
 
 Pedida por el humano el 2026-10-24. Tras F-147, `R-SIGRID-CON` es `fuera_mcp` (no se publica), pero `contexto_bbdd()` la sigue citando en el bloque `identidad_sigrid` de `_meta.diccionario_contexto` (`config/diccionario/00_global.yaml` ~l.1643: «es guia del ETL, en la regla `R-SIGRID-CON`») y `describir_tabla` la cita en dos columnas de `compras` (`compras.yaml` ~l.770 y ~l.1321: «(`con.cod`, `R-SIGRID-CON`)»). La IA lee una referencia a una regla que no puede consultar. QUÉ SE TOCA: esos tres textos (el bloque dice que cómo se lee Sigrid es guía interna del ETL, sin nombrar la regla; las columnas, «(`con.cod`)»); un test que impida que el texto publicado al MCP (bloques de contexto, fichas y columnas de objetos publicados al MCP, reglas publicadas) cite un código de regla que no se publica (`fuera_mcp`) o que no existe; diccionario v61. FUERA: los comentarios `#` del YAML y la ficha de `raw` (el MCP no expone `raw`); la regla `R-SIGRID-CON` sigue en el YAML como guía del ETL. DESPLIEGUE (tras APROBADO y merge): imagen y job, `publicar-diccionario` (v61) y `check-diccionario`, reiniciar el MCP leyendo antes la revisión activa y comprobar «Versión 61» en `contexto_bbdd()` y que no aparece `R-SIGRID-CON`.
+
+### F-150 · La receta de la caja (fase 1): el procedimiento de devengo a caja en el diccionario, el coeficiente de venta por partida y los reparto en varios meses
+
+estado **terminada** · prioridad 1 · rigor `estandar` · SDD sí · rama `feature/F-150-receta-caja`
+
+Pedida por el humano el 2026-10-26, nace de la P2 de la review de F-140 y de su conversación sobre cómo se construye la caja. F-140 publica los ingredientes y las 23 hipótesis, pero no el ORDEN en que se aplican: la IA improvisa la secuencia en cada conversación. QUÉ SE HACE: (1) la RECETA, el procedimiento ordenado de devengo a caja (devengo del mes, desfase a certificación o factura, venta con coeficientes, plazo de cobro o pago, retención y su devolución, IVA y su liquidación, cartera viva y emitido tras el cierre sin duplicar), publicada en la ficha de `tesoreria.hipotesis_caja` y no en el resumen de la regla, para no subir el presupuesto de F-147; `R-CAJA-HIPOTESIS` remite a ella. (2) EL COEFICIENTE DE VENTA POR PARTIDA: el devengo de VENTA de F-140 sale de `mart`, SIN coeficientes, y lo que se certifica y se cobra va CON ellos (`R-VENTA-COEFICIENTES`). El humano propone sacarlos del ámbito de CERTIFICACIÓN. Medido el 2026-10-26 (solo lectura, versión master vigente de cada obra): el master de certificación (ámbito 9) existe en 121 de 126 obras; 40 obras con coeficiente en el 9 y 41 en el venta (11), ninguna con coeficiente solo en uno; el ratio con/sin coincide por partida en 69.022 de 85.909 partidas comunes; lo normal es 1,19 en toda la obra y en 13 obras conviven partidas a 1,000 con otras a 1,19-1,26 (una obra a 0,967), así que un coeficiente medio de obra falla en las mixtas. El 9 casi no está planificado en el tiempo (planificación en 7.178 de 85.914 partidas; fecha de planificación en 199 de 3.115 versiones) y su importe difiere del de venta en 26.678 partidas (743,6 frente a 772,3 M EUR sin coeficientes): el spec-author decide si el 9 da solo el coeficiente (importe con/sin por partida, con el 11 de respaldo) o también el importe a certificar, con el perfil temporal del 11. Se publica como columna (`coeficiente_venta`) en `tesoreria.devengo_pendiente_partida` y su agregado por obra-mes. (3) REPARTO EN VARIOS MESES: tanto el cobro como el pago pueden partirse en varios meses y empezar varios meses después (p. ej. formas de pago con varios vencimientos, o una certificación cobrada en dos plazos). Hoy H03/H08 son un único desfase y H02/H09 un único plazo: el catálogo debe admitir un perfil de reparto (lista de desfase en meses y porcentaje) por sentido, con defecto y valor por obra, y la receta debe aplicarlo. FUERA: la función que calcula la caja (F-151); validar las hipótesis con Control de Costes.
+
+### F-155 · Hotfix: ofertas compartidas entre comparativos rompen build_compras
+
+estado **terminada** · prioridad 1 · rigor `estandar` · SDD no · rama `feature/F-155-ofertas-compartidas`
+
+La nocturna del 2026-10-31 falló dos veces en `build_compras` (sub-paso `comparativos`): `could not create unique index "comparativo_ofertas_pkey" DETAIL: Key (oferta_id)=(2796053) is duplicated`. Compras se quedó en el 30-10 y `compras.v_estado_documentos` (13_estado_documentos.sql, F-132) no existe (check-declarados KO). Causa medida en solo lectura: en Sigrid se creó el comparativo COM26/0014 (`raw.comprv.comide` 2865169) reutilizando las 6 MISMAS ofertas (docide 2795986, 2796015, 2796032, 2796039, 2796053, 2799121) del 0697.0_0037 (comide 2793682); `raw.comprv` 72.113 filas y 72.107 `docide` distintos. `compras.comparativo_ofertas` (08_comparativos.sql) tenía PRIMARY KEY (oferta_id) = `dco.ide`.
 
 ### F-009 · Inventario del entorno Azure existente
 
