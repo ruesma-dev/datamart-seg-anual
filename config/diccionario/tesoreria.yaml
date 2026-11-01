@@ -1188,7 +1188,10 @@ objetos:
       responde que el perfil no lo incluye.
 
       **COMO SE PAGA EL PERSONAL DE CADA EMPRESA: NETO EN EL MES, IRPF + SS EN
-      EL SIGUIENTE** (F-150, N18). Por empresa del devengo de COSTE, la parte
+      EL SIGUIENTE** (F-150, N18). Por empresa del devengo de COSTE (las
+      empresas de las obras de `mart.fact_seguimiento_mensual` que lee el
+      devengo; solo para saber QUE empresas, asi que el duplicado de filas
+      que F-042 corrigio en ese fact no le afecta), la parte
       de la nomina que se paga el mes SIGUIENTE (`cuota_irpf_ss`: el IRPF del
       trabajo y la Seguridad Social obrera y patronal) y la que se paga en el
       mes (`cuota_neto`), medidas en su CONTABILIDAD: los abonos NORMAL de 12
