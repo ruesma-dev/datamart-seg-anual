@@ -455,6 +455,20 @@ def test_f150_r60_las_columnas_nuevas_con_ficha() -> None:
     assert "mes SIGUIENTE" in texto
 
 
+def test_f150_r60_docs_dicen_los_dos_tramos() -> None:
+    """T51 (N18): ARCHITECTURE explica por qué `07` lee `raw.apu` y que solo
+    publica cuotas; CLAUDE.md, el mapa (dos tramos)."""
+    arquitectura = _texto(RUTA_ARCHITECTURE)
+    tramo = arquitectura[arquitectura.index("**El personal en dos tramos** (N18"):]
+    tramo = tramo[: tramo.index("**`descompuestos` (F-097")]
+    for clave in ("`raw.apu`", "02_mayor.sql", "R-PERFILES", "solo cuotas",
+                  "tesoreria.reparto_pago_personal", "personal_irpf_ss_pendiente"):
+        assert clave in tramo, clave
+    claude = _texto(RUTA_CLAUDE)
+    assert "se paga el último día\n  del mes de su devengo (N16" not in claude
+    assert "`tesoreria.reparto_pago_personal`" in claude and "dos tramos" in claude
+
+
 def test_f150_r32_version_69_con_su_nota() -> None:
     glob = yaml.safe_load((DICC / "00_global.yaml").read_text(encoding="utf-8"))
     assert int(glob["version"]) >= 69

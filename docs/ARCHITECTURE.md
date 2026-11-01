@@ -183,14 +183,29 @@ ingredientes SIEMPRE en el mismo orden y con el dato del contrato:
 - **El personal a fin de mes y el coste por contrato** (N16-N17, 31-10): `07`
   separa del devengo de COSTE la parte de PERSONAL de cada partida (cuota = coste
   de sus partes, `raw.hmores` + `raw.res` con el mismo filtro que `10`, sobre su
-  coste real, tope 1; CP fuera), que se paga el último día del mes de su
-  devengo por regla fija. El resto, sin CP, se reparte entre los contratos de
+  coste real, tope 1; CP fuera), que se paga por regla fija (desde N18, en dos
+  tramos: ver el punto siguiente). El resto, sin CP, se reparte entre los contratos de
   compra de la obra que tienen la partida (`raw.ctrpro.paride`, sin Terminados
   ni Rescindidos de `raw.ctr`/`raw.con`) por lo que les queda por servir, con
   redondeo acumulado (la suma cuadra al céntimo y el resto nunca es negativo),
   y se publica en `tesoreria.devengo_pendiente_contrato_mes` (una guarda `DO`
   exige que cuadre con `devengo_pendiente_obra_mes`). Lo que no enlaza va en la
   fila de `contrato_id` vacío, con H02 de su categoría.
+- **El personal en dos tramos** (N18, 31-10): el neto se paga el último día del
+  mes de su devengo y el IRPF + la Seguridad Social el del mes siguiente, por una
+  cuota POR EMPRESA medida en su contabilidad. `07` lee **`raw.apu`** de la misma
+  noche (y no el mayor de la víspera: `tesoreria` se construye antes que
+  `contabilidad`, y en una base vacía el mayor aún no existe), solo los abonos
+  NORMAL —la clase de `contabilidad/02_mayor.sql`, comparada por test— de tres
+  cuentas de nómina (4652000000, 4751000000, 4760000000) de 12 meses. Son
+  **cuentas restringidas** (`R-PERFILES`): sus sumas viven solo en una temporal y
+  `tesoreria.reparto_pago_personal` publica **solo cuotas**, meses, recuentos y
+  la fuente (sin importes, test de nombres; con menos de 10 personas con partes,
+  `DEFECTO`). La obra-mes parte su personal con esa cuota
+  (`importe_personal_neto` + `importe_personal_irpf_ss`, guarda fila a fila) y
+  `10` publica el IRPF + SS de los partes del último cierre que aún no ha
+  vencido (`personal_irpf_ss_pendiente`). Una guarda de entrada tumba `07` si
+  `raw.apu` llega vacía o sin ninguna de las tres cuentas.
 
 **`descompuestos` (F-097, 2026-09-28) es de qué se compone cada partida**, por
 ORIGEN, y es el primer esquema del datamart que NO se reconstruye de cero:
