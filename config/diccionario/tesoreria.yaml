@@ -697,8 +697,9 @@ objetos:
       pendiente_personal:
         significado: >-
           La parte de PERSONAL propio de `pendiente` (suma de la de cada
-          partida). Se paga el ULTIMO DIA del mes de su devengo, sin plazo,
-          retencion ni IVA (regla fija de la receta, F-150, N16).
+          partida). Se paga en DOS TRAMOS, sin plazo, retencion ni IVA (regla
+          fija de la receta, F-150, N18): el neto el ULTIMO DIA del mes de su
+          devengo y `pendiente_personal_irpf_ss` el del mes siguiente.
         unidad: EUR
         agregacion: suma
         nulo_significa: VENTA.
@@ -708,6 +709,15 @@ objetos:
           las filas con contrato de `devengo_pendiente_contrato_mes`, que se
           pagan con H01, H04 y H06 de su contrato. El resto, con H02. Declaralo
           (F-150, N17).
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: VENTA.
+      pendiente_personal_irpf_ss:
+        significado: >-
+          La parte IRPF + Seguridad Social de `pendiente_personal` (suma de
+          `importe_personal_irpf_ss` de `devengo_pendiente_obra_mes`): se paga
+          el ULTIMO DIA del mes SIGUIENTE al de su devengo. El neto es
+          `pendiente_personal` menos ella (F-150, N18).
         unidad: EUR
         agregacion: suma
         nulo_significa: VENTA.
@@ -860,8 +870,27 @@ objetos:
       importe_pendiente_personal:
         significado: >-
           La parte de PERSONAL propio de `importe_pendiente` en el mes (el mismo
-          reparto). Se paga el ULTIMO DIA de ese mes, sin plazo, retencion ni
-          IVA; el resto del coste va por contrato o por H02 (F-150, N16).
+          reparto). Se paga en dos tramos, sin plazo, retencion ni IVA:
+          `importe_personal_neto` e `importe_personal_irpf_ss`, que la suman al
+          centimo; el resto del coste va por contrato o por H02 (F-150, N16,
+          N18).
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: VENTA.
+      importe_personal_neto:
+        significado: >-
+          El NETO de la nomina de `importe_pendiente_personal`: se paga el
+          ULTIMO DIA de ese mes (F-150, N18). Es `importe_pendiente_personal`
+          menos `importe_personal_irpf_ss`.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: VENTA.
+      importe_personal_irpf_ss:
+        significado: >-
+          El IRPF + la Seguridad Social de `importe_pendiente_personal`: x la
+          `cuota_irpf_ss` de su empresa (`tesoreria.reparto_pago_personal`), al
+          centimo. Se paga el ULTIMO DIA del mes SIGUIENTE, aunque la obra ya
+          no devengue ese mes (F-150, N18). Con la fuente DEFECTO, 0.
         unidad: EUR
         agregacion: suma
         nulo_significa: VENTA.
@@ -1037,8 +1066,10 @@ objetos:
         nulo_significa: VENTA.
       pendiente_personal:
         significado: >-
-          `pendiente` x `cuota_personal` al centimo: se paga el ULTIMO DIA del
-          mes de su devengo (regla fija, sin hipotesis).
+          `pendiente` x `cuota_personal` al centimo: se paga en dos tramos
+          (regla fija, sin hipotesis; N18), el neto el ULTIMO DIA del mes de su
+          devengo y el IRPF + SS el del mes siguiente, por la cuota de su
+          empresa. Los tramos por mes, en `devengo_pendiente_obra_mes`.
         unidad: EUR
         agregacion: suma
         nulo_significa: VENTA.
@@ -1069,8 +1100,8 @@ objetos:
       **EL COSTE PENDIENTE DE LA OBRA POR CONTRATO DE COMPRA** (F-150, N17):
       por obra, mes, categoria y contrato, el devengo pendiente de COSTE SIN el
       coste proporcional (CP: no es caja de la obra) ni el PERSONAL (que se
-      paga el ultimo dia del mes de su devengo: `importe_pendiente_personal`
-      de `devengo_pendiente_obra_mes`). Cada partida se reparte entre los
+      paga en dos tramos, neto y IRPF + SS: `importe_pendiente_personal` de
+      `devengo_pendiente_obra_mes`). Cada partida se reparte entre los
       contratos de compra de la obra que la tienen (las lineas del contrato,
       `raw.ctrpro.paride`; ni Terminados ni Rescindidos) por lo que les queda
       por SERVIR, hasta su pendiente. Las filas con `contrato_id` se pagan con
@@ -1141,6 +1172,92 @@ objetos:
     ejemplos_preguntas:
       - Que parte del coste pendiente de la obra X va por contrato
       - A que proveedores pagara la obra X lo que queda por ejecutar
+
+  reparto_pago_personal:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es un ingrediente ya aplicado: la cuota esta dentro de
+      `importe_personal_neto` e `importe_personal_irpf_ss` de
+      `devengo_pendiente_obra_mes`, que es lo que se consulta. Aqui solo se lee
+      la `fuente` para declararla (`R-CAJA-HIPOTESIS`).
+    descripcion: >-
+      **No disponible para el perfil restringido** (F-141, `R-PERFILES`):
+      con su login la consulta devuelve «permission denied», y eso no se rodea:
+      responde que el perfil no lo incluye.
+
+      **COMO SE PAGA EL PERSONAL DE CADA EMPRESA: NETO EN EL MES, IRPF + SS EN
+      EL SIGUIENTE** (F-150, N18). Por empresa del devengo de COSTE, la parte
+      de la nomina que se paga el mes SIGUIENTE (`cuota_irpf_ss`: el IRPF del
+      trabajo y la Seguridad Social obrera y patronal) y la que se paga en el
+      mes (`cuota_neto`), medidas en su CONTABILIDAD: los abonos NORMAL de 12
+      meses de las cuentas 4652000000 (Nominas Pdtes de Pago), 4751000000
+      (H.P. Acree. Reten. Trabajo) y 4760000000 (Seguridad Social Acreedora).
+      Es el ingrediente del paso 1 de la receta (`tesoreria.hipotesis_caja`):
+      ya aplicado en `importe_personal_neto` e `importe_personal_irpf_ss` de
+      `devengo_pendiente_obra_mes`. Medido el 2026-10-31, empresa 1: 0,4419
+      (12 meses, oct-25 a sep-26).
+
+      **VA SIN IMPORTES** a proposito: las cuentas de nomina son restringidas
+      (`R-PERFILES`) y sus sumas no salen del build; solo el cociente, con al
+      menos 10 personas con partes (con menos, delataria el IRPF de alguien).
+
+      **LA FUENTE SE DECLARA**: `CONTABILIDAD` (12 meses),
+      `CONTABILIDAD_PARCIAL` (1-11 meses: la paga extra pesa mas o menos) o
+      `DEFECTO` (cuota 0: todo el personal a fin del mes de su devengo, lo
+      mas pesimista para la caja) con su `motivo`. Si es `DEFECTO`, dilo.
+    grano: Una fila por empresa (`empresa_id`) con devengo de COSTE.
+    clave_negocio: [empresa_id]
+    paso_etl: build_tesoreria
+    refresco: nocturno
+    columnas:
+      empresa_id:
+        significado: Empresa del devengo de COSTE (`R-CODIGO-POR-EMPRESA`).
+        agregacion: no_sumable
+      mes_desde:
+        significado: Primer mes de la ventana de 12 meses de la contabilidad.
+        nulo_significa: Sin nomina reciente (fuente DEFECTO).
+      mes_hasta:
+        significado: >-
+          Ultimo mes con nomina contabilizada (abono en 4652000000) de los 3
+          anteriores al del build: el mes en curso nunca cuenta.
+        nulo_significa: Sin nomina en esos 3 meses (fuente DEFECTO).
+      meses_con_nomina:
+        significado: Meses de la ventana con abono en la cuenta del neto (0 a 12).
+        agregacion: no_sumable
+      personas_con_partes:
+        significado: >-
+          Recursos PERSONA internos con partes en la ventana en obras de la
+          empresa: con menos de 10, fuente DEFECTO (POCAS_PERSONAS).
+        agregacion: no_sumable
+      cuota_neto:
+        significado: >-
+          Parte del personal que se paga el ULTIMO DIA del mes de su devengo:
+          1 - `cuota_irpf_ss`.
+        agregacion: no_sumable
+      cuota_irpf_ss:
+        significado: >-
+          Parte del personal que se paga el ULTIMO DIA del mes SIGUIENTE:
+          (IRPF + SS) / (neto + IRPF + SS) a 6 decimales; 0 con DEFECTO.
+        agregacion: no_sumable
+      fuente:
+        significado: De donde sale la cuota; si es DEFECTO, dilo al dar la caja.
+        valores: [CONTABILIDAD, CONTABILIDAD_PARCIAL, DEFECTO]
+      motivo:
+        significado: Por que la fuente es DEFECTO.
+        valores: [SIN_NOMINA_RECIENTE, POCAS_PERSONAS, CUOTA_FUERA_DE_RANGO]
+        nulo_significa: La cuota sale de la contabilidad.
+      fecha_calculo:
+        significado: Dia del build que la calculo.
+    relaciones:
+      - de: empresa_id
+        a: tesoreria.devengo_pendiente_obra_mes.empresa_id
+        cardinalidad: "1:N"
+        porque: La cuota con la que se parte el personal de cada obra y mes.
+    ejemplos_preguntas:
+      - Que parte del personal se paga el mes siguiente
+      - De donde sale el reparto del pago de las nominas
 
   albaranes_pendientes_neto:
     tipo: tabla
@@ -1286,7 +1403,10 @@ objetos:
 
       **EL PERSONAL**: las nominas no estan en esta cartera; el personal va
       por el coste de sus partes (`personal_coste_partes`, sin IVA) hasta el
-      ultimo cierre, y lo de despues por el devengo pendiente. El coste
+      ultimo cierre, y lo de despues por el devengo pendiente. De esos partes,
+      el IRPF + SS del ultimo mes cerrado se paga a fin del mes siguiente
+      (N18): si aun no ha vencido, esta en `personal_irpf_ss_pendiente` y NO
+      es caja movida. El coste
       proporcional (`CP`) de lo pagado no es caja de la obra: se resta.
 
       **EL IVA** (N15): lo pagado lleva IVA soportado y lo cobrado repercutido
@@ -1402,6 +1522,18 @@ objetos:
           antes del de `fecha_corte` (H30 `MENSUAL_REDEME`).
         unidad: EUR
         agregacion: suma
+      personal_irpf_ss_pendiente:
+        significado: >-
+          La parte IRPF + Seguridad Social (la `cuota_irpf_ss` de su empresa en
+          `tesoreria.reparto_pago_personal`) de los partes de
+          `mes_ultimo_cierre`, que vence el ultimo dia del mes siguiente al
+          cierre, SI ese dia no es anterior a `fecha_corte`; si ya vencio, 0.
+          Esta dentro de `personal_coste_partes` pero aun NO esta pagada: lo
+          pagado del personal es `personal_coste_partes` menos ella, y ella se
+          paga ese dia (F-150, N18). SIN IVA.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: La obra no tiene cierre.
     relaciones:
       - de: obra_id
         a: maestro.obras.obra_id
@@ -1457,7 +1589,10 @@ objetos:
       rompe `R-TESORERIA-ESTADO` a proposito: los originales agrupados estan
       de BAJA, y se cuentan pagados en su vencimiento; declarala. El personal
       del saldo es el coste de sus partes hasta el ultimo cierre (sin IVA); lo
-      de despues esta en el devengo. No hay retenciones aparte: las
+      de despues esta en el devengo. Lo PAGADO del personal es
+      `personal_coste_partes` − `personal_irpf_ss_pendiente` (el IRPF + SS
+      del ultimo mes cerrado, N18), y `personal_irpf_ss_pendiente` se paga el
+      ultimo dia del mes siguiente al cierre. No hay retenciones aparte: las
       retenciones entran al cobrarse o pagarse (son efectos propios), y las
       pendientes van en la cartera del paso 7.
 
@@ -1473,8 +1608,13 @@ objetos:
       sociales: NO sumes pagos de personal de la cartera (nominas, embargos,
       cuotas de `tesoreria_restringida`) ni digas que faltan. Su parte del
       devengo es `importe_pendiente_personal` (por partida,
-      `pendiente_personal` y `fuente_personal`) y se paga el ULTIMO DIA del mes
-      de su devengo, sin IVA ni retencion: es una regla, no una hipotesis (N16).
+      `pendiente_personal` y `fuente_personal`) y se paga en DOS TRAMOS, sin
+      IVA, retencion, documento, plazo ni fraccionamiento: el neto
+      (`importe_personal_neto`) se paga el ULTIMO DIA del mes de su devengo y
+      el IRPF + SS (`importe_personal_irpf_ss`) el ULTIMO DIA del mes
+      SIGUIENTE, aunque la obra ya no devengue ese mes; es una regla, no una
+      hipotesis (N16, N18): declara la `fuente` de
+      `tesoreria.reparto_pago_personal` y, si es `DEFECTO`, dilo.
       Las partidas con `fuente_personal` = `SIN_PARTES` (sin partes de
       personal hasta el cierre) no llevan personal: si pesan, dilo.
 

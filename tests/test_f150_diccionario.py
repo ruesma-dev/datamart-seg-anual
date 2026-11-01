@@ -392,11 +392,73 @@ def test_f150_r47_r51_la_receta_nombra_los_ingredientes_nuevos() -> None:
 
 
 def test_f150_r47_r51_la_regla_de_caja_dice_fin_de_mes_y_contrato() -> None:
+    """N18 (R60) sustituye el «ultimo dia del mes» de N16 por los dos tramos."""
     regla = _reglas()["R-CAJA-HIPOTESIS"]
     texto = _plano(regla["regla"])
-    assert "el personal se paga el ultimo dia del mes de su devengo" in texto
+    assert "el personal se paga el ultimo dia del mes de su devengo" not in texto
+    assert ("el personal se paga en dos tramos (regla, no hipotesis): el neto el ultimo dia del "
+            "mes de su devengo y el IRPF + SS el del mes siguiente") in texto
     assert "por contrato de compra" in texto
     assert "tesoreria.devengo_pendiente_contrato_mes" in regla["ambito"]
+
+
+# ===========================================================================
+# R60 · el personal en dos tramos (N18, T50)
+# ===========================================================================
+
+
+def test_f150_r60_el_paso_1_paga_el_personal_en_dos_tramos() -> None:
+    tramo = _plano(_tramos()["DEVENGO"])
+    assert "se paga en DOS TRAMOS" in tramo
+    assert ("el neto (`importe_personal_neto`) se paga el ULTIMO DIA del mes de su devengo y el "
+            "IRPF + SS (`importe_personal_irpf_ss`) el ULTIMO DIA del mes SIGUIENTE, aunque la "
+            "obra ya no devengue ese mes") in tramo
+    assert "`tesoreria.reparto_pago_personal`" in tramo and "si es `DEFECTO`, dilo" in tramo
+
+
+def test_f150_r60_el_paso_0_resta_lo_pendiente_del_personal() -> None:
+    tramo = _plano(_tramos()["SALDO"])
+    assert ("Lo PAGADO del personal es `personal_coste_partes` − "
+            "`personal_irpf_ss_pendiente`") in tramo
+    assert "se paga el ultimo dia del mes siguiente al cierre" in tramo
+
+
+def test_f150_r60_la_regla_declara_la_fuente_y_el_ambito() -> None:
+    regla = _reglas()["R-CAJA-HIPOTESIS"]
+    assert "tesoreria.reparto_pago_personal" in regla["ambito"]
+    assert "declara su `fuente`" in _plano(regla["regla"])
+
+
+def test_f150_r60_ficha_del_reparto_sin_importes() -> None:
+    import re as _re
+
+    ficha = _fichas_tesoreria()["reparto_pago_personal"]
+    assert ficha["consumo_recomendado"] is False, "ingrediente, no recomendada"
+    assert ficha["clave_negocio"] == ["empresa_id"]
+    texto = _plano(ficha["descripcion"])
+    assert "VA SIN IMPORTES" in texto and "`R-PERFILES`" in texto and "0,4419" in texto
+    for columna in ficha["columnas"]:
+        assert not _re.search(r"importe|debe|haber|saldo|total|eur", columna), columna
+    assert ficha["columnas"]["fuente"]["valores"] == ["CONTABILIDAD", "CONTABILIDAD_PARCIAL",
+                                                      "DEFECTO"]
+
+
+def test_f150_r60_las_columnas_nuevas_con_ficha() -> None:
+    fichas = _fichas_tesoreria()
+    for tabla, columna in (("devengo_pendiente_obra_mes", "importe_personal_neto"),
+                           ("devengo_pendiente_obra_mes", "importe_personal_irpf_ss"),
+                           ("devengo_corte_obra", "pendiente_personal_irpf_ss"),
+                           ("saldo_partida_obra", "personal_irpf_ss_pendiente")):
+        assert columna in fichas[tabla]["columnas"], f"{tabla}.{columna}"
+    texto = _plano(fichas["devengo_pendiente_obra_mes"]["columnas"]["importe_personal_irpf_ss"]
+                   ["significado"])
+    assert "mes SIGUIENTE" in texto
+
+
+def test_f150_r32_version_69_con_su_nota() -> None:
+    glob = yaml.safe_load((DICC / "00_global.yaml").read_text(encoding="utf-8"))
+    assert int(glob["version"]) >= 69
+    assert "# version 69 (F-150, 2026-10-31)" in (DICC / "00_global.yaml").read_text(encoding="utf-8")
 
 
 def test_f150_r47_r51_ficha_del_coste_por_contrato() -> None:

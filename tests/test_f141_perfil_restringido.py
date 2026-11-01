@@ -1532,7 +1532,9 @@ NO_DISPONIBLES = {
                        "hipotesis_caja_obra",
                        # F-150 (N11, N14, N17): el esquema entero queda fuera del restringido.
                        "albaranes_pendientes_neto", "saldo_partida_obra",
-                       "devengo_pendiente_contrato_mes"],
+                       "devengo_pendiente_contrato_mes",
+                       # F-150 (N18): la cuota del pago del personal por empresa.
+                       "reparto_pago_personal"],
     "personal.yaml": ["recursos", "partes_lineas", "v_pbi_horas_obra_mes", "partes",
                       "recursos_tipos_hora", "usuarios_sigrid"],
 }
