@@ -134,6 +134,10 @@ F-006 y `test_f024_cli.py`).
   `progress/current.md`, sección «F-150 · Redespliegue MANUAL de N18 (T53)». N11-N17 ya está en
   `main` y en Azure (el 31-10 `devengo_pendiente_obra_mes` ya tiene `importe_pendiente_personal` y el
   MCP sirve la v68): este despliegue es solo el de N18, con la **v69**.
+- Tras la review (pasada 6): la vuelta atrás de T53 ya es ejecutable desde el puesto (job al tag
+  del paso 0; `git switch --detach <merge>^1` + `publicar-diccionario` → v68 + `git switch main`;
+  reinicio del MCP; la tabla y las 4 columnas se quedan, sin escribir en producción), el paso 4 lee
+  con `.venv/Scripts/python.exe` (sin `psql`), igual en la spec §12.4; T45 marcada en `tasks.md`.
 - **R31** con el MCP en la 0686: noviembre ~0,117 el 30-11 y ~0,093 el 31-12, con la `fuente`.
 - **Para validar por el humano** (de la spec, no bloquean): la cuota medida 0,442 (55,8 / 15,5 /
   28,7) frente a su 51 / 15 / 34; el saldo de partida también cambia (~0,12 M EUR); el defecto sin

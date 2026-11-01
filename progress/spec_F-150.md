@@ -686,7 +686,7 @@ imagen que ya lleva N18: los pasos de T45 con estas cifras añadidas y la v69 en
    acabar en `:<tag nuevo>`. Sin esto, la nocturna rehace la tesorería con la imagen vieja.
 3. `.venv/Scripts/python.exe main.py build-tesoreria` (sin ingesta: `raw.apu` y `raw.con` ya están) →
    SUCCESS en los 10 sub-pasos.
-4. Cifras, solo lectura (`psql -X -A -c "<consulta>" $dsn`):
+4. Cifras, solo lectura, cada consulta con `.venv/Scripts/python.exe -c "import main, sys; pg = main._get_pg(); pg._bootstrap_done = True; print(pg.filas_solo_lectura(sys.argv[1], 120))" "<consulta>"` (transacción READ ONLY):
    - `SELECT empresa_id, mes_desde, mes_hasta, meses_con_nomina, personas_con_partes, cuota_irpf_ss,
      fuente FROM tesoreria.reparto_pago_personal` → `1`, ventana de 12 meses que acaba en 2026-09 o
      2026-10 (según esté contabilizado octubre), `12`, ~273, ~0,44, `CONTABILIDAD`.
@@ -707,8 +707,22 @@ imagen que ya lleva N18: los pasos de T45 con estas cifras añadidas y la v69 en
    -n ca-mcp-bbdd-dev --revision <revision> -o none`.
 8. R31 por el MCP, 0686: personal de noviembre ~0,12 el 30-11 y ~0,09 el 31-12, con la `fuente` declarada.
 
-- **Vuelta atrás**: `powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag del paso 0>`,
-  comprobada con el `az` del paso 0, y `publicar-diccionario` con esa imagen (vuelve a la v68).
+- **Vuelta atrás** (desde el puesto, en este orden):
+  1. Job: `powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag del paso 0>`, comprobado con
+     el `az` del paso 0 (debe acabar en `:<tag del paso 0>`).
+  2. Diccionario: `publicar-diccionario` publica las fichas del ÁRBOL local, no las de la imagen, así
+     que se publica desde el `main` de antes del merge de N18: `git switch --detach <sha del merge de
+     N18>^1` (el primer padre del merge; hoy `c9e4bbe` si `main` no se mueve antes), luego
+     `.venv/Scripts/python.exe main.py publicar-diccionario` (→ **v68**, 255 objetos) y
+     `git switch main`. Si no se hace, la nocturna siguiente lo republica igualmente desde la imagen
+     vieja del job (la v68), pero hasta entonces el MCP serviría la v69 sobre datos de la imagen vieja.
+  3. MCP: el reinicio del paso 7 → `contexto_bbdd()` abre con «Versión 68».
+  4. Qué queda en Azure y se deja así, sin escribir en producción: la tabla
+     `tesoreria.reparto_pago_personal` y las 4 columnas nuevas (`importe_personal_neto`,
+     `importe_personal_irpf_ss`, `pendiente_personal_irpf_ss`, `personal_irpf_ss_pendiente`) siguen,
+     porque el DDL es aditivo y la imagen vieja no las borra. La tabla conserva los datos del último
+     build de N18 y queda sin ficha en la v68 (fuera de la superficie del MCP); las 4 columnas se
+     quedan a NULL en cuanto la imagen vieja reconstruya sus tablas (no las rellena).
 
 **Para validar el humano** (no bloquean): (1) la cuota medida es 0,442 (55,8 / 15,5 / 28,7), no el
 ~49 % de su 51 / 15 / 34; (2) el saldo de partida (paso 0) también se corrige (R59: ~0,12 M EUR que hoy
