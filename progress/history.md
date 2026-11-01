@@ -1946,3 +1946,36 @@ valor por obra, la cascada `obra_via` de los pagos sin centro y la ingesta de `a
 rechazada (papeleo y P1: 23 hipótesis por obra), pasada 2 APROBADO. Desplegada el 26-10: imagen
 `r20261026-2111`, `build-tesoreria` 239,7 s, v62 y MCP reiniciado. Siguen F-150 (receta,
 coeficiente de venta, repartos en varios meses) y F-151 (función de caja).
+
+## F-150 — La receta de la caja (fase 1) · 2026-11-01
+
+Rama `feature/F-150-receta-caja`. Seis pasadas de review, APROBADO en la 7
+(`progress/review_F-150.md`); spec `progress/spec_F-150.md` (§1-§12), detalle
+en `progress/impl_F-150*.md`.
+
+Publica en `tesoreria` la receta ordenada de devengo a caja (ficha de
+`tesoreria.hipotesis_caja`, ocho pasos) y sus ingredientes: coeficiente, IVA y
+retención del contrato de cada partida, hueco de facturación por obra,
+albaranes netos FIFO, saldo de partida con IVA (H28/H29), personal fuera del
+coste (N16), resto del coste por contrato de compra
+(`tesoreria.devengo_pendiente_contrato_mes`, N17) y el personal en dos tramos
+(N18, `tesoreria.reparto_pago_personal`: neto a fin del mes de devengo, IRPF +
+SS a fin del siguiente, cuota por empresa de la contabilidad, empresa 1
+0,4419). Validado con la contabilidad de Sigrid: H30 (devolución del IVA a +4
+meses) y H13 (IVA efectivo ~5,7 %).
+
+Desplegado: imagen r20261101-1219, diccionario v69 (256 objetos), MCP
+reiniciado. Medido en Azure el 01-11: personal 5,648 M EUR (neto 3,152, IRPF +
+SS 2,496), 0686 noviembre 0,117 + 0,093, saldo de partida IRPF + SS 0,107 en 15
+obras. Merge `main` 47218ff, `dev` e5d5d15. FUERA: la función de caja (F-151)
+y la caja del coste proporcional (F-154).
+
+## F-155 — Hotfix: ofertas compartidas entre comparativos · 2026-11-01
+
+Rama `feature/F-155-ofertas-compartidas`. APROBADO en la pasada 2
+(`progress/review_F-155.md`). La nocturna del 31-10 cayó en `build_compras`
+porque el comparativo COM26/0014 reutiliza las 6 ofertas del 0687.0_0037:
+`compras.comparativo_ofertas` pasa al grano de la INVITACIÓN
+(`invitacion_id`) y se corrigen 08, 09 y 14. Desplegado con la imagen
+r20261031-1727 y el diccionario v68; `build-compras` SUCCESS el 31-10;
+72.113 invitaciones. Merge `main` c9e4bbe, `dev` 7adb5a0.
