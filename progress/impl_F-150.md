@@ -16,7 +16,7 @@ diseño 12.2, tareas T46-T53). Rama `feature/F-150-receta-caja` (desde `bc4f54f`
 | T49 | `8af41ab` | Contraste de solo lectura en Azure y sandbox (§3, §4) |
 | T50 | `2f854e8` | Diccionario **v69**: ficha nueva (no recomendada, `motivo_no_consumo`), 4 columnas, textos, receta pasos 0 y 1, `R-CAJA-HIPOTESIS` (regla y ámbito); H01/H02/H06 en dos tramos (R60) |
 | T51 | `b86b322` | `ARCHITECTURE.md`, `CLAUDE.md`; `azure-apps` **`499defb`** (local, sin push) |
-| T52 | `aeb2c15` | Lo que cazó la línea base de la mutación (ver §2.8): la ficha del reparto dice de qué fact cuelga (F-042), inventario de F-079, recuentos v69 en `current.md`; mutación (`progress/mutacion_F-150_n18.md`) e `init.sh` |
+| T52 | `aeb2c15` | Lo que cazó la línea base de la mutación (ver §2.7): la ficha del reparto dice de qué fact cuelga (F-042), inventario de F-079, recuentos v69 en `current.md`; mutación (`progress/mutacion_F-150_n18.md`) e `init.sh` |
 
 Producción tocada: `etl_sigrid/domain/proyeccion_caja.py`, `sql/tesoreria/{00_setup,07_devengo_pendiente,
 10_saldo_partida}.sql`, `config/hipotesis_caja.yaml`, `config/diccionario/{00_global,tesoreria}.yaml`.
@@ -45,12 +45,12 @@ Sin tablas de Sigrid nuevas: `raw.apu` y `raw.con` ya se ingieren. Sin dependenc
 6. Las fichas de N18 entraron en T50, no con el SQL: entre T47 y T50 la puerta del diccionario
    (`test_f006_*`, `test_f024_cli` `run-all`) estaba en rojo por `reparto_pago_personal` sin ficha.
    Se cerró en T50; cada tarea pasó su propia verificación.
-8. **La primera campaña de mutación abortó con la línea base en rojo** (3 tests que T50 no corrió):
+7. **La primera campaña de mutación abortó con la línea base en rojo** (3 tests que T50 no corrió):
    `test_f006_r19_un_consumidor_del_fact_…[tesoreria.reparto_pago_personal]` (la ficha no decía que
    cuelga de `mart.fact_seguimiento_mensual` ni lo de F-042), `test_f079_r3_el_inventario_…` (un no
    recomendado nuevo sin inventariar) y `test_f006_los_recuentos_de_current_…` (2240 columnas).
    Arreglados en `aeb2c15` (texto, inventario `GRUPO_F_F140`, recuentos); la segunda campaña, en verde.
-7. Paso 1 de la receta: «sin IVA, retención, documento, plazo ni fraccionamiento» en vez de «H03 … H24»
+8. Paso 1 de la receta: «sin IVA, retención, documento, plazo ni fraccionamiento» en vez de «H03 … H24»
    (R60): el test r2 exige que cada paso nombre solo sus hipótesis.
 
 **PARADA (T49)**: ninguna sobre importes. Un recuento se aparta > 5 % de la referencia de R62
@@ -147,9 +147,9 @@ F-006 y `test_f024_cli.py`).
 
 | Evidencia | Valor real |
 |---|---|
-| `bash harness/init.sh` | PENDIENTE (se rellena al terminar) |
-| Tiempo de la suite | PENDIENTE |
-| Cobertura de las líneas cambiadas | PENDIENTE |
-| Tamaño | PENDIENTE |
+| `bash harness/init.sh` (al final, sobre `ad35ecc`) | **verde**, código 0, «ENTORNO LISTO. Puedes trabajar.»: **10.042 passed**, 274 skipped, 2.570 warnings |
+| Tiempo de la suite | 2.747,60 s (0:45:47), con cobertura |
+| Cobertura de las líneas cambiadas | `PUERTA COBERTURA`: **100,0 %** (30/30, umbral 80 %, nivel estandar; diff desde `c9e4bbecba`, merge-base con `main`) |
+| Tamaño | `PUERTA TAMAÑO`: requirements 150/150, design 250/250, impl 155/220 (antes de esta tabla), review 129/140 |
 | Mutación incremental (`python -m harness.mutacion --feature F-150 --base bc4f54f --max-mutantes 8 --workers 3 --timeout 3000`, sobre `aeb2c15`) | 83 líneas de `proyeccion_caja.py`, 28 generados, **8 evaluados: 8 muertos, 0 supervivientes, 0 timeouts** (5.948,4 s; base 1.227-1.244 s por worker). Sin supervivientes que analizar. Informe: `progress/mutacion_F-150_n18.md`. El SQL no se muta: lo cubren los literales y la sandbox |
 | Verificación semántica del SQL | `07` y `10`: **61 OK, 0 fallos** (Postgres 16.15, tipos de Azure) |
