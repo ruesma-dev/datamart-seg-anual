@@ -667,7 +667,7 @@ de N16, N17 (R50 igual: el personal total no cambia), el catálogo de hipótesis
 - [x] T49: contraste de SOLO LECTURA en Azure de los `SELECT` de T47-T48 (sin `INSERT`) frente a R62 y 12.0, fuera de 00:00-03:15 UTC; y el build de `07` y `10` contra la sandbox con los tipos reales de `raw` (`raw.apu.hab` es `double precision`); si algo se aparta > 5 %, PARADA  |  Verificación: tabla en `progress/impl_F-150.md`
 - [x] T50: diccionario y textos (12.2 punto 7), `version` 69 con su nota, `test_f150_diccionario.py` y `test_f150_receta.py` (dos tramos; 30 hipótesis)  |  Verificación: `pytest tests/test_f150_diccionario.py tests/test_f150_receta.py tests/test_f140_hipotesis.py -k "r60 or r2 or r37"` y la puerta del diccionario de `bash harness/init.sh`
 - [x] T51: `docs/ARCHITECTURE.md`, `CLAUDE.md` y `azure-apps/datamart_seg_anual.md` (commit local allí)  |  Verificación: `pytest tests/test_f150_diccionario.py -k docs`
-- [ ] T52: mutación incremental sobre `cuota_irpf_ss`, `reparto_pago_personal` y `partir_personal`, y `bash harness/init.sh` en verde  |  Verificación: `python -m harness.mutacion --feature F-150` y `bash harness/init.sh`
+- [x] T52: mutación incremental sobre `cuota_irpf_ss`, `reparto_pago_personal` y `partir_personal`, y `bash harness/init.sh` en verde  |  Verificación: `python -m harness.mutacion --feature F-150` y `bash harness/init.sh`
 - [ ] T53 (MANUAL, humano): redespliegue de 12.4 y R62 en Azure  |  Verificación: resultados en `progress/impl_F-150.md`
 
 Todos los tests propuestos corren SIN red ni BBDD (dominio y texto del SQL); lo que exige BBDD es T49
