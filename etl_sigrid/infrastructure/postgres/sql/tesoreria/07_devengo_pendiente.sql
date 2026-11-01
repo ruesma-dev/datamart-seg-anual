@@ -90,6 +90,25 @@
 -- cada partida (`raw.ctrpro.paride`) por lo que les queda por servir, en
 -- `tesoreria.devengo_pendiente_contrato_mes`; el corte publica lo enlazado.
 --
+-- F-150 (N18, 31-10), el personal en DOS TRAMOS (corrige el fin de mes de N16):
+--   2 sexies. `_dev_nomina`: por empresa del devengo de COSTE, mes y cuenta, la
+--      suma de los ABONOS NORMAL (la clase de `contabilidad/02_mayor.sql`,
+--      letra a letra: un test la compara) de las tres cuentas de nomina
+--      (4652000000 neto, 4751000000 IRPF, 4760000000 Seguridad Social) de los
+--      15 meses anteriores al del build, leida de `raw.apu` de la MISMA noche
+--      (`tesoreria` se construye antes que `contabilidad`). `_dev_ventana`: los
+--      12 meses que acaban en el ultimo con abono en 4652000000, si es de los 3
+--      anteriores al build. `_dev_personas`: recursos PERSONA internos con
+--      partes en la ventana, por la empresa de la obra.
+--      `tesoreria.reparto_pago_personal`: SOLO la cuota (las sumas son de
+--      cuentas restringidas, `R-PERFILES`, y mueren con la temporal), con
+--      las reglas de `reparto_pago_personal` del dominio (DEFECTO = cuota 0).
+--   5. La obra-mes parte su personal: `importe_personal_irpf_ss` = personal x
+--      cuota de su empresa al centimo (se paga el ultimo dia del mes
+--      SIGUIENTE) y `importe_personal_neto` la resta (el ultimo dia del mes de
+--      su devengo); una guarda mira la igualdad fila a fila. 6: el corte
+--      publica `pendiente_personal_irpf_ss`.
+--
 -- Las tablas de trabajo son temporales y mueren con la transaccion. Si algo
 -- falla, quedan las tablas de ayer. Cada una lleva su `ANALYZE`: sin
 -- estadisticas el planificador las cree de una fila y cruza el perfil con las
@@ -101,8 +120,10 @@
 --         maestro.v_obra_fichas, tesoreria.efectos,
 --         tesoreria.condiciones_contrato_cliente, raw.obrparpar, raw.obr,
 --         raw.dvf, raw.dcfpro, raw.hmores, raw.res, raw.ctrpro, raw.ctr,
---         raw.con, tesoreria.condiciones_contrato_compra.
--- Escribe en: tesoreria.devengo_pendiente_partida,
+--         raw.con, tesoreria.condiciones_contrato_compra, raw.apu (N18:
+--         solo los abonos de tres cuentas de nomina, en una temporal).
+-- Escribe en: tesoreria.reparto_pago_personal,
+--             tesoreria.devengo_pendiente_partida,
 --             tesoreria.devengo_pendiente_obra_mes,
 --             tesoreria.devengo_pendiente_contrato_mes,
 --             tesoreria.devengo_corte_obra.
@@ -127,9 +148,23 @@ BEGIN
        OR to_regclass('raw.ctrpro') IS NULL
        OR to_regclass('raw.ctr') IS NULL
        OR to_regclass('raw.con') IS NULL
+       OR to_regclass('raw.apu') IS NULL
        OR to_regclass('tesoreria.condiciones_contrato_compra') IS NULL
        OR to_regclass('tesoreria.condiciones_contrato_cliente') IS NULL THEN
         RAISE EXCEPTION 'devengo_pendiente: falta una fuente (mart, stg, maestro, raw o tesoreria)';
+    END IF;
+END $$;
+
+-- Guarda de entrada de N18 (R61): sin apuntes, o sin ninguna de las tres
+-- cuentas de nomina, falla con su motivo: nunca un defecto silencioso para
+-- todas las empresas.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM raw.apu) THEN
+        RAISE EXCEPTION 'devengo_pendiente: raw.apu llega vacia (N18: sin apuntes no hay reparto del pago del personal)';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM raw.con WHERE tip = 17 AND cod IN ('4652000000', '4751000000', '4760000000')) THEN
+        RAISE EXCEPTION 'devengo_pendiente: raw.con no trae ninguna de las cuentas de nomina 4652000000, 4751000000 ni 4760000000 (N18)';
     END IF;
 END $$;
 
@@ -241,6 +276,65 @@ WHERE r.cla = 1 AND COALESCE(r.prvide, 0) = 0
   AND date_trunc('month', tesoreria.fn_fecha(h.fec))::DATE <= v.mes_ultimo_cierre
 GROUP BY v.obra_id, NULLIF(h.paride, 0);
 ANALYZE _dev_personal;
+
+-- ---------------------------------------------------------------------------
+-- 2 sexies · el reparto del pago del personal por empresa (F-150, N18)
+--
+-- `_dev_nomina`: los ABONOS (haber) NORMAL de las tres cuentas de nomina, por
+-- empresa del devengo de COSTE, mes y cuenta, de los 15 meses anteriores al
+-- del build (lo que basta para la ventana). La clase es la de
+-- `contabilidad/02_mayor.sql` letra a letra (un test la compara): fuera los
+-- cierres, las aperturas (la de enero abona el saldo de diciembre) y las
+-- regularizaciones. `raw.apu.hab` es `double precision`: se castea. Las sumas
+-- son de cuentas restringidas (`R-PERFILES`): viven solo aqui.
+-- ---------------------------------------------------------------------------
+CREATE TEMP TABLE _dev_nomina ON COMMIT DROP AS
+SELECT
+    k.emp AS empresa_id,
+    date_trunc('month', tesoreria.fn_fecha(a.fec))::DATE AS anio_mes,
+    k.cod AS cuenta,
+    SUM(COALESCE(a.hab, 0)::NUMERIC(18, 2)) AS haber
+FROM raw.apu a
+JOIN raw.con k ON k.ide = a.cueide AND k.tip = 17
+WHERE k.cod IN ('4652000000', '4751000000', '4760000000')
+  AND k.emp IN (SELECT empresa_id FROM _dev_version WHERE concepto = 'COSTE')
+  AND CASE WHEN a.cla = 3 OR a.res ILIKE 'asiento de cierre%' THEN 'CIERRE'
+           WHEN a.cla = -1 OR a.res ILIKE 'asiento de apertura%' THEN 'APERTURA'
+           WHEN a.cla = 1 OR a.res ILIKE 'asiento de regulariz%' THEN 'REGULARIZACION'
+           ELSE 'NORMAL' END = 'NORMAL'
+  AND tesoreria.fn_fecha(a.fec) >= (date_trunc('month', CURRENT_DATE) - INTERVAL '15 month')::DATE
+  AND tesoreria.fn_fecha(a.fec) < date_trunc('month', CURRENT_DATE)::DATE
+GROUP BY k.emp, date_trunc('month', tesoreria.fn_fecha(a.fec))::DATE, k.cod;
+ANALYZE _dev_nomina;
+
+-- La ventana (R57): 12 meses que acaban en el ultimo mes ANTERIOR al del build
+-- con abono en la cuenta del neto, si es de los 3 anteriores; si no, sin ella.
+CREATE TEMP TABLE _dev_ventana ON COMMIT DROP AS
+SELECT
+    e.empresa_id,
+    (h.mes_hasta - INTERVAL '11 month')::DATE AS mes_desde,
+    h.mes_hasta
+FROM (SELECT DISTINCT empresa_id FROM _dev_version WHERE concepto = 'COSTE' AND empresa_id IS NOT NULL) e
+LEFT JOIN LATERAL (
+    SELECT MAX(n.anio_mes) AS mes_hasta
+    FROM _dev_nomina n
+    WHERE n.empresa_id = e.empresa_id AND n.cuenta = '4652000000' AND n.haber <> 0
+      AND n.anio_mes >= (date_trunc('month', CURRENT_DATE) - INTERVAL '3 month')::DATE
+) h ON TRUE;
+ANALYZE _dev_ventana;
+
+-- Las personas con partes en la ventana (el umbral de R54), por la empresa de
+-- la obra: PERSONA interna, el filtro de `_dev_personal`.
+CREATE TEMP TABLE _dev_personas ON COMMIT DROP AS
+SELECT w.empresa_id, COUNT(DISTINCT h.reside) AS personas
+FROM _dev_ventana w
+JOIN maestro.v_obra_fichas fo ON fo.empresa_id = w.empresa_id
+JOIN raw.hmores h ON NULLIF(h.obride, 0) = fo.obra_id
+JOIN raw.res r ON r.ide = h.reside
+WHERE r.cla = 1 AND COALESCE(r.prvide, 0) = 0
+  AND date_trunc('month', tesoreria.fn_fecha(h.fec))::DATE BETWEEN w.mes_desde AND w.mes_hasta
+GROUP BY w.empresa_id;
+ANALYZE _dev_personas;
 
 -- La categoria de cada partida planificada, una vez (la vista, en bucle, es lenta).
 CREATE TEMP TABLE _dev_categoria ON COMMIT DROP AS
@@ -380,6 +474,62 @@ BEGIN
     END IF;
 END $$;
 
+-- ---------------------------------------------------------------------------
+-- 2 sexies (fin) · la cuota de cada empresa (R53, R54, R56): solo cocientes,
+-- meses, recuentos y la fuente; ni una suma sale de las temporales.
+-- ---------------------------------------------------------------------------
+TRUNCATE tesoreria.reparto_pago_personal;
+
+INSERT INTO tesoreria.reparto_pago_personal (
+    empresa_id, mes_desde, mes_hasta, meses_con_nomina, personas_con_partes,
+    cuota_neto, cuota_irpf_ss, fuente, motivo, fecha_calculo
+)
+SELECT
+    q.empresa_id              AS empresa_id,
+    q.mes_desde               AS mes_desde,
+    q.mes_hasta               AS mes_hasta,
+    q.meses_con_nomina        AS meses_con_nomina,
+    q.personas_con_partes     AS personas_con_partes,
+    1 - q.cuota_irpf_ss AS cuota_neto,
+    q.cuota_irpf_ss           AS cuota_irpf_ss,
+    q.fuente                  AS fuente,
+    q.motivo                  AS motivo,
+    CURRENT_DATE              AS fecha_calculo
+FROM (
+    SELECT
+        c.empresa_id, c.mes_desde, c.mes_hasta, c.meses_con_nomina, c.personas_con_partes, c.motivo,
+        CASE WHEN c.motivo IS NULL THEN c.cuota_bruta ELSE 0 END AS cuota_irpf_ss,
+        CASE WHEN c.motivo IS NOT NULL THEN 'DEFECTO' WHEN c.meses_con_nomina >= 12 THEN 'CONTABILIDAD' ELSE 'CONTABILIDAD_PARCIAL' END AS fuente
+    FROM (
+        SELECT
+            b.*,
+            CASE WHEN b.meses_con_nomina <= 0 THEN 'SIN_NOMINA_RECIENTE'
+                 WHEN b.personas_con_partes < 10 THEN 'POCAS_PERSONAS'
+                 WHEN b.cuota_bruta IS NULL OR b.cuota_bruta < 0 OR b.cuota_bruta > 1 THEN 'CUOTA_FUERA_DE_RANGO'
+            END AS motivo
+        FROM (
+            SELECT
+                a.empresa_id, a.mes_desde, a.mes_hasta, a.meses_con_nomina, a.personas_con_partes,
+                CASE WHEN a.neto > 0 THEN ROUND((a.irpf + a.ss) / NULLIF(a.neto + a.irpf + a.ss, 0), 6) END AS cuota_bruta
+            FROM (
+                SELECT
+                    w.empresa_id,
+                    w.mes_desde,
+                    w.mes_hasta,
+                    COUNT(DISTINCT n.anio_mes) FILTER (WHERE n.cuenta = '4652000000' AND n.haber <> 0) AS meses_con_nomina,
+                    COALESCE(MAX(p.personas), 0) AS personas_con_partes,
+                    SUM(n.haber) FILTER (WHERE n.cuenta = '4652000000') AS neto,
+                    SUM(n.haber) FILTER (WHERE n.cuenta = '4751000000') AS irpf,
+                    SUM(n.haber) FILTER (WHERE n.cuenta = '4760000000') AS ss
+                FROM _dev_ventana w
+                LEFT JOIN _dev_nomina n ON n.empresa_id = w.empresa_id AND n.anio_mes BETWEEN w.mes_desde AND w.mes_hasta
+                LEFT JOIN _dev_personas p ON p.empresa_id = w.empresa_id
+                GROUP BY w.empresa_id, w.mes_desde, w.mes_hasta
+            ) a
+        ) b
+    ) c
+) q;
+
 TRUNCATE tesoreria.devengo_pendiente_partida;
 
 INSERT INTO tesoreria.devengo_pendiente_partida (
@@ -498,7 +648,8 @@ INSERT INTO tesoreria.devengo_pendiente_obra_mes (
     importe_pendiente, importe_retraso_sin_perfil, num_partidas,
     mes_pasado_sin_cierre, importe_pendiente_con_coeficientes, coeficiente_venta,
     importe_iva_contrato, base_sin_iva_contrato, importe_retencion_contrato,
-    base_sin_retencion_contrato, importe_pendiente_personal
+    base_sin_retencion_contrato, importe_pendiente_personal,
+    importe_personal_neto, importe_personal_irpf_ss
 )
 SELECT
     x.obra_id                         AS obra_id,
@@ -520,7 +671,10 @@ SELECT
     CASE WHEN x.concepto = 'VENTA' THEN COALESCE(x.base_sin_iva, 0) END AS base_sin_iva_contrato,
     CASE WHEN x.concepto = 'VENTA' THEN ROUND(COALESCE(x.retencion_bruto, 0) / 100, 2) END AS importe_retencion_contrato,
     CASE WHEN x.concepto = 'VENTA' THEN COALESCE(x.base_sin_retencion, 0) END AS base_sin_retencion_contrato,
-    CASE WHEN x.concepto = 'COSTE' THEN COALESCE(x.importe_personal, 0) END AS importe_pendiente_personal
+    CASE WHEN x.concepto = 'COSTE' THEN COALESCE(x.importe_personal, 0) END AS importe_pendiente_personal,
+    -- N18 (R55, R58): el neto se paga el ultimo dia del mes; el IRPF + SS, el del siguiente.
+    CASE WHEN x.concepto = 'COSTE' THEN COALESCE(x.importe_personal, 0) - ROUND(COALESCE(x.importe_personal, 0) * COALESCE(rp.cuota_irpf_ss, 0), 2) END AS importe_personal_neto,
+    CASE WHEN x.concepto = 'COSTE' THEN ROUND(COALESCE(x.importe_personal, 0) * COALESCE(rp.cuota_irpf_ss, 0), 2) END AS importe_personal_irpf_ss
 FROM (
     SELECT
         r.obra_id,
@@ -545,7 +699,8 @@ FROM (
     LEFT JOIN mart.v_pbi_dim_partida dp ON dp.partida_id = r.partida_id
     GROUP BY r.obra_id, r.concepto, r.anio_mes, dp.categoria
 ) x
-JOIN _dev_version v ON v.obra_id = x.obra_id AND v.concepto = x.concepto;
+JOIN _dev_version v ON v.obra_id = x.obra_id AND v.concepto = x.concepto
+LEFT JOIN tesoreria.reparto_pago_personal rp ON rp.empresa_id = v.empresa_id;
 
 -- Guarda de la suma: el reparto no crea ni pierde un centimo (R14).
 DO $$
@@ -579,6 +734,24 @@ BEGIN
             fallo.obra_id, fallo.concepto, fallo.total_mes, fallo.total_partida,
             fallo.total_coef_mes, fallo.total_coef_partida,
             fallo.total_personal_mes, fallo.total_personal_partida;
+    END IF;
+END $$;
+
+-- Guarda de N18 (R58): los dos tramos del personal suman el personal del mes,
+-- fila a fila; si no, falla con la obra y el mes.
+DO $$
+DECLARE
+    fallo RECORD;
+BEGIN
+    SELECT obra_id, anio_mes, categoria, importe_pendiente_personal, importe_personal_neto, importe_personal_irpf_ss
+      INTO fallo
+      FROM tesoreria.devengo_pendiente_obra_mes
+     WHERE concepto = 'COSTE' AND importe_personal_neto + importe_personal_irpf_ss IS DISTINCT FROM importe_pendiente_personal
+     LIMIT 1;
+    IF FOUND THEN
+        RAISE EXCEPTION 'devengo_pendiente: el personal de la obra % en % (%) no cuadra en sus dos tramos: % + % frente a %',
+            fallo.obra_id, fallo.anio_mes, fallo.categoria, fallo.importe_personal_neto,
+            fallo.importe_personal_irpf_ss, fallo.importe_pendiente_personal;
     END IF;
 END $$;
 
@@ -848,7 +1021,7 @@ INSERT INTO tesoreria.devengo_corte_obra (
     base_pendiente_facturar_sin_iva_contrato, retencion_pendiente_facturar_contrato,
     base_pendiente_facturar_sin_retencion_contrato, cartera_viva_coste_proporcional,
     cartera_emitida_tras_cierre_coste_proporcional, pendiente_personal,
-    pendiente_enlazado_contrato
+    pendiente_enlazado_contrato, pendiente_personal_irpf_ss
 )
 SELECT
     v.obra_id                                       AS obra_id,
@@ -888,7 +1061,8 @@ SELECT
     CASE WHEN v.concepto = 'COSTE' THEN ROUND(COALESCE(c.cartera_viva_cp, 0), 2) END AS cartera_viva_coste_proporcional,
     CASE WHEN v.concepto = 'COSTE' THEN ROUND(COALESCE(c.cartera_emitida_tras_cierre_cp, 0), 2) END AS cartera_emitida_tras_cierre_coste_proporcional,
     CASE WHEN v.concepto = 'COSTE' THEN COALESCE(s.pendiente_personal, 0) END AS pendiente_personal,
-    CASE WHEN v.concepto = 'COSTE' THEN COALESCE(en.pendiente_enlazado_contrato, 0) END AS pendiente_enlazado_contrato
+    CASE WHEN v.concepto = 'COSTE' THEN COALESCE(en.pendiente_enlazado_contrato, 0) END AS pendiente_enlazado_contrato,
+    CASE WHEN v.concepto = 'COSTE' THEN COALESCE(pi.pendiente_personal_irpf_ss, 0) END AS pendiente_personal_irpf_ss
 FROM _dev_version v
 LEFT JOIN (
     SELECT
@@ -938,16 +1112,22 @@ LEFT JOIN LATERAL (
 LEFT JOIN _dev_hueco hu ON hu.obra_id = v.obra_id AND v.concepto = 'VENTA'
 LEFT JOIN (
     SELECT obra_id, SUM(importe_pendiente) AS pendiente_enlazado_contrato FROM tesoreria.devengo_pendiente_contrato_mes WHERE contrato_id IS NOT NULL GROUP BY obra_id
-) en ON en.obra_id = v.obra_id;
+) en ON en.obra_id = v.obra_id
+LEFT JOIN (
+    SELECT obra_id, SUM(importe_personal_irpf_ss) AS pendiente_personal_irpf_ss FROM tesoreria.devengo_pendiente_obra_mes WHERE concepto = 'COSTE' GROUP BY obra_id
+) pi ON pi.obra_id = v.obra_id;
 
 COMMENT ON TABLE tesoreria.devengo_pendiente_partida IS
-'F-140. Por (obra, partida, concepto) con plan en la ultima version master (V): plan desde el mes de V, plan del intervalo (mes de V a ultimo cierre), ejecutado real del intervalo, plan restante tras el cierre, pendiente = max(0, plan desde V - ejecutado) y sobre_ejecutado. F-150, solo en VENTA: el contrato con el cliente de la partida (de la misma obra), su coeficiente de venta (el del contrato y, si no, el del master de V: certificacion 9 o venta 11; nunca una media de obra) con su fuente y el del master aparte, pendiente_con_coeficientes, y el IVA y la retencion del contrato con su fuente (CONTRATO o SIN). F-150 (N16), solo en COSTE: cuota_personal (coste de los partes de personal propio hasta el cierre entre lo real a origen de la partida, tope 1; CP, 0), fuente_personal (PARTES, SIN_PARTES, CP) y pendiente_personal, que se paga el ultimo dia del mes de su devengo (fin de mes, regla fija de la receta). Devengo SIN IVA: no es caja. Clave: obra_id, partida_id, concepto.';
+'F-140. Por (obra, partida, concepto) con plan en la ultima version master (V): plan desde el mes de V, plan del intervalo (mes de V a ultimo cierre), ejecutado real del intervalo, plan restante tras el cierre, pendiente = max(0, plan desde V - ejecutado) y sobre_ejecutado. F-150, solo en VENTA: el contrato con el cliente de la partida (de la misma obra), su coeficiente de venta (el del contrato y, si no, el del master de V: certificacion 9 o venta 11; nunca una media de obra) con su fuente y el del master aparte, pendiente_con_coeficientes, y el IVA y la retencion del contrato con su fuente (CONTRATO o SIN). F-150 (N16), solo en COSTE: cuota_personal (coste de los partes de personal propio hasta el cierre entre lo real a origen de la partida, tope 1; CP, 0), fuente_personal (PARTES, SIN_PARTES, CP) y pendiente_personal (N18: se paga en dos tramos, el neto el ultimo dia del mes de su devengo, fin de mes, y el IRPF + SS el ultimo dia del mes siguiente, por la cuota de su empresa en reparto_pago_personal; el reparto vive en devengo_pendiente_obra_mes). Devengo SIN IVA: no es caja. Clave: obra_id, partida_id, concepto.';
 
 COMMENT ON TABLE tesoreria.devengo_pendiente_obra_mes IS
-'F-140. El pendiente de cada partida repartido en proporcion a su plan restante (al centimo, el resto al ultimo mes; sin perfil, al primer mes pendiente y en importe_retraso_sin_perfil), por (obra, mes, concepto, categoria), con el plan restante de V. Suma = la de devengo_pendiente_partida. F-150, solo en VENTA: el pendiente con coeficientes repartido igual (y su cociente, solo para leer), el IVA y la retencion del contrato de cada partida sobre esa parte (redondeados al final) y las bases sin ellos, sobre las que van H12 y H10. F-150 (N16), solo en COSTE: importe_pendiente_personal, el personal del mes (mismo reparto), que se paga el ultimo dia de ese mes (fin de mes). Lo que lleva coeficientes no se suma con el coste ni con la venta sin ellos. Devengo SIN IVA: no es caja. Clave: obra_id, anio_mes, concepto, categoria.';
+'F-140. El pendiente de cada partida repartido en proporcion a su plan restante (al centimo, el resto al ultimo mes; sin perfil, al primer mes pendiente y en importe_retraso_sin_perfil), por (obra, mes, concepto, categoria), con el plan restante de V. Suma = la de devengo_pendiente_partida. F-150, solo en VENTA: el pendiente con coeficientes repartido igual (y su cociente, solo para leer), el IVA y la retencion del contrato de cada partida sobre esa parte (redondeados al final) y las bases sin ellos, sobre las que van H12 y H10. F-150 (N16), solo en COSTE: importe_pendiente_personal, el personal del mes (mismo reparto). F-150 (N18): importe_personal_neto (se paga el ultimo dia de ese mes, fin de mes) e importe_personal_irpf_ss (el IRPF + la Seguridad Social, el ultimo dia del mes SIGUIENTE, aunque la obra ya no devengue), por la cuota de su empresa en reparto_pago_personal; suman importe_pendiente_personal al centimo. Lo que lleva coeficientes no se suma con el coste ni con la venta sin ellos. Devengo SIN IVA: no es caja. Clave: obra_id, anio_mes, concepto, categoria.';
 
 COMMENT ON TABLE tesoreria.devengo_corte_obra IS
-'F-140. Por (obra, concepto): la version V, su mes, el ultimo cierre, las sumas de devengo_pendiente_partida con lo adelantado, lo retrasado, lo ejecutado sin plan de V y lo pendiente sin perfil, el real a origen hasta el cierre, el plan total de V y la frontera con tesoreria.efectos del sentido del concepto (cartera viva y emitida tras el cierre, CON IVA). F-150, solo en VENTA: el hueco de facturacion de H26, NETO POR OBRA: la venta real a origen con coeficientes (la de partidas sin coeficiente, con la media de la obra, declarada aparte) menos lo facturado (raw.dvf), con suelo 0, lo facturado por delante (que no se cobra) y el IVA y la retencion del hueco por el peso de cada contrato. F-150, solo en COSTE: la parte de coste proporcional (CP, estructura) de la cartera viva y de la emitida tras el cierre, por la categoria de las partidas de la factura de cada efecto; el CP no es caja de la obra y se resta. F-150 (N16), solo en COSTE: pendiente_personal, el personal pendiente de la obra (se paga a fin de mes). F-150 (N17), solo en COSTE: pendiente_enlazado_contrato, lo que de ese pendiente va por contrato de compra (devengo_pendiente_contrato_mes). Clave: obra_id, concepto.';
+'F-140. Por (obra, concepto): la version V, su mes, el ultimo cierre, las sumas de devengo_pendiente_partida con lo adelantado, lo retrasado, lo ejecutado sin plan de V y lo pendiente sin perfil, el real a origen hasta el cierre, el plan total de V y la frontera con tesoreria.efectos del sentido del concepto (cartera viva y emitida tras el cierre, CON IVA). F-150, solo en VENTA: el hueco de facturacion de H26, NETO POR OBRA: la venta real a origen con coeficientes (la de partidas sin coeficiente, con la media de la obra, declarada aparte) menos lo facturado (raw.dvf), con suelo 0, lo facturado por delante (que no se cobra) y el IVA y la retencion del hueco por el peso de cada contrato. F-150, solo en COSTE: la parte de coste proporcional (CP, estructura) de la cartera viva y de la emitida tras el cierre, por la categoria de las partidas de la factura de cada efecto; el CP no es caja de la obra y se resta. F-150 (N16), solo en COSTE: pendiente_personal, el personal pendiente de la obra (N18: el neto a fin de mes y pendiente_personal_irpf_ss, el IRPF + SS, a fin del mes siguiente). F-150 (N17), solo en COSTE: pendiente_enlazado_contrato, lo que de ese pendiente va por contrato de compra (devengo_pendiente_contrato_mes). Clave: obra_id, concepto.';
 
 COMMENT ON TABLE tesoreria.devengo_pendiente_contrato_mes IS
 'F-150 (N17). El pendiente de COSTE de cada obra y mes, SIN el coste proporcional (CP) ni el personal (que se paga a fin de mes), repartido por contrato de compra: cada partida, entre los contratos de compra de la misma obra que la tienen (raw.ctrpro.paride; ni Terminados ni Rescindidos) por lo que les queda por servir, hasta su pendiente; lo enlazado se paga con la forma de pago, los dias y la retencion de ese contrato (H01, H15, H04, H06 en condiciones_contrato_compra). La fila de contrato_id vacio es el resto, que va con H02 de su categoria. Suma por obra = la de devengo_pendiente_obra_mes sin CP ni personal. Devengo SIN IVA: no es caja. Clave: obra_id, anio_mes, categoria, contrato_id (NULL = sin contrato).';
+
+COMMENT ON TABLE tesoreria.reparto_pago_personal IS
+'F-150 (N18). Una fila por empresa del devengo de COSTE: la cuota de la nomina que se paga el mes SIGUIENTE (cuota_irpf_ss: IRPF del trabajo + Seguridad Social obrera y patronal) y la que se paga en el mes (cuota_neto = 1 - cuota_irpf_ss), de los abonos NORMAL de 12 meses (mes_desde a mes_hasta, el ultimo con nomina de los 3 anteriores al build) de las cuentas 4652000000, 4751000000 y 4760000000 de raw.apu, con meses_con_nomina, personas_con_partes, la fuente (CONTABILIDAD con 12 meses, CONTABILIDAD_PARCIAL con 1-11, DEFECTO con cuota 0: todo a fin del mes de devengo) y el motivo del defecto (SIN_NOMINA_RECIENTE, POCAS_PERSONAS con menos de 10, CUOTA_FUERA_DE_RANGO). Va sin importes: las cuentas de nomina son restringidas (R-PERFILES) y sus sumas no salen del build. Clave: empresa_id.';

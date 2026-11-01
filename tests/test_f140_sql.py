@@ -402,6 +402,15 @@ def test_f140_r16_sin_aritmetica_de_fechas(ruta: Path) -> None:
     `\\binterval\\b`: el tipo, no las columnas `plan_intervalo` de R12.
     """
     texto = _sin_comment_on(ruta).lower()
+    if ruta == RUTA_DEVENGO:
+        # F-150 (N18, R57, 31-10): `07` lee los abonos de la NOMINA de los 15
+        # meses anteriores al build y fija una ventana de 12 meses que acaba en
+        # uno de los 3 anteriores. Es la VENTANA de lectura de la contabilidad,
+        # no un plazo sumado a un devengo: los tres intervalos, una vez cada uno
+        # (los vigila `tests/test_f150_personal_n18.py`), y ninguno mas.
+        for ventana in ("interval '15 month'", "interval '3 month'", "interval '11 month'"):
+            assert texto.count(ventana) == 1, ventana
+            texto = texto.replace(ventana, "")
     for prohibido in (r"\binterval\b", r"make_interval", r"date_add", r"\+ f\.", r"\+ dias"):
         assert not re.search(prohibido, texto), f"{ruta.name}: {prohibido}"
 
@@ -442,7 +451,11 @@ def test_f140_r18_lo_de_personal_no_se_lee(ruta: Path, prohibido: str) -> None:
         # ni recurso: lo mismo que ya publica `mart` como coste real de esa
         # partida (los partes son su coste). Mismo precedente que el saldo de
         # partida (`10`, N14). Fuera de esa suma, nada de `hmores`.
-        assert texto.count("raw.hmores") == 2, "la guarda de entrada y _dev_personal"
+        # F-150 (N18, R54): y `_dev_personas` CUENTA los recursos distintos con
+        # partes en la ventana de la nomina, por empresa (el umbral de 10 que
+        # impide que la cuota delate el IRPF de alguien): un recuento, sin
+        # nombre ni recurso publicado.
+        assert texto.count("raw.hmores") == 3, "la guarda, _dev_personal y _dev_personas"
         assert "FROM raw.hmores h JOIN raw.res r ON r.ide = h.reside" in texto
         return
     assert not re.search(prohibido, texto), f"{ruta.name}: {prohibido}"

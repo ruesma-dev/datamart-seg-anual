@@ -172,6 +172,8 @@ GRUPO_E_F097 = {
 #: `tesoreria.hipotesis_caja_obra`, que ya la resuelve.
 GRUPO_F_F140 = {
     "tesoreria.hipotesis_caja_manual": "ya resuelta en hipotesis_caja_obra",
+    # F-150 (N18): la cuota ya va aplicada en devengo_pendiente_obra_mes.
+    "tesoreria.reparto_pago_personal": "ya aplicada en devengo_pendiente_obra_mes",
 }
 
 
