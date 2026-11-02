@@ -517,11 +517,15 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
     entran.
 - **LA ANTIGÜEDAD DEL ESTADO SALE DE `rac` (F-132).**
   `sql/compras/13_estado_documentos.sql` crea `compras.v_estado_documentos`:
-  una fila por contrato, factura y comparativo con su estado (el de la
-  cabecera) y desde cuándo está en él, del ÚLTIMO paso de
-  `compras.documento_procesos`. `origen_fecha` dice de dónde sale la fecha:
-  PASO (al segundo, el 99,4 %), ALTA (sin pasos y en un estado inicial: el día
-  de alta) o FUERA_DE_PROCESO (sin fecha, con la cota `cambio_posterior_a`).
+  una fila por contrato, factura, comparativo y albarán (F-153, con proformas y
+  notas) con su estado (el de la cabecera) y desde cuándo está en él, del ÚLTIMO
+  paso de `compras.documento_procesos`. `origen_fecha` dice de dónde sale la
+  fecha: PASO (al segundo, el 99,4 % sin contar albaranes), FACTURACION (albarán
+  facturado: `dca.fecfac`, de día), ALTA (sin pasos y en un estado inicial: el
+  día de alta), SIN_HISTORIAL (albarán sin pasos publicados, hasta F-133: sin
+  fecha) o FUERA_DE_PROCESO (sin fecha, con la cota `cambio_posterior_a`). El
+  tipo 14 da en `tipo_documento` el de `compras.albaranes`: su familia se filtra
+  por `tipo_documento_codigo = 14`.
   Historia NETA: un paso deshecho no se fecha. Va DETRÁS de `12` en
   `build_compras` porque el `DROP ... CASCADE` de `12` tira la vista cada noche. La regla
   (familias, estados iniciales, orígenes) vive en `domain/estado_documentos.py`
