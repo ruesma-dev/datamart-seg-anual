@@ -769,7 +769,13 @@
 # y `saldo_partida_obra` `personal_irpf_ss_pendiente` (el IRPF + SS de los
 # partes del ultimo cierre, aun sin pagar). Receta pasos 0 y 1 y la regla de
 # `R-CAJA-HIPOTESIS`.
-version: 69
+# version 70 (F-153, 2026-11-02): EL ESTADO DE CADA ALBARAN. `compras.albaranes`
+# gana `estado_id`, `estado_codigo` y `estado` (tipo 14, con proformas y notas) y
+# `compras.v_estado_documentos` publica esos documentos, de 208.000 a 524.000
+# filas. `tipo_documento` del tipo 14 es el de la cabecera (se filtra la familia
+# por `tipo_documento_codigo = 14`) y `origen_fecha` gana FACTURACION (`dca.fecfac`,
+# de dia) y SIN_HISTORIAL (sin pasos hasta F-133). 256 objetos y 2.243 columnas.
+version: 70
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -1864,7 +1870,8 @@ esquemas:
       lineas SIN IVA y cabeceras CON IVA (`R-COMPRAS-SIN-IVA`). A quien se
       compra, cuanto se contrata, que hay albaranado sin facturar y el coste
       por partida; tambien formas de pago, comparativos, alarmas y el estado
-      de cada documento (`compras.v_estado_documentos`, de `rac`, F-132).
+      de cada documento, tambien de los albaranes
+      (`compras.v_estado_documentos`, de `rac`, F-132 y F-153).
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_compras]
