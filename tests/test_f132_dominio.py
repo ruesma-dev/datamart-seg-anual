@@ -45,12 +45,16 @@ def test_f132_r11_estados_iniciales_medidos() -> None:
         15: frozenset({1, 20}),
         44: frozenset({1}),
         46: frozenset({1, 11, 100}),
+        14: frozenset({1}),  # F-153
     } == ESTADOS_INICIALES
-    assert set(ESTADOS_INICIALES) == set(FAMILIAS_ESTADO)
+    assert set(ESTADOS_INICIALES) == set(FAMILIAS_ESTADO) | {14}
 
 
-def test_f132_r11_los_tres_origenes_en_orden() -> None:
-    assert ORIGENES_FECHA == ("PASO", "ALTA", "FUERA_DE_PROCESO")
+def test_f132_r11_los_origenes_en_orden() -> None:
+    # F-153 añade FACTURACION y SIN_HISTORIAL, solo del tipo 14.
+    paso, alta, fuera = (o for o in ORIGENES_FECHA if o not in ("FACTURACION", "SIN_HISTORIAL"))
+    assert (paso, alta, fuera) == ("PASO", "ALTA", "FUERA_DE_PROCESO")
+    assert len(ORIGENES_FECHA) == 5
 
 
 def test_f132_r11_el_dominio_no_importa_infraestructura_ni_configuracion() -> None:
@@ -202,7 +206,9 @@ def test_f132_r7_cambio_posterior_a_solo_en_fuera_de_proceso() -> None:
     assert con_paso.cambio_posterior_a is None
     assert de_alta.cambio_posterior_a is None
     assert fuera.cambio_posterior_a == ENVIO.momento
-    assert {con_paso.origen, de_alta.origen, fuera.origen} == set(ORIGENES_FECHA)
+    assert {con_paso.origen, de_alta.origen, fuera.origen} == {
+        "PASO", "ALTA", "FUERA_DE_PROCESO",
+    }
 
 
 # R13 y R14 (el contraste con la foto diaria): RETIRADOS con la foto. La Fase B
