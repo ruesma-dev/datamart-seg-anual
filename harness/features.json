@@ -2446,7 +2446,7 @@
         "Tests de humo del SQL nuevo; `bash harness/init.sh` en verde"
       ],
       "priority": 4,
-      "status": "spec_ready",
+      "status": "in_progress",
       "sdd": true,
       "rigor": "estandar",
       "branch": "feature/F-153-estado-albaranes"

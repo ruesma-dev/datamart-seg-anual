@@ -3,17 +3,18 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **143 features**, 73 abiertas (0 en curso, 2 con la spec lista, 0 bloqueadas y 71 en backlog) y 70 terminadas.
+Resumen: **143 features**, 73 abiertas (1 en curso, 1 con la spec lista, 0 bloqueadas y 71 en backlog) y 70 terminadas.
 
 ## En curso
 
-_Ninguna feature en curso._
+| # | Feature | Prioridad | Rigor | Rama |
+|---|---|---|---|---|
+| F-153 | El estado de cada albarán (con proformas y notas): `estado` en `compras.albaranes` y los albaranes en `compras.v_estado_documentos` | 4 | estandar | `feature/F-153-estado-albaranes` |
 
 ## Spec lista
 
 | # | Feature | Prioridad | Rigor | Rama |
 |---|---|---|---|---|
-| F-153 | El estado de cada albarán (con proformas y notas): `estado` en `compras.albaranes` y los albaranes en `compras.v_estado_documentos` | 4 | estandar | `feature/F-153-estado-albaranes` |
 | F-111 | Los nombres de partida se resuelven por codigo en los niveles del arbol y en la dimension de costes indirectos: 10.593 filas con un escalon con el nombre de otra partida | 18 | estandar | `feature/F-111-nombres-partida-por-ancestro` |
 
 ## Bloqueadas
@@ -187,7 +188,7 @@ Decidido por el humano el 2026-09-23, prioridad 3. Sale de la decision H5 de la 
 
 ### F-153 · El estado de cada albarán (con proformas y notas): `estado` en `compras.albaranes` y los albaranes en `compras.v_estado_documentos`
 
-estado **spec lista** · prioridad 4 · rigor `estandar` · SDD sí · rama `feature/F-153-estado-albaranes`
+estado **en curso** · prioridad 4 · rigor `estandar` · SDD sí · rama `feature/F-153-estado-albaranes`
 
 Pedida por el humano el 2026-10-28: «está publicada la tabla del catálogo de estados pero no sé el estado por albarán». LO QUE YA HAY: `maestro.estados_documento` publica el catálogo entero de Sigrid (193 parejas tipo-estado, 29 tipos) y `compras.fn_estado_documento` lo traduce por la PAREJA (tipo de documento, estado), nunca solo por el número. Contratos (44), facturas (15) y comparativos (46) ya publican `estado_id`, `estado_codigo` y `estado`, y `compras.v_estado_documentos` da el estado actual con `en_estado_desde` y `dias_en_estado` de esos tres tipos. LO QUE FALTA: `compras.albaranes` (tipo 14, con proformas y notas) no publica su estado, y `v_estado_documentos` no incluye albaranes. Publicar `estado_id`, `estado_codigo` y `estado` en `compras.albaranes`, traducido con `fn_estado_documento(14, con.est)` como las facturas, y añadir los albaranes a `v_estado_documentos`. Medir qué estados del catálogo del tipo 14 se usan, cuántos albaranes caen fuera de catálogo y cómo se reparte por serie (albarán, proforma, nota). RELACIÓN: F-133 (procesos de los albaranes en `compras.documento_procesos`) da el historial de pasos; esta da el estado actual. Si `en_estado_desde` de un albarán necesita los procesos de F-133, se publica el estado sin esa fecha y se declara, sin esperar a F-133.
 
