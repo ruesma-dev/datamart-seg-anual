@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **143 features**, 73 abiertas (0 en curso, 1 con la spec lista, 0 bloqueadas y 72 en backlog) y 70 terminadas.
+Resumen: **143 features**, 73 abiertas (0 en curso, 2 con la spec lista, 0 bloqueadas y 71 en backlog) y 70 terminadas.
 
 ## En curso
 
@@ -13,6 +13,7 @@ _Ninguna feature en curso._
 
 | # | Feature | Prioridad | Rigor | Rama |
 |---|---|---|---|---|
+| F-153 | El estado de cada albarán (con proformas y notas): `estado` en `compras.albaranes` y los albaranes en `compras.v_estado_documentos` | 4 | estandar | `feature/F-153-estado-albaranes` |
 | F-111 | Los nombres de partida se resuelven por codigo en los niveles del arbol y en la dimension de costes indirectos: 10.593 filas con un escalon con el nombre de otra partida | 18 | estandar | `feature/F-111-nombres-partida-por-ancestro` |
 
 ## Bloqueadas
@@ -25,7 +26,6 @@ _Ninguna feature bloqueada._
 |---|---|---|---|---|
 | F-040 | El lado de ingresos: ventas, certificaciones y clientes | 2 | critico | `feature/F-040-ingresos` |
 | F-104 | La retencion de CLIENTE no esta saneada: 22,16 M EUR «vivos» de los que 19,93 M tienen fecha de baja, y la contabilidad dice 13,81 M | 3 | estandar | `feature/F-104-retenciones-cliente` |
-| F-153 | El estado de cada albarán (con proformas y notas): `estado` en `compras.albaranes` y los albaranes en `compras.v_estado_documentos` | 4 |  |  |
 | F-151 | La función de caja proyectada (fase 2): `tesoreria.fn_caja_proyectada(obra, hipótesis del usuario)` | 5 | critico | `feature/F-151-funcion-caja-proyectada` |
 | F-054 | Glosario de negocio para la IA (`_meta.glosario`): qué significan en Ruesma la valorada, el incurrido, el ABC o la liquidatoria, y dónde están en el datamart | 6 | documental | `feature/F-054-conocimiento-de-negocio` |
 | F-152 | La forma de pago por defecto de la ficha del proveedor (`prv.pagide` -> `auxpag`), junto a los días fijos y los meses sin pago que ya se publican | 7 | estandar | `feature/F-152-forma-pago-ficha-proveedor` |
@@ -187,7 +187,7 @@ Decidido por el humano el 2026-09-23, prioridad 3. Sale de la decision H5 de la 
 
 ### F-153 · El estado de cada albarán (con proformas y notas): `estado` en `compras.albaranes` y los albaranes en `compras.v_estado_documentos`
 
-estado **pendiente** · prioridad 4 · SDD sí
+estado **spec lista** · prioridad 4 · rigor `estandar` · SDD sí · rama `feature/F-153-estado-albaranes`
 
 Pedida por el humano el 2026-10-28: «está publicada la tabla del catálogo de estados pero no sé el estado por albarán». LO QUE YA HAY: `maestro.estados_documento` publica el catálogo entero de Sigrid (193 parejas tipo-estado, 29 tipos) y `compras.fn_estado_documento` lo traduce por la PAREJA (tipo de documento, estado), nunca solo por el número. Contratos (44), facturas (15) y comparativos (46) ya publican `estado_id`, `estado_codigo` y `estado`, y `compras.v_estado_documentos` da el estado actual con `en_estado_desde` y `dias_en_estado` de esos tres tipos. LO QUE FALTA: `compras.albaranes` (tipo 14, con proformas y notas) no publica su estado, y `v_estado_documentos` no incluye albaranes. Publicar `estado_id`, `estado_codigo` y `estado` en `compras.albaranes`, traducido con `fn_estado_documento(14, con.est)` como las facturas, y añadir los albaranes a `v_estado_documentos`. Medir qué estados del catálogo del tipo 14 se usan, cuántos albaranes caen fuera de catálogo y cómo se reparte por serie (albarán, proforma, nota). RELACIÓN: F-133 (procesos de los albaranes en `compras.documento_procesos`) da el historial de pasos; esta da el estado actual. Si `en_estado_desde` de un albarán necesita los procesos de F-133, se publica el estado sin esa fecha y se declara, sin esperar a F-133.
 

@@ -9,6 +9,20 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-02 · F-153 · `spec_ready` · rama `feature/F-153-estado-albaranes`
+
+Spec-author. Spec en `specs/F-153-estado-albaranes/`, medida en Azure el 02-11. Sin código.
+**Pendiente de PARADA 1: no implementar hasta que el humano valide** (design §7, recomendadas las A):
+- **D1**: fecha de FACTURADO desde `dca.fecfac` (origen `FACTURACION`, de día; 235.254 documentos).
+- **D2**: `tipo_documento` de la vista = ALBARAN, PROFORMA, NOTA, OTRO, como en `compras.albaranes`.
+- **D3**: origen nuevo `SIN_HISTORIAL` (72.941) en vez de `FUERA_DE_PROCESO`.
+- **D4**: no absorber F-133.
+
+Dos hallazgos que cambian lo supuesto: **F-133 no fecharía FACTURADO** (de 270.177, solo 2.257 tienen
+el paso a 10 en `rac`), y **su criterio «la vista da lo mismo antes y después» deja de valer** tras
+F-153 (revisarlo al especificarla; `features.json` de F-133 no se ha tocado). Sin ingesta nueva:
+`con.est` ya está. Fuera de catálogo: 10 (`est = 0`). Power BI no se pudo inspeccionar.
+
 ## 2026-10-31 · F-155 (HOTFIX) · `spec_ready` · implementada · rama `feature/F-155-ofertas-compartidas`
 
 Implementer. La nocturna del 31-10 cayó dos veces en `build_compras` (`comparativo_ofertas_pkey`,
