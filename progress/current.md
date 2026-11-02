@@ -21,7 +21,7 @@ Implementer. Humano: D1=A, D2=A, D3=A, D4=A. T1-T9 y T11 hechas; detalle y evide
   ~35.000 FAC sin `fecfac` a `FUERA_DE_PROCESO`, design §8). `features.json` de F-133 sin tocar.
 - **T10 PENDIENTE, MANUAL (humano), tras APROBADO y merge a `main`:** los pasos exactos, con su
   vuelta atrás, en `specs/F-153-estado-albaranes/design.md` §9: tag actual, imagen, job,
-  `build-compras`, cifras, `publicar-diccionario` v70, checks, reinicio del MCP, R16-R18 e `init.sh`
+  `build-compras`, `apply-grants`, cifras y coste, `publicar-diccionario` v70, checks, reinicio del MCP, R16-R18 e `init.sh`
   sobre `main`. Fuera de 00:00-05:00 UTC. Hasta el paso 5, `check-diccionario` devuelve 1, y es lo
   esperado.
 

@@ -118,7 +118,9 @@ FAILED tests/test_f153_diccionario.py::test_f153_r15_azure_apps_recoge_el_cambio
 ## 5. Verificaciones MANUAL pendientes (T10, design §9)
 
 Tras APROBADO y merge: imagen, job, `build-compras`, cifras reales, `publicar-diccionario` v70, checks,
-reinicio del MCP, **R16-R18** por el MCP, **R19** (coste) e `init.sh` sobre `main`. **Power BI** no se pudo
+reinicio del MCP, **R16-R18** por el MCP, **R19** (paso 4 bis) e `init.sh` sobre `main`. Tras la review,
+§9 lleva `apply-grants` fijo (ida y vuelta, 49 y 46 columnas para los dos lectores), `7e755b3` como
+vuelta atrás con merge `--no-ff`, y la medida de R19. Solo cambió `design.md` §8-§9; ni código ni tests. **Power BI** no se pudo
 inspeccionar. Hasta el paso 5, `check-diccionario` devuelve 1: es lo esperado.
 
 ## 6. Fuera de alcance

@@ -181,63 +181,63 @@ subir `PRESUPUESTO_MAX` con su línea de motivo, como las anteriores.
 | Un fallo de `build_compras` deja sin la vista | Igual que hoy; `check-declarados` lo detecta |
 | Power BI con `estado` sin cualificar | §1; columnas al final, se revisa si un informe falla |
 
-**Límite del servicio:** todo cabe en este repositorio. Nada toca `sigrid-api` ni
-la configuración del servidor compartido.
+**Límite del servicio:** todo cabe aquí; nada toca `sigrid-api` ni el servidor compartido.
 
 ## 9. Pasos MANUAL (tras APROBADO y merge a `main`; los lanza el humano)
 
-Fuera de 00:00-05:00 UTC, desde la raíz del repositorio, en este orden.
+El líder fusiona con `git merge --no-ff`. Vuelta atrás: `7e755b3`, último `main` sin
+F-153; **si `main` se mueve antes del merge, cambia: usar la punta de `main` previa al
+merge**. Fuera de 00:00-05:00 UTC, desde la raíz, en este orden. `<PY>` =
+`.venv/Scripts/python.exe`; `<Q>` = `<PY> -c "import main, sys; pg = main._get_pg();
+pg._bootstrap_done = True; print(pg.filas_solo_lectura(sys.argv[1], 60))" "<consulta>"`.
 
 0. Tag actual (vuelta atrás): `az containerapp job show -n caj-datamart-seg-dev -g
    rg-datamart-seg-dev --query "properties.template.containers[0].image" -o tsv`.
 1. `powershell -NoProfile -File infra/70_build_image.ps1` → anotar el tag nuevo.
 2. `powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag nuevo>` y el `az`
    del paso 0 → debe acabar en `:<tag nuevo>`.
-3. `.venv/Scripts/python.exe main.py build-compras` (sin ingesta) → SUCCESS, con
-   `estado_documentos` sin error, ~9 min.
-4. Cifras, cada una con `.venv/Scripts/python.exe -c "import main, sys; pg =
-   main._get_pg(); pg._bootstrap_done = True; print(pg.filas_solo_lectura(sys.argv[1],
-   60))" "<consulta>"` (cambian poco cada noche):
+3. `<PY> main.py build-compras` (sin ingesta) → SUCCESS, `estado_documentos` sin error.
+   **3 bis.** `<PY> main.py apply-grants`, siempre: `sigrid_dm_perfil_restringido_ro` no
+   tiene privilegio por defecto en `compras` y pierde lo que el build recrea.
+4. Cifras con `<Q>` (cambian poco cada noche):
    - `SELECT estado_codigo, count(*) FROM compras.albaranes GROUP BY 1 ORDER BY 2 DESC`
      → FAC ~270.200, CON ~37.600, PDT ~7.700, COM ~410, NULL 10.
    - `SELECT origen_fecha, count(*), count(en_estado_desde) FROM
-     compras.v_estado_documentos WHERE tipo_documento_codigo = 14 GROUP BY 1` →
-     FACTURACION ~235.300 (todas con fecha), ALTA ~7.700 (todas), SIN_HISTORIAL
-     ~72.900 (0).
+     compras.v_estado_documentos WHERE tipo_documento_codigo = 14 GROUP BY 1` → FACTURACION
+     ~235.300 (todas con fecha), ALTA ~7.700 (todas), SIN_HISTORIAL ~72.900 (0).
    - `SELECT tipo_documento_codigo, tipo_documento, count(*) FROM
      compras.v_estado_documentos GROUP BY 1, 2 ORDER BY 1, 2` → ALBARAN ~312.650,
      PROFORMA ~2.960, NOTA 278, OTRO 1; 44, 15 y 46, los de sus tablas.
-   - `SELECT count(*) FROM information_schema.column_privileges WHERE table_schema
-     = 'compras' AND table_name = 'albaranes' AND grantee = 'mcp_sigrid_dm_ro'`
-     → 49. Si no: `.venv/Scripts/python.exe main.py apply-grants`.
-5. `.venv/Scripts/python.exe main.py publicar-diccionario` → **v70, 256 objetos**.
-6. `.venv/Scripts/python.exe main.py check-diccionario` → OK (antes del paso 5
-   devuelve 1, y es lo esperado); `.venv/Scripts/python.exe main.py check-declarados`
-   → sin faltantes; `.venv/Scripts/python.exe main.py check-unicidad --timeout 300`
-   → sin duplicados.
-7. Reinicio del MCP: `az containerapp show -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev
-   --query properties.latestReadyRevisionName -o tsv` y `az containerapp revision
-   restart -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --revision <revision> -o none` →
-   `contexto_bbdd()` abre con «Versión 70».
+   - **Permisos** (`SQL_PERMISOS`): `SELECT grantee, count(DISTINCT column_name) FROM
+     information_schema.column_privileges WHERE table_schema = 'compras' AND table_name
+     = 'albaranes' AND grantee IN ('mcp_sigrid_dm_ro', 'sigrid_dm_perfil_restringido_ro')
+     GROUP BY 1` → **49 los dos**.
+   **4 bis. Coste (R19).** Cronometrar `<Q>` con `SELECT count(*) FROM
+   compras.v_estado_documentos` → ≤ ~1 s (timeout del MCP, 30 s). Y `SELECT started_at,
+   finished_at - started_at FROM _meta.etl_runs WHERE step = 'build_compras' AND status =
+   'SUCCESS' ORDER BY started_at DESC LIMIT 2` → el manual frente a la noche anterior
+   (sin competencia, ~9 min; la nocturna, ~20; `LATERAL`, ~1 s). Anotar ambas.
+5. `<PY> main.py publicar-diccionario` → **v70, 256 objetos**.
+6. `<PY> main.py` con `check-diccionario` → OK (antes del paso 5 devuelve 1, lo esperado),
+   `check-declarados` → sin faltantes y `check-unicidad --timeout 300` → sin duplicados.
+7. Reinicio del MCP: `az containerapp show -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --query
+   properties.latestReadyRevisionName -o tsv` y `az containerapp revision restart -g rg-mcp-bbdd-dev
+   -n ca-mcp-bbdd-dev --revision <revision> -o none` → `contexto_bbdd()` abre con «Versión 70».
 8. R16-R18 por el MCP, sin explicarle nada; anotar en `progress/impl_F-153.md`.
 9. `bash harness/init.sh` en verde sobre `main`.
 
 **Vuelta atrás** (desde el puesto, en este orden):
 
-1. Job: `powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag del paso 0>`,
-   comprobado con el `az` del paso 0.
-2. `git switch --detach <sha del merge de F-153>^1`.
-3. `.venv/Scripts/python.exe main.py build-compras`: el SQL viejo rehace la tabla
-   sin las columnas y la vista sin el tipo 14 (lee el árbol local). Si se omite,
+1. Job: `infra/85_update_job.ps1 -Tag <tag del paso 0>`, comprobado con el `az` del paso 0.
+2. `git switch --detach 7e755b3` (o la punta previa al merge, ver cabecera).
+3. `<PY> main.py build-compras`: el SQL viejo (árbol local) rehace tabla y vista. Si se omite,
    lo hace la nocturna, y entre tanto los datos llevan más que la ficha v69.
-4. `.venv/Scripts/python.exe main.py publicar-diccionario` → **v69**, 256 objetos:
-   publica las fichas del ÁRBOL local, no las de la imagen.
-5. `git switch main` (`check-diccionario` dará 1 desde `main`: compara con la v70
-   del árbol).
+   **3 bis.** `<PY> main.py apply-grants`, siempre, y `SQL_PERMISOS` → **46 los dos**.
+4. `<PY> main.py publicar-diccionario` → **v69**, 256 objetos (fichas del ÁRBOL local).
+5. `git switch main` (`check-diccionario` dará 1 desde `main`: compara con la v70).
 6. Reinicio del MCP (paso 7) → «Versión 69».
 
-No queda nada en Azure: el DDL es `DROP` + `CREATE`, sin columnas añadidas por
-`ALTER`, y `idx_com_alb_est` cae con la tabla.
+No queda nada en Azure: DDL `DROP` + `CREATE`, sin `ALTER`; `idx_com_alb_est` cae con la tabla.
 
 ## 10. Tests de humo (sin red ni BBDD)
 
