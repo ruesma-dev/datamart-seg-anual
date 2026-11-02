@@ -157,22 +157,18 @@ subir `PRESUPUESTO_MAX` con su línea de motivo, como las anteriores.
 ## 7. Decisiones y alternativas
 
 - **D1 · Fecha de FACTURADO.** **A (recomendada):** `dca.fecfac`, origen
-  `FACTURACION`, de día; da fecha al 74,5 % del tipo 14 y ya se publica. B: sin
-  fecha; más puro, pero deja sin dato al 97,6 % hasta F-133 y al 85 % después,
-  porque F-133 no lo arregla. C: fecha de la factura por `idefac`: solo 53.848 y
-  no es el momento del cambio.
-- **D2 · `tipo_documento`.** **A (recomendada):** ALBARAN, PROFORMA, NOTA y OTRO,
-  el vocabulario de `compras.albaranes`. B: `ALBARAN` para los 315.884: una misma
-  columna con dos significados en dos objetos, y `tipo_documento = 'ALBARAN'`
-  daría cifras distintas sin avisar. C: columna `subtipo_documento`: cambia la
-  forma de la vista y mantiene la trampa.
+  `FACTURACION`, de día; da fecha al 74,5 % del tipo 14. B: sin fecha: deja sin dato
+  al 97,6 % hasta F-133 y al 85 % después. C: la de la factura por `idefac`: solo
+  53.848, y no es el momento del cambio.
+- **D2 · `tipo_documento`.** **A (recomendada):** el vocabulario de
+  `compras.albaranes`. B: `ALBARAN` para los 315.884: la misma columna con dos
+  significados, y cifras distintas sin avisar. C: columna `subtipo_documento`:
+  cambia la forma de la vista y mantiene la trampa.
 - **D3 · Lo que no tiene fecha.** **A (recomendada):** `SIN_HISTORIAL`. B:
-  `FUERA_DE_PROCESO`: afirma que el estado cambió sin un paso, y en los 38.008
-  COM y CON el paso existe. Es falso de forma medible y contradice la ficha.
-- **D4 · F-133.** **A (recomendada):** no se absorbe; lo manda la feature y son
-  ~610.000 filas más de `documento_procesos` y su sub-paso. B: leer `raw.rac` en
-  la vista: `rac` no tiene índice por `conide`, son 2,5 M de filas por consulta,
-  y rompe R9.
+  `FUERA_DE_PROCESO`: afirma que el estado cambió sin un paso, y en los 38.008 COM
+  y CON el paso existe.
+- **D4 · F-133.** **A (recomendada):** no se absorbe (~610.000 filas más y su
+  sub-paso). B: leer `raw.rac` en la vista: sin índice por `conide` y rompe R9.
 
 ## 8. Riesgos
 
