@@ -268,6 +268,10 @@ ALBARANES_NUEVAS = (
 )
 
 
+#: F-153: el estado, también AL FINAL y sin mover ninguna de las anteriores.
+ALBARANES_F153 = ["estado_id", "estado_codigo", "estado"]
+
+
 def _albaranes() -> str:
     return _sentencia(_texto(DOCUMENTOS), "compras.albaranes")
 
@@ -275,7 +279,7 @@ def _albaranes() -> str:
 def test_f128_r10_albaranes_prefijo_intacto_y_nuevas_en_orden():
     columnas = _columnas(_albaranes(), "raw.dca a")
     assert len(ALBARANES_NUEVAS) == 34
-    assert columnas == ALBARANES_DE_SIEMPRE + ALBARANES_NUEVAS
+    assert columnas == ALBARANES_DE_SIEMPRE + ALBARANES_NUEVAS + ALBARANES_F153
 
 
 def _comprobar_importes(s: str, desde: str, a: str, total: str, recargos: str) -> None:
