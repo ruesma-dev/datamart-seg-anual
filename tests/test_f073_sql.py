@@ -624,7 +624,11 @@ def test_f073_r22_el_comment_avisa_de_que_el_plazo_no_es_un_numero() -> None:
 #: recargos antes de ellas y, en la última sección, la cuenta bancaria del
 #: proveedor en `compras_restringida`. Ninguna columna de siempre se mueve; lo
 #: fijan `tests/test_f083_sql.py` y `tests/test_f128_sql.py`.
-HASH_01_DOCUMENTOS = "e7b22eab71d87635168d5858aa58c9e44487f91fb0d23f71b6fcdfc97aa3b334"
+#:
+#: **RECALCULADO POR F-153 el 2026-11-02**: `estado_id`, `estado_codigo` y
+#: `estado` AL FINAL de `albaranes`, con su lateral y su índice. Ninguna columna
+#: de siempre se mueve; lo fijan `tests/test_f128_sql.py` y `tests/test_f153_sql.py`.
+HASH_01_DOCUMENTOS = "5c5775794c911f372a3e2e00f791cb9e55ef1ea3ed0989d9eac36b3ff51e0360"
 
 #: Los dos ficheros del SELLO. Tocar una coma fuerza la reconstrucción completa
 #: de las 921 obras la noche siguiente (R25).

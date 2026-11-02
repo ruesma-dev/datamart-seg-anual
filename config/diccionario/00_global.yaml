@@ -1869,9 +1869,8 @@ esquemas:
       Contratos, albaranes, proformas, notas, facturas y abonos de proveedor:
       lineas SIN IVA y cabeceras CON IVA (`R-COMPRAS-SIN-IVA`). A quien se
       compra, cuanto se contrata, que hay albaranado sin facturar y el coste
-      por partida; tambien formas de pago, comparativos, alarmas y el estado
-      de cada documento, tambien de los albaranes
-      (`compras.v_estado_documentos`, de `rac`, F-132 y F-153).
+      por partida; formas de pago, comparativos, alarmas y estado de cada
+      documento y albaran (`compras.v_estado_documentos`, de `rac`, F-132).
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_compras]

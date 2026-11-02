@@ -4143,7 +4143,7 @@ objetos:
           con la cabecera: todos comparten la columna `documento_id`.
         valores: [CONTRATO, FACTURA, COMPARATIVO, ALBARAN, PROFORMA, NOTA, OTRO]
       codigo_documento:
-        significado: Codigo del documento tal y como se ve en Sigrid (`CTSB25/0002`, `FR26/10025`, `AC22/01874`).
+        significado: Codigo del documento tal y como se ve en Sigrid (`CTSB25/0002`, `FR26/10025`, `PROF25/00055`).
       estado_id:
         significado: >-
           Codigo interno del estado ACTUAL (`con.est`), el de la cabecera; solo

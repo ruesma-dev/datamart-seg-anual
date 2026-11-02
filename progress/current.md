@@ -9,7 +9,23 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-11-02 · F-153 · `spec_ready` · rama `feature/F-153-estado-albaranes`
+## 2026-11-02 · F-153 · `in_progress` · implementada · rama `feature/F-153-estado-albaranes`
+
+Implementer. Humano: D1=A, D2=A, D3=A, D4=A. T1-T9 y T11 hechas; detalle y evidencias en
+`progress/impl_F-153.md`. `azure-apps` commit local `076f669`, sin push.
+- `compras.albaranes` +3 columnas al final y `compras.v_estado_documentos` con el tipo 14, cinco
+  orígenes. Diccionario **v70** en el árbol (256 objetos, 2243 columnas), SIN publicar. Nada lanzado contra Azure salvo lecturas.
+- `raw.yaml` no se toca: `conest` habla de «las cabeceras de `compras`», sigue siendo cierto.
+- **F-133, para quien la especifique:** su criterio «la vista da lo mismo antes y después» deja de
+  valer para el tipo 14 tras F-153: excluir el 14 del contraste y medir (~37.900 pasan a `PASO`,
+  ~35.000 FAC sin `fecfac` a `FUERA_DE_PROCESO`, design §8). `features.json` de F-133 sin tocar.
+- **T10 PENDIENTE, MANUAL (humano), tras APROBADO y merge a `main`:** los pasos exactos, con su
+  vuelta atrás, en `specs/F-153-estado-albaranes/design.md` §9: tag actual, imagen, job,
+  `build-compras`, cifras, `publicar-diccionario` v70, checks, reinicio del MCP, R16-R18 e `init.sh`
+  sobre `main`. Fuera de 00:00-05:00 UTC. Hasta el paso 5, `check-diccionario` devuelve 1, y es lo
+  esperado.
+
+## 2026-11-02 · F-153 · spec (antecedente)
 
 Spec-author. Spec en `specs/F-153-estado-albaranes/`, medida en Azure el 02-11. Sin código.
 **Pendiente de PARADA 1: no implementar hasta que el humano valide** (design §7, recomendadas las A):
