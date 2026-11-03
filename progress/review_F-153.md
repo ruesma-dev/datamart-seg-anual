@@ -1,7 +1,42 @@
 <!-- progress/review_F-153.md -->
-Revisión completa (pasada 1), sobre `caebdb4`.
+Revisión incremental desde 066aecb (pasada 2), sobre `9639b45`.
 
 # F-153 · Review
+
+## Pasada 2 · Veredicto: APPROVED
+
+El delta es un solo commit, `9639b45`, y toca `design.md` §8-§9, `progress/current.md` y
+`progress/impl_F-153.md`: **ni código, ni SQL, ni fichas, ni tests**. Lo aprobado en la pasada 1
+sigue valiendo: la campaña de mutación (alcance intacto) y el prototipo en Azure.
+
+- **Cambio 1 · resuelto.** Hay un 3 bis con `apply-grants` incondicional tras `build-compras` en la
+  ida y en la vuelta, con su motivo. `SQL_PERMISOS` cubre los dos lectores. Ejecutado en Azure
+  (solo lectura, 09:14 UTC): hoy da `mcp_sigrid_dm_ro` 46 y `sigrid_dm_perfil_restringido_ro` 46.
+  La consulta funciona; las cifras esperadas son 49 tras el despliegue y 46 tras la vuelta atrás.
+- **Cambio 2 · resuelto.** La cabecera de §9 exige `git merge --no-ff`, y la vuelta atrás va a
+  `7e755b3` (hoy `main` = merge-base). También avisa de que, si `main` se mueve, hay que usar la punta
+  previa al merge.
+- **Cambio 3 · resuelto.** El paso 4 bis mide R19: `count(*)` de la vista y las dos últimas
+  `build_compras` de `_meta.etl_runs`. Ejecutado: la consulta de `etl_runs` funciona (columnas reales:
+  1.045 s el 03-11 y 1.230 s el 02-11). El `count(*)` de la vista actual (208.054 filas) tardó
+  **~5 s** de reloj, conexión incluida, frente a los 0,3-0,8 s de §1. Es una observación, no un
+  bloqueo: el criterio que vale es el del MCP (30 s), y conviene juzgar el paso 4 bis por ese y no por
+  el «≤ ~1 s».
+- **Tope:** `design.md` 250/250 (PUERTA TAMAÑO en verde). §8 solo perdió una frase redundante; los
+  riesgos siguen todos.
+- **`progress/current.md`** remite a §9 y nombra `apply-grants` y el coste.
+- **Observación sin bloqueo:** el paso 1 de la vuelta atrás quedó como `infra/85_update_job.ps1 -Tag
+  ...`, sin el `powershell -NoProfile -File` de la ida. Desde PowerShell funciona; desde Git Bash, no.
+  Mejor escribirlo igual que el paso 2 de la ida cuando se toque el fichero.
+- **`bash harness/init.sh`** sobre `9639b45`: **ENTORNO LISTO**, exit 0; **10.103 passed, 274
+  skipped** (1 h 31 min); PUERTA COBERTURA 100,0 % (15/15); PUERTA TAMAÑO en verde.
+- **Checkpoints:** C4 «MANUAL listadas con su comando exacto» pasa a `[x]`. El resto, como en la
+  pasada 1: C1-C5, C4 bis `[x]`, y los N/A justificados (C3 bis, `history.md`, RM5, RM6). T10 sigue
+  abierta a propósito: es el despliegue del humano, tras el merge.
+
+---
+
+## Pasada 1 (`caebdb4`) · histórico
 
 **Veredicto: CHANGES_REQUESTED.** El código, el SQL, las fichas y los tests están bien: no hay que
 tocarlos. Lo que falla son **los pasos MANUAL de `design.md` §9**: tres huecos, los tres en un
