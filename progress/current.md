@@ -9,6 +9,23 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-03 · F-156 · `spec_ready` · spec escrita · rama `feature/F-156-postventa`
+
+Spec-author. Spec en `specs/F-156-postventa/`, medida en solo lectura el 03-11 (Sigrid por
+`sigrid-api` y Azure; `progress/spec_F-156.md`). Sin código. **No implementar hasta cerrar
+F-153 y hasta que el humano valide la PARADA 1** (requirements, D1-D10; recomendadas en negrita):
+- **D1 (la que manda)**: datos personales de propietarios y contactos en `postventa_restringida`
+  SOLO con autorización escrita del responsable del dato (como F-057); sin ella, fuera.
+- **D2**: `mcp-bbdd` necesita `postventa` en su lista blanca y un índice de adjuntos MÚLTIPLE
+  (hoy admite un objeto): pliego en design § 11 para una feature de ese repositorio.
+- D3 perfiles (restringido sí), D4 coste enlazado (Sigrid no liga coste a la incidencia),
+  D5 ingesta completa (~78.000 filas, ~15 s), D6 tras `build_contabilidad`, D7 una feature,
+  D8 traer de `dbo.log` las 659 líneas de cierre de `postventa-incidencias` (cierra sin `rac`),
+  D9 los partes firmados (DNI manuscrito) solo abribles por el perfil total, D10 texto libre
+  enmascarado en el general.
+- Hallazgos: `act`, `uve`, `uveref` y `auxuvetip` están VACÍAS (no hay unidad de venta); los
+  «partes» de postventa son las reclamaciones (`con.tip` 708) y sus tareas `tar` (47).
+
 ## 2026-11-02 · F-153 · `in_progress` · implementada · rama `feature/F-153-estado-albaranes`
 
 Implementer. Humano: D1=A, D2=A, D3=A, D4=A. T1-T9 y T11 hechas; detalle y evidencias en
