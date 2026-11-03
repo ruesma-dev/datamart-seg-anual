@@ -1979,3 +1979,21 @@ porque el comparativo COM26/0014 reutiliza las 6 ofertas del 0687.0_0037:
 (`invitacion_id`) y se corrigen 08, 09 y 14. Desplegado con la imagen
 r20261031-1727 y el diccionario v68; `build-compras` SUCCESS el 31-10;
 72.113 invitaciones. Merge `main` c9e4bbe, `dev` 7adb5a0.
+
+## F-153 — Estado de albaranes, proformas y notas · 2026-11-03
+
+Rama `feature/F-153-estado-albaranes`. APROBADO en la pasada 2
+(`progress/review_F-153.md`); spec en `specs/F-153-estado-albaranes/`.
+
+`compras.albaranes` publica `estado_id`, `estado_codigo` y `estado`
+(`fn_estado_documento(14, con.est)`, toda la familia del tipo 14: albaranes,
+proformas y notas) y `compras.v_estado_documentos` incluye el tipo 14 con
+`origen_fecha` (PASO / FACTURACION / ALTA / SIN_HISTORIAL / FUERA_DE_PROCESO).
+
+Desplegado: imagen r20261103-1601, diccionario v70 (256 objetos), MCP
+reiniciado. Medido en Azure el 03-11: FAC 270.178, CON 37.597, PDT 7.689, COM
+412, sin estado 10; con fecha por facturación 235.255 y por alta 7.689, sin
+historial 72.942 (hasta F-133). `build-compras` 636 s; la vista entera en
+0,48 s; grants 49/49. `check-unicidad` sin colisiones (sigue sin comprobar
+`stg.plan_mensual` por timeout, ya conocido). Merge `main` bec363c, `dev`
+036206c. FUERA: el historial de pasos de los albaranes (F-133).
