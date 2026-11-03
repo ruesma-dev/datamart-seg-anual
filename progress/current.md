@@ -9,22 +9,20 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-11-03 · F-156 · `spec_ready` · spec escrita · rama `feature/F-156-postventa`
+## 2026-11-03 · F-156 · `spec_ready` · spec revisada con las decisiones del humano · rama `feature/F-156-postventa`
 
-Spec-author. Spec en `specs/F-156-postventa/`, medida en solo lectura el 03-11 (Sigrid por
-`sigrid-api` y Azure; `progress/spec_F-156.md`). Sin código. **No implementar hasta cerrar
-F-153 y hasta que el humano valide la PARADA 1** (requirements, D1-D10; recomendadas en negrita):
-- **D1 (la que manda)**: datos personales de propietarios y contactos en `postventa_restringida`
-  SOLO con autorización escrita del responsable del dato (como F-057); sin ella, fuera.
-- **D2**: `mcp-bbdd` necesita `postventa` en su lista blanca y un índice de adjuntos MÚLTIPLE
-  (hoy admite un objeto): pliego en design § 11 para una feature de ese repositorio.
-- D3 perfiles (restringido sí), D4 coste enlazado (Sigrid no liga coste a la incidencia),
-  D5 ingesta completa (~78.000 filas, ~15 s), D6 tras `build_contabilidad`, D7 una feature,
-  D8 traer de `dbo.log` las 659 líneas de cierre de `postventa-incidencias` (cierra sin `rac`),
-  D9 los partes firmados (DNI manuscrito) solo abribles por el perfil total, D10 texto libre
-  enmascarado en el general.
-- Hallazgos: `act`, `uve`, `uveref` y `auxuvetip` están VACÍAS (no hay unidad de venta); los
-  «partes» de postventa son las reclamaciones (`con.tip` 708) y sus tareas `tar` (47).
+Spec-author. Spec en `specs/F-156-postventa/` (+ `pliego_mcp_bbdd.md`), medida en solo lectura
+(`progress/spec_F-156.md`, §§ 1-10). Sin código. **No implementar hasta cerrar F-153.**
+Decisiones del humano (2026-11-03) ya recogidas: D1=A («d1 ok») con un PERFIL NUEVO «postventa»
+(= restringido + `postventa_restringida`; grupo `sigrid_dm_perfil_postventa_ro`, login
+`mcp_sigrid_dm_postventa`, contraseña en `kv-mcp-bbdd-dev/pg-password-postventa`, lo crea el
+humano con `02_roles.sql`); D3 `postventa` para los cuatro perfiles; D4 coste por OBRA de origen
+por el código de las partidas de POSTV/POSTV2 (facturas ligadas ~2,58 M€, sin obra ~0,54 M€;
+los partes de personal fuera de la vista); D9 `REPARACION` solo postventa y total; histórico con
+login en el 100 % de los pasos y nombre en el 96,8 % de los de 708. Quedan para el humano:
+- Enviar `specs/F-156-postventa/pliego_mcp_bbdd.md` a `mcp-bbdd` (lista blanca, índice de
+  adjuntos múltiple, tercera conexión para el perfil postventa).
+- Decidir allí qué hacer con vídeos y comprimidos adjuntos (≈ 190 vídeos).
 
 ## 2026-11-02 · F-153 · `in_progress` · implementada · rama `feature/F-153-estado-albaranes`
 

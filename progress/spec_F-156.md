@@ -136,3 +136,33 @@ Lecturas de 10.000 filas completas: `rcp` 0,9 s · `tar` 0,7 s · `rcpint` 0,2 s
 - `mcp-bbdd/config/config.yaml`: `seguridad.esquemas_permitidos` es una lista fija (15
   esquemas, la fija su `test_f022_esquema_compras_restringida.py`) y `adjuntos.indice` admite
   UN objeto (`compras.documento_adjuntos`) con `origenes` por familia.
+
+## 10. Segunda pasada (2026-11-03, 18:10-18:20 UTC, tras las decisiones del humano)
+
+**Quién cambió cada estado.** `rac` trae fecha, hora y login (`usu`) en el 100 % de los pasos
+de los tres tipos: 708 37.669 (10 logins; casan con `usu.cod` 36.451, **96,8 %**; 1.218 son
+logins que ya no están en `usu`), 47 1.156 (2 logins, todos en `usu`), 707 923 (6, todos). Las
+659 líneas `Cerrar parte (postventa-incidencias)` de `dbo.log` traen el login en `usu` (659 de
+659, 3 logins, todos en `usu`). Sin autor: las 2.015 SAT sin pasos (solo hay alta).
+
+**Coste de postventa por obra (D4).** Las partidas de las obras de postventa SE LLAMAN COMO LA
+OBRA DE ORIGEN: en POSTV2 (empresa 1, `obride` 1659588) 251 partidas (capítulos CD 90 hijos,
+CI 8, CP 12) con códigos `0342`, `0592`, `0593B`, `0613-B`, `0561 ` (espacio)…; en POSTV
+(870589) 15, todas con código de obra; en POSTV2 de la empresa 28 (2558492) 6 con el código sin
+cero (`626`, `637`…). Las tres `0004` (empresas 11, 18 y 28) no tienen partidas. `mart` no tiene
+filas de POSTV2 (fuera del universo del seguimiento): el coste se lee de `compras` y `personal`.
+Ligando por el código de la partida o del ancestro más cercano (cifras iniciales a 4 con ceros,
+contra las obras tipo 42 de la misma empresa):
+
+| Obra | Fuente | Ligado (obras) | Sin obra |
+|---|---|---:|---:|
+| POSTV (e1) | facturas | 100.489 € (15) | 0 |
+| POSTV (e1) | partes de personal | 6.966 € (6) | 0 |
+| POSTV2 (e1) | facturas | 2.476.938 € (71) | 536.651 € (capítulos CI/CP) |
+| POSTV2 (e1) | partes de personal | 1.838.287 € (71) | 73.953 € |
+| POSTV2 (e28) | partes de personal | 17.213 € (3) | 30.803 € |
+
+Facturas ligadas de la empresa 1: **~2.577.000 €**; sin obra ~537.000 €. Además 130.729 € de
+líneas de factura de esas obras sin partida. La agregación entera tardó 6,7 s; la vista leerá
+`compras.factura_lineas` por `partida_id` (índice `idx_com_faclin_par`). Los partes (personal)
+no entran en la vista: el perfil restringido no ve `personal`.
