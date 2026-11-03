@@ -24,6 +24,7 @@ import pytest
 from etl_sigrid.domain.estado_documentos import (
     FAMILIAS_ESTADO,
     ORIGENES_FECHA,
+    TIPOS_DOCUMENTO_ALBARAN,
 )
 from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
 
@@ -104,7 +105,7 @@ def test_f132_r18_vista_la_fecha_sale_de_rac_y_no_de_la_foto() -> None:
         assert frase not in _ficha_entera(VISTA), frase
 
 
-def test_f132_r18_vista_los_tres_origenes_y_lo_que_significan() -> None:
+def test_f132_r18_vista_los_origenes_y_lo_que_significan() -> None:
     origen = _columna(VISTA, "origen_fecha")
     assert list(origen.valores) == list(ORIGENES_FECHA)
     texto = _texto_columna(VISTA, "origen_fecha")
@@ -125,10 +126,13 @@ def test_f132_r18_vista_fuera_de_proceso_sin_fecha_y_con_cota() -> None:
     assert "fuera_de_proceso" in _texto_columna(VISTA, "dias_en_estado")
 
 
-def test_f132_r18_vista_tres_familias() -> None:
-    assert list(_columna(VISTA, "tipo_documento").valores) == list(FAMILIAS_ESTADO.values())
+def test_f132_r18_vista_las_familias() -> None:
+    # F-153: el tipo 14 publica el `tipo_documento` de `compras.albaranes`.
+    assert list(_columna(VISTA, "tipo_documento").valores) == [
+        *FAMILIAS_ESTADO.values(), *TIPOS_DOCUMENTO_ALBARAN,
+    ]
     assert list(_columna(VISTA, "tipo_documento_codigo").valores) == [
-        str(t) for t in FAMILIAS_ESTADO
+        *(str(t) for t in FAMILIAS_ESTADO), "14",
     ]
     destinos = {r.a for r in _ficha(VISTA).relaciones}
     assert {

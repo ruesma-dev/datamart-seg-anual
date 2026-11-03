@@ -46,7 +46,7 @@ ventanas por documento) y no lo necesita nadie del esquema salvo `13`. Lee
 
 `13` (F-132) va DETRÁS de `12` porque la vista `compras.v_estado_documentos`
 lee `compras.documento_procesos`, y el `DROP TABLE ... CASCADE` de `12` se la
-lleva cada noche: `13` la vuelve a crear. Lee además las tres cabeceras (`01`,
+lleva cada noche: `13` la vuelve a crear. Lee además las cuatro cabeceras (`01`,
 `08`).
 
 `14` (F-090) solo lee `raw` (`rcg`, `gra`, `con`, `comprv`) y la función
@@ -202,7 +202,8 @@ SUB_PASOS: tuple[_SubStep, ...] = (
         target_table="documento_procesos",
     ),
     # F-132: `compras.v_estado_documentos`, el estado actual de contratos,
-    # facturas y comparativos y desde cuándo, sacado del último paso de `rac`.
+    # facturas, comparativos y albaranes (F-153) y desde cuándo, sacado del
+    # último paso de `rac`.
     # DETRÁS de `12`, cuyo `DROP ... CASCADE` tira la vista cada noche. Es una
     # VISTA: no declara tabla destino y no se cuentan filas (contarlas la
     # recorrería entera para nada).
