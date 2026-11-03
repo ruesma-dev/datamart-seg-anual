@@ -12,7 +12,7 @@ LO QUE ESTE FICHERO DEFIENDE:
    `compras.documento_procesos`, y el estado, de la cabecera (R3).
 2. **Los literales del SQL son los del dominio** (R11,
    `domain/estado_documentos.py`): las familias, los estados iniciales y los
-   tres orígenes.
+   orígenes (cinco desde F-153, que añade el tipo 14; `tests/test_f153_sql.py`).
 3. La foto de F-067 (`11_historial_estados.sql`) ya no existe: la retiró la
    Fase B (`tests/test_f132_retirada.py`).
 """
@@ -137,11 +137,14 @@ def test_f132_r1_no_lee_la_foto_ni_raw() -> None:
     assert "tiemod" not in vista and "fn_sigrid_tiempo" not in vista
 
 
-def test_f132_r1_una_fila_por_documento_de_las_tres_cabeceras() -> None:
+def test_f132_r1_una_fila_por_documento_de_las_cabeceras() -> None:
     vista = _vista()
     documentos = vista[vista.index("WITH documentos AS (") : vista.index("), con_paso AS (")]
-    assert documentos.count(" UNION ALL ") == 2
-    for tabla in ("compras.contratos c", "compras.facturas f", "compras.comparativos m"):
+    assert documentos.count(" UNION ALL ") == 3  # F-153 añade el tipo 14
+    for tabla in (
+        "compras.contratos c", "compras.facturas f", "compras.comparativos m",
+        "compras.albaranes a",
+    ):
         assert f"FROM {tabla}" in documentos, tabla
     # El último paso, uno por documento: LEFT JOIN por `es_ultimo` (no multiplica).
     assert (
@@ -155,16 +158,17 @@ def test_f132_r3_el_estado_es_el_de_la_cabecera() -> None:
     documentos = vista[vista.index("WITH documentos AS (") : vista.index("), con_paso AS (")]
     assert (
         "c.contrato_id AS documento_id, c.codigo_contrato AS codigo_documento, "
-        "c.estado_id, c.estado_codigo, c.estado, c.fecha AS fecha_alta "
+        "c.estado_id, c.estado_codigo, c.estado, c.fecha AS fecha_alta, "
+        "NULL::TEXT AS tipo_albaran, NULL::DATE AS fecha_facturacion "
         "FROM compras.contratos c" in documentos
     )
     assert (
         "f.factura_id, f.codigo_factura, f.estado_id, f.estado_codigo, f.estado, "
-        "f.fecha_alta FROM compras.facturas f" in documentos
+        "f.fecha_alta, NULL, NULL FROM compras.facturas f" in documentos
     )
     assert (
         "m.comparativo_id, m.codigo_comparativo, m.estado_id, m.estado_codigo, "
-        "m.estado, m.fecha_alta FROM compras.comparativos m" in documentos
+        "m.estado, m.fecha_alta, NULL, NULL FROM compras.comparativos m" in documentos
     )
     elementos = _elementos(_proyeccion())
     for columna in ("estado_id", "estado_codigo", "estado"):
@@ -190,7 +194,8 @@ def test_f132_r2_publica_sus_columnas_en_orden() -> None:
 def test_f132_r11_las_familias_son_las_del_dominio() -> None:
     caso = " ".join(f"WHEN {t} THEN '{n}'" for t, n in FAMILIAS_ESTADO.items())
     assert (
-        f"CASE f.tipo_documento_codigo {caso} END::TEXT AS tipo_documento"
+        f"CASE f.tipo_documento_codigo {caso} WHEN 14 THEN f.tipo_albaran END::TEXT "
+        "AS tipo_documento"
         in _elementos(_proyeccion())
     )
     vista = _vista()
@@ -213,14 +218,16 @@ def test_f132_r11_los_origenes_son_los_del_dominio() -> None:
 
 
 def test_f132_r4_r5_r6_el_origen_en_el_orden_del_dominio() -> None:
-    paso, alta, fuera = ORIGENES_FECHA
+    # Los dos orígenes de F-153 y su orden completo: `tests/test_f153_sql.py`.
+    paso, _facturacion, alta, _sin_historial, fuera = ORIGENES_FECHA
     assert (
         "CASE WHEN u.paso_id IS NOT NULL "
         "AND u.estado_destino_id IS NOT DISTINCT FROM d.estado_id "
-        f"THEN '{paso}' WHEN u.paso_id IS NULL AND (d.tipo_documento_codigo, d.estado_id) IN "
-        in _vista()
+        f"THEN '{paso}' WHEN " in _vista()
     )
-    assert f"THEN '{alta}' ELSE '{fuera}' END AS origen_fecha" in _vista()
+    assert f"(d.tipo_documento_codigo, d.estado_id) IN " in _vista()
+    assert f"THEN '{alta}' WHEN " in _vista()
+    assert f"ELSE '{fuera}' END AS origen_fecha" in _vista()
 
 
 def test_f132_r4_el_momento_del_paso_o_su_dia_a_las_cero() -> None:
@@ -230,6 +237,7 @@ def test_f132_r4_el_momento_del_paso_o_su_dia_a_las_cero() -> None:
 def test_f132_r4_r5_r8_en_estado_desde_paso_o_alta_y_si_no_nulo() -> None:
     assert (
         "CASE p.origen_fecha WHEN 'PASO' THEN p.momento_ultimo "
+        "WHEN 'FACTURACION' THEN p.fecha_facturacion::TIMESTAMP "
         "WHEN 'ALTA' THEN p.fecha_alta::TIMESTAMP END AS en_estado_desde" in _vista()
     )
     assert "f.en_estado_desde" in _elementos(_proyeccion())

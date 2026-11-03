@@ -1,17 +1,23 @@
 -- etl_sigrid/infrastructure/postgres/sql/compras/13_estado_documentos.sql
 -- ============================================================================
 -- F-132 · `compras.v_estado_documentos`: EL ESTADO ACTUAL DE CADA CONTRATO,
--- FACTURA Y COMPARATIVO Y DESDE CUÁNDO ESTÁ EN ÉL.
+-- FACTURA, COMPARATIVO Y ALBARÁN (F-153) Y DESDE CUÁNDO ESTÁ EN ÉL.
 --
 -- LA FECHA SALE DE `rac` (F-085), vía `compras.documento_procesos`: el último
 -- paso de la ventana «Procesos» fecha al segundo el estado actual del 99,4 %
--- de los documentos (medido el 2026-10-08). Tres orígenes (`origen_fecha`):
+-- de contratos, facturas y comparativos (medido el 2026-10-08). Cinco orígenes
+-- (`origen_fecha`), en este orden; FACTURACION y SIN_HISTORIAL son del tipo 14:
 --   PASO              el destino del último paso es el estado de la cabecera:
 --                     la fecha es su `momento` (hora de Madrid; sin hora, su
 --                     día a las 00:00), con quién lo dio.
+--   FACTURACION       albarán (14) en estado 10 con `fecha_facturacion`
+--                     (`dca.fecfac`): ese día a las 00:00. `rac` casi nunca
+--                     registra el paso a FACTURADO. No es la fecha de la factura.
 --   ALTA              sin un solo paso y en un estado INICIAL de su tipo: la
 --                     fecha es el día de alta (`con.fec`, sin hora; sin alta,
 --                     NULL).
+--   SIN_HISTORIAL     albarán sin ningún paso publicado (F-133): SIN fecha ni
+--                     cota, y sin afirmar que cambió fuera de un proceso.
 --   FUERA_DE_PROCESO  cualquier otro caso (el estado cambió sin un paso, ~75
 --                     documentos de stock histórico): SIN fecha, y
 --                     `cambio_posterior_a` da la cota «cambió después de».
@@ -19,14 +25,18 @@
 -- estado al que se vuelve deshaciendo cuenta desde el paso que llevó a él la
 -- primera vez (D2 del humano). La fecha del deshacer está en `dbo.log` (F-105).
 --
--- UNA FILA POR DOCUMENTO de `compras.contratos` (44), `compras.facturas` (15)
--- y `compras.comparativos` (46). El estado (`estado_id`, `estado_codigo`,
+-- UNA FILA POR DOCUMENTO de `compras.contratos` (44), `compras.facturas` (15),
+-- `compras.comparativos` (46) y `compras.albaranes` (14, F-153). El tipo 14
+-- publica en `tipo_documento` el de su cabecera (ALBARAN, PROFORMA, NOTA, OTRO):
+-- la familia entera se filtra por `tipo_documento_codigo = 14`. CUANDO F-133
+-- traiga sus pasos a `documento_procesos`, la regla vale sin reescribirse: COM y
+-- CON pasarán solos a PASO, y `FAMILIAS_SIN_HISTORIAL` se vaciará. El estado (`estado_id`, `estado_codigo`,
 -- `estado`) es el de la CABECERA, ya traducido por la pareja tipo-estado
 -- (F-084), nunca el destino de un paso. `dias_en_estado` se calcula AL
 -- CONSULTAR con la fecha de hoy en Madrid: avanza solo.
 --
--- Lee: `compras.contratos`, `compras.facturas`, `compras.comparativos` (01, 08)
--- y `compras.documento_procesos` (12). NUNCA la foto diaria de F-067, que
+-- Lee: `compras.contratos`, `compras.facturas`, `compras.albaranes`,
+-- `compras.comparativos` (01, 08) y `compras.documento_procesos` (12). NUNCA la foto diaria de F-067, que
 -- sigue construyéndose en `11` como RESPALDO mientras dura el contraste
 -- (`python main.py contraste-estados`). `con.tiemod` tampoco entra (D2 de F-067).
 --
@@ -34,7 +44,8 @@
 -- CASCADE` cada noche y se lleva la vista por delante: aquí se tira (por si
 -- quedaba la de F-067, con otras columnas) y se crea de nuevo.
 --
--- LOS LITERALES —familias, estados iniciales y orígenes— son los de
+-- LOS LITERALES —familias, estados iniciales, orígenes y los números 14 y 10—
+-- son los de
 -- `etl_sigrid/domain/estado_documentos.py`, donde la regla está escrita como
 -- oráculo y probada caso a caso; `tests/test_f132_sql.py` fija que aquí son
 -- LOS MISMOS. Un cambio se hace allí y aquí, en el mismo commit.
@@ -46,14 +57,19 @@ WITH documentos AS (
     -- El estado de la CABECERA (R3), uno por documento.
     SELECT 44 AS tipo_documento_codigo, c.contrato_id AS documento_id,
            c.codigo_contrato AS codigo_documento,
-           c.estado_id, c.estado_codigo, c.estado, c.fecha AS fecha_alta   -- c.fecha = con.fec
+           c.estado_id, c.estado_codigo, c.estado, c.fecha AS fecha_alta,  -- c.fecha = con.fec
+           NULL::TEXT AS tipo_albaran, NULL::DATE AS fecha_facturacion
     FROM compras.contratos c
     UNION ALL
     SELECT 15, f.factura_id, f.codigo_factura, f.estado_id, f.estado_codigo, f.estado,
-           f.fecha_alta FROM compras.facturas f
+           f.fecha_alta, NULL, NULL FROM compras.facturas f
     UNION ALL
     SELECT 46, m.comparativo_id, m.codigo_comparativo, m.estado_id, m.estado_codigo,
-           m.estado, m.fecha_alta FROM compras.comparativos m
+           m.estado, m.fecha_alta, NULL, NULL FROM compras.comparativos m
+    UNION ALL
+    -- F-153. `a.fecha` = con.fec. Sin `raw`: todo sale de la cabecera.
+    SELECT 14, a.albaran_id, a.codigo_albaran, a.estado_id, a.estado_codigo, a.estado,
+           a.fecha, a.tipo_documento, a.fecha_facturacion FROM compras.albaranes a
 ),
 con_paso AS (
     -- El ÚLTIMO paso de `rac`: uno por documento como mucho (`es_ultimo`).
@@ -62,10 +78,15 @@ con_paso AS (
            CASE WHEN u.paso_id IS NOT NULL
                      AND u.estado_destino_id IS NOT DISTINCT FROM d.estado_id
                 THEN 'PASO'                                                     -- R4
+                WHEN d.tipo_documento_codigo = 14 AND d.estado_id = 10
+                     AND d.fecha_facturacion IS NOT NULL
+                THEN 'FACTURACION'                                              -- F-153
                 WHEN u.paso_id IS NULL
                      AND (d.tipo_documento_codigo, d.estado_id) IN
-                         ((15, 1), (15, 20), (44, 1), (46, 1), (46, 11), (46, 100))
+                         ((14, 1), (15, 1), (15, 20), (44, 1), (46, 1), (46, 11), (46, 100))
                 THEN 'ALTA'                                                     -- R5
+                WHEN u.paso_id IS NULL AND d.tipo_documento_codigo IN (14)
+                THEN 'SIN_HISTORIAL'                                            -- F-153
                 ELSE 'FUERA_DE_PROCESO' END AS origen_fecha                     -- R6
     FROM documentos d
     LEFT JOIN compras.documento_procesos u
@@ -73,8 +94,10 @@ con_paso AS (
 ),
 fechados AS (
     SELECT p.*,
-           -- R4, R5, R8: FUERA_DE_PROCESO no tiene fecha; ALTA sin alta, tampoco.
+           -- R4, R5, R8: FUERA_DE_PROCESO y SIN_HISTORIAL no tienen fecha; ALTA sin
+           -- alta, tampoco.
            CASE p.origen_fecha WHEN 'PASO' THEN p.momento_ultimo
+                               WHEN 'FACTURACION' THEN p.fecha_facturacion::TIMESTAMP
                                WHEN 'ALTA' THEN p.fecha_alta::TIMESTAMP END AS en_estado_desde
     FROM con_paso p
 )
@@ -82,7 +105,7 @@ SELECT
     f.documento_id,
     f.tipo_documento_codigo,
     CASE f.tipo_documento_codigo WHEN 44 THEN 'CONTRATO' WHEN 15 THEN 'FACTURA'
-         WHEN 46 THEN 'COMPARATIVO' END::TEXT                    AS tipo_documento,
+         WHEN 46 THEN 'COMPARATIVO' WHEN 14 THEN f.tipo_albaran END::TEXT AS tipo_documento,
     f.codigo_documento,
     f.estado_id,
     f.estado_codigo,
@@ -101,4 +124,4 @@ SELECT
 FROM fechados f;
 
 COMMENT ON VIEW compras.v_estado_documentos IS
-'Estado actual de cada contrato, factura y comparativo y desde cuando esta en el (F-132). La fecha sale del ultimo paso de rac (compras.documento_procesos): origen_fecha PASO (al segundo, hora de Madrid, con quien lo dio), ALTA (sin pasos y en estado inicial: el dia de alta) o FUERA_DE_PROCESO (sin fecha, con la cota en cambio_posterior_a). Historia NETA: un paso deshecho no se fecha. dias_en_estado se calcula al consultar.';
+'Estado actual de cada contrato, factura, comparativo y albaran (F-132, F-153) y desde cuando esta en el. La fecha sale del ultimo paso de rac (compras.documento_procesos): origen_fecha PASO (al segundo, hora de Madrid, con quien lo dio), FACTURACION (albaran facturado: el dia de facturacion), ALTA (sin pasos y en estado inicial: el dia de alta), SIN_HISTORIAL (albaran sin pasos publicados: sin fecha) o FUERA_DE_PROCESO (sin fecha, con la cota en cambio_posterior_a). La familia de albaranes se filtra por tipo_documento_codigo = 14. Historia NETA: un paso deshecho no se fecha. dias_en_estado se calcula al consultar.';

@@ -114,6 +114,13 @@
 -- solo para el perfil total, y ningún otro bloque la publica ni la lee.
 -- Fuera, por decisión del humano: `empide` y `hor` (F-134), el desajuste
 -- cabecera-línea (F-093) y los catálogos no ingeridos (`cocide` → F-143).
+--
+-- F-153 (2026-11-02) · EL ESTADO DEL ALBARÁN. El bloque ALBARANES gana TRES
+-- columnas al final —`estado_id`, `estado_codigo` y `estado`—, de `con.est` y
+-- traducidas por la pareja con `compras.fn_estado_documento(14, ...)`, como las
+-- facturas. Sin `WHERE` ni `JOIN` interno nuevo: un `est` fuera de catálogo (10,
+-- todos a 0) se publica igual, con los literales a NULL. El estado NO es
+-- `facturado_sigrid` (`dca.estfac`), que difiere en 185 documentos.
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
@@ -344,10 +351,16 @@ SELECT
     compras.fn_sigrid_date(a.feclim)        AS fecha_limite,
     COALESCE(a.estfac = 1, FALSE)           AS facturado_sigrid,
     compras.fn_sigrid_date(a.fecfac)        AS fecha_facturacion,
-    NULLIF(a.idefac, 0)                     AS factura_cabecera_id  -- la buena es por línea
+    NULLIF(a.idefac, 0)                     AS factura_cabecera_id,  -- la buena es por línea
+    -- F-153: AL FINAL, como F-128. `con.est` y su traducción, por la pareja.
+    con.est                                 AS estado_id,        -- código interno del tipo 14
+    est.codigo_estado                       AS estado_codigo,    -- PDT, COM, CON, FAC
+    est.nombre_estado                       AS estado            -- ya traducido (tipo 14)
 FROM raw.dca a
 JOIN raw.con con          ON con.ide = a.ide
 LEFT JOIN raw.con prv_con ON prv_con.ide = NULLIF(a.entide, 0)
+-- F-153: el estado, por la pareja (tipo, estado), como en FACTURAS.
+LEFT JOIN LATERAL compras.fn_estado_documento(14, con.est) est ON TRUE
 -- F-128: todos LEFT y ningún `WHERE` externo: los 314.042 documentos siguen.
 -- La forma y el medio de pago, de `raw` y no de `compras.formas_pago`, que se
 -- construye después (`04_formas_pago.sql`), como en CONTRATOS.
@@ -370,6 +383,7 @@ ALTER TABLE compras.albaranes ADD PRIMARY KEY (albaran_id);
 CREATE INDEX idx_com_alb_ctr ON compras.albaranes (contrato_id);
 CREATE INDEX idx_com_alb_prv ON compras.albaranes (proveedor_id);
 CREATE INDEX idx_com_alb_tip ON compras.albaranes (tipo_documento);
+CREATE INDEX idx_com_alb_est ON compras.albaranes (estado_id);
 
 DROP TABLE IF EXISTS compras.albaran_lineas CASCADE;
 CREATE TABLE compras.albaran_lineas AS
