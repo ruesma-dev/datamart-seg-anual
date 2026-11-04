@@ -485,8 +485,10 @@ def test_f156_r24_de_per_solo_salen_sus_cinco_columnas() -> None:
     usadas = set(re.findall(r"\bp[rcu]\.(\w+)", sql))
     assert usadas, "las personas se leen con los alias pr, pc y pu"
     assert usadas <= set(pv.COLUMNAS_PER), f"de per sale {sorted(usadas - set(pv.COLUMNAS_PER))}"
+    alias = set(re.findall(r"raw\.per (\w+)", sql))
+    assert alias and alias <= {"pr", "pc", "pu"}, f"raw.per se lee con alias {sorted(alias)}"
     for prohibida in pv.COLUMNAS_PER_PROHIBIDAS:
-        assert not re.search(rf"\.{prohibida}\b", sql), f"07 nombra `.{prohibida}` (R24)"
+        assert not re.search(rf"\bp[rcu]\.{prohibida}\b", sql), f"07 lee per.{prohibida} (R24)"
 
 
 def test_f156_r23_textos_integros_sin_mascara() -> None:

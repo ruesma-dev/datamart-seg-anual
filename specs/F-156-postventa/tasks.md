@@ -9,7 +9,7 @@ Precondición: F-153 cerrada (una sola `in_progress`). Decisiones del humano del
 - [x] T4: `sql/postventa/00_setup.sql` a `03_tareas.sql` y `build_postventa_step.py` con `SUB_PASOS` (R6-R13)  |  Verificación: `pytest tests/test_f156_ingesta_sql.py -k "r6 or r7 or r8 or r9 or r10 or r11 or r12 or r13"`
 - [x] T5: `04_procesos.sql` y `05_estado.sql`: histórico con fechas, estados y login/nombre, y vista de estado (R14-R16, R18)  |  Verificación: `pytest tests/test_f156_ingesta_sql.py -k "r14 or r15 or r16 or r18" tests/test_f156_dominio.py`
 - [x] T6: `06_adjuntos.sql`: índice de gráficos con su guarda y las expresiones de compras (R19-R21)  |  Verificación: `pytest tests/test_f156_ingesta_sql.py -k "r19 or r20 or r21" tests/test_f090_ingesta_sql.py`
-- [ ] T7: `07_restringida.sql` (R23-R24)  |  Verificación: `pytest tests/test_f156_ingesta_sql.py -k "r23 or r24"`
+- [x] T7: `07_restringida.sql` (R23-R24)  |  Verificación: `pytest tests/test_f156_ingesta_sql.py -k "r23 or r24"`
 - [ ] T8: `08_coste_obra.sql`: `partida_obra_origen` y `v_coste_obra` (R25-R26)  |  Verificación: `pytest tests/test_f156_ingesta_sql.py -k "r25 or r26" tests/test_f156_dominio.py`
 - [ ] T9: Fase RED de `tests/test_f156_grants.py`; listas en `settings.py` y `.env.example`, `ESQUEMAS_DEL_DATAMART` (R28-R29); tests de listas de esquemas al día  |  Verificación: `pytest tests/test_f156_grants.py -k "r28 or r29" tests/test_f135_grants.py tests/test_f138_grants.py tests/test_f057_personal.py`
 - [ ] T10: Perfil postventa: `perfil_postventa_en_conflicto` en `grants.py` y su bloque en `apply_grants_step.py` (R29-R30)  |  Verificación: `pytest tests/test_f156_grants.py tests/test_f141_perfil_restringido.py tests/test_f136_*.py`
