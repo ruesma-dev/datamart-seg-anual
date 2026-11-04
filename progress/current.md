@@ -17,6 +17,11 @@ Implementer. Spec aprobada por el humano el 2026-11-04 («si lanza»). Tarea en 
   rama nace de `bec363c` (merge de F-153 con `init.sh` verde y review APROBADO). La puerta
   completa se pasa al final.
 - Desviaciones (justificadas): ver la sección «Desviaciones» de `progress/impl_F-156.md`.
+- T1-T14 hechas y commiteadas (T13 diccionario, T14 documentación; `azure-apps` commit local
+  `8dc4b04`, sin push). Diccionario del árbol hoy: **v71, 287 objetos, 2459 columnas, 137 de
+  consumo**, 23 reglas (nueva `R-POSTVENTA-RESTRINGIDA`), SIN publicar. Presupuesto de F-147
+  subido con motivo a 34.212. Nada lanzado contra Azure salvo lecturas; el PostgreSQL desechable
+  local ya está parado. Pendiente: T15 (informe + mutación), T17 (`init.sh` en verde); T16 MANUAL.
 
 ## 2026-11-03 · F-156 · `spec_ready` · spec revisada con las decisiones del humano · rama `feature/F-156-postventa`
 

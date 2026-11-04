@@ -26,7 +26,7 @@ Módulos adicionales: `compras`, `maestro`, `retenciones`, `personal`,
 ejecutado en orden dentro de cada capa.
 
 **`postventa` (F-156, 2026-11-04) es la postventa de las viviendas
-entregadas**, construida por `build_postventa` desde 13 tablas nuevas de `raw`
+entregadas**, construida por `build_postventa` desde trece tablas nuevas de `raw`
 (`sql/postventa/`, nueve ficheros): las unidades (`con` 707) con sus
 garantías, las incidencias (708) con sus intervinientes, las tareas (47), el
 histórico de estados de los tres (`incidencia_procesos`: los pasos de `rac` MÁS

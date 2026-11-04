@@ -176,6 +176,17 @@ GRUPO_F_F140 = {
     "tesoreria.reparto_pago_personal": "ya aplicada en devengo_pendiente_obra_mes",
 }
 
+#: F-156 (2026-11-04): las cinco funciones locales de `postventa` y la llave de
+#: partidas del coste, que ya aplica `postventa.v_coste_obra`.
+GRUPO_G_F156 = {
+    "postventa.fn_enmascarar": "funcion auxiliar del build",
+    "postventa.fn_estado": "funcion auxiliar del build",
+    "postventa.fn_fecha": "funcion auxiliar del build",
+    "postventa.fn_momento": "funcion auxiliar del build",
+    "postventa.fn_obra_de_partida": "funcion auxiliar del build",
+    "postventa.partida_obra_origen": "ya aplicada en postventa.v_coste_obra",
+}
+
 
 def _dicc():
     return cargar_diccionario(DIR_DICCIONARIO)[0]
@@ -455,7 +466,7 @@ def test_f079_r3_el_inventario_de_lo_que_no_se_toca_esta_completo() -> None:
 
     inventario = (
         set(GRUPO_B_FUNCIONES) | set(GRUPO_C) | set(GRUPO_D_F095) | set(GRUPO_E_F097)
-        | set(GRUPO_F_F140)
+        | set(GRUPO_F_F140) | set(GRUPO_G_F156)
     )
     assert fuera == inventario, (
         f"sin inventariar: {sorted(fuera - inventario)}; "

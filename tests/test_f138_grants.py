@@ -87,7 +87,7 @@ def test_f138_r22_es_un_esquema_del_datamart() -> None:
     from etl_sigrid.domain import diccionario
 
     assert RESTR in diccionario.ESQUEMAS_DEL_DATAMART
-    assert len(diccionario.ESQUEMAS_DEL_DATAMART) == 16
+    assert len(diccionario.ESQUEMAS_DEL_DATAMART) == 18  # F-156: + postventa y postventa_restringida
     assert list(diccionario.ESQUEMAS_DEL_DATAMART) == sorted(diccionario.ESQUEMAS_DEL_DATAMART)
     texto = (RAIZ / "etl_sigrid" / "domain" / "diccionario.py").read_text(encoding="utf-8")
     assert "F-138" in texto.split("ESQUEMAS_DEL_DATAMART = (")[0]

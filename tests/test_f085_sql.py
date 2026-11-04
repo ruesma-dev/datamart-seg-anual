@@ -128,9 +128,12 @@ def test_f085_r2_el_comentario_de_usu_da_el_motivo_de_cada_exclusion() -> None:
 
 
 def test_f085_r4_el_censo_pasa_a_72_sin_conpro_rol_ni_log() -> None:
-    assert len(_tablas()) == 80  # +2 de F-090 (`rcg`, `gra`), +2 de F-138 (`conala`, `auxala`), +2 de F-140 (`auxcob`, `auxefc`), +2 de F-150 (`iva`, `dvf`)
+    assert len(_tablas()) == 93  # +2 de F-090 (`rcg`, `gra`), +2 de F-138 (`conala`, `auxala`), +2 de F-140 (`auxcob`, `auxefc`), +2 de F-150 (`iva`, `dvf`), +13 de F-156 (postventa)
     assert "usu" in _tablas()
-    for tabla in ("conpro", "rol", "log"):
+    # F-156 (D8) da de alta `log`, pero RECORTADA a los cierres de la aplicacion
+    # de Posventa y sin `res` ni `err`: la bitacora entera sigue fuera (F-105).
+    assert _tablas()["log"]["where"], "`log` solo entra filtrada (F-156 D8)"
+    for tabla in ("conpro", "rol"):
         assert tabla not in _tablas(), f"`{tabla}` no se da de alta (D5, D8)"
 
 
