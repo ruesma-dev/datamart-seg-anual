@@ -50,10 +50,12 @@ FICHERO_PENDIENTES = RAIZ / "config" / "objetos_pendientes.yaml"
 #: --las formas y los medios de cobro-- y son 78; F-150 añade `iva` --el
 #: catálogo de impuestos de los contratos con el cliente y de la ficha de la
 #: obra-- y `dvf` --la CABECERA de las facturas de venta, por lista blanca,
-#: para el hueco de facturación de H26-- y son 80. La
+#: para el hueco de facturación de H26-- y son 80; F-156 añade las 13 de
+#: postventa (unidades, incidencias, tareas, catálogos, el recorte de `log` y
+#: cinco columnas de `per`) y son 93. La
 #: constante se mueve con la realidad a propósito: es lo que hace que
 #: los tres documentos que citan el número no se queden viejos en silencio.
-TOTAL_TABLAS = 80
+TOTAL_TABLAS = 93
 
 #: La lista estándar de nombres de texto/binario ilimitado de documentos, tal y
 #: como la declara el bloque COMPRAS de `config/tables_sigrid.yaml`.
