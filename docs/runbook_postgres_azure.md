@@ -50,6 +50,8 @@ nativos de PostgreSQL con contraseña, y la contraseña en Key Vault**.
 | `mcp_sigrid_dm_total` | `LOGIN` + contraseña, solo en `kv-mcp-bbdd-dev` (`pg-password-total`) | El acceso TOTAL del MCP (F-136): miembro de los dos anteriores, sin GRANT propios y **nunca `raw`**. Alta y rotación: **§12** |
 | `sigrid_dm_perfil_restringido_ro` | Grupo, `NOLOGIN` | El perfil RESTRINGIDO (F-141, administrativos): ve MENOS que el estándar, sin `contabilidad` (el esquema entero desde F-146; antes, sin el mayor y sus saldos), `tesoreria` ni `personal`. Lleva los permisos |
 | `mcp_sigrid_dm_restringido` | `LOGIN` + contraseña, solo en `kv-mcp-bbdd-dev` (`pg-password-restringido`) | El login del perfil restringido (F-141): miembro solo del grupo anterior, sin GRANT propios. Alta: **§13** |
+| `sigrid_dm_perfil_postventa_ro` | Grupo, `NOLOGIN` | El perfil POSTVENTA (F-156, departamento de postventa): EXACTAMENTE lo del restringido más `postventa_restringida` (los datos personales de postventa, «d1 ok» del humano el 2026-11-03). Lleva los permisos |
+| `mcp_sigrid_dm_postventa` | `LOGIN` + contraseña, solo en `kv-mcp-bbdd-dev` (`pg-password-postventa`) | El login del perfil postventa (F-156): miembro solo del grupo anterior, sin GRANT propios. Alta: **§14** |
 
 El grupo AUTORIZADO se llama `sigrid_dm_autorizado_ro` desde F-141 (antes llevaba
 «restringido» en el nombre y es justo el que ve MÁS); el renombre es el punto
@@ -946,3 +948,86 @@ ese esquema entero está vetado al perfil restringido).
   TO` el nombre de `NOMBRE_AUTORIZADO_RETIRADO` (`config/settings.py`), como
   administrador, y volver a la imagen anterior a F-141 el mismo día. El grupo y
   el login del perfil se pueden quedar: sin cliente que los use no exponen nada.
+
+## 14. Alta del perfil postventa (F-156)
+
+Misma sesión, mismas reglas y mismo orden que la §13 (PowerShell 5.1, de día,
+sin imprimir nunca un valor, el vault antes que la base); aquí solo lo que
+cambia. Da de alta el perfil POSTVENTA del MCP: el grupo
+`sigrid_dm_perfil_postventa_ro` (lleva los permisos) y su login
+`mcp_sigrid_dm_postventa`, que leen EXACTAMENTE lo del perfil restringido más
+`postventa_restringida`. Crea además los esquemas `postventa` y
+`postventa_restringida` (punto 4) y veta el segundo al estándar (punto 5 ter).
+Va DESPUÉS de desplegar la imagen con F-156 y ANTES de su primer
+`build-postventa` (paso 2 de los MANUAL de `specs/F-156-postventa/design.md`
+§ 12): sin el esquema, el build lo crearía igual, pero sin el veto la ventana
+hasta la nocturna dejaría `postventa_restringida` sin proteger.
+
+| Secreto | Login | Quién lo usa |
+|---|---|---|
+| `kv-mcp-bbdd-dev/pg-password-postventa` | `mcp_sigrid_dm_postventa` | el MCP, cuando despliegue el pliego de F-156. Solo en este vault |
+
+### P0-P1 · Puerta y variables
+
+Las de la §13 (P0 y P1), con el job ya en la imagen que lleva F-156.
+
+### P2-P3 · El vault primero y releer al entorno
+
+```powershell
+$v = Nueva-Clave
+az keyvault secret set --vault-name $kvMcp --name pg-password-postventa --value $v -o none
+if ($LASTEXITCODE -ne 0) { throw "P2: pg-password-postventa" }
+$v = $null
+$env:POSTVENTA_PWD = az keyvault secret show --vault-name $kvMcp --name pg-password-postventa @q
+if ($env:POSTVENTA_PWD.Length -ne 64) { throw "P3: POSTVENTA_PWD no mide 64" }
+```
+
+### P4 · La base
+
+```powershell
+psql -X -v ON_ERROR_STOP=1 -f $roles $dsn
+Remove-Item Env:POSTVENTA_PWD
+```
+
+Esperado: `mcp_sigrid_dm_postventa: contraseña fijada` y las otras cuatro SIN
+CAMBIOS; `COMMIT`; los nueve roles con `rolsuper = f`; los dieciocho esquemas;
+el estándar con `lee = f` en las cinco vetadas; el login postventa con
+exactamente una pertenencia (`sigrid_dm_perfil_postventa_ro`, `hereda = t`,
+`set_role = f`), `t` en `postventa`, `postventa_restringida` y `_meta`, `f` en
+`contabilidad`, `tesoreria`, `personal`, `raw` y las otras tres `*_restringida`,
+`conecta = t` y cero filas de privilegios propios.
+
+### P5 · Negativa y positiva con el login real
+
+```powershell
+$dsnP = "host=$pgh dbname=sigrid_dm user=mcp_sigrid_dm_postventa sslmode=require"
+$env:PGPASSWORD = az keyvault secret show --vault-name $kvMcp --name pg-password-postventa @q
+$no = "tesoreria.efectos", "personal.recursos", "raw.per", "contabilidad.mayor",
+      "compras_restringida.documento_alarmas"
+foreach ($t in $no) { psql -X -c "SELECT 1 FROM $t LIMIT 1" $dsnP }
+$si = "postventa.incidencias", "postventa_restringida.contactos_incidencia",
+      "compras.facturas", "_meta.v_diccionario"
+foreach ($t in $si) { psql -X -c "SELECT 1 FROM $t LIMIT 1" $dsnP }
+Remove-Item Env:PGPASSWORD
+python main.py apply-grants
+```
+
+Esperado: `permission denied` en las cinco de `$no`; una fila en las cuatro de
+`$si` (tras el primer `build-postventa`); y `apply-grants` en SUCCESS con
+`verificacion_postventa`, `pertenencias_postventa` y `filtraciones_postventa` a
+`ok` (y los del estándar, el total y el restringido, como antes).
+
+### P6 · El contrato a `mcp-bbdd`
+
+El pliego `specs/F-156-postventa/pliego_mcp_bbdd.md`: login y secreto por
+nombre, qué lee, y `abrir_adjunto` de la familia `REPARACION` solo para los
+perfiles postventa y total (D9). Su feature y su despliegue son de `mcp-bbdd`.
+
+### Vuelta atrás
+
+- **P2 o P4 fallan**: `02_roles.sql` es reejecutable; lo que va dentro del
+  `BEGIN` se deshace solo. Se repite desde P2.
+- **Hay que retirar el perfil**: como administrador, `DROP OWNED BY
+  sigrid_dm_perfil_postventa_ro; DROP ROLE mcp_sigrid_dm_postventa; DROP ROLE
+  sigrid_dm_perfil_postventa_ro;` y borrar el secreto. Los esquemas los retira
+  la vuelta atrás de `design.md` § 12.

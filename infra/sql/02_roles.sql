@@ -55,6 +55,14 @@
 --     └── mcp_sigrid_dm_restringido  LOGIN, contraseña SOLO en el vault del MCP
 --                      (F-141, RESTRINGIDO_PWD). Miembro solo de su grupo, sin
 --                      GRANT propio. Quién conecta con él lo decide `mcp-bbdd`
+--   sigrid_dm_perfil_postventa_ro  NOLOGIN, sin contraseña (F-156). El perfil
+--                      POSTVENTA (departamento de postventa): EXACTAMENTE lo
+--                      del restringido más `postventa_restringida`, los datos
+--                      personales de postventa («d1 ok» del humano, 2026-11-03).
+--                      Lleva los permisos (punto 5 sexies)
+--     └── mcp_sigrid_dm_postventa  LOGIN, contraseña SOLO en el vault del MCP
+--                      (F-156, POSTVENTA_PWD). Miembro solo de su grupo, sin
+--                      GRANT propio. Quién conecta con él lo decide `mcp-bbdd`
 --
 -- F-141 RENOMBRÓ el grupo autorizado a `sigrid_dm_autorizado_ro` (punto 0 bis):
 -- su nombre anterior decía «restringido» y es justo lo que ve MÁS. El renombre
@@ -81,13 +89,15 @@
 \getenv mcp_pwd MCP_PWD
 \getenv total_pwd TOTAL_PWD
 \getenv restringido_pwd RESTRINGIDO_PWD
+\getenv postventa_pwd POSTVENTA_PWD
 
 -- 0. Guarda (F-136, R18): un login que aún no existe necesita su contraseña.
 --    Se comprueba ANTES de crear nada, para no dejar un login a medias.
 SELECT NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sigrid_dm_app') AS falta_app,
        NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mcp_sigrid_dm_ro') AS falta_mcp,
        NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mcp_sigrid_dm_total') AS falta_total,
-       NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mcp_sigrid_dm_restringido') AS falta_restringido
+       NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mcp_sigrid_dm_restringido') AS falta_restringido,
+       NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mcp_sigrid_dm_postventa') AS falta_postventa
 \gset
 \if :falta_app
 \if :{?app_pwd}
@@ -111,6 +121,12 @@ DO $$ BEGIN RAISE EXCEPTION 'F-136: mcp_sigrid_dm_total no existe y falta TOTAL_
 \if :{?restringido_pwd}
 \else
 DO $$ BEGIN RAISE EXCEPTION 'F-141: mcp_sigrid_dm_restringido no existe y falta RESTRINGIDO_PWD en el entorno (runbook §13)'; END $$;
+\endif
+\endif
+\if :falta_postventa
+\if :{?postventa_pwd}
+\else
+DO $$ BEGIN RAISE EXCEPTION 'F-156: mcp_sigrid_dm_postventa no existe y falta POSTVENTA_PWD en el entorno (runbook §14)'; END $$;
 \endif
 \endif
 
@@ -154,6 +170,11 @@ SELECT 'CREATE ROLE mcp_sigrid_dm_restringido LOGIN'
 WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mcp_sigrid_dm_restringido')
 \gexec
 
+-- F-156: el login del perfil POSTVENTA del MCP
+SELECT 'CREATE ROLE mcp_sigrid_dm_postventa LOGIN'
+WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mcp_sigrid_dm_postventa')
+\gexec
+
 -- Las contraseñas: cada una solo si su variable existe, y nunca su valor en la
 -- salida. Un ALTER ROLE que FALLE deja su texto en el log del servidor
 -- (`log_min_error_statement = error`): por eso la guarda de arriba.
@@ -181,6 +202,12 @@ ALTER ROLE mcp_sigrid_dm_restringido WITH LOGIN PASSWORD :'restringido_pwd';
 \else
 \echo 'mcp_sigrid_dm_restringido: contraseña SIN CAMBIOS'
 \endif
+\if :{?postventa_pwd}
+ALTER ROLE mcp_sigrid_dm_postventa WITH LOGIN PASSWORD :'postventa_pwd';
+\echo 'mcp_sigrid_dm_postventa: contraseña fijada'
+\else
+\echo 'mcp_sigrid_dm_postventa: contraseña SIN CAMBIOS'
+\endif
 
 -- F-135: el rol AUTORIZADO es un grupo sin login y sin contraseña. Quien lo
 -- necesite entra con su propio login, miembro de este grupo.
@@ -192,6 +219,12 @@ WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sigrid_dm_autorizado_r
 -- los permisos; su login (arriba) solo es miembro suyo (punto 5 quinquies).
 SELECT 'CREATE ROLE sigrid_dm_perfil_restringido_ro NOLOGIN'
 WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sigrid_dm_perfil_restringido_ro')
+\gexec
+
+-- F-156: el grupo del perfil POSTVENTA, sin login y sin contraseña. Lleva los
+-- permisos; su login (arriba) solo es miembro suyo (punto 5 sexies).
+SELECT 'CREATE ROLE sigrid_dm_perfil_postventa_ro NOLOGIN'
+WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sigrid_dm_perfil_postventa_ro')
 \gexec
 
 -- Ninguno de ellos crea bases ni roles.
@@ -215,6 +248,8 @@ ALTER ROLE mcp_sigrid_dm_total WITH LOGIN NOCREATEDB NOCREATEROLE;
 ALTER ROLE sigrid_dm_autorizado_ro WITH NOLOGIN NOCREATEDB NOCREATEROLE;
 ALTER ROLE mcp_sigrid_dm_restringido WITH LOGIN NOCREATEDB NOCREATEROLE;
 ALTER ROLE sigrid_dm_perfil_restringido_ro WITH NOLOGIN NOCREATEDB NOCREATEROLE;
+ALTER ROLE mcp_sigrid_dm_postventa WITH LOGIN NOCREATEDB NOCREATEROLE;
+ALTER ROLE sigrid_dm_perfil_postventa_ro WITH NOLOGIN NOCREATEDB NOCREATEROLE;
 
 -- 2. El rol del ETL es miembro del grupo propietario.
 GRANT sigrid_dm_etl TO sigrid_dm_app;
@@ -227,9 +262,11 @@ GRANT CONNECT ON DATABASE sigrid_dm TO mcp_sigrid_dm_ro;
 GRANT CONNECT ON DATABASE sigrid_dm TO sigrid_dm_autorizado_ro;
 -- F-141: al GRUPO del perfil restringido; su login lo hereda
 GRANT CONNECT ON DATABASE sigrid_dm TO sigrid_dm_perfil_restringido_ro;
+-- F-156: al GRUPO del perfil postventa; su login lo hereda (sin GRANT propio)
+GRANT CONNECT ON DATABASE sigrid_dm TO sigrid_dm_perfil_postventa_ro;
 
 -- 4. Esquemas del datamart. Los crea también el auto-bootstrap del ETL, pero
---    dejarlos aquí permite comprobar los dieciséis nada más provisionar.
+--    dejarlos aquí permite comprobar los dieciocho nada más provisionar.
 SET ROLE sigrid_dm_etl;
 CREATE SCHEMA IF NOT EXISTS raw;
 CREATE SCHEMA IF NOT EXISTS stg;
@@ -263,6 +300,13 @@ CREATE SCHEMA IF NOT EXISTS tesoreria_restringida;
 -- 5 ter). Tiene que existir ANTES del primer `build-compras`, que escribe en
 -- ella: por eso este fichero se ejecuta antes del despliegue.
 CREATE SCHEMA IF NOT EXISTS compras_restringida;
+-- F-156: postventa. La GENERAL (`postventa`, sin datos personales y con los
+-- textos enmascarados) la leen el general y los perfiles; la de los datos
+-- personales (`postventa_restringida`) solo el autorizado y el perfil
+-- postventa: se le VETA al general (punto 5 ter). Antes del primer
+-- `build-postventa`, que escribe en las dos.
+CREATE SCHEMA IF NOT EXISTS postventa;
+CREATE SCHEMA IF NOT EXISTS postventa_restringida;
 RESET ROLE;
 
 -- 5. Permisos de lectura del MCP.
@@ -305,7 +349,7 @@ DECLARE
 BEGIN
     FOREACH esquema IN ARRAY ARRAY[
         'mart', 'cierre', 'compras', 'maestro', 'retenciones', 'personal',
-        'contabilidad', 'tesoreria', 'descompuestos', 'stg', 'aux', '_meta'
+        'contabilidad', 'tesoreria', 'descompuestos', 'postventa', 'stg', 'aux', '_meta'
     ]
     LOOP
         EXECUTE format('GRANT USAGE ON SCHEMA %I TO mcp_sigrid_dm_ro', esquema);
@@ -438,7 +482,9 @@ RESET ROLE;
 --    `tesoreria_restringida`, la cartera completa con los pagos de nómina
 --    («los pagos de nominas deben quedar restringidos», decisión del humano), y
 --    F-138 (2026-10-14) `compras_restringida`, las alarmas de recursos y partes
---    («solo para el perfil admin y no el estándar»). La lista es `DEFAULT_VETOED_SCHEMAS` de
+--    («solo para el perfil admin y no el estándar») y F-156 (2026-11-04)
+--    `postventa_restringida`, los datos personales de postventa («d1 ok»).
+--    La lista es `DEFAULT_VETOED_SCHEMAS` de
 --    `config/settings.py` (un test lo vigila) y la sostiene cada noche
 --    `apply_grants`, que además COMPRUEBA en el catálogo que el rol general no
 --    los lee y falla si los lee.
@@ -457,7 +503,7 @@ DECLARE
     vetado text;
     vetado_total text;
 BEGIN
-    FOREACH vetado IN ARRAY ARRAY['contabilidad_restringida', 'tesoreria_restringida', 'compras_restringida', 'raw']
+    FOREACH vetado IN ARRAY ARRAY['contabilidad_restringida', 'tesoreria_restringida', 'compras_restringida', 'postventa_restringida', 'raw']
     LOOP
         -- en una base recién creada el esquema puede no existir todavía
         IF to_regnamespace(vetado) IS NOT NULL THEN
@@ -500,13 +546,17 @@ ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl IN SCHEMA tesoreria_restringida 
 GRANT USAGE ON SCHEMA compras_restringida TO sigrid_dm_autorizado_ro;
 GRANT SELECT ON ALL TABLES IN SCHEMA compras_restringida TO sigrid_dm_autorizado_ro;
 ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl IN SCHEMA compras_restringida GRANT SELECT ON TABLES TO sigrid_dm_autorizado_ro;
+-- F-156: y los datos personales de postventa, igual (el total los hereda).
+GRANT USAGE ON SCHEMA postventa_restringida TO sigrid_dm_autorizado_ro;
+GRANT SELECT ON ALL TABLES IN SCHEMA postventa_restringida TO sigrid_dm_autorizado_ro;
+ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl IN SCHEMA postventa_restringida GRANT SELECT ON TABLES TO sigrid_dm_autorizado_ro;
 
 DO $$
 DECLARE
     vetado text;
     vetado_total text;
 BEGIN
-    FOREACH vetado IN ARRAY ARRAY['contabilidad_restringida', 'tesoreria_restringida', 'compras_restringida', 'raw']
+    FOREACH vetado IN ARRAY ARRAY['contabilidad_restringida', 'tesoreria_restringida', 'compras_restringida', 'postventa_restringida', 'raw']
     LOOP
         IF to_regnamespace(vetado) IS NOT NULL THEN
             EXECUTE format(
@@ -569,7 +619,7 @@ DECLARE
 BEGIN
     FOREACH esquema_r IN ARRAY ARRAY[
         'mart', 'cierre', 'compras', 'maestro', 'retenciones', 'descompuestos',
-        'stg', 'aux', '_meta'
+        'postventa', 'stg', 'aux', '_meta'
     ]
     LOOP
         IF to_regnamespace(esquema_r) IS NOT NULL THEN
@@ -586,7 +636,7 @@ BEGIN
         SELECT nspname FROM pg_namespace
         WHERE nspname <> ALL (ARRAY[
                   'mart', 'cierre', 'compras', 'maestro', 'retenciones', 'descompuestos',
-                  'stg', 'aux', '_meta'])
+                  'postventa', 'stg', 'aux', '_meta'])
           AND nspname <> ALL (ARRAY['information_schema', 'public'])
           AND nspname NOT LIKE 'pg\_%'
         ORDER BY 1
@@ -600,6 +650,55 @@ BEGIN
         EXECUTE format(
             'ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl IN SCHEMA %I '
             'REVOKE ALL ON TABLES FROM sigrid_dm_perfil_restringido_ro', ajeno_r
+        );
+    END LOOP;
+END
+$$;
+
+-- 5 sexies a) El perfil POSTVENTA (F-156, 2026-11-04): su mitad como DUEÑO.
+--
+--    Copia del 5 quinquies a) para el grupo postventa: EXACTAMENTE los esquemas
+--    del restringido más `postventa_restringida` (`DEFAULT_PERFIL_POSTVENTA_SCHEMAS`,
+--    un test lo vigila), privilegio por defecto SIEMPRE en REVOKE y veto de todo
+--    esquema del CATÁLOGO que no sea suyo. Como `sigrid_dm_etl`, por lo mismo.
+DO $$
+DECLARE
+    esquema_pv text;
+    ajeno_pv text;
+BEGIN
+    FOREACH esquema_pv IN ARRAY ARRAY[
+        'mart', 'cierre', 'compras', 'maestro', 'retenciones', 'descompuestos',
+        'postventa', 'stg', 'aux', '_meta', 'postventa_restringida'
+    ]
+    LOOP
+        IF to_regnamespace(esquema_pv) IS NOT NULL THEN
+            EXECUTE format('GRANT USAGE ON SCHEMA %I TO sigrid_dm_perfil_postventa_ro', esquema_pv);
+            EXECUTE format('GRANT SELECT ON ALL TABLES IN SCHEMA %I TO sigrid_dm_perfil_postventa_ro', esquema_pv);
+            EXECUTE format(
+                'ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl IN SCHEMA %I '
+                'REVOKE SELECT ON TABLES FROM sigrid_dm_perfil_postventa_ro', esquema_pv
+            );
+        END IF;
+    END LOOP;
+
+    FOR ajeno_pv IN
+        SELECT nspname FROM pg_namespace
+        WHERE nspname <> ALL (ARRAY[
+                  'mart', 'cierre', 'compras', 'maestro', 'retenciones', 'descompuestos',
+                  'postventa', 'stg', 'aux', '_meta', 'postventa_restringida'])
+          AND nspname <> ALL (ARRAY['information_schema', 'public'])
+          AND nspname NOT LIKE 'pg\_%'
+        ORDER BY 1
+    LOOP
+        EXECUTE format(
+            'REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA %I FROM sigrid_dm_perfil_postventa_ro', ajeno_pv
+        );
+        EXECUTE format(
+            'REVOKE ALL PRIVILEGES ON SCHEMA %I FROM sigrid_dm_perfil_postventa_ro', ajeno_pv
+        );
+        EXECUTE format(
+            'ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl IN SCHEMA %I '
+            'REVOKE ALL ON TABLES FROM sigrid_dm_perfil_postventa_ro', ajeno_pv
         );
     END LOOP;
 END
@@ -642,7 +741,7 @@ BEGIN
         SELECT nspname FROM pg_namespace
         WHERE nspname <> ALL (ARRAY[
                   'mart', 'cierre', 'compras', 'maestro', 'retenciones', 'descompuestos',
-                  'stg', 'aux', '_meta'])
+                  'postventa', 'stg', 'aux', '_meta'])
           AND nspname <> ALL (ARRAY['information_schema', 'public'])
           AND nspname NOT LIKE 'pg\_%'
         ORDER BY 1
@@ -658,16 +757,45 @@ END
 $$;
 GRANT sigrid_dm_perfil_restringido_ro TO mcp_sigrid_dm_restringido WITH INHERIT TRUE, SET FALSE;
 
+-- 5 sexies b) El perfil POSTVENTA (F-156): su mitad como ADMINISTRADOR.
+--
+--    Copia del 5 quinquies b): el veto de lo ajeno con este concedente y la
+--    ÚNICA concesión al login, ser miembro de su grupo, DESPUÉS de los vetos.
+DO $$
+DECLARE
+    ajeno_pv text;
+BEGIN
+    FOR ajeno_pv IN
+        SELECT nspname FROM pg_namespace
+        WHERE nspname <> ALL (ARRAY[
+                  'mart', 'cierre', 'compras', 'maestro', 'retenciones', 'descompuestos',
+                  'postventa', 'stg', 'aux', '_meta', 'postventa_restringida'])
+          AND nspname <> ALL (ARRAY['information_schema', 'public'])
+          AND nspname NOT LIKE 'pg\_%'
+        ORDER BY 1
+    LOOP
+        EXECUTE format(
+            'REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA %I FROM sigrid_dm_perfil_postventa_ro', ajeno_pv
+        );
+        EXECUTE format(
+            'REVOKE ALL PRIVILEGES ON SCHEMA %I FROM sigrid_dm_perfil_postventa_ro', ajeno_pv
+        );
+    END LOOP;
+END
+$$;
+GRANT sigrid_dm_perfil_postventa_ro TO mcp_sigrid_dm_postventa WITH INHERIT TRUE, SET FALSE;
+
 COMMIT;
 
--- 6. Comprobaciones. Deben salir: los siete roles (`rolsuper = f` en todos;
---    los dos del perfil restringido desde F-141), sigrid_dm_app dentro de
---    sigrid_dm_etl, y los dieciséis esquemas.
+-- 6. Comprobaciones. Deben salir: los nueve roles (`rolsuper = f` en todos;
+--    los dos del perfil restringido desde F-141 y los dos del postventa desde
+--    F-156), sigrid_dm_app dentro de sigrid_dm_etl, y los dieciocho esquemas.
 SELECT rolname, rolcanlogin, rolsuper, rolcreatedb, rolcreaterole
 FROM pg_roles
 WHERE rolname IN ('sigrid_dm_etl', 'sigrid_dm_app', 'mcp_sigrid_dm_ro',
                   'sigrid_dm_autorizado_ro', 'mcp_sigrid_dm_total',
-                  'sigrid_dm_perfil_restringido_ro', 'mcp_sigrid_dm_restringido')
+                  'sigrid_dm_perfil_restringido_ro', 'mcp_sigrid_dm_restringido',
+                  'sigrid_dm_perfil_postventa_ro', 'mcp_sigrid_dm_postventa')
 ORDER BY rolname;
 
 SELECT r.rolname AS miembro, g.rolname AS grupo
@@ -681,7 +809,8 @@ FROM pg_namespace
 WHERE nspname IN ('raw', 'stg', 'aux', 'mart', '_meta',
                   'cierre', 'compras', 'maestro', 'retenciones', 'personal',
                   'contabilidad', 'contabilidad_restringida', 'descompuestos',
-                  'tesoreria', 'tesoreria_restringida', 'compras_restringida')
+                  'tesoreria', 'tesoreria_restringida', 'compras_restringida',
+                  'postventa', 'postventa_restringida')
 ORDER BY nspname;
 
 -- F-068: las tablas excluidas NO deben aparecer aquí. CERO filas es el
@@ -695,16 +824,17 @@ ORDER BY table_name, privilege_type;
 
 -- F-135: el rol GENERAL no lee ningún esquema vetado. CERO filas en la primera
 -- consulta y `lee = f` en las cuatro filas de la segunda es el resultado
--- correcto (`compras_restringida` desde F-138).
+-- correcto (`compras_restringida` desde F-138, `postventa_restringida` desde
+-- F-156: cinco filas).
 SELECT table_schema, table_name, privilege_type
 FROM information_schema.table_privileges
 WHERE grantee = 'mcp_sigrid_dm_ro'
-  AND table_schema IN ('contabilidad_restringida', 'tesoreria_restringida', 'compras_restringida', 'raw')
+  AND table_schema IN ('contabilidad_restringida', 'tesoreria_restringida', 'compras_restringida', 'postventa_restringida', 'raw')
 ORDER BY table_schema, table_name, privilege_type;
 
 SELECT nspname, has_schema_privilege('mcp_sigrid_dm_ro', nspname, 'USAGE') AS lee
 FROM pg_namespace
-WHERE nspname IN ('contabilidad_restringida', 'tesoreria_restringida', 'compras_restringida', 'raw')
+WHERE nspname IN ('contabilidad_restringida', 'tesoreria_restringida', 'compras_restringida', 'postventa_restringida', 'raw')
 ORDER BY nspname;
 
 -- F-136: el login TOTAL. Deben salir EXACTAMENTE dos pertenencias
@@ -757,6 +887,7 @@ SELECT has_schema_privilege('mcp_sigrid_dm_restringido', 'mart', 'USAGE') AS mar
        has_schema_privilege('mcp_sigrid_dm_restringido', 'maestro', 'USAGE') AS maestro,
        has_schema_privilege('mcp_sigrid_dm_restringido', 'retenciones', 'USAGE') AS retenciones,
        has_schema_privilege('mcp_sigrid_dm_restringido', 'descompuestos', 'USAGE') AS descompuestos,
+       has_schema_privilege('mcp_sigrid_dm_restringido', 'postventa', 'USAGE') AS postventa,
        has_schema_privilege('mcp_sigrid_dm_restringido', 'stg', 'USAGE') AS stg,
        has_schema_privilege('mcp_sigrid_dm_restringido', 'aux', 'USAGE') AS aux,
        has_schema_privilege('mcp_sigrid_dm_restringido', '_meta', 'USAGE') AS meta;
@@ -770,7 +901,9 @@ SELECT has_schema_privilege('mcp_sigrid_dm_restringido', 'tesoreria', 'USAGE') A
        has_schema_privilege('mcp_sigrid_dm_restringido', 'tesoreria_restringida', 'USAGE')
            AS tesoreria_restringida,
        has_schema_privilege('mcp_sigrid_dm_restringido', 'compras_restringida', 'USAGE')
-           AS compras_restringida;
+           AS compras_restringida,
+       has_schema_privilege('mcp_sigrid_dm_restringido', 'postventa_restringida', 'USAGE')
+           AS postventa_restringida;
 
 SELECT has_table_privilege('mcp_sigrid_dm_restringido', to_regclass('contabilidad.mayor'), 'SELECT')
            AS mayor,
@@ -787,4 +920,39 @@ SELECT has_table_privilege('mcp_sigrid_dm_restringido', to_regclass('contabilida
 SELECT table_schema, table_name, privilege_type
 FROM information_schema.table_privileges
 WHERE grantee = 'mcp_sigrid_dm_restringido'
+ORDER BY table_schema, table_name, privilege_type;
+
+-- F-156: el login del perfil POSTVENTA. Debe salir EXACTAMENTE una pertenencia
+-- (`sigrid_dm_perfil_postventa_ro`, hereda = t, set_role = f). Luego `t` en
+-- `postventa`, `postventa_restringida` y `_meta`; `f` en `contabilidad`,
+-- `tesoreria`, `personal`, `raw` y las otras tres `*_restringida`; `conecta = t`;
+-- y CERO filas en la última: el login no tiene ninguna concesión propia de
+-- tablas.
+SELECT g.rolname AS grupo, m.inherit_option AS hereda, m.set_option AS set_role,
+       m.admin_option AS admin
+FROM pg_auth_members AS m
+JOIN pg_roles AS r ON r.oid = m.member
+JOIN pg_roles AS g ON g.oid = m.roleid
+WHERE r.rolname = 'mcp_sigrid_dm_postventa'
+ORDER BY grupo;
+
+SELECT has_schema_privilege('mcp_sigrid_dm_postventa', 'postventa', 'USAGE') AS postventa,
+       has_schema_privilege('mcp_sigrid_dm_postventa', 'postventa_restringida', 'USAGE')
+           AS postventa_restringida,
+       has_schema_privilege('mcp_sigrid_dm_postventa', '_meta', 'USAGE') AS meta,
+       has_schema_privilege('mcp_sigrid_dm_postventa', 'contabilidad', 'USAGE') AS contabilidad,
+       has_schema_privilege('mcp_sigrid_dm_postventa', 'tesoreria', 'USAGE') AS tesoreria,
+       has_schema_privilege('mcp_sigrid_dm_postventa', 'personal', 'USAGE') AS personal,
+       has_schema_privilege('mcp_sigrid_dm_postventa', 'raw', 'USAGE') AS raw,
+       has_schema_privilege('mcp_sigrid_dm_postventa', 'contabilidad_restringida', 'USAGE')
+           AS contabilidad_restringida,
+       has_schema_privilege('mcp_sigrid_dm_postventa', 'tesoreria_restringida', 'USAGE')
+           AS tesoreria_restringida,
+       has_schema_privilege('mcp_sigrid_dm_postventa', 'compras_restringida', 'USAGE')
+           AS compras_restringida,
+       has_database_privilege('mcp_sigrid_dm_postventa', current_database(), 'CONNECT') AS conecta;
+
+SELECT table_schema, table_name, privilege_type
+FROM information_schema.table_privileges
+WHERE grantee = 'mcp_sigrid_dm_postventa'
 ORDER BY table_schema, table_name, privilege_type;

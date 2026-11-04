@@ -674,7 +674,8 @@ def test_f136_r17_cada_contrasena_es_opcional_y_se_anuncia_sin_valor() -> None:
         assert bloque in sql, f"falta el bloque de {login}"
         assert sql.count(f"PASSWORD :'{variable}'") == 1
     # F-141 suma la del login restringido (test_f141_r21_la_contrasena_...)
-    assert sql.count("PASSWORD") == 4, "ninguna otra sentencia con contraseña"
+    # y F-156 la del login postventa (test_f156_grants)
+    assert sql.count("PASSWORD") == 5, "ninguna otra sentencia con contraseña"
 
 
 def test_f136_r18_guarda_antes_de_crear_nada() -> None:
