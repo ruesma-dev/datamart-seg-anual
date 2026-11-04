@@ -363,6 +363,47 @@ def perfil_restringido_en_conflicto(
     return conflicto
 
 
+#: Lo que el perfil POSTVENTA ve de MÁS que el restringido (F-156, D1 = A): los
+#: datos personales de postventa. Tienen que estar vetados al general y ser del
+#: autorizado, como cualquier `*_restringida`.
+ESQUEMAS_PROPIOS_POSTVENTA: tuple[str, ...] = ("postventa_restringida",)
+
+
+def perfil_postventa_en_conflicto(
+    esquemas: Sequence[str],
+    *,
+    restringido: Sequence[str],
+    vetados: Sequence[str],
+    restringidos: Sequence[str],
+) -> list[str]:
+    """Lo que sobra, falta o no está protegido en el perfil postventa (F-156, R29).
+
+    Su lista tiene que ser EXACTAMENTE la del perfil restringido más
+    `ESQUEMAS_PROPIOS_POSTVENTA` (en cualquier orden), y cada uno de esos propios
+    tiene que estar vetado al general y en lo restringido: si no, el estándar lo
+    leería o el total no. Devuelve los esquemas en conflicto, primero los que
+    sobran (en el orden de `esquemas`), luego los que faltan (en el de la lista
+    esperada) y luego los propios sin proteger; sin repetir. Vacía es lo correcto.
+    """
+    esperados = [*restringido, *ESQUEMAS_PROPIOS_POSTVENTA]
+    conflicto: list[str] = []
+
+    def anotar(esquema: str) -> None:
+        if esquema not in conflicto:
+            conflicto.append(esquema)
+
+    for esquema in esquemas:
+        if esquema not in esperados:
+            anotar(esquema)
+    for esquema in esperados:
+        if esquema not in esquemas:
+            anotar(esquema)
+    for esquema in ESQUEMAS_PROPIOS_POSTVENTA:
+        if esquema not in vetados or esquema not in restringidos:
+            anotar(esquema)
+    return conflicto
+
+
 def excluidas_invalidas(excluidas: Sequence[str], esquemas: Sequence[str]) -> list[str]:
     """Los objetos excluidos mal escritos o de un esquema que no se concede (F-141, R7).
 
