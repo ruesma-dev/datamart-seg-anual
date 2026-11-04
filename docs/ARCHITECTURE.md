@@ -22,8 +22,29 @@ obras. Microservicio único; se despliega como job programado en Azure.
 
 `raw` → `stg` → `mart` (+ `cierre` para cierres mensuales y planif vs real).
 Módulos adicionales: `compras`, `maestro`, `retenciones`, `personal`,
-`contabilidad`, `tesoreria`, `descompuestos`, `auxiliar`. SQL numerado `NN_nombre.sql` y
+`contabilidad`, `tesoreria`, `descompuestos`, `postventa`, `auxiliar`. SQL numerado `NN_nombre.sql` y
 ejecutado en orden dentro de cada capa.
+
+**`postventa` (F-156, 2026-11-04) es la postventa de las viviendas
+entregadas**, construida por `build_postventa` desde 13 tablas nuevas de `raw`
+(`sql/postventa/`, nueve ficheros): las unidades (`con` 707) con sus
+garantías, las incidencias (708) con sus intervinientes, las tareas (47), el
+histórico de estados de los tres (`incidencia_procesos`: los pasos de `rac` MÁS
+los cierres que la aplicación `postventa-incidencias` escribe solo en
+`dbo.log`, traído recortado a `raw.log`), `v_estado_incidencias` (estado,
+desde cuándo y tiempos), el índice de adjuntos (mismo mecanismo que compras,
+con la familia `REPARACION` —partes firmados con DNI manuscrito— atada a la
+restringida) y el coste por obra de origen (`partida_obra_origen` +
+`v_coste_obra`, SOLO facturas: Sigrid no liga incidencia y coste, se liga por
+las partidas de las obras `POSTV*`). Mismo patrón de DOS esquemas:
+**`postventa_restringida`** guarda los datos personales —propietarios,
+reclamantes, contactos, teléfonos, correos y el texto íntegro— con
+autorización del humano («d1 ok», 2026-11-03), y el general lleva el texto
+enmascarado (`fn_enmascarar`, mismos patrones que `domain/postventa.py`). La
+lee el **perfil postventa** (abajo) y el total. Regla dura
+`R-POSTVENTA-RESTRINGIDA`. Lo que toca a `mcp-bbdd` (login nuevo y
+`abrir_adjunto` de `REPARACION`) va en su pliego:
+`specs/F-156-postventa/pliego_mcp_bbdd.md`.
 
 **`personal` (F-057, 2026-09-18) es el único esquema con datos personales**
 —nombre, NIF y DNI, publicados con autorización expresa del responsable del
@@ -931,6 +952,19 @@ fallo con cualquier tolerancia.
   o una excepción que ya no lee la cartera (`excepciones_sobrantes`): aviso.
   `02_roles.sql` hace lo mismo al provisionar (punto 5 quinquies: la mitad del
   dueño, como `sigrid_dm_etl`, y la del administrador, con la pertenencia).
+- **El perfil postventa en `apply_grants`, desde F-156.** El cuarto perfil:
+  EXACTAMENTE lo del restringido más `postventa_restringida`
+  (`PG_PERFIL_POSTVENTA_GROUP`, `_LOGIN` y `_SCHEMAS`, por defecto
+  `sigrid_dm_perfil_postventa_ro`, `mcp_sigrid_dm_postventa` y la lista del
+  restringido + `postventa_restringida`; el job no lleva variables nuevas). Lo
+  ejecuta la MISMA clase que el restringido (`_PerfilRestringido`, parametrizada
+  por sus rótulos), así que hereda sus guardas, su veto de todo lo que no es
+  suyo, la búsqueda de vistas que filtran y las verificaciones, con claves
+  propias (`verificacion_postventa`, `pertenencias_postventa`,
+  `filtraciones_postventa`). Antes de abrir conexión, FAILED (F-156) si su lista
+  no es la del restringido más `postventa_restringida` o si ésta no está vetada
+  al estándar y restringida al autorizado. Su bloque va detrás del restringido.
+  `02_roles.sql` lo provisiona en el punto 5 sexies (runbook §14).
   Sin `personal` siguen visibles los logins y nombres de usuarios de Sigrid de
   `compras.documento_procesos`, `documento_alarmas.creada_por` y
   `documento_adjuntos.subido_por`: el humano lo aceptó («deja visible compras»).
@@ -1376,13 +1410,15 @@ estar desfasados semanas. F-057 añadió el quinto, `build_personal`, que nació
 ya dentro, F-056 el sexto, `build_contabilidad`, F-097 el séptimo,
 `build_descompuestos`, con su propia ingesta `ingest_descompuestos` delante, y
 F-037 el octavo, `build_tesoreria`, delante de `build_compras` (su
-`compras.vencimientos` es una vista de `tesoreria.efectos`; sin `depends_on`).
-Los quince pasos de hoy, en orden:
+`compras.vencimientos` es una vista de `tesoreria.efectos`; sin `depends_on`),
+y F-156 el noveno, `build_postventa`, tras `build_contabilidad` (solo depende
+de `ingest_raw`; nadie depende de él).
+Los dieciséis pasos de hoy, en orden:
 
 ```
 ingest_raw → load_excel_aux → build_stg → build_mart
            → build_maestros → build_tesoreria → build_compras → build_retenciones
-           → build_personal → build_contabilidad
+           → build_personal → build_contabilidad → build_postventa
            → ingest_descompuestos → build_descompuestos → build_cierre
            → publicar_diccionario → apply_grants
 ```
