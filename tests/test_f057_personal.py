@@ -1039,7 +1039,7 @@ def test_f057_r25_el_fichero_de_provision_trae_los_diez_esquemas() -> None:
     # general NO recibe, igual que `raw` desde entonces (los dos, VETADOS).
     esperado = set(ESQUEMAS_DEL_DATAMART) | {"contabilidad_restringida"}
     vetados = {"raw", "contabilidad_restringida", "tesoreria_restringida",
-               "compras_restringida"}  # F-037, F-138
+               "compras_restringida", "postventa_restringida"}  # F-037, F-138, F-156
 
     creados = set(re.findall(r"CREATE SCHEMA IF NOT EXISTS (\w+);", sql))
     assert creados == esperado, f"punto 4: crea {sorted(creados)} (R25)"

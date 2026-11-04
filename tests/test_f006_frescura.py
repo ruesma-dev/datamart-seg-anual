@@ -85,6 +85,8 @@ def test_f006_r14_el_pipeline_nocturno_es_este_e_incluye_los_cinco() -> None:
         "build_retenciones",
         "build_personal",
         "build_contabilidad",
+        # F-156: el noveno, postventa. Nadie depende de el.
+        "build_postventa",
         # F-097: los descompuestos, con su propia ingesta delante.
         "ingest_descompuestos",
         "build_descompuestos",
