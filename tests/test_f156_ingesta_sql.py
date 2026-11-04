@@ -511,7 +511,7 @@ def test_f156_r25_partida_obra_origen() -> None:
     assert "ob.emp = opv.empresa_id" in create, "la obra de origen es de SU empresa"
     literales = re.search(r"CASE (WHEN .*?) END AS liga", create)
     assert literales
-    encontrados = re.findall(r"THEN '(\w+)'", literales.group(1))
+    encontrados = re.findall(r"(?:THEN|ELSE) '(\w+)'", literales.group(1))
     assert set(encontrados) == set(pv.LIGAS_COSTE), encontrados
     assert "ADD PRIMARY KEY (partida_id)" in _sql("08_coste_obra.sql")
 
