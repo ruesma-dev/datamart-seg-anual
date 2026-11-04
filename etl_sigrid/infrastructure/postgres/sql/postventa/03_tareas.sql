@@ -8,8 +8,8 @@
 -- Estado por la pareja (47, `con.est`): en uso 20 IELA, 21 IENV y 23 IREC.
 --
 -- El oficio y el proveedor salen del recurso de la tarea (`raw.tarres`, solo
--- `obrofcide` tiene dato), uno por tarea: el primero por posición si hubiera
--- más. El empleado asignado va como `empleado_id` SIN nombre (el nombre está
+-- `obrofcide` tiene dato), uno por tarea: el primero por posición con oficio
+-- si hubiera más. El empleado asignado va como `empleado_id` SIN nombre (el nombre está
 -- en `personal`, que el perfil restringido no lee). Coste y venta de `tar`
 -- están a 0 en el 100 %: no se publican (el coste, en `v_coste_obra`).
 --
@@ -20,8 +20,10 @@
 DROP TABLE IF EXISTS postventa.tareas CASCADE;
 CREATE TABLE postventa.tareas AS
 WITH recurso AS (
-    SELECT DISTINCT ON (tr.taride) tr.taride, NULLIF(tr.obrofcide, 0) AS oficio_obra_id
+    -- El primero, por posición, que tenga oficio de obra.
+    SELECT DISTINCT ON (tr.taride) tr.taride, tr.obrofcide AS oficio_obra_id
     FROM   raw.tarres tr
+    WHERE  COALESCE(tr.obrofcide, 0) <> 0
     ORDER  BY tr.taride, tr.pos, tr.ide
 )
 SELECT
