@@ -775,7 +775,7 @@
 # filas. `tipo_documento` del tipo 14 es el de la cabecera (se filtra la familia
 # por `tipo_documento_codigo = 14`) y `origen_fecha` gana FACTURACION (`dca.fecfac`,
 # de dia) y SIN_HISTORIAL (sin pasos hasta F-133). 256 objetos y 2.243 columnas.
-version: 70
+version: 71
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -803,30 +803,32 @@ reglas:
   # las reglas al acortarlas o fundirlas esta en la ficha de su objeto.
 
   - codigo: R-FRESCURA
-    titulo: Ocho esquemas pueden quedarse atras sin tumbar la noche
+    titulo: Nueve esquemas pueden quedarse atras sin tumbar la noche
     severidad: bloqueante
-    ambito: [cierre, compras, compras_restringida, maestro, retenciones, personal, contabilidad, contabilidad_restringida, tesoreria, tesoreria_restringida, descompuestos]
+    ambito: [cierre, compras, compras_restringida, maestro, retenciones, personal, contabilidad, contabilidad_restringida, tesoreria, tesoreria_restringida, descompuestos, postventa, postventa_restringida]
     resumen: >-
       Cita la fecha del dato en toda respuesta de cierre, compras, maestro,
-      retenciones, personal, contabilidad, tesorería o descompuestos: cada uno
-      se construye aparte y puede ir una noche atrasado. Fecha: «ESTADO POR
+      retenciones, personal, contabilidad, tesorería, descompuestos o
+      postventa: cada uno se construye aparte y puede ir un día atrás. Fecha: «ESTADO POR
       ESQUEMA» o `_meta.v_frescura`.
     regla: >-
-      Estos ocho esquemas (once con `contabilidad_restringida`,
-      `tesoreria_restringida` y `compras_restringida`, que construyen el mismo
-      `build_contabilidad`, el mismo `build_tesoreria` y el mismo
-      `build_compras`) SI se construyen cada noche dentro de
+      Estos nueve esquemas (trece con `contabilidad_restringida`,
+      `tesoreria_restringida`, `compras_restringida` y
+      `postventa_restringida`, que construyen el mismo `build_contabilidad`,
+      `build_tesoreria`, `build_compras` y `build_postventa`) SI se construyen cada noche dentro de
       `run-all`, y los ocho registran paso, asi que su fecha de build siempre es
       consultable. Lo que no cambia es que su paso NO es dependencia de ningun
       otro: si `build_cierre`, `build_compras`, `build_maestros`,
       `build_retenciones`, `build_personal`, `build_contabilidad`,
-      `build_tesoreria` o `build_descompuestos` falla (o su ingesta
+      `build_tesoreria`, `build_postventa` o `build_descompuestos` falla (o su ingesta
       `ingest_descompuestos`, que lo salta), la noche continua y termina, y ese
       esquema se queda con el dato de una noche anterior mientras `raw`, `stg` y
       `mart` estan al dia. Toda respuesta que salga de ellos DEBE citar su fecha
       de build: `SELECT * FROM _meta.v_frescura WHERE paso = 'build_cierre'` (o
       `build_compras`, `build_maestros`, `build_retenciones`, `build_personal`,
-      `build_contabilidad`, `build_tesoreria`, `build_descompuestos`).
+      `build_contabilidad`, `build_tesoreria`, `build_postventa`,
+      `build_descompuestos`). `postventa.v_coste_obra` lee `compras` al
+      consultar: vale tambien la frescura de `build_compras`.
       `compras.vencimientos` es una vista de `tesoreria.efectos`: su frescura
       es la de `build_tesoreria`. Que el pipeline sea uno solo NO significa que
       todo el datamart tenga la misma frescura.
@@ -836,8 +838,9 @@ reglas:
       donde se consulta su frescura— `ingest_raw`, `load_excel_aux`,
       `build_stg`, `build_mart`, `build_maestros`, `build_tesoreria`,
       `build_compras`, `build_retenciones`, `build_personal`,
-      `build_contabilidad`, `ingest_descompuestos`, `build_descompuestos`,
-      `build_cierre`, `publicar_diccionario` y `apply_grants`. Hasta el 2026-08-28 cuatro de
+      `build_contabilidad`, `build_postventa`, `ingest_descompuestos`,
+      `build_descompuestos`, `build_cierre`, `publicar_diccionario` y
+      `apply_grants`. Hasta el 2026-08-28 cuatro de
       ellos se lanzaban A MANO y podian llevar semanas parados; peor aun, `mart`
       DESTRUIA cada noche `cierre.v_pbi_planif_vs_real` —cuelga de
       `mart.fact_seguimiento_categoria`, que `03_agg_categoria.sql` dropea con
@@ -845,8 +848,8 @@ reglas:
       dentro de la nocturna y con la misma propiedad, y esta vez a proposito:
       un fallo del SQL de personal no puede dejar al `mart` sin construir.
       `contabilidad` (F-056, 2026-09-26), `descompuestos` (F-097,
-      2026-09-28) y `tesoreria` (F-037, 2026-10-13), igual. Dar un dato de
-      cualquiera de los ocho sin fecha es dar una respuesta vieja con aplomo.
+      2026-09-28), `tesoreria` (F-037, 2026-10-13) y `postventa` (F-156,
+      2026-11-04), igual. Dar un dato de cualquiera de los nueve sin fecha es dar una respuesta vieja con aplomo.
 
   - codigo: R-IMPORTE-MES
     titulo: importe_mes no se suma entre meses; importe_origen ya es acumulado
@@ -1075,7 +1078,7 @@ reglas:
       da 5.345.557,80, lo mismo que la pantalla de Sigrid.
 
   - codigo: R-PERFILES
-    titulo: El perfil restringido ve menos que el estandar; *_restringida es solo del total
+    titulo: El perfil restringido ve menos que el estandar; *_restringida es del total
     severidad: bloqueante
     entrega: entera
     ambito:
@@ -1085,6 +1088,7 @@ reglas:
       - tesoreria_restringida
       - personal
       - compras_restringida
+      - postventa_restringida
       - compras.documento_alarmas
       - compras.vencimientos
       - compras.v_facturas_pago
@@ -1094,23 +1098,27 @@ reglas:
       - retenciones.apuntes_contables
     resumen: >-
       Usa siempre el esquema general; `*_restringida` es solo del perfil total
-      y solo si piden personal (nóminas, embargos, cuentas, alarmas de recursos
-      y partes); nunca se suman con la general. «permission denied» no se
+      (`postventa_restringida`, también del postventa) y solo si piden
+      personal o personas; nunca se suman con la general. «permission denied» no se
       rodea: di que tu perfil no lo ve.
     regla: >-
-      Tres perfiles: TOTAL ⊃ ESTANDAR ⊃ RESTRINGIDO. El TOTAL (y el grupo
+      Cuatro perfiles: TOTAL ⊃ ESTANDAR ⊃ RESTRINGIDO, y POSTVENTA = lo del
+      RESTRINGIDO mas `postventa_restringida` (F-156). El TOTAL (y el grupo
       `sigrid_dm_autorizado_ro`) lee ademas los `*_restringida`; el ESTANDAR,
       el consumo salvo `raw` y `*_restringida`; el RESTRINGIDO
       (administrativos), lo del estandar MENOS el esquema `contabilidad` entero
       (`contabilidad.mayor`, `contabilidad.saldos_cuenta_mes`; tampoco el mayor
       analitico), `tesoreria` y `personal`. SI lee `retenciones` y `compras`.
       «restringida» = reservada al perfil total: los `*_restringida` son del
-      perfil TOTAL y NO del perfil restringido. «permission denied» no se
+      perfil TOTAL y NO del perfil restringido; la unica excepcion es
+      `postventa_restringida`, que lee tambien el perfil POSTVENTA (los
+      contactos de los clientes de postventa). «permission denied» no se
       rodea: ni el mayor desde `retenciones.apuntes_contables`, ni personas
       desde los logins de `compras`, ni la cartera desde
       `compras.vencimientos`; responde que el perfil no lo incluye.
     motivo: >-
-      Decisiones del humano (F-135, F-037, F-138, F-141; F-146 el 2026-10-21). El MCP no
+      Decisiones del humano (F-135, F-037, F-138, F-141; F-146 el 2026-10-21;
+      F-156, «d1 ok» el 2026-11-03). El MCP no
       filtra el diccionario por perfil y esta regla trata de lo que el perfil
       no ve: por eso se sirve entera. Lo que falta en cada general, en su
       ficha.
@@ -1149,6 +1157,33 @@ reglas:
       grupo 40+41, pero con 3,9 M EUR de previsto antiguo que la contabilidad
       no sostiene (223 cuentas cuadran al centimo solo sin el). Mismo patron
       que F-094 en las retenciones: efectos antiguos no punteados.
+
+  - codigo: R-POSTVENTA-RESTRINGIDA
+    titulo: Postventa sin personas; los contactos solo en postventa_restringida
+    severidad: bloqueante
+    ambito: [postventa, postventa_restringida]
+    resumen: >-
+      Responde de postventa con `postventa`, sin personas y con textos
+      enmascarados. Propietarios, reclamantes, contactos y textos íntegros,
+      solo en `postventa_restringida` (perfiles postventa y total) y solo si
+      los piden; nunca se suman con la general.
+    regla: >-
+      Por defecto se responde con `postventa`: incidencias, unidades, tareas,
+      historico, adjuntos y coste, sin personas y con el texto libre
+      enmascarado (`[TELEFONO]`, `[CORREO]`). Quien es el propietario, quien
+      reclamo, como contactarle o que dice el texto integro solo esta en
+      `postventa_restringida`, que leen el perfil postventa y el total; ni el
+      estandar ni el restringido. Las dos tablas nunca se suman ni se unen
+      para contar: son las mismas incidencias y unidades. Los adjuntos
+      REPARACION (partes firmados con DNI manuscrito) solo los abren el perfil
+      postventa y el total; «permission denied» no se rodea.
+    motivo: >-
+      Decision del humano, «d1 ok», chat del 2026-11-03 (F-156, D1 = A y D9):
+      los datos de los clientes de postventa se traen, pero en un esquema
+      aparte con un perfil propio, para el departamento de postventa. El MCP
+      no filtra el diccionario por perfil: sin esta regla el agente mezclaria
+      el texto enmascarado con el integro o buscaria a las personas por otro
+      camino.
 
   - codigo: R-CAJA-HIPOTESIS
     titulo: No hay caja proyectada; pasar devengo a caja exige declarar todas las hipotesis
@@ -1973,6 +2008,30 @@ esquemas:
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [ingest_descompuestos, build_descompuestos]
+
+  postventa:
+    titulo: Postventa de las viviendas entregadas, sin personas
+    para_que_sirve: >-
+      Unidades entregadas y sus garantias, incidencias (las reclamaciones del
+      cliente), tareas, el historico de estados con tiempos de resolucion
+      (`postventa.v_estado_incidencias`), los adjuntos y el coste de facturas
+      por obra de origen (`postventa.v_coste_obra`). Sin personas: textos
+      enmascarados (`R-POSTVENTA-RESTRINGIDA`).
+    consumo_recomendado: true
+    refresco: nocturno
+    pasos_etl: [build_postventa]
+
+  postventa_restringida:
+    titulo: Los datos personales de postventa (solo perfiles postventa y total del MCP)
+    para_que_sirve: >-
+      Propietarios, reclamantes y contactos de cada incidencia y unidad, con
+      telefonos y correos, y los textos integros (F-156, «d1 ok» del humano).
+      Solo la leen el perfil postventa (`mcp_sigrid_dm_postventa`) y el total;
+      para los demas, «permission denied». No se suma con `postventa`
+      (`R-POSTVENTA-RESTRINGIDA`).
+    consumo_recomendado: true
+    refresco: nocturno
+    pasos_etl: [build_postventa]
 
   maestro:
     titulo: Maestros y dimensiones de consulta directa

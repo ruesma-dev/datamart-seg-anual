@@ -47,6 +47,8 @@ from dataclasses import dataclass, replace
 #: (la completa, con los pagos de personal, vetada al rol general). F-138
 #: (2026-10-14) añadió `compras_restringida`: las alarmas COMPLETAS de los
 #: documentos, con las de recursos y partes de trabajo, vetada al rol general.
+#: F-156 (2026-11-04) añadió `postventa` y `postventa_restringida` (los datos
+#: personales de postventa: solo perfiles postventa y total).
 #:
 #: Ojo a la trampa de nombres: el esquema se llama `aux` pero su carpeta de SQL
 #: es `sql/auxiliar/`.
@@ -66,6 +68,8 @@ ESQUEMAS_DEL_DATAMART = (
     "maestro",
     "mart",
     "personal",
+    "postventa",
+    "postventa_restringida",
     "raw",
     "retenciones",
     "stg",

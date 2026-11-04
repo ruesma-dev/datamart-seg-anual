@@ -1,0 +1,205 @@
+# config/diccionario/postventa_restringida.yaml
+#
+# Fichas del esquema `postventa_restringida` (F-156, 2026-11-04): LOS DATOS
+# PERSONALES DE POSTVENTA. Propietarios, quien reclama, personas de contacto,
+# sus telefonos y correos, los avisos y horarios de cada unidad y el texto
+# libre INTEGRO (sin enmascarar) de incidencias y tareas.
+#
+# AUTORIZACION: decision del humano, «d1 ok», chat del 2026-11-03 (D1 = A de
+# F-156): se traen con un perfil nuevo. SOLO LA LEEN el perfil POSTVENTA del
+# MCP (grupo `sigrid_dm_perfil_postventa_ro`, login `mcp_sigrid_dm_postventa`)
+# y el perfil TOTAL (por el grupo `sigrid_dm_autorizado_ro`). El estandar,
+# Power BI y el perfil restringido la tienen VETADA: `apply_grants` se la
+# revoca y lo comprueba cada noche. Cada ficha EMPIEZA por el aviso porque el
+# MCP no filtra el diccionario por perfil. Reglas `R-POSTVENTA-RESTRINGIDA` y
+# `R-PERFILES`.
+#
+# De `raw.per` solo salen nombre, telefonos y correo: ni DNI, ni credenciales,
+# ni direcciones, ni observaciones. Ni un dato personal en este fichero.
+
+version: 1
+esquema: postventa_restringida
+
+objetos:
+
+  contactos_incidencia:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **ACCESO RESTRINGIDO: solo los perfiles postventa y total del MCP**
+      («d1 ok» del humano, chat del 2026-11-03). Si no lo tienes, la consulta
+      devuelve «permission denied»: usa `postventa.incidencias`, sin
+      reintentar ni buscar otro camino (`R-POSTVENTA-RESTRINGIDA`).
+
+      **LAS PERSONAS DE CADA INCIDENCIA**: el propietario de la unidad (su
+      nombre es el de su ficha en Sigrid), quien reclama y la persona de
+      contacto, con nombre, telefonos y correo, mas el telefono y el correo
+      de avisos de la propia incidencia. Propietario en 16.888 incidencias,
+      reclamante en 16.832 y contacto en 2.758 el 2026-11-03. Es tambien la
+      tabla de origen de los adjuntos `REPARACION` de
+      `postventa.documento_adjuntos` (los partes firmados, con DNI
+      manuscrito): quien no la lee no los abre.
+    grano: >-
+      Una fila por incidencia, identificada por `incidencia_id`, clave
+      primaria declarada.
+    clave_negocio: [incidencia_id]
+    paso_etl: build_postventa
+    refresco: nocturno
+    columnas:
+      incidencia_id:
+        significado: Identificador de la incidencia (el de `postventa.incidencias`).
+        agregacion: clave_sustituta
+      codigo_incidencia:
+        significado: Codigo del parte de reclamacion en Sigrid.
+      propietario_id:
+        significado: Ficha de Sigrid del propietario de la unidad reclamada.
+        agregacion: no_sumable
+        nulo_significa: La incidencia no tiene propietario.
+      propietario_nombre:
+        significado: Nombre del propietario (dato personal).
+      reclamante_id:
+        significado: Persona que reclama (ficha de contactos de Sigrid).
+        agregacion: no_sumable
+        nulo_significa: No consta quien reclama.
+      reclamante_nombre:
+        significado: Nombre de quien reclama (dato personal).
+      reclamante_telefono:
+        significado: Telefono de quien reclama (dato personal).
+      reclamante_telefono_2:
+        significado: Segundo telefono de quien reclama (dato personal).
+      reclamante_correo:
+        significado: Correo electronico de quien reclama (dato personal).
+      contacto_id:
+        significado: Persona de contacto de la incidencia (ficha de contactos de Sigrid).
+        agregacion: no_sumable
+        nulo_significa: Sin persona de contacto (la mayoria).
+      contacto_nombre:
+        significado: Nombre de la persona de contacto (dato personal).
+      contacto_telefono:
+        significado: Telefono de la persona de contacto (dato personal).
+      contacto_telefono_2:
+        significado: Segundo telefono de la persona de contacto (dato personal).
+      contacto_correo:
+        significado: Correo de la persona de contacto (dato personal).
+      telefonos_avisos:
+        significado: Telefono de avisos de la incidencia; vacio en todas el 2026-11-03.
+      correo_avisos:
+        significado: Correo de avisos de la incidencia; vacio en todas el 2026-11-03.
+    relaciones:
+      - de: incidencia_id
+        a: postventa.incidencias.incidencia_id
+        cardinalidad: "1:1"
+        porque: Para la obra, la unidad y el estado de la incidencia.
+    ejemplos_preguntas:
+      - Quien reclamo la incidencia X y como contactarle
+      - Que telefono tiene el propietario de la incidencia X
+
+  contactos_unidad:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **ACCESO RESTRINGIDO: solo los perfiles postventa y total del MCP**
+      («d1 ok» del humano, chat del 2026-11-03). Si no lo tienes, la consulta
+      devuelve «permission denied»: usa `postventa.unidades`, sin reintentar
+      (`R-POSTVENTA-RESTRINGIDA`).
+
+      **LAS PERSONAS DE CADA UNIDAD**: propietario (999 unidades) y persona
+      de contacto (994), con su telefono y correo, el telefono y el correo de
+      la propia unidad (751 y 871), si quiere avisos por telefono o correo y
+      en que horario.
+    grano: >-
+      Una fila por unidad de postventa, identificada por `unidad_id`.
+    clave_negocio: [unidad_id]
+    paso_etl: build_postventa
+    refresco: nocturno
+    columnas:
+      unidad_id:
+        significado: Identificador de la unidad (el de `postventa.unidades`).
+        agregacion: clave_sustituta
+      codigo_unidad:
+        significado: Codigo de la unidad en Sigrid.
+      propietario_id:
+        significado: Ficha de Sigrid del propietario de la unidad.
+        agregacion: no_sumable
+        nulo_significa: La unidad no tiene propietario.
+      propietario_nombre:
+        significado: Nombre del propietario (dato personal).
+      contacto_id:
+        significado: Persona de contacto de la unidad (ficha de contactos de Sigrid).
+        agregacion: no_sumable
+      contacto_nombre:
+        significado: Nombre de la persona de contacto (dato personal).
+      contacto_telefono:
+        significado: Telefono de la persona de contacto (dato personal).
+      contacto_telefono_2:
+        significado: Segundo telefono de la persona de contacto (dato personal).
+      contacto_correo:
+        significado: Correo de la persona de contacto (dato personal).
+      telefono_unidad:
+        significado: Telefono de contacto de la unidad (dato personal).
+      correo_unidad:
+        significado: Correo de contacto de la unidad (dato personal).
+      aviso_telefono:
+        significado: Si quiere los avisos por telefono.
+      aviso_correo:
+        significado: Si quiere los avisos por correo.
+      horario_manana:
+        significado: Si se le puede atender por la manana.
+      horario_tarde:
+        significado: Si se le puede atender por la tarde.
+      horario_otros:
+        significado: Si tiene otro horario (ver `texto_otro_horario`).
+      texto_otro_horario:
+        significado: Texto libre con el otro horario de atencion.
+    relaciones:
+      - de: unidad_id
+        a: postventa.unidades.unidad_id
+        cardinalidad: "1:1"
+        porque: Para la obra, el estado y las garantias de la unidad.
+    ejemplos_preguntas:
+      - Como contacto con el propietario de la vivienda X
+      - En que horario se puede visitar la unidad X
+
+  textos:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **ACCESO RESTRINGIDO: solo los perfiles postventa y total del MCP**
+      («d1 ok» del humano, chat del 2026-11-03). Si no lo tienes, usa los
+      textos enmascarados de `postventa.incidencias` y `postventa.tareas`
+      (`R-POSTVENTA-RESTRINGIDA`).
+
+      **LOS TEXTOS INTEGROS**, sin enmascarar, de incidencias (708) y tareas
+      (47): descripcion, descripcion larga y motivo. Pueden traer telefonos y
+      correos de los clientes (los patrones aparecen en una decena de textos).
+      NUNCA se unen con los enmascarados para contar: son el mismo texto.
+    grano: >-
+      Una fila por documento (incidencia o tarea), identificada por
+      `documento_id`.
+    clave_negocio: [documento_id]
+    paso_etl: build_postventa
+    refresco: nocturno
+    columnas:
+      documento_id:
+        significado: El `incidencia_id` o el `tarea_id`, segun el tipo.
+        agregacion: clave_sustituta
+      tipo_documento_codigo:
+        significado: Tipo del documento (708 incidencia, 47 tarea).
+        valores: [47, 708]
+        agregacion: no_sumable
+      codigo_documento:
+        significado: Codigo del documento en Sigrid.
+      descripcion:
+        significado: Descripcion corta integra (puede traer datos personales).
+      descripcion_larga:
+        significado: Texto largo integro (puede traer datos personales).
+      motivo:
+        significado: Motivo integro de la reclamacion.
+        nulo_significa: Es una tarea, o la incidencia no tiene motivo.
+    relaciones: []
+    ejemplos_preguntas:
+      - Que dice exactamente la reclamacion X
+      - Que texto integro tiene la tarea X

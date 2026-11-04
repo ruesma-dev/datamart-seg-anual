@@ -787,7 +787,7 @@ GRANT sigrid_dm_perfil_postventa_ro TO mcp_sigrid_dm_postventa WITH INHERIT TRUE
 
 COMMIT;
 
--- 6. Comprobaciones. Deben salir: los nueve roles (`rolsuper = f` en todos;
+-- 6. Comprobaciones. Deben salir: los 9 roles (`rolsuper = f` en todos;
 --    los dos del perfil restringido desde F-141 y los dos del postventa desde
 --    F-156), sigrid_dm_app dentro de sigrid_dm_etl, y los dieciocho esquemas.
 SELECT rolname, rolcanlogin, rolsuper, rolcreatedb, rolcreaterole
