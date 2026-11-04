@@ -246,7 +246,8 @@ def test_f156_r9_oficios_obra() -> None:
 def test_f156_r7_incidencias_solo_con_cabecera_708() -> None:
     create = _create("02_incidencias.sql", "postventa.incidencias")
     assert f"FROM raw.rcp r JOIN raw.con c ON c.ide = r.ide AND c.tip = {pv.TIPO_INCIDENCIA}" in create
-    assert "JOIN postventa.unidades un ON un.unidad_id = r.upvide" not in create, (
+    assert "LEFT JOIN postventa.unidades un ON un.unidad_id = r.upvide" in create
+    assert not re.search(r"(?<!LEFT )JOIN postventa\.unidades", create), (
         "una incidencia sin unidad publicada no se pierde: LEFT JOIN"
     )
     for columna in ("incidencia_id", "empresa_id", "obra_id", "codigo_obra", "unidad_id",
