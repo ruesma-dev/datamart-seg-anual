@@ -2494,7 +2494,7 @@
         "Datos personales de propietarios y contactos tratados según decida el humano (esquema restringido o fuera), nunca en el esquema general sin autorización",
         "Tests de humo del SQL y del dominio nuevos; `bash harness/init.sh` en verde"
       ],
-      "status": "spec_ready",
+      "status": "in_progress",
       "sdd": true,
       "rigor": "estandar",
       "priority": 3,

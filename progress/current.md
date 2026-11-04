@@ -9,6 +9,15 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-04 · F-156 · `in_progress` · implementando · rama `feature/F-156-postventa`
+
+Implementer. Spec aprobada por el humano el 2026-11-04 («si lanza»). Tarea en curso: ver
+`specs/F-156-postventa/tasks.md` (las `[x]`). Informe final: `progress/impl_F-156.md`.
+- Línea base: el `init.sh` de arranque se paró a los ~8 min (la suite tarda ~1 h 07 min); la
+  rama nace de `bec363c` (merge de F-153 con `init.sh` verde y review APROBADO). La puerta
+  completa se pasa al final.
+- Desviaciones (justificadas): ver la sección «Desviaciones» de `progress/impl_F-156.md`.
+
 ## 2026-11-03 · F-156 · `spec_ready` · spec revisada con las decisiones del humano · rama `feature/F-156-postventa`
 
 Spec-author. Spec en `specs/F-156-postventa/` (+ `pliego_mcp_bbdd.md`), medida en solo lectura

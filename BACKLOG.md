@@ -3,17 +3,18 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **144 features**, 73 abiertas (0 en curso, 2 con la spec lista, 0 bloqueadas y 71 en backlog) y 71 terminadas.
+Resumen: **144 features**, 73 abiertas (1 en curso, 1 con la spec lista, 0 bloqueadas y 71 en backlog) y 71 terminadas.
 
 ## En curso
 
-_Ninguna feature en curso._
+| # | Feature | Prioridad | Rigor | Rama |
+|---|---|---|---|---|
+| F-156 | Postventa entera: unidades, incidencias (reclamaciones), sus partes e intervinientes, su histórico y sus gráficos (documentos) | 3 | estandar | `feature/F-156-postventa` |
 
 ## Spec lista
 
 | # | Feature | Prioridad | Rigor | Rama |
 |---|---|---|---|---|
-| F-156 | Postventa entera: unidades, incidencias (reclamaciones), sus partes e intervinientes, su histórico y sus gráficos (documentos) | 3 | estandar | `feature/F-156-postventa` |
 | F-111 | Los nombres de partida se resuelven por codigo en los niveles del arbol y en la dimension de costes indirectos: 10.593 filas con un escalon con el nombre de otra partida | 18 | estandar | `feature/F-111-nombres-partida-por-ancestro` |
 
 ## Bloqueadas
@@ -188,7 +189,7 @@ Decidido por el humano el 2026-09-23, prioridad 3. Sale de la decision H5 de la 
 
 ### F-156 · Postventa entera: unidades, incidencias (reclamaciones), sus partes e intervinientes, su histórico y sus gráficos (documentos)
 
-estado **spec lista** · prioridad 3 · rigor `estandar` · SDD sí · rama `feature/F-156-postventa`
+estado **en curso** · prioridad 3 · rigor `estandar` · SDD sí · rama `feature/F-156-postventa`
 
 Pedida por el humano el 2026-11-03: «traernos toda la info de postventa, incidencias, partes, gráficos (documentos), histórico de las incidencias, unidades, etc... todo». HOY el datamart no ingiere nada de postventa (ni `tables_sigrid.yaml` ni el diccionario lo citan). LO QUE HAY EN SIGRID (diccionario `azure-apps/sigrid_tablas.md`, a confirmar contra la base): `upv` (Unidad Postventa: obra, propietario `cliide`, persona de contacto, fechas de garantía por tramo —vicios/defectos, habitabilidad/instalaciones, estructura—, escrituración, visita técnica, tipología `obrtplide` → `prmtpl`); `rcp` (Reclamación = la incidencia: unidad `upvide`, fecha y hora, propietario, quién reclama y contacto, descripción, clase `auxrcp`, tipo `auxtrcp`, motivo, forma de comunicación, urgencia, ubicación, oficio `auxofc`, solución, fecha prevista de nueva visita); `rcpint` (intervinientes de la reclamación, con oficio de obra); y lo que cuelga de `rcp` por `act.rcpide` y `tar.rcpide` (actuaciones y tareas: los partes de postventa); además `uve`/`uveref`/`auxuvetip` (unidades de venta y sus reformas) y la relación unidad de venta ↔ unidad postventa. QUÉ SE HACE: (1) ingesta de esas tablas y sus catálogos; (2) un esquema `postventa` con unidades, incidencias, partes/actuaciones e intervinientes, con la obra y la empresa (`R-CODIGO-POR-EMPRESA`); (3) el HISTÓRICO de cada incidencia: estado actual y sus cambios (catálogo de estados del tipo de documento de `rcp` con `compras.fn_estado_documento` o equivalente, y pasos en `raw.rac` si los hay), con `en_estado_desde` y días abierta, como F-132/F-153; (4) los GRÁFICOS (documentos y fotos adjuntos a unidades e incidencias) con el mismo mecanismo que `compras.documento_adjuntos` (F-138) para que `abrir_adjunto` del MCP los sirva; (5) fichas del diccionario y preguntas tipo («incidencias abiertas por obra y oficio», «tiempo medio de resolución», «incidencias por unidad dentro de garantía»). DECISIONES PARA EL HUMANO EN LA SPEC: datos personales de propietarios y contactos (nombre, teléfono, correo): fuera del esquema general, o en esquema restringido con autorización del responsable del dato como `personal` (F-057); si el coste de postventa (partes de horas y compras imputados a la obra o a una obra de postventa) entra aquí o se enlaza; volumen y si la ingesta es completa o incremental. FUERA: escribir en Sigrid; la app de partes o de albaranes (`azure-apps`).
 
