@@ -558,7 +558,7 @@ ALTER TABLE tesoreria.devengo_pendiente_obra_mes ADD COLUMN IF NOT EXISTS import
 ALTER TABLE tesoreria.devengo_pendiente_obra_mes ADD COLUMN IF NOT EXISTS base_sin_iva_contrato NUMERIC(18,2);
 ALTER TABLE tesoreria.devengo_pendiente_obra_mes ADD COLUMN IF NOT EXISTS importe_retencion_contrato NUMERIC(18,2);
 ALTER TABLE tesoreria.devengo_pendiente_obra_mes ADD COLUMN IF NOT EXISTS base_sin_retencion_contrato NUMERIC(18,2);
--- F-150 (N16, R46): el personal del mes (mismo reparto que el pendiente). Solo COSTE.
+-- F-150 (N16, R46): el personal del mes (por acumulado sobre el pendiente del mes, F-158). Solo COSTE.
 ALTER TABLE tesoreria.devengo_pendiente_obra_mes ADD COLUMN IF NOT EXISTS importe_pendiente_personal NUMERIC(18,2);
 
 CREATE TABLE IF NOT EXISTS tesoreria.devengo_corte_obra (
