@@ -2500,6 +2500,23 @@
       "priority": 3,
       "branch": "feature/F-156-postventa",
       "notes": "2026-11-03: anotada por el líder a petición del humano; sin medir aún en Sigrid. Tablas candidatas leídas de `azure-apps/sigrid_tablas.md` (upv, rcp, rcpint, auxrcp, auxtrcp, auxofc, act, tar, uve, uveref, auxuvetip, prmtpl). 2026-11-03: spec en `specs/F-156-postventa/`, medida en solo lectura (`progress/spec_F-156.md`): `act`, `uve`, `uveref` y `auxuvetip` están VACÍAS en Sigrid; entran `upv`, `rcp`, `rcpint`, `tar` (filtrada a reclamaciones), `tarres`, `obrofc`, catálogos, `auxgra`, 659 líneas de `log` y, si D1=A, `per` reducida. Revisada el mismo día con las decisiones del humano (D1=A con perfil nuevo «postventa», coste por obra de origen por las partidas de POSTV*, histórico con login): requirements.md. Pliego para `mcp-bbdd` en `specs/F-156-postventa/pliego_mcp_bbdd.md`. No implementar hasta cerrar F-153."
+    },
+    {
+      "id": "F-157",
+      "title": "La planificación en el tiempo de la fase 0 (Previsto) de coste y venta: el reparto mensual por partida que el jefe de obra mete en Sigrid no llega a `stg.plan_mensual`",
+      "description": "Pedida por Juan Romero (Control de Costes) el 2026-11-05: «el datamart publica el importe total de cada partida en fase 0 (Previsto) en coste y en venta, pero no su planificación en el tiempo» (pantalla de Sigrid «Planificación en el tiempo (por partidas)»). COMPROBADO por el líder el 2026-11-05, solo lectura: (1) en el código, `stg/08_plan_mensual.sql` solo explota `raw.obrparpre.planif` para los master (ámbitos 8 y 11, anclados en `obrfasamb.plafec`); de los ámbitos 3 y 7 solo publica los cierres reales (`fase_num >= 1`), así que la fase 0 de coste y venta no se reparte nunca. (2) En los datos: `raw.obrfasamb` tiene `plafec` en la fase 0 en 144 obras de coste (ámbito 3) y 139 de venta (ámbito 7), de 2015-05 a 2026-10. En la 0726 (CENTRO SOCIOSANITARIO LAGUNA NORTE, obra 2817778) la venta fase 0 (ámbito 7, 23.928.969,90 €, el total que cita Juan) tiene `plafec` 2026-10-01 y `planif` en 83 de sus 1.460 partidas (acumulado por meses separado por `|`, termina en 1, p. ej. `0|0|0|0|0.15|0.85|1`); su coste fase 0 (ámbito 3, 1.545 partidas) NO tiene `planif` ni `plafec` en esa obra, y sus master 0 y 1 (8/11) tampoco tienen `plafec` (por eso no tienen meses, como dice Juan). `stg.plan_mensual` de la 0726 solo tiene ámbito 3 versión 1 (31 filas). QUÉ HACER: publicar el reparto mensual de la fase 0 (ámbitos 3 y 7) por partida con porcentaje e importe de cada mes, con la misma explosión que los master (`planif` acumulado → porcentaje del mes, anclado en `plafec`), sin mezclarlo con los cierres reales (versión 0 hoy no existe en 3/7: decidir si va en `plan_mensual` con versión 0 o en un objeto propio, y cuidar la clave de `stg.plan_mensual` y lo que cruza `pm.version` con `stg.fases.numero_fase` en `cierre/`). Medir cuántas partidas tienen `planif` en fase 0, cuántas suman 100 % y qué pasa con las que no tienen. Para que Juan compare la planificación viva del jefe de obra con la del master vigente y el coste con la venta antes de guardar el master.",
+      "acceptance": [
+        "Spec SDD aprobada por el humano antes de implementar, con las mediciones (obras y partidas con `planif` en fase 0 de los ámbitos 3 y 7, porcentaje que suma, partidas sin reparto) y la decisión de dónde se publica",
+        "La 0726 publica la venta fase 0 por meses desde 2026-10 en sus 83 partidas planificadas, con porcentaje e importe de cada mes, y la suma de los meses cuadra con el total planificado de cada partida",
+        "Los cierres reales y los master de `stg.plan_mensual` no cambian (mismas filas y mismos importes antes y después), y `cierre/` sigue cruzando solo las fases reales",
+        "Ficha del diccionario con el objeto, la regla de que la fase 0 es planificación viva (no master ni cierre) y un ejemplo de pregunta; tests y `bash harness/init.sh` en verde"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 1,
+      "branch": "feature/F-157-planificacion-fase0",
+      "notes": "2026-11-05: anotada por el líder a petición del humano («añádelo a la feature como siguiente»): prioridad 1, la siguiente tras cerrar F-156."
     }
   ]
 }
