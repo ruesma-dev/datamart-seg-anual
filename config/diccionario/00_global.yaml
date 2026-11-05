@@ -782,7 +782,12 @@
 # 2026-11-03), con su regla `R-POSTVENTA-RESTRINGIDA`; `R-PERFILES` gana el
 # cuarto perfil (POSTVENTA) y `R-FRESCURA` el paso `build_postventa`. 287 objetos
 # y 2.459 columnas.
-version: 71
+# version 72 (F-158, 2026-11-05): HOTFIX DEL CENTIMO NEGATIVO. El personal
+# de `devengo_pendiente_obra_mes` se reparte por acumulado sobre
+# `importe_pendiente` y nunca lo supera en un mes; `devengo_pendiente_contrato_mes`
+# dice que su fila sin contrato solo es negativa por un mes negativo del plan.
+# Errata de postventa («la mascara es heuristica»). Sin objetos ni columnas nuevas.
+version: 72
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
