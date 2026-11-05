@@ -24,6 +24,10 @@ del master; D5 desplegar en SÁBADO (el sello fuerza una noche completa: +~100 m
 domingo); D6 solo ámbitos 3 y 7; D7 sin regla dura nueva; D8 `mart` no se toca. Queda además
 para Control de Costes: el cuadre con la pantalla de Sigrid (no está documentada en ningún
 sitio) en la 0726 y en una obra con `plamed = 2`.
+`bash harness/init.sh` en el worktree del spec-author: ROJO por entorno, no por la spec (falta
+`.env` en el worktree y no se copia: `test_f006_t26_cli_dry_run_no_toca_la_base` cae en
+`SigridApiSettings` sin `base_url`); 256 tests pasados antes del corte y tamaños dentro de tope
+(requirements 132/150, design 250/250). Hay que repasarlo en el checkout principal.
 
 ## 2026-11-04 · F-156 · `in_progress` · implementando · rama `feature/F-156-postventa`
 
