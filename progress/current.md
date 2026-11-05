@@ -9,6 +9,16 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-05 · F-158 · implementado (T1-T5), pendiente de review · rama `feature/F-158-hotfix-devengo-negativo`
+
+Implementer, en el worktree del agente; spec aprobada (D1 = A, D2 fuera, D3 v72, D4 sin
+sandbox). T1-T5 hechas, un commit por tarea (`4e46f0f`..`b7c091d`): `repartir_personal` en el
+dominio, el paso 5 de `07` con el personal por acumulado, fichas y v72, errata de postventa.
+Informe: `progress/impl_F-158.md`, con las desviaciones: el plan de 392521 reconstruido de los
+cinco importes del diagnóstico, `test_f156_r34` a `>=` y la mutación manual. Quedan T6
+(despliegue MANUAL del humano) y la puerta completa de `init.sh` en un checkout con `.env`.
+`features.json` sin tocar: F-156 sigue `in_progress` en el árbol.
+
 ## 2026-11-05 · F-158 · `pending` · spec escrita (HOTFIX) · rama `feature/F-158-hotfix-devengo-negativo`
 
 Spec-author, en su worktree desde `main` `fbf43dd`; sin código, va a la PARADA 1. Las nocturnas
