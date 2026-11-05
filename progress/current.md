@@ -21,7 +21,8 @@ Implementer. Spec aprobada por el humano el 2026-11-04 («si lanza»). Tarea en 
   `8dc4b04`, sin push). Diccionario del árbol hoy: **v71, 287 objetos, 2459 columnas, 137 de
   consumo**, 23 reglas (nueva `R-POSTVENTA-RESTRINGIDA`), SIN publicar. Presupuesto de F-147
   subido con motivo a 34.212. Nada lanzado contra Azure salvo lecturas; el PostgreSQL desechable
-  local ya está parado. Pendiente: T15 (informe + mutación), T17 (`init.sh` en verde); T16 MANUAL.
+  local ya está parado. T15 y T17 hechas: `init.sh` verde (10509 passed, cobertura 100 % de 239
+  líneas), mutación 19/20 muertos (el superviviente, equivalente). Pendiente: review y T16 MANUAL.
 
 ## 2026-11-03 · F-156 · `spec_ready` · spec revisada con las decisiones del humano · rama `feature/F-156-postventa`
 

@@ -54,7 +54,8 @@ local, sin push. **T16 (despliegue) NO ejecutada**: es del humano (§5).
 
 - `bash harness/init.sh` (2026-11-04/05): **verde**. `10509 passed, 312 skipped in 15175.92s
   (4:12:55)` con medición de cobertura; `PUERTA COBERTURA: 100.0% de 239 líneas cambiadas
-  cubiertas (239/239)`; `PUERTA TAMAÑO` OK.
+  cubiertas (239/239)`; `PUERTA TAMAÑO` OK. Corrido sobre `206fd57`; después solo cambian
+  `progress/` y `tasks.md` (informe, mutación y marcas), sin código ni tests.
 - Los 9 SQL de postventa ejecutados contra un **PostgreSQL 16 desechable local** (puerto 55432,
   datos sintéticos de `raw` con los tipos reales): todos corren; paridad SQL ↔ dominio de
   `fn_enmascarar` y `fn_obra_de_partida` en 33 casos, 0 fallos. `02_roles.sql` corrido allí con
@@ -149,5 +150,5 @@ de solo lectura con `pg._bootstrap_done = True` (design §12); `$dsn` del admini
 |---|---|
 | Tests ejecutados | `bash harness/init.sh`: **10509 passed, 312 skipped**, 0 failed (F-156: 196 tests propios) |
 | Cobertura de líneas cambiadas | **100.0 %** (239/239), `PUERTA COBERTURA`, umbral 80 % |
-| Mutantes | MUTACION_PENDIENTE |
+| Mutantes | `python -m harness.mutacion --feature F-156 --workers 2 --timeout 3000`: 762 líneas de producción en 8 ficheros, 20 evaluados (muestreo `estandar`, semilla 20260820): **19 muertos, 1 superviviente, 0 timeouts** (19.878 s; base 2.193-2.204 s por worker). El superviviente (`build_postventa_step.py:137`, redondeo de `duration_s` de 2 a 3 decimales) solo va al log: equivalente, analizado en `progress/mutacion_F-156.md`. El SQL no se muta: lo cubren los tests de literales contra el dominio y el PostgreSQL desechable |
 | Tiempo de la suite | **15175,92 s (4 h 12 min 55 s)** con cobertura, según la propia suite |
