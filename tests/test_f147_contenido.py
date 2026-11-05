@@ -48,6 +48,8 @@ REGLAS_TRAS_F147 = {
     "R-COMPRAS-SIN-IVA", "R-COMPRAS-LINEA",
     # F-140 (2026-10-25), la que obliga a declarar las hipotesis de caja.
     "R-CAJA-HIPOTESIS",
+    # F-156 (2026-11-04), la de los datos personales de postventa.
+    "R-POSTVENTA-RESTRINGIDA",
 }
 
 #: Los ocho códigos que F-147 retira (R8). Se escriben partidos para que este

@@ -1,0 +1,976 @@
+# config/diccionario/postventa.yaml
+#
+# Fichas del esquema `postventa` (F-156, 2026-11-04): las unidades de
+# postventa (viviendas y locales entregados, `con` tipo 707), sus incidencias
+# (las reclamaciones del cliente, 708), las tareas que las atienden (47), su
+# historico de estados, el indice de sus adjuntos y el coste de postventa por
+# obra de origen. Lo construye `build_postventa`, dentro de `run-all`, desde
+# `raw` (y `v_coste_obra` lee `compras` al consultar). Todas las cifras de aqui
+# estan MEDIDAS contra Sigrid el 2026-11-03 (`progress/spec_F-156.md`).
+#
+# LAS COSAS QUE HAY QUE SABER ANTES DE ESCRIBIR UNA CONSULTA AQUI:
+#
+# 1. **Aqui NO estan las fichas de clientes.** Propietarios, reclamantes, contactos, telefonos,
+#    correos y el texto libre INTEGRO viven en `postventa_restringida`, que solo
+#    leen el perfil postventa y el total (`R-POSTVENTA-RESTRINGIDA`). Los textos
+#    de este esquema van ENMASCARADOS (`[TELEFONO]`, `[CORREO]`), pero la mascara
+#    es HEURISTICA: un nombre propio en el texto libre NO se quita, y `ubicacion`,
+#    `urgencia`, `espacios`, `nombre_unidad`, `nombre_fichero` y la `descripcion`
+#    de los adjuntos van sin mascara (review F-156, pasada 1).
+# 2. **El estado actual y desde cuando, en `v_estado_incidencias`**: una parte
+#    de los cierres la escribe la aplicacion `postventa-incidencias` sin paso en
+#    `rac`; esa vista y `incidencia_procesos` ya lo resuelven.
+# 3. **Sigrid no liga una incidencia con su coste.** El coste es por OBRA DE
+#    ORIGEN (`v_coste_obra`), solo de facturas, y sin el personal.
+#
+# Lo lee el perfil restringido (administrativos); el general NO lleva datos
+# personales a proposito (R11 de F-156).
+
+version: 1
+esquema: postventa
+
+objetos:
+
+  unidades:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **LAS UNIDADES DE POSTVENTA**: cada vivienda, local o garaje entregado
+      que Sigrid sigue en postventa (`con` tipo 707, `raw.upv`), con su obra,
+      su estado (707: PRE «En preventa», GAR «En garantia»), su tipologia y
+      las fechas de sus garantias. 1.328 en 18 obras el 2026-11-03.
+
+      **LAS TRES GARANTIAS**: la general (`inicio_garantia`, `fin_garantia`),
+      la de vicios (`fin_garantia_vicios`, la de la clase 0001 de la
+      incidencia) y la de habitabilidad (`*_habitabilidad`, la de la 0002).
+      **La de estructura (clase 0003) solo tiene INICIO en Sigrid**
+      (`inicio_garantia_estructura`), no fin: no se puede decir si una
+      incidencia de estructura esta dentro de garantia. Las fechas estan en
+      876 unidades (general y vicios) y 644 (habitabilidad).
+
+      **NO HAY RELACION CON LA UNIDAD DE VENTA**: las tablas de Sigrid que la
+      darian (`uve`, `uveref`) estan VACIAS, asi que no se puede cruzar una
+      unidad de postventa con su unidad de venta ni con su precio. El
+      propietario y su contacto estan en
+      `postventa_restringida.contactos_unidad`; aqui solo `tiene_propietario`.
+    grano: >-
+      Una fila por unidad de postventa, identificada por `unidad_id`
+      (`upv.ide`), clave primaria declarada.
+    clave_negocio: [unidad_id]
+    paso_etl: build_postventa
+    refresco: nocturno
+    columnas:
+      unidad_id:
+        significado: Identificador de la unidad (`upv.ide`, el del documento 707 de Sigrid).
+        agregacion: clave_sustituta
+      empresa_id:
+        significado: Empresa del documento de la unidad; hoy todas son de la empresa 1.
+        agregacion: no_sumable
+      obra_id:
+        significado: Identificador de la obra a la que pertenece la unidad.
+        agregacion: no_sumable
+        nulo_significa: La unidad no tiene obra en Sigrid.
+      codigo_obra:
+        significado: Codigo de la obra tal y como se ve en Sigrid (`0594`, `0627`...).
+      codigo_unidad:
+        significado: Codigo de la unidad en Sigrid, unico dentro de su empresa.
+      nombre_unidad:
+        significado: Nombre de la unidad (portal, planta y letra, o el que le dieran).
+      estado_id:
+        significado: Estado de la unidad en Sigrid (tipo 707), en numero.
+        valores: [1, 5, 10]
+        agregacion: no_sumable
+      estado_codigo:
+        significado: Mnemonico del estado de la unidad, lo estable para filtrar.
+        valores: [PRE, GAR, TG]
+      estado:
+        significado: Nombre del estado, traducido por la pareja (707, estado).
+      tipologia_id:
+        significado: Identificador de la tipologia de la unidad (`prmtpl`).
+        agregacion: no_sumable
+        nulo_significa: Sin tipologia (228 unidades el 2026-11-03).
+      codigo_tipologia:
+        significado: Codigo de la tipologia de la unidad en Sigrid.
+      tipologia:
+        significado: Nombre de la tipologia (vivienda, local, garaje...).
+      inicio_garantia:
+        significado: Inicio de la garantia general de la unidad (la entrega).
+        agregacion: no_sumable
+      fin_garantia:
+        significado: Fin de la garantia general de la unidad.
+        agregacion: no_sumable
+      fin_garantia_vicios:
+        significado: >-
+          Fin de la garantia de vicios y defectos de acabado: la de las
+          incidencias de clase 0001.
+        agregacion: no_sumable
+      inicio_garantia_habitabilidad:
+        significado: Inicio de la garantia de habitabilidad (clase 0002).
+        agregacion: no_sumable
+      fin_garantia_habitabilidad:
+        significado: Fin de la garantia de habitabilidad, la de las incidencias de clase 0002.
+        agregacion: no_sumable
+      inicio_garantia_estructura:
+        significado: >-
+          Inicio de la garantia de estructura (clase 0003). Sigrid NO guarda su
+          fin.
+        agregacion: no_sumable
+      fecha_escrituracion:
+        significado: Fecha de escritura de la unidad.
+        agregacion: no_sumable
+      fecha_fin_primer_listado:
+        significado: Fecha en que se cerro el primer listado de repasos de la unidad.
+        agregacion: no_sumable
+      fecha_visita_tecnica_prevista:
+        significado: Fecha prevista de la visita tecnica a la unidad.
+        agregacion: no_sumable
+      fecha_visita_tecnica:
+        significado: Fecha real de la visita tecnica a la unidad.
+        agregacion: no_sumable
+      espacios:
+        significado: Texto con los espacios de la unidad (dormitorios, banos...), tal cual.
+      tiene_propietario:
+        significado: >-
+          Si la unidad tiene propietario en Sigrid. Quien es, solo en
+          `postventa_restringida.contactos_unidad`.
+    relaciones:
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: Para el nombre, el cliente y las fechas de la obra, que aqui no vienen.
+    ejemplos_preguntas:
+      - Que unidades de la obra X siguen dentro de garantia y cuantas incidencias tienen
+      - Cuando vence la garantia de habitabilidad de las viviendas de la obra X
+
+  oficios_obra:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **LOS OFICIOS DE CADA OBRA Y QUIEN LOS HIZO** (`raw.obrofc`): para cada
+      obra, que proveedor ejecuto cada oficio (fontaneria, carpinteria...). Es
+      lo que dice a quien reclamar una incidencia: el interviniente y la tarea
+      apuntan aqui. `comentario` va enmascarado.
+    grano: >-
+      Una fila por oficio de obra, identificada por `oficio_obra_id`
+      (`obrofc.ide`). Una obra tiene varios oficios y un oficio puede tener
+      varios proveedores en la misma obra.
+    clave_negocio: [oficio_obra_id]
+    paso_etl: build_postventa
+    refresco: nocturno
+    columnas:
+      oficio_obra_id:
+        significado: Identificador del oficio de la obra (`obrofc.ide`).
+        agregacion: clave_sustituta
+      obra_id:
+        significado: Identificador de la obra del oficio.
+        agregacion: no_sumable
+      codigo_obra:
+        significado: Codigo de la obra tal y como se ve en Sigrid.
+      empresa_id:
+        significado: Empresa de la obra del oficio.
+        agregacion: no_sumable
+      oficio_id:
+        significado: Identificador del oficio en el catalogo (`auxofc`).
+        agregacion: no_sumable
+      oficio_codigo:
+        significado: Codigo del oficio en el catalogo de Sigrid.
+      oficio:
+        significado: Nombre del oficio (fontaneria, electricidad, carpinteria...).
+      proveedor_id:
+        significado: Identificador del proveedor que hizo el oficio en esa obra.
+        agregacion: no_sumable
+        nulo_significa: El oficio no tiene proveedor asignado en Sigrid.
+      proveedor:
+        significado: Nombre del proveedor que hizo el oficio en esa obra.
+      comentario:
+        significado: Comentario libre del oficio, con telefonos y correos enmascarados.
+    relaciones:
+      - de: proveedor_id
+        a: maestro.proveedores.proveedor_id
+        cardinalidad: "N:1"
+        porque: Para el CIF y los datos del proveedor del oficio.
+    ejemplos_preguntas:
+      - Que proveedor hizo la fontaneria de la obra X
+      - Que oficios tiene la obra X y con que proveedores
+
+  incidencias:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **LAS INCIDENCIAS DE POSTVENTA**: una fila por reclamacion del cliente
+      (`raw.rcp` con su cabecera 708, el «parte de reclamacion»), con su
+      unidad, obra, estado, clase, tipo, oficio, urgencia, ubicacion y el fin
+      de la garantia de SU clase. 22.179 el 2026-11-03, todas de la empresa 1,
+      desde 2020. Estados (708): 1 SAT Sin atender y 3 PTE Pendiente
+      (abiertas); 5 TER Terminada, 7 NPR No procede y 9 CER Cerrada.
+
+      **TRAMPAS MEDIDAS**: las 1.502 cabeceras 708 sin fila en `rcp` (borradas)
+      NO estan. 15.229 incidencias no tienen clase (`clase_id` nulo), asi que
+      para ellas `dentro_garantia` es nulo: no se sabe. La forma de
+      comunicacion (`forma_comunicacion_codigo`) es un codigo sin catalogo:
+      solo el 1 tiene nombre documentado, «Escrita» (12.810); el 0 (1.945) y
+      el 3 (7.424) no se saben. `urgencia` solo esta en 7.434.
+
+      Texto (`descripcion`, `descripcion_larga`, `motivo`) ENMASCARADO. LA MASCARA ES HEURISTICA: solo cambia por `[TELEFONO]` y `[CORREO]` lo que tiene forma de telefono o de correo; un NOMBRE PROPIO escrito en el texto libre NO se quita.
+      `ubicacion` y `urgencia` van sin mascara. El integro y las fichas de
+      las personas, en `postventa_restringida`. Desde cuando esta en
+      su estado y cuanto tardo: `postventa.v_estado_incidencias`.
+    grano: >-
+      Una fila por incidencia, identificada por `incidencia_id` (`rcp.ide`),
+      clave primaria declarada.
+    clave_negocio: [incidencia_id]
+    paso_etl: build_postventa
+    refresco: nocturno
+    columnas:
+      incidencia_id:
+        significado: Identificador de la incidencia (`rcp.ide`, el del documento 708).
+        agregacion: clave_sustituta
+      empresa_id:
+        significado: Empresa del parte; hoy todas son de la empresa 1.
+        agregacion: no_sumable
+      obra_id:
+        significado: Obra de la unidad de la incidencia.
+        agregacion: no_sumable
+        nulo_significa: La incidencia no tiene unidad publicada, o su unidad no tiene obra.
+      codigo_obra:
+        significado: Codigo de la obra de la unidad, tal y como se ve en Sigrid.
+      unidad_id:
+        significado: Unidad de postventa reclamada.
+        agregacion: no_sumable
+      codigo_unidad:
+        significado: Codigo de la unidad reclamada en Sigrid.
+      codigo_incidencia:
+        significado: Codigo del parte de reclamacion en Sigrid (unico en el tipo 708).
+      fecha_alta:
+        significado: Fecha de la reclamacion (la de `rcp`, o la de la cabecera si falta).
+        agregacion: no_sumable
+      momento_alta:
+        significado: Fecha y hora de la reclamacion, hora de Madrid.
+        agregacion: no_sumable
+      estado_id:
+        significado: Estado actual de la incidencia (tipo 708), en numero.
+        valores: [1, 3, 5, 7, 9]
+        agregacion: no_sumable
+      estado_codigo:
+        significado: Mnemonico del estado actual, lo estable para filtrar.
+        valores: [SAT, PTE, TER, NPR, CER]
+      estado:
+        significado: Nombre del estado actual, traducido por la pareja (708, estado).
+      clase_id:
+        significado: Clase de la incidencia (`auxrcp`), la que decide su garantia.
+        agregacion: no_sumable
+        nulo_significa: Sin clase, 15.229 de 22.179 el 2026-11-03.
+      clase_codigo:
+        significado: Codigo de la clase (0001 vicios, 0002 habitabilidad, 0003 estructura).
+        valores: ["0001", "0002", "0003"]
+      clase:
+        significado: Nombre de la clase de la incidencia.
+      tipo_id:
+        significado: Tipo de la incidencia (`auxtrcp`).
+        agregacion: no_sumable
+      tipo_codigo:
+        significado: Codigo del tipo de la incidencia en Sigrid.
+        valores: ["0001", "0002", "0003", "0004"]
+      tipo:
+        significado: >-
+          Nombre del tipo: PREVENTA, PRIMER LISTADO POSTVENTA, POST VENTA o
+          VISITA DE CORTESIA.
+      oficio_id:
+        significado: Oficio al que se atribuye la incidencia (`auxofc`).
+        agregacion: no_sumable
+        nulo_significa: Sin oficio (3.938 el 2026-11-03).
+      oficio_codigo:
+        significado: Codigo del oficio de la incidencia.
+      oficio:
+        significado: Nombre del oficio de la incidencia (fontaneria, carpinteria...).
+      motivo:
+        significado: Motivo de la reclamacion, texto libre enmascarado (solo en 1.239).
+      forma_comunicacion_codigo:
+        significado: >-
+          Como llego la reclamacion, codigo de Sigrid sin catalogo: solo el 1
+          («Escrita») tiene nombre; 0 y 3 no se saben.
+        agregacion: no_sumable
+      urgencia:
+        significado: Urgencia declarada (Normal, Urgente); solo en 7.434 incidencias.
+      ubicacion:
+        significado: Donde esta el defecto dentro de la unidad (cocina, bano...).
+      descripcion:
+        significado: Descripcion corta del parte, con telefonos y correos enmascarados.
+      descripcion_larga:
+        significado: Texto largo de la reclamacion, con telefonos y correos enmascarados.
+      referencia_externa:
+        significado: >-
+          Referencia de la aplicacion de Posventa (`PVI-...`, campo extendido
+          `RCPCLI`), en 5.099 incidencias.
+      fin_garantia_clase:
+        significado: >-
+          Fin de la garantia de la clase de la incidencia: el de vicios para la
+          0001 y el de habitabilidad para la 0002.
+        agregacion: no_sumable
+        nulo_significa: >-
+          Clase 0003 (estructura, sin fin en Sigrid), sin clase, o unidad sin
+          fecha de garantia.
+      dentro_garantia:
+        significado: Si la reclamacion se hizo dentro de la garantia de su clase.
+        nulo_significa: No se sabe (sin clase, estructura o unidad sin fecha de garantia).
+    relaciones:
+      - de: unidad_id
+        a: postventa.unidades.unidad_id
+        cardinalidad: "N:1"
+        porque: Para las fechas de garantia y la tipologia de la unidad reclamada.
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: Para el nombre y el cliente de la obra.
+    ejemplos_preguntas:
+      - Cuantas incidencias abiertas hay en cada obra y de que oficio
+      - Que oficios acumulan mas incidencias en la obra X
+      - Cuantas incidencias se reclamaron dentro de garantia el ultimo ano
+
+  incidencia_intervinientes:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **QUIEN INTERVIENE EN CADA INCIDENCIA** (`raw.rcpint`): el oficio de la
+      obra (y su proveedor) que tiene que repararla, y si es el CAUSANTE. Una
+      incidencia puede tener varios. Los 1.499 intervinientes huerfanos de
+      Sigrid (de incidencias borradas) no estan.
+    grano: >-
+      Una fila por interviniente, identificada por `interviniente_id`
+      (`rcpint.ide`). Varias por incidencia.
+    clave_negocio: [interviniente_id]
+    paso_etl: build_postventa
+    refresco: nocturno
+    columnas:
+      interviniente_id:
+        significado: Identificador del interviniente (`rcpint.ide`).
+        agregacion: clave_sustituta
+      incidencia_id:
+        significado: Incidencia en la que interviene.
+        agregacion: no_sumable
+      posicion:
+        significado: Orden del interviniente dentro de la incidencia.
+        agregacion: no_sumable
+      oficio_obra_id:
+        significado: Oficio de la obra que interviene (`postventa.oficios_obra`).
+        agregacion: no_sumable
+      oficio_id:
+        significado: Oficio del catalogo del interviniente.
+        agregacion: no_sumable
+      oficio_codigo:
+        significado: Codigo del oficio del interviniente.
+      oficio:
+        significado: Nombre del oficio del interviniente.
+      proveedor_id:
+        significado: Proveedor del oficio de la obra que interviene.
+        agregacion: no_sumable
+      proveedor:
+        significado: Nombre del proveedor que interviene.
+      causante:
+        significado: Si el interviniente es el causante del defecto (8.520 lo son).
+    relaciones:
+      - de: incidencia_id
+        a: postventa.incidencias.incidencia_id
+        cardinalidad: "N:1"
+        porque: Para la obra, el estado y la fecha de la incidencia.
+    ejemplos_preguntas:
+      - Que proveedores son causantes de mas incidencias en la obra X
+      - Cuantas incidencias tiene abiertas cada proveedor
+
+  tareas:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **LAS TAREAS QUE ATIENDEN LAS INCIDENCIAS** (`raw.tar`, `con` tipo 47,
+      serie `REP2...`): 13.767 el 2026-11-03, todas con incidencia. Estado
+      (47): en uso 20 IELA, 21 IENV y 23 IREC. El oficio y el proveedor salen
+      del primer recurso con oficio de la tarea; coincide con el de la
+      incidencia en 12.682.
+
+      **SIN COSTE**: el coste y la venta de las tareas estan a 0 en el 100 %
+      en Sigrid y no se publican. El coste de postventa esta en
+      `postventa.v_coste_obra`. El empleado asignado va solo por id.
+      `descripcion` y `texto` van enmascarados, pero lA MASCARA ES HEURISTICA: solo cambia por `[TELEFONO]` y `[CORREO]` lo que tiene forma de telefono o de correo; un NOMBRE PROPIO escrito en el texto libre NO se quita.
+    grano: >-
+      Una fila por tarea, identificada por `tarea_id` (`tar.ide`). Varias por
+      incidencia.
+    clave_negocio: [tarea_id]
+    paso_etl: build_postventa
+    refresco: nocturno
+    columnas:
+      tarea_id:
+        significado: Identificador de la tarea (`tar.ide`, el del documento 47).
+        agregacion: clave_sustituta
+      incidencia_id:
+        significado: Incidencia que atiende la tarea.
+        agregacion: no_sumable
+      empresa_id:
+        significado: Empresa del documento de la tarea.
+        agregacion: no_sumable
+      obra_id:
+        significado: Obra de la incidencia de la tarea.
+        agregacion: no_sumable
+      codigo_obra:
+        significado: Codigo de la obra de la incidencia, tal y como se ve en Sigrid.
+      codigo_tarea:
+        significado: Codigo de la tarea en Sigrid (serie `REP2...`).
+      fecha_alta:
+        significado: Fecha de la cabecera de la tarea.
+        agregacion: no_sumable
+      estado_id:
+        significado: Estado de la tarea (tipo 47), en numero.
+        agregacion: no_sumable
+      estado_codigo:
+        significado: Mnemonico del estado de la tarea (IELA, IENV, IREC...).
+      estado:
+        significado: Nombre del estado, traducido por la pareja (47, estado).
+      empleado_id:
+        significado: >-
+          Empleado asignado (id del recurso, SIN nombre: el nombre esta en
+          `personal`, que el perfil restringido no lee).
+        agregacion: no_sumable
+        nulo_significa: Tarea sin empleado asignado (402 el 2026-11-03).
+      oficio_obra_id:
+        significado: Oficio de la obra del primer recurso con oficio de la tarea.
+        agregacion: no_sumable
+      oficio_id:
+        significado: Oficio del catalogo de la tarea.
+        agregacion: no_sumable
+      oficio_codigo:
+        significado: Codigo del oficio de la tarea.
+      oficio:
+        significado: Nombre del oficio de la tarea.
+      proveedor_id:
+        significado: Proveedor del oficio de la obra de la tarea.
+        agregacion: no_sumable
+      proveedor:
+        significado: Nombre del proveedor que hace la tarea.
+      fecha_inicio_estimada:
+        significado: Inicio estimado de la tarea (solo en 690).
+        agregacion: no_sumable
+      fecha_fin_estimada:
+        significado: Fin estimado de la tarea (solo en 457).
+        agregacion: no_sumable
+      fecha_limite:
+        significado: Fecha limite de la tarea (solo en 690).
+        agregacion: no_sumable
+      fecha_inicio_real:
+        significado: Inicio real de la tarea, si se registro.
+        agregacion: no_sumable
+      fecha_fin_real:
+        significado: Fin real de la tarea, si se registro.
+        agregacion: no_sumable
+      prioridad:
+        significado: Prioridad de la tarea en Sigrid (numero, sin catalogo publicado).
+        agregacion: no_sumable
+      porcentaje:
+        significado: Porcentaje de avance de la tarea (solo en 457).
+        agregacion: no_sumable
+      descripcion:
+        significado: Descripcion corta de la tarea, con telefonos y correos enmascarados.
+      texto:
+        significado: Texto de la tarea, con telefonos y correos enmascarados.
+    relaciones:
+      - de: incidencia_id
+        a: postventa.incidencias.incidencia_id
+        cardinalidad: "N:1"
+        porque: Para la unidad, la clase y el estado de la incidencia de la tarea.
+    ejemplos_preguntas:
+      - Que tareas de reparacion tiene pendientes cada proveedor
+      - Cuantas tareas tiene cada incidencia abierta de la obra X
+
+  incidencia_procesos:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **EL HISTORICO DE ESTADOS** de unidades (707), incidencias (708) y
+      tareas (47): quien cambio el estado, desde cual, a cual y cuando. Dos
+      origenes en una tabla: `RAC`, un paso de la ventana «Procesos» de
+      Sigrid (`raw.rac`), y `CIERRE_APLICACION`, la linea con que la
+      aplicacion `postventa-incidencias` cierra un parte (escribe el estado 9
+      y `dbo.log`, NO un paso de `rac`): sin estado de origen.
+
+      **LOGINS SIN NOMBRE**: `usuario` es el LOGIN; `usuario_nombre` sale de
+      los usuarios de Sigrid y es nulo si el login ya no existe (el 3,2 % de
+      los pasos de 708). Es la historia NETA: un paso deshecho en Sigrid ya
+      no esta. `es_ultimo` marca el paso mas reciente de cada documento.
+    grano: >-
+      Una fila por paso, identificada por `paso_id` (`RAC-<ide>` o
+      `LOG-<ide>`). Varias por documento.
+    clave_negocio: [paso_id]
+    paso_etl: build_postventa
+    refresco: nocturno
+    columnas:
+      paso_id:
+        significado: Clave del paso, `RAC-<rac.ide>` o `LOG-<log.ide>`.
+        agregacion: clave_sustituta
+      origen:
+        significado: De donde sale el paso.
+        valores: [RAC, CIERRE_APLICACION]
+      ide_origen:
+        significado: El `ide` del paso en su tabla de Sigrid (`rac` o `log`).
+        agregacion: no_sumable
+      documento_id:
+        significado: >-
+          Documento cuyo estado cambia: `incidencia_id`, `unidad_id` o
+          `tarea_id` segun `tipo_documento_codigo`.
+        agregacion: no_sumable
+      tipo_documento_codigo:
+        significado: Tipo del documento (708 incidencia, 707 unidad, 47 tarea).
+        valores: [47, 707, 708]
+        agregacion: no_sumable
+      codigo_documento:
+        significado: Codigo del documento en Sigrid.
+      proceso:
+        significado: Nombre del proceso de Sigrid que dio el paso.
+        nulo_significa: Paso de la aplicacion (`CIERRE_APLICACION`), que no tiene proceso.
+      estado_origen_id:
+        significado: >-
+          Estado del que sale el documento, en numero. Vacio en los cierres de
+          la aplicacion (`CIERRE_APLICACION`), que no guardan el de origen.
+        agregacion: no_sumable
+      estado_origen_codigo:
+        significado: Mnemonico del estado de origen.
+      estado_origen:
+        significado: Nombre del estado de origen.
+      estado_destino_id:
+        significado: Estado al que llega el documento, en numero.
+        agregacion: no_sumable
+      estado_destino_codigo:
+        significado: Mnemonico del estado de destino.
+      estado_destino:
+        significado: Nombre del estado de destino.
+      fecha:
+        significado: Fecha del paso.
+        agregacion: no_sumable
+      momento:
+        significado: Fecha y hora del paso, hora de Madrid.
+        agregacion: no_sumable
+      usuario:
+        significado: LOGIN de quien dio el paso (dato personal).
+      usuario_nombre:
+        significado: Nombre del usuario de Sigrid de ese login.
+        nulo_significa: El login ya no existe en los usuarios de Sigrid.
+      es_ultimo:
+        significado: Si es el paso mas reciente de su documento (de los dos origenes).
+    relaciones:
+      - de: documento_id
+        a: postventa.incidencias.incidencia_id
+        cardinalidad: "N:1"
+        porque: >-
+          Solo para `tipo_documento_codigo = 708`: los pasos de unidades y
+          tareas apuntan a `postventa.unidades` y `postventa.tareas`.
+    ejemplos_preguntas:
+      - Quien cerro la incidencia X y cuando
+      - Cuantas incidencias paso a terminada cada usuario el ultimo mes
+
+  v_estado_incidencias:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **EL ESTADO ACTUAL DE CADA INCIDENCIA Y DESDE CUANDO**, con los tiempos:
+      cuando se resolvio (el primer paso, de cualquier origen, a 5 TER, 7 NPR
+      o 9 CER), cuantos dias tardo, cuantos lleva abierta y cuantos en su
+      estado. `origen_fecha` dice de donde sale la fecha del estado: PASO (un
+      paso de `rac`), CIERRE_APLICACION (cierre de la aplicacion de
+      Posventa), ALTA (sigue en el estado del alta) o SIN_HISTORIAL (cambio de
+      estado sin paso: sin fecha). Es VISTA: los dias se cuentan al consultar,
+      con la fecha de hoy en Madrid.
+    grano: >-
+      Una fila por incidencia, identificada por `incidencia_id`.
+    clave_negocio: [incidencia_id]
+    paso_etl: build_postventa
+    refresco: nocturno
+    columnas:
+      incidencia_id:
+        significado: Identificador de la incidencia.
+        agregacion: clave_sustituta
+      codigo_incidencia:
+        significado: Codigo del parte de reclamacion en Sigrid.
+      empresa_id:
+        significado: Empresa del parte.
+        agregacion: no_sumable
+      obra_id:
+        significado: Obra de la unidad de la incidencia.
+        agregacion: no_sumable
+      codigo_obra:
+        significado: Codigo de la obra, tal y como se ve en Sigrid.
+      unidad_id:
+        significado: Unidad de postventa reclamada.
+        agregacion: no_sumable
+      estado_id:
+        significado: Estado actual de la incidencia, en numero.
+        valores: [1, 3, 5, 7, 9]
+        agregacion: no_sumable
+      estado_codigo:
+        significado: Mnemonico del estado actual.
+        valores: [SAT, PTE, TER, NPR, CER]
+      estado:
+        significado: Nombre del estado actual.
+      fecha_alta:
+        significado: Fecha de la reclamacion.
+        agregacion: no_sumable
+      en_estado_desde:
+        significado: Fecha y hora (Madrid) desde la que la incidencia esta en su estado.
+        agregacion: no_sumable
+        nulo_significa: SIN_HISTORIAL, no hay paso que lo feche.
+      cambiado_por:
+        significado: LOGIN de quien la puso en su estado (dato personal).
+        nulo_significa: Sigue en el estado del alta, o no hay paso que lo diga.
+      origen_fecha:
+        significado: De donde sale `en_estado_desde`.
+        valores: [PASO, CIERRE_APLICACION, ALTA, SIN_HISTORIAL]
+      abierta:
+        significado: Si esta abierta (1 SAT o 3 PTE).
+      fecha_resolucion:
+        significado: Primer paso a 5 TER, 7 NPR o 9 CER, de cualquier origen.
+        agregacion: no_sumable
+        nulo_significa: No se ha resuelto, o se resolvio sin paso que lo feche.
+      dias_hasta_resolucion:
+        significado: Dias entre el alta y la resolucion.
+        agregacion: promedio
+        nulo_significa: Sin fecha de resolucion.
+      dias_abierta:
+        significado: Dias abierta, hasta hoy si sigue abierta o hasta la resolucion.
+        agregacion: promedio
+      dias_en_estado:
+        significado: Dias que lleva en su estado actual, hasta hoy.
+        agregacion: promedio
+        nulo_significa: SIN_HISTORIAL, sin fecha del estado.
+    relaciones:
+      - de: incidencia_id
+        a: postventa.incidencias.incidencia_id
+        cardinalidad: "1:1"
+        porque: Para la clase, el oficio y la garantia de la incidencia.
+    ejemplos_preguntas:
+      - Cual es el tiempo medio de resolucion de las incidencias por obra
+      - Que incidencias llevan mas de 30 dias pendientes
+
+  documento_adjuntos:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **EL INDICE DE LOS FICHEROS ADJUNTOS** de unidades, incidencias y
+      tareas (los «Graficos asociados» de Sigrid, `raw.rcg` + `raw.gra`), con
+      el mismo mecanismo que `compras.documento_adjuntos`: 15.986 enlaces el
+      2026-11-03, todos de la empresa 1. EL BINARIO NO ESTA AQUI: lo abre la
+      herramienta `abrir_adjunto` del MCP por la pareja
+      (`empresa_repositorio`, `cod_repositorio`). La clase de fichero sale de
+      la extension del nombre.
+
+      **QUIEN PUEDE ABRIR EL FICHERO**: quien pueda leer la tabla de origen
+      de su `familia`: INCIDENCIA -> `postventa.incidencias.incidencia_id`,
+      UNIDAD -> `postventa.unidades.unidad_id`, TAREA ->
+      `postventa.tareas.tarea_id`, REPARACION ->
+      `postventa_restringida.contactos_incidencia.incidencia_id`. Asi, las
+      fotos de incidencias, las fichas de unidad y los informes de tarea los
+      abre quien lee `postventa`; las REPARACION solo el perfil postventa y
+      el total (D9 de F-156). Las FILAS del indice si las ven todos.
+
+      **DNI MANUSCRITO**: la familia REPARACION (clase de grafico PV002
+      «Fotos Reparaciones», 4.427) es casi siempre el PARTE FIRMADO por el
+      cliente (3.874 se llaman asi), con su DNI escrito a mano dentro.
+      `subido_por` es el LOGIN de quien subio el fichero. **`nombre_fichero` y
+      `descripcion` van SIN mascara**: los pone quien sube el fichero y pueden
+      llevar el nombre del cliente.
+    grano: >-
+      Una fila por enlace de grafico, identificada por `adjunto_id`
+      (`rcg.ide`, unica tambien frente al indice de compras).
+    clave_negocio: [adjunto_id]
+    paso_etl: build_postventa
+    refresco: nocturno
+    columnas:
+      adjunto_id:
+        significado: Identificador del enlace (`rcg.ide`), lo que pide `abrir_adjunto`.
+        agregacion: clave_sustituta
+      familia:
+        significado: De que cuelga el fichero; decide quien puede abrirlo.
+        valores: [INCIDENCIA, REPARACION, UNIDAD, TAREA]
+      documento_id:
+        significado: Documento de Sigrid del que cuelga el fichero.
+        agregacion: no_sumable
+      tipo_documento_codigo:
+        significado: Tipo del documento (708 incidencia, 707 unidad, 47 tarea).
+        valores: [47, 707, 708]
+        agregacion: no_sumable
+      codigo_documento:
+        significado: Codigo del documento en Sigrid.
+      incidencia_id:
+        significado: Incidencia del fichero (la del documento, o la de su tarea).
+        agregacion: no_sumable
+        nulo_significa: Fichero de una unidad.
+      unidad_id:
+        significado: Unidad del fichero (la del documento, o la de su incidencia).
+        agregacion: no_sumable
+        nulo_significa: La incidencia no tiene unidad.
+      tarea_id:
+        significado: Tarea del fichero, si cuelga de una tarea.
+        agregacion: no_sumable
+        nulo_significa: El fichero no cuelga de una tarea.
+      grafico_id:
+        significado: Identificador del grafico en Sigrid (`gra.ide`).
+        agregacion: no_sumable
+      cod_repositorio:
+        significado: Codigo del fichero en el repositorio de Sigrid; con la empresa, lo localiza.
+      empresa_repositorio:
+        significado: Empresa del repositorio del fichero (`gra.emp`, entera).
+        agregacion: no_sumable
+      nombre_fichero:
+        significado: Nombre del fichero tal y como se subio.
+      extension:
+        significado: Extension del nombre del fichero, en minusculas.
+      clase_fichero:
+        significado: >-
+          Clase del fichero por su extension (la misma expresion que en compras);
+          los videos y `heic` caen en OTRO.
+        valores: [PDF, EXCEL, WORD, CORREO, IMAGEN, SIN_EXTENSION, OTRO]
+      clase_grafico_id:
+        significado: Clase de grafico de Sigrid (`gratipide`).
+        agregacion: no_sumable
+        nulo_significa: Sin clase de grafico (3.343 enlaces de incidencias).
+      clase_grafico_codigo:
+        significado: Codigo de la clase de grafico (PV001, PV002, PV004, PV006).
+      clase_grafico:
+        significado: Nombre de la clase de grafico (Fotos de incidencias, Fotos Reparaciones...).
+      descripcion:
+        significado: Descripcion del fichero en Sigrid.
+      fecha_alta:
+        significado: Fecha del fichero en Sigrid.
+        agregacion: no_sumable
+      subido_por:
+        significado: LOGIN de quien subio el fichero (dato personal).
+      posicion:
+        significado: Orden del fichero dentro de su documento.
+        agregacion: no_sumable
+    relaciones:
+      - de: incidencia_id
+        a: postventa.incidencias.incidencia_id
+        cardinalidad: "N:1"
+        porque: Para la obra y el estado de la incidencia de la foto.
+    ejemplos_preguntas:
+      - Que fotos tiene la incidencia X
+      - Cuantos partes firmados hay de la obra X
+
+  partida_obra_origen:
+    tipo: tabla
+    capa: preparacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es la llave del coste de postventa por obra: se consulta el coste en
+      `postventa.v_coste_obra`, que ya la aplica.
+    descripcion: >-
+      **LAS PARTIDAS DE LAS OBRAS DE POSTVENTA Y SU OBRA DE ORIGEN**: el
+      coste de postventa se imputa a obras propias (`POSTV`, `POSTV2` de la
+      empresa 1; `POSTV2` y `0004` de otras) y sus partidas se llaman como la
+      obra reparada (`0592`, `0593B`, `626`...). La obra de origen sale del
+      codigo de la partida (sus 3 o 4 cifras iniciales, a 4 con ceros) o del
+      ancestro mas cercano que lo tenga, contra las obras de SU empresa.
+      `liga` = PARTIDA, ANCESTRO o SIN_OBRA. Las tres obras `0004` no tienen
+      partidas.
+    grano: >-
+      Una fila por partida de una obra de postventa, identificada por
+      `partida_id`.
+    clave_negocio: [partida_id]
+    paso_etl: build_postventa
+    refresco: nocturno
+    columnas:
+      partida_id:
+        significado: Identificador de la partida de la obra de postventa.
+        agregacion: clave_sustituta
+      empresa_id:
+        significado: Empresa de la obra de postventa.
+        agregacion: no_sumable
+      obra_postventa_id:
+        significado: Obra de postventa (POSTV, POSTV2...) de la partida.
+        agregacion: no_sumable
+      codigo_obra_postventa:
+        significado: Codigo de la obra de postventa en Sigrid.
+      codigo_partida:
+        significado: Codigo de la partida, del que sale la obra de origen.
+      nombre_partida:
+        significado: Nombre de la partida en Sigrid.
+      partida_padre_id:
+        significado: Partida padre (capitulo) de la partida.
+        agregacion: no_sumable
+      liga:
+        significado: Como se encontro la obra de origen.
+        valores: [PARTIDA, ANCESTRO, SIN_OBRA]
+      niveles_subidos:
+        significado: Cuantos niveles se subio hasta el ancestro que da la obra (0 = la propia).
+        agregacion: no_sumable
+      obra_origen_id:
+        significado: Obra reparada a la que se refiere la partida.
+        agregacion: no_sumable
+        nulo_significa: SIN_OBRA, ni la partida ni sus ancestros dan una obra de su empresa.
+      codigo_obra_origen:
+        significado: Codigo de la obra de origen, tal y como se ve en Sigrid.
+    relaciones: []
+    ejemplos_preguntas: []
+
+  v_coste_obra:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **EL COSTE DE POSTVENTA POR OBRA DE ORIGEN**, SOLO DE FACTURAS: el
+      importe SIN IVA de las lineas de factura de compra de las partidas de
+      las obras de postventa, por obra de postventa, obra de origen, `liga` y
+      mes de la factura. Sigrid no liga una incidencia con su coste: se liga
+      por las partidas (`postventa.partida_obra_origen`).
+
+      **LO QUE NO ESTA**: el coste de los partes de personal (en la POSTV2 de
+      la empresa 1 era 1,84 M EUR frente a 2,48 de facturas el 2026-11-03).
+      Se cruza aparte, por la partida, con `personal.partes_lineas`, y solo
+      quien lee `personal`. Las obras `0004` de otras empresas no tienen
+      partidas: su coste no sale aqui. **SIN_OBRA SE CUENTA**: los capitulos
+      CI y CP de POSTV2 (~537.000 EUR de facturas) no tienen obra de origen;
+      no se reparten. Lee `compras` al consultar: vale su frescura.
+    grano: >-
+      Una fila por `obra_postventa_id`, `liga`, `obra_origen_id` y `mes` de
+      la factura.
+    clave_negocio: [obra_postventa_id, liga, obra_origen_id, mes]
+    paso_etl: build_postventa
+    refresco: nocturno
+    columnas:
+      empresa_id:
+        significado: Empresa de la obra de postventa.
+        agregacion: no_sumable
+      obra_postventa_id:
+        significado: Obra de postventa que recibe el coste.
+        agregacion: no_sumable
+      codigo_obra_postventa:
+        significado: Codigo de la obra de postventa (POSTV, POSTV2...).
+      liga:
+        significado: Como se encontro la obra de origen del coste.
+        valores: [PARTIDA, ANCESTRO, SIN_OBRA]
+      obra_origen_id:
+        significado: >-
+          Obra reparada a la que se atribuye el coste. Vacia en SIN_OBRA: coste
+          de postventa sin obra de origen identificable.
+        agregacion: no_sumable
+      codigo_obra_origen:
+        significado: Codigo de la obra de origen, tal y como se ve en Sigrid.
+      mes:
+        significado: Primer dia del mes de la factura.
+        agregacion: no_sumable
+      importe:
+        significado: Importe SIN IVA de las lineas de factura (los abonos restan).
+        agregacion: suma
+      lineas:
+        significado: Numero de lineas de factura sumadas.
+        agregacion: suma
+    relaciones:
+      - de: obra_origen_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: Para el nombre y el cliente de la obra reparada.
+    ejemplos_preguntas:
+      - Cuanto coste de postventa lleva cada obra reparada
+      - Que coste de postventa de facturas tiene la obra X por mes
+
+  fn_fecha:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de postventa, usada solo dentro del SQL que
+      construye el esquema.
+    descripcion: >-
+      Convierte una fecha de Sigrid (un entero YYYYMMDD) en una fecha de
+      verdad, con el 0 y las invalidas como ausencia de fecha. Copia local
+      deliberada, como en los demas esquemas.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_postventa
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_momento:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de postventa, usada solo dentro del SQL que
+      construye el esquema.
+    descripcion: >-
+      Junta una fecha y una hora de Sigrid (enteros HHMMSS) en una fecha y
+      hora local de Sigrid (Madrid); una hora invalida deja solo la fecha. Es la de `momento_alta` y `momento` de los pasos.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_postventa
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_estado:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de postventa, usada solo dentro del SQL que
+      construye el esquema.
+    descripcion: >-
+      Traduce un estado de Sigrid por la PAREJA (tipo de documento, estado)
+      contra su catalogo: el mismo numero significa cosas distintas en 707,
+      708 y 47. Devuelve el mnemonico y el nombre.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_postventa
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_enmascarar:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de postventa, usada solo dentro del SQL que
+      construye el esquema.
+    descripcion: >-
+      Enmascara el texto libre del esquema general: los correos pasan a
+      `[CORREO]` y los telefonos a `[TELEFONO]`. LA MASCARA ES HEURISTICA: solo cambia por `[TELEFONO]` y `[CORREO]` lo que tiene forma de telefono o de correo; un NOMBRE PROPIO escrito en el texto libre NO se quita. Se aplica a
+      `descripcion`, `descripcion_larga` y `motivo` de incidencias,
+      `descripcion` y `texto` de tareas y `comentario` de oficios; NO a
+      `ubicacion`, `urgencia`, `espacios`, `nombre_unidad` ni a `nombre_fichero`
+      y `descripcion` de los adjuntos. Los mismos patrones que el
+      dominio (`etl_sigrid/domain/postventa.py`); el texto integro, solo en
+      `postventa_restringida.textos`.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_postventa
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_obra_de_partida:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de postventa, usada solo dentro del SQL que
+      construye el esquema.
+    descripcion: >-
+      Saca el codigo de obra del codigo de una partida de postventa: sus 3 o 4
+      cifras iniciales, completadas a 4 con ceros (`626` -> `0626`, `0593B`
+      -> `0593`). Nulo si no empieza por cifras.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_postventa
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []

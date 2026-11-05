@@ -169,14 +169,18 @@ def test_f090_r10_extensiones_en_minusculas_y_sin_punto() -> None:
 # ===========================================================================
 
 
+# F-156 (R4, decisión del humano del 2026-11-03): la ingesta trae también los
+# gráficos de postventa (47, 707, 708); el índice de compras sigue con sus cinco.
 def test_f090_r1_filtro_rcg_literal() -> None:
-    assert filtro_rcg() == "con IN (SELECT ide FROM dbo.con WHERE tip IN (12, 14, 15, 44, 46))"
+    assert filtro_rcg() == (
+        "con IN (SELECT ide FROM dbo.con WHERE tip IN (12, 14, 15, 44, 46, 47, 707, 708))"
+    )
 
 
 def test_f090_r2_filtro_gra_literal() -> None:
     assert filtro_gra() == (
         "ide IN (SELECT r.gra FROM dbo.rcg r JOIN dbo.con c ON c.ide = r.con "
-        "WHERE c.tip IN (12, 14, 15, 44, 46))"
+        "WHERE c.tip IN (12, 14, 15, 44, 46, 47, 707, 708))"
     )
 
 

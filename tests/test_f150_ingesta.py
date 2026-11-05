@@ -190,7 +190,7 @@ def test_f150_r16_dvf_solo_la_cabecera_y_sin_tiemod() -> None:
 
 def test_f150_r16_solo_dvf_usa_lista_blanca() -> None:
     con_lista = sorted(n for n, t in _ingesta().items() if t.get("include_columns"))
-    assert con_lista == ["dvf"]
+    assert con_lista == ["dvf", "log", "per"]  # F-156: log y per (R2, R3)
 
 
 @pytest.mark.parametrize("tabla", ["iva", "dvf"])

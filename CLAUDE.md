@@ -73,10 +73,10 @@ confirmación cubre el plan que se enseñó, no lo que apareció después.
 
 - `main.py` — CLI (click). Comandos: check-api, check-pg, bootstrap, ingest,
   stage, build-mart, publicar-diccionario, run-all, status. `run-all` construye
-  el datamart ENTERO desde F-047: quince pasos, con los ocho build de
-  negocio —maestros, tesoreria, compras, retenciones, personal, contabilidad,
-  descompuestos (con su ingesta `ingest_descompuestos` delante) y cierre—
-  dentro y en ese orden. `tesoreria` va delante de `compras` porque
+  el datamart ENTERO desde F-047: dieciséis pasos (F-156; eran quince pasos),
+  con los nueve build de negocio —maestros, tesoreria, compras, retenciones,
+  personal, contabilidad, postventa, descompuestos (con su ingesta
+  `ingest_descompuestos` delante) y cierre— dentro y en ese orden. `tesoreria` va delante de `compras` porque
   `compras.vencimientos` es una vista suya (F-037). `ingest-descompuestos` y `build-descompuestos` sueltos
   llevan `--sin-tope` para la primera carga, que es MANUAL.
   `cierre` va después de `mart` porque `mart` destruye lo que `cierre`
@@ -99,7 +99,11 @@ confirmación cubre el plan que se enseñó, no lo que apareció después.
 - `etl_sigrid/infrastructure/postgres/` — cliente + `sql/` por capa:
   `raw` (implícito en ingesta), `stg/`, `mart/`, `cierre/`, `compras/`,
   `maestro/`, `retenciones/`, `personal/`, `contabilidad/`, `tesoreria/`,
-  `auxiliar/`, `descompuestos/`. **`tesoreria/` (F-037)** es la cartera de
+  `auxiliar/`, `descompuestos/`, `postventa/`. **`postventa/` (F-156)** son
+  unidades, incidencias, tareas, su histórico, sus adjuntos y el coste por obra
+  de origen (solo facturas), sin personas y con el texto enmascarado; los datos
+  personales, en `postventa_restringida`, que solo leen el perfil postventa
+  (el cuarto) y el total (`R-POSTVENTA-RESTRINGIDA`). **`tesoreria/` (F-037)** es la cartera de
   cobros y pagos (un efecto de `raw.pag`/`raw.cob` por fila) en dos esquemas,
   como la contabilidad: `tesoreria` (la general) y `tesoreria_restringida` (con
   los pagos de nómina, embargo y cuota; solo el perfil total). BAJA no se suma

@@ -23,7 +23,7 @@ Operación del datamart en Azure (F-005, ver docs/runbook_postgres_azure.md):
                                         build-cierre, build-compras,
                                         build-maestros, build-retenciones,
                                         build-personal, build-contabilidad,
-                                        build-tesoreria o
+                                        build-tesoreria, build-postventa o
                                         build-descompuestos sueltos: recrean
                                         tablas y vistas con
                                         DROP + CREATE y un DROP se lleva los
@@ -111,6 +111,7 @@ from etl_sigrid.application.steps.build_descompuestos_step import BuildDescompue
 from etl_sigrid.application.steps.build_maestros_step import BuildMaestrosStep
 from etl_sigrid.application.steps.build_mart_step import BuildMartStep
 from etl_sigrid.application.steps.build_personal_step import BuildPersonalStep
+from etl_sigrid.application.steps.build_postventa_step import BuildPostventaStep
 from etl_sigrid.application.steps.build_retenciones_step import BuildRetencionesStep
 from etl_sigrid.application.steps.build_stg_step import (
     BuildStgStep,
@@ -202,9 +203,9 @@ CAP_DOCUMENTADO_SIGRID_API = 1_000
 #: de ella sale el sufijo del `batch_id` que les permite reanudar.
 VARIABLE_EJECUCION_JOB = "CONTAINER_APP_JOB_EXECUTION_NAME"
 
-#: F-148, R25. Los diez build que recrean vistas con DROP + CREATE: tras cada
-#: uno, `run-all` devuelve los permisos completos sin esperar al `apply_grants`
-#: final, que sigue siendo el que decide.
+#: F-148, R25. Los build que recrean vistas con DROP + CREATE (once desde F-156):
+#: tras cada uno, `run-all` devuelve los permisos completos sin esperar al
+#: `apply_grants` final, que sigue siendo el que decide.
 PASOS_CON_PERMISOS = (
     "build_stg",
     "build_mart",
@@ -214,6 +215,7 @@ PASOS_CON_PERMISOS = (
     "build_retenciones",
     "build_personal",
     "build_contabilidad",
+    "build_postventa",
     "build_descompuestos",
     "build_cierre",
 )
@@ -627,7 +629,8 @@ def build_pipeline_steps(
     mano, F-057 añadió el quinto (`build_personal`), F-056 el sexto
     (`build_contabilidad`), F-097 el séptimo (`build_descompuestos`, con su
     propia ingesta `ingest_descompuestos` delante) y F-037 el octavo
-    (`build_tesoreria`): ocho build de negocio, quince pasos. El
+    (`build_tesoreria`): ocho build de negocio, quince pasos. F-156 suma el
+    noveno (`build_postventa`): dieciséis pasos. El
     orden dentro de la lista es legible, pero lo que lo GARANTIZA es el
     `depends_on` de cada paso, que es lo que obedece el orden topológico.
 
@@ -673,6 +676,12 @@ def build_pipeline_steps(
         # que su `depends_on` es `ingest_raw`; la posicion es legibilidad. Nadie
         # depende de el: si falla, la noche continua y termina.
         BuildContabilidadStep(settings),
+        # F-156: postventa (unidades, incidencias, tareas, su historico, sus
+        # adjuntos y los datos personales en `postventa_restringida`), el NOVENO
+        # build de negocio. Sus tablas solo leen `raw` (`depends_on` =
+        # `ingest_raw`); la vista `v_coste_obra` lee `compras` al consultar.
+        # Nadie depende de el: si falla, la noche continua y R-FRESCURA avisa.
+        BuildPostventaStep(settings),
         # F-097: los descompuestos de las partidas, el SEPTIMO build de negocio,
         # con su propia ingesta delante. `ingest_descompuestos` trae de Sigrid el
         # texto `des` de forma INCREMENTAL por version, a tablas del esquema
@@ -946,7 +955,8 @@ def apply_grants() -> None:
     `run-all` ya lo ejecuta como último paso de la noche. A mano hace falta
     tras lanzar `build-cierre`, `build-compras`, `build-maestros`,
     `build-retenciones`, `build-personal`, `build-contabilidad`,
-    `build-tesoreria` o `build-descompuestos` SUELTOS: esos comandos recrean
+    `build-tesoreria`, `build-postventa` o `build-descompuestos` SUELTOS: esos
+    comandos recrean
     tablas y vistas con
     DROP + CREATE y un DROP se lleva los GRANT concedidos.
     """
@@ -5459,6 +5469,46 @@ def build_personal() -> None:
     pg = _get_pg()
     ejecucion = _arrancar_ejecucion(pg)
     _ejecutar_paso(BuildPersonalStep(settings), pg, ejecucion)
+
+
+# =============================================================================
+# MÓDULO POSTVENTA (F-156): unidades, incidencias, tareas, histórico y adjuntos
+# =============================================================================
+@cli.command("build-postventa")
+def build_postventa() -> None:
+    """
+    Construye los schemas postventa y postventa_restringida desde raw.*.
+
+    Ejecuta en orden los SQL de sql/postventa:
+      00_setup.sql        schemas y funciones (fecha, momento, estado, máscara)
+      01_unidades.sql     unidades postventa (707) y oficios de obra
+      02_incidencias.sql  incidencias (708) e intervinientes, con la guarda R12
+      03_tareas.sql       tareas (47) de las incidencias
+      04_procesos.sql     el histórico: pasos de rac y cierres de la aplicación
+      05_estado.sql       v_estado_incidencias: estado actual y desde cuándo
+      06_adjuntos.sql     índice de adjuntos, con la guarda de huérfanos R21
+      07_restringida.sql  postventa_restringida: contactos y textos íntegros
+      08_coste_obra.sql   partida_obra_origen y la vista v_coste_obra
+
+    Requiere haber ingerido upv, rcp, rcpint, tar, tarres, obrofc, auxrcp,
+    auxtrcp, auxofc, prmtpl, auxgra, log, per, rcg y gra (F-156). Tras
+    lanzarlo suelto, `apply-grants`. No publica el diccionario.
+
+    LO QUE HAY QUE SABER ANTES DE CONSULTAR LO QUE ESTO CONSTRUYE:
+
+      * Los datos personales (propietarios, reclamantes, teléfonos, correos y
+        los textos íntegros) SOLO están en `postventa_restringida`, que leen el
+        perfil postventa y el total. En `postventa` los textos van enmascarados.
+      * El coste por obra es SOLO de facturas (`v_coste_obra`): Sigrid no liga
+        una incidencia con su coste, se liga por las partidas de las obras de
+        postventa. `SIN_OBRA` es coste sin obra de origen identificable.
+      * `v_estado_incidencias.origen_fecha` dice de dónde sale la fecha del
+        estado: PASO, CIERRE_APLICACION, ALTA o SIN_HISTORIAL (sin fecha).
+    """
+    settings = get_settings()
+    pg = _get_pg()
+    ejecucion = _arrancar_ejecucion(pg)
+    _ejecutar_paso(BuildPostventaStep(settings), pg, ejecucion)
 
 
 # =============================================================================

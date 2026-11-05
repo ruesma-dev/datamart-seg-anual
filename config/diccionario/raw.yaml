@@ -2,7 +2,7 @@
 #
 # Fichas del esquema `raw`: la copia de Sigrid, tabla a tabla.
 #
-# **A NIVEL DE OBJETO, NO DE COLUMNA** (DA-2 de la spec). Son 80 tablas con
+# **A NIVEL DE OBJETO, NO DE COLUMNA** (DA-2 de la spec). Son 93 tablas con
 # cientos de campos de cuatro letras cuyo diccionario completo —tipos, indices y
 # referencias— vive en `azure-apps/sigrid_tablas.md`. Cada ficha remite alli con
 # el `grep` de su bloque. Lo que SI se documenta aqui es lo que ese documento no
@@ -2270,7 +2270,7 @@ objetos:
     descripcion: >-
       **EL ENLACE DE LOS «GRAFICOS ASOCIADOS» DE SIGRID** (F-090): una fila por fichero colgado de un documento. `con` es el documento (`raw.con.ide`), `gra` el grafico, o sea el fichero (`raw.gra.ide`), y `pos` su posicion en la pestaña. Un mismo grafico puede colgar de varios documentos (102 casos medidos), asi que la clave del enlace es `ide`, no la pareja documento-grafico.
 
-      **FILTRADA EN ORIGEN a las cinco familias de compras** (decision D2 del humano del 2026-10-09): solo los enlaces cuyo documento es una factura (`con.tip` 15), un contrato (44), un comparativo (46), una oferta (12) o un albaran (14). Medido el 2026-10-09: 199.042 de los 289.451 enlaces de Sigrid. Los de personal (empleados y nominas: DNI, nominas, embargos), posventa y el resto NO estan aqui, y no es un fallo de la ingesta: no se traen a proposito. Contar esta tabla contra el total de Sigrid no casa por eso; `check-raw-recuentos` aplica el mismo filtro.
+      **FILTRADA EN ORIGEN a las cinco familias de compras** (decision D2 del humano del 2026-10-09): solo los enlaces cuyo documento es una factura (`con.tip` 15), un contrato (44), un comparativo (46), una oferta (12) o un albaran (14). Medido el 2026-10-09: 199.042 de los 289.451 enlaces de Sigrid. **Desde F-156** (decision del humano del 2026-11-03) trae ADEMAS los enlaces de postventa: unidad (707), incidencia (708) y tarea (47), 15.986 el 2026-11-03, que indexa `postventa.documento_adjuntos`. Los de personal (empleados y nominas: DNI, nominas, embargos) y el resto NO estan aqui, y no es un fallo de la ingesta: no se traen a proposito. Contar esta tabla contra el total de Sigrid no casa por eso; `check-raw-recuentos` aplica el mismo filtro.
 
       **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `rcg`, y se localiza con `grep -n "^| rcg " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
 
@@ -2292,7 +2292,7 @@ objetos:
 
       **EL FICHERO NO ESTA AQUI NI EN NINGUNA TABLA DEL DATAMART.** El binario vive en la base documental `ruesma_rep` de Sigrid (casa con esta tabla por `(emp, cod)` en el 99,75 %) y lo sirve `sigrid-api` (`documents/read` con la pareja (`emp`, `cod`)); el datamart publica solo el indice.
 
-      **FILTRADA EN ORIGEN** (decision D2 del humano del 2026-10-09): solo los ficheros enlazados por `raw.rcg` a una factura, contrato, comparativo, oferta o albaran (199.042 el 2026-10-09, de 289.036 en Sigrid). Los adjuntos de personal y posventa no se traen a proposito. `gratipide` (la clase de grafico de Sigrid, catalogo `auxgra`, que no se ingiere) esta a 0 en el 100 % de estos ficheros: la clase de fichero sale de la extension, en `compras.documento_adjuntos`.
+      **FILTRADA EN ORIGEN** (decision D2 del humano del 2026-10-09): solo los ficheros enlazados por `raw.rcg` a una factura, contrato, comparativo, oferta o albaran (199.042 el 2026-10-09, de 289.036 en Sigrid). **Desde F-156** trae ademas los de postventa (unidad 707, incidencia 708, tarea 47; 15.986 enlaces el 2026-11-03). Los adjuntos de personal no se traen a proposito. En compras `gratipide` (la clase de grafico de Sigrid, catalogo `raw.auxgra`) esta a 0 en el 100 % de los ficheros: la clase de fichero sale de la extension, en `compras.documento_adjuntos`. En postventa SI tiene dato (PV001-PV006) y da la familia REPARACION de `postventa.documento_adjuntos`.
 
       **Dato personal**: `usu` y el sufijo de `cod` son el LOGIN de quien subio el fichero, y `raw` es legible por el rol del MCP. `nom` lleva nombres de proveedor y numeros de factura.
 
@@ -2382,6 +2382,240 @@ objetos:
 
       **Como se carga.** El job nocturno arranca `run-all --full`, asi que cada noche la tabla se **recarga entera** desde Sigrid. No tiene columna de ultima modificacion.
     grano: Una factura de venta por fila, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  upv:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es la ficha en bruto de la unidad, con datos de contacto. La unidad publicada, sin contacto, esta en `postventa.unidades`; el contacto, solo en `postventa_restringida.contactos_unidad`.
+    descripcion: >-
+      **LA UNIDAD POSTVENTA** (F-156; 1.328 filas el 2026-11-03 en 18 obras, propiedades de `con` tipo 707): la obra (`obride`), el propietario (`cliide`), la persona de contacto (`peride`), las fechas de garantia por tramo (`fecfin1` vicios o defectos, `fecfin2` habitabilidad e instalaciones; la de estructura solo tiene inicio, `fecini3`), escrituracion, primer listado, visita tecnica y tipologia (`obrtplide` -> `raw.prmtpl`). **Dato personal**: `restel` y `resele` son el telefono y el correo de contacto de la unidad (751 y 871 filas). Las unidades de VENTA (`uve`) estan vacias en Sigrid: la relacion unidad de venta <-> unidad postventa no existe.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `upv`, y se localiza con `grep -n "^| upv " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full`, asi que cada noche la tabla se **recarga entera** desde Sigrid. No tiene columna de ultima modificacion util.
+    grano: Una unidad postventa por fila, identificada por `ide` (= `con.ide` tipo 707).
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  rcp:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es la incidencia en bruto, con el texto libre integro y las personas. La publicada, con el texto enmascarado y el estado traducido, esta en `postventa.incidencias`; las personas, en `postventa_restringida.contactos_incidencia`.
+    descripcion: >-
+      **LA INCIDENCIA DE POSTVENTA** (F-156; 22.179 filas el 2026-11-03, todas de la empresa 1): la reclamacion de Sigrid, el «parte de reclamacion» de Posventa (series `RS<aa>.<mm>/`). Su codigo, su estado y su descripcion corta estan en `raw.con` (tipo 708); aqui la unidad (`upvide`), la fecha y la hora, el propietario (`cliide`), quien reclama (`recide`) y el contacto (`cntide`) -> `raw.per`, la clase (`rcpide` -> `raw.auxrcp`), el tipo (`trcpide`), el oficio (`ofcide`), motivo, forma de comunicacion (`rcptip`: solo el 1, ESCRITA, tiene nombre), urgencia, ubicacion y `tex`, el texto libre. `tel`, `ele`, `fecpre` y `solrcp` estan vacias el 2026-11-03. **1.502 cabeceras 708 de `raw.con` no tienen fila aqui** (borradas).
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `rcp`, y se localiza con `grep -n "^| rcp " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full`, asi que cada noche la tabla se **recarga entera** desde Sigrid. No tiene columna de ultima modificacion util.
+    grano: Una incidencia (reclamacion) por fila, identificada por `ide` (= `con.ide` tipo 708).
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  rcpint:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Los intervinientes publicados, sin los huerfanos y con el oficio y el proveedor traducidos, estan en `postventa.incidencia_intervinientes`.
+    descripcion: >-
+      **LOS INTERVINIENTES DE CADA INCIDENCIA** (F-156; 24.909 filas el 2026-11-03): el oficio de la obra que interviene (`obrofcide` -> `raw.obrofc`) y si es causante de la averia (`cauave`). **1.499 son huerfanos** de `rcp` (de incidencias borradas).
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `rcpint`, y se localiza con `grep -n "^| rcpint " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full`, asi que cada noche la tabla se **recarga entera** desde Sigrid. No tiene columna de ultima modificacion util.
+    grano: Un interviniente de una incidencia por fila, identificado por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  tar:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Las tareas publicadas, con el estado y el oficio traducidos y el texto enmascarado, estan en `postventa.tareas`.
+    descripcion: >-
+      **LAS TAREAS DE LAS INCIDENCIAS** (F-156; 13.767 de las 16.434 de Sigrid el 2026-11-03, serie `REP2...`): la incidencia (`rcpide`), el empleado asignado (`empide`), fechas estimadas, limite y reales, prioridad, porcentaje y texto. **Coste y venta a 0 en el 100 %**: Sigrid no liga la incidencia con su coste (el coste de postventa esta en `postventa.v_coste_obra`).
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `tar`, y se localiza con `grep -n "^| tar " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full`, asi que cada noche la tabla se **recarga entera** desde Sigrid, solo las de una incidencia (`rcpide > 0`): las 2.666 tareas de obra no se traen. No tiene columna de ultima modificacion util.
+    grano: Una tarea de una incidencia por fila, identificada por `ide` (= `con.ide` tipo 47).
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  tarres:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Solo da el oficio de la obra de cada tarea, ya en `postventa.tareas`.
+    descripcion: >-
+      **EL RECURSO DE CADA TAREA** (F-156; 13.767 filas de tareas de incidencia el 2026-11-03): solo `obrofcide` (el oficio-proveedor de la obra, `raw.obrofc`) tiene dato; fechas, cantidades y estado estan a 0.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `tarres`, y se localiza con `grep -n "^| tarres " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full`, asi que cada noche la tabla se **recarga entera** desde Sigrid, solo las de tareas de incidencia. No tiene columna de ultima modificacion util.
+    grano: Un recurso de una tarea por fila, identificado por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  obrofc:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Los oficios de obra publicados, con su nombre y su proveedor, estan en `postventa.oficios_obra`.
+    descripcion: >-
+      **LOS OFICIOS DE CADA OBRA** (F-156; 1.084 filas el 2026-11-03 en 21 obras, 973 con proveedor): la obra (`obride`), el oficio (`ofcide` -> `raw.auxofc`) y el proveedor que lo cubre (`prvide`).
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `obrofc`, y se localiza con `grep -n "^| obrofc " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full`, asi que cada noche la tabla se **recarga entera** desde Sigrid. No tiene columna de ultima modificacion util.
+    grano: Un oficio de una obra por fila, identificado por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  auxrcp:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Catalogo: la clase ya traducida esta en `postventa.incidencias`.
+    descripcion: >-
+      **LAS CLASES DE INCIDENCIA** (F-156; 3 filas el 2026-11-03): 0001 Vicios o defectos, 0002 Habitabilidad/Instalaciones y 0003 Estructura. La clase decide que fin de garantia aplica.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `auxrcp`, y se localiza con `grep -n "^| auxrcp " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full`, asi que cada noche la tabla se **recarga entera** desde Sigrid. No tiene columna de ultima modificacion util.
+    grano: Una clase de incidencia por fila, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  auxtrcp:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Catalogo: el tipo ya traducido esta en `postventa.incidencias`.
+    descripcion: >-
+      **LOS TIPOS DE INCIDENCIA** (F-156; 4 filas el 2026-11-03): PREVENTA, PRIMER LISTADO POSTVENTA, POST VENTA y VISITA DE CORTESIA.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `auxtrcp`, y se localiza con `grep -n "^| auxtrcp " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full`, asi que cada noche la tabla se **recarga entera** desde Sigrid. No tiene columna de ultima modificacion util.
+    grano: Un tipo de incidencia por fila, identificado por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  auxofc:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Catalogo: el oficio ya traducido esta en `postventa.incidencias`, `postventa.tareas` y `postventa.oficios_obra`.
+    descripcion: >-
+      **LOS OFICIOS** (F-156; 135 filas el 2026-11-03): el gremio de una incidencia o de una tarea (fontaneria, carpinteria...).
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `auxofc`, y se localiza con `grep -n "^| auxofc " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full`, asi que cada noche la tabla se **recarga entera** desde Sigrid. No tiene columna de ultima modificacion util.
+    grano: Un oficio por fila, identificado por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  prmtpl:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Catalogo: la tipologia de cada unidad ya traducida esta en `postventa.unidades`.
+    descripcion: >-
+      **LAS TIPOLOGIAS DE CADA PROMOCION** (F-156; 257 filas el 2026-11-03): la de cada unidad postventa (`upv.obrtplide`), con metros y `ubica`, las ubicaciones validas.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `prmtpl`, y se localiza con `grep -n "^| prmtpl " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full`, asi que cada noche la tabla se **recarga entera** desde Sigrid. No tiene columna de ultima modificacion util.
+    grano: Una tipologia de una promocion por fila, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  auxgra:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Catalogo: la clase ya traducida esta en `postventa.documento_adjuntos`.
+    descripcion: >-
+      **LAS CLASES DE GRAFICO** (F-156; 48 filas el 2026-11-03). PV001-PV006 son de postventa; PV002 «Fotos Reparaciones» (`ide` 35) es, en una incidencia, el PARTE FIRMADO por el cliente con su DNI manuscrito: familia REPARACION. En compras la clase esta a 0.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `auxgra`, y se localiza con `grep -n "^| auxgra " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full`, asi que cada noche la tabla se **recarga entera** desde Sigrid. No tiene columna de ultima modificacion util.
+    grano: Una clase de grafico (fichero adjunto) por fila, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  log:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es un recorte de la bitacora de Sigrid. Los cierres ya estan en `postventa.incidencia_procesos` (origen `CIERRE_APLICACION`).
+    descripcion: >-
+      **UN RECORTE DE LA BITACORA DE SIGRID** (`dbo.log`, 8,59 M filas; F-156, D8): solo las lineas con que la aplicacion `postventa-incidencias` cierra una incidencia (`tab = 'con'`, `tip = 708`, `tex` que empieza por `Cerrar parte (postventa-incidencias)`): 659 el 2026-11-03, desde el 2026-09-11, y creceran. Esa aplicacion escribe el estado 9 y esta linea, NO un paso de `raw.rac`. **El nombre es generico pero NO es la bitacora entera**: F-105 la ampliara. Se traen 12 columnas por lista blanca (`include_columns`): sin `res` ni `err`, que en las lineas de cambio de campo llevan el texto libre de la incidencia. `usu` es el LOGIN de quien cerro.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `log`, y se localiza con `grep -n "^| log " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full`, asi que cada noche la tabla se **recarga entera** desde Sigrid, con su filtro. No tiene columna de ultima modificacion util.
+    grano: Una linea de cierre de la aplicacion de Posventa por fila, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  per:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Son datos personales en bruto. Las personas de cada incidencia y unidad estan en `postventa_restringida`, que solo leen los perfiles postventa y total.
+    descripcion: >-
+      **LAS PERSONAS DE CONTACTO DE POSTVENTA** (F-156, D1 = A, «d1 ok» del humano el 2026-11-03): quien reclama, el contacto de la incidencia y el de la unidad, 362 de las 666 de Sigrid el 2026-11-03. **DATOS PERSONALES.** Solo se traen 5 columnas por lista blanca (`include_columns`): `ide`, `nom` (nombre), `tel`, `tel2` y `ele` (correo). El DNI, las credenciales de i-Sigrid, las direcciones y las observaciones NO entran (un test falla si entran). Preguntar por otra aqui devuelve "columna inexistente".
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `per`, y se localiza con `grep -n "^| per " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full`, asi que cada noche la tabla se **recarga entera** desde Sigrid, solo las personas que cita `rcp` o `upv`. No tiene columna de ultima modificacion util.
+    grano: Una persona de contacto por fila, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
     refresco: nocturno

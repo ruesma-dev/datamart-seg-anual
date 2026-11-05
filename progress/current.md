@@ -9,6 +9,36 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-04 · F-156 · `in_progress` · implementando · rama `feature/F-156-postventa`
+
+Implementer. Spec aprobada por el humano el 2026-11-04 («si lanza»). Tarea en curso: ver
+`specs/F-156-postventa/tasks.md` (las `[x]`). Informe final: `progress/impl_F-156.md`.
+- Línea base: el `init.sh` de arranque se paró a los ~8 min (la suite tarda ~1 h 07 min); la
+  rama nace de `bec363c` (merge de F-153 con `init.sh` verde y review APROBADO). La puerta
+  completa se pasa al final.
+- Desviaciones (justificadas): ver la sección «Desviaciones» de `progress/impl_F-156.md`.
+- T1-T14 hechas y commiteadas (T13 diccionario, T14 documentación; `azure-apps` commit local
+  `8dc4b04`, sin push). Diccionario del árbol hoy: **v71, 287 objetos, 2459 columnas, 137 de
+  consumo**, 23 reglas (nueva `R-POSTVENTA-RESTRINGIDA`), SIN publicar. Presupuesto de F-147
+  subido con motivo a 34.056 (34.006 en la implementación; +50 por la review). Nada lanzado contra Azure salvo lecturas; el PostgreSQL desechable
+  local ya está parado. T15 y T17 hechas: `init.sh` verde (10509 passed, cobertura 100 % de 239
+  líneas), mutación 19/20 muertos (el superviviente, equivalente). Pendiente: review y T16 MANUAL.
+
+## 2026-11-03 · F-156 · `spec_ready` · spec revisada con las decisiones del humano · rama `feature/F-156-postventa`
+
+Spec-author. Spec en `specs/F-156-postventa/` (+ `pliego_mcp_bbdd.md`), medida en solo lectura
+(`progress/spec_F-156.md`, §§ 1-10). Sin código. **No implementar hasta cerrar F-153.**
+Decisiones del humano (2026-11-03) ya recogidas: D1=A («d1 ok») con un PERFIL NUEVO «postventa»
+(= restringido + `postventa_restringida`; grupo `sigrid_dm_perfil_postventa_ro`, login
+`mcp_sigrid_dm_postventa`, contraseña en `kv-mcp-bbdd-dev/pg-password-postventa`, lo crea el
+humano con `02_roles.sql`); D3 `postventa` para los cuatro perfiles; D4 coste por OBRA de origen
+por el código de las partidas de POSTV/POSTV2 (facturas ligadas ~2,58 M€, sin obra ~0,54 M€;
+los partes de personal fuera de la vista); D9 `REPARACION` solo postventa y total; histórico con
+login en el 100 % de los pasos y nombre en el 96,8 % de los de 708. Quedan para el humano:
+- Enviar `specs/F-156-postventa/pliego_mcp_bbdd.md` a `mcp-bbdd` (lista blanca, índice de
+  adjuntos múltiple, tercera conexión para el perfil postventa).
+- Decidir allí qué hacer con vídeos y comprimidos adjuntos (≈ 190 vídeos).
+
 ## 2026-11-02 · F-153 · `in_progress` · implementada · rama `feature/F-153-estado-albaranes`
 
 Implementer. Humano: D1=A, D2=A, D3=A, D4=A. T1-T9 y T11 hechas; detalle y evidencias en

@@ -272,6 +272,15 @@ infraestructura.
 > **Enmienda del 2026-10-31 (F-150, cuarta tanda).** Entra
 > `tesoreria.devengo_pendiente_contrato_mes` (el coste pendiente de la obra por
 > contrato de compra, N17), de consumo. El inventario pasa a **255 objetos**.
+>
+> **Enmienda del 2026-11-04 (F-156, postventa).** Entran los esquemas
+> `postventa` (unidades, incidencias, intervinientes, tareas, oficios de obra,
+> el histórico de estados, `v_estado_incidencias`, el índice de adjuntos, la
+> llave de partidas, `v_coste_obra` y cinco funciones locales) y
+> `postventa_restringida` (los datos personales: tres tablas, solo perfiles
+> postventa y total), 18 objetos sobre los 269 que había con las 13 tablas
+> nuevas de `raw`. Regla dura nueva `R-POSTVENTA-RESTRINGIDA`. El inventario
+> pasa a **287 objetos**.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,

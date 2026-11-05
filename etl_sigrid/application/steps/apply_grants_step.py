@@ -80,6 +80,19 @@ entero como cualquier esquema ajeno, sin código nuevo en este paso.
     `infra/sql/02_roles.sql`.
   - Grupo vacío: nada. Grupo, login o una excepción que ya no lee la cartera:
     avisa y sigue, como un login al que le falta lectura.
+
+Desde F-156 (2026-11-04) mira además el perfil POSTVENTA del MCP (D1 = A, «d1 ok»
+del humano el 2026-11-03): EXACTAMENTE lo del perfil restringido más
+`postventa_restringida`, los datos personales de postventa. Es el mismo bloque
+que el restringido (misma clase, otros rótulos), DETRÁS de él:
+
+  - ANTES de abrir conexión, FAILED si su grupo o su login coinciden con otro rol
+    (incluidos los del restringido) o si su lista no es la del restringido más
+    `postventa_restringida`, vetada al general y del autorizado
+    (`perfil_postventa_en_conflicto`). Las exclusiones son las del restringido.
+  - Concede, veta lo ajeno del catálogo, busca las vistas que filtran, verifica
+    lecturas y pertenencias (punto 5 sexies de `infra/sql/02_roles.sql`) y suma
+    sus fallos al MISMO mensaje, detrás de los del restringido.
 """
 
 from __future__ import annotations
@@ -102,6 +115,8 @@ from etl_sigrid.infrastructure.postgres.grants import (
     esquemas_en_conflicto,
     excluidas_invalidas,
     origenes_de_adjuntos_sin_leer,
+    ESQUEMAS_PROPIOS_POSTVENTA,
+    perfil_postventa_en_conflicto,
     perfil_restringido_en_conflicto,
     separar_excepciones,
 )
@@ -127,14 +142,55 @@ CLAVES_RESTRINGIDO = (
 )
 
 
+#: La del perfil POSTVENTA (F-156): las mismas, con su sufijo.
+CLAVES_POSTVENTA = (
+    "login_postventa",
+    "verificacion_postventa",
+    "filtraciones_postventa",
+    "vigilados_postventa",
+    "pertenencias_postventa",
+    "acceso_postventa",
+    "excepciones_sobrantes_postventa",
+)
+
+
+@dataclass(frozen=True, slots=True)
+class _Rotulos:
+    """Los nombres con que un perfil acotado (restringido o postventa) firma lo que hace."""
+
+    nombre: str              # «el perfil <nombre>» y eventos `apply_grants_<nombre>_...`
+    variable: str            # prefijo de sus variables de entorno
+    feature: str             # la feature que lo pide, al final de cada motivo
+    punto: str               # su punto de `infra/sql/02_roles.sql`
+    claves: tuple[str, ...]  # su `metadata`, en el orden de CLAVES_RESTRINGIDO
+
+    def clave(self, base: str) -> str:
+        return self.claves[CLAVES_RESTRINGIDO.index(base)]
+
+
+ROTULOS_RESTRINGIDO = _Rotulos(
+    "restringido", "PG_PERFIL_RESTRINGIDO", "F-141", "5 quinquies", CLAVES_RESTRINGIDO
+)
+ROTULOS_POSTVENTA = _Rotulos(
+    "postventa", "PG_PERFIL_POSTVENTA", "F-156", "5 sexies", CLAVES_POSTVENTA
+)
+
+
 @dataclass(frozen=True, slots=True)
 class _PerfilRestringido:
-    """La configuración del perfil RESTRINGIDO (F-141) y lo que se hace con ella."""
+    """La configuración de un perfil acotado del MCP y lo que se hace con ella.
+
+    El RESTRINGIDO (F-141) y, con otros rótulos, el POSTVENTA (F-156): el mismo
+    bloque nocturno, distinta guarda de esquemas.
+    """
 
     grupo: str
     login: str
     esquemas: list[str]
     excluidas: list[str]
+    rotulos: _Rotulos = ROTULOS_RESTRINGIDO
+    #: solo el postventa: la lista del restringido contra la que se compara la suya
+    base: tuple[str, ...] = ()
 
     @classmethod
     def desde(cls, pg_settings: Any) -> _PerfilRestringido:
@@ -146,6 +202,21 @@ class _PerfilRestringido:
             login=(pg_settings.perfil_restringido_login or "").strip(),
             esquemas=list(pg_settings.perfil_restringido_schema_list),
             excluidas=list(pg_settings.perfil_restringido_excluded_table_list),
+        )
+
+    @classmethod
+    def postventa_desde(cls, pg_settings: Any) -> _PerfilRestringido:
+        """El perfil POSTVENTA (F-156). Sus exclusiones son las del restringido."""
+        grupo = (getattr(pg_settings, "perfil_postventa_group", "") or "").strip()
+        if not grupo:
+            return cls("", "", [], [], ROTULOS_POSTVENTA)
+        return cls(
+            grupo=grupo,
+            login=(getattr(pg_settings, "perfil_postventa_login", "") or "").strip(),
+            esquemas=list(getattr(pg_settings, "perfil_postventa_schema_list", [])),
+            excluidas=list(getattr(pg_settings, "perfil_restringido_excluded_table_list", [])),
+            rotulos=ROTULOS_POSTVENTA,
+            base=tuple(getattr(pg_settings, "perfil_restringido_schema_list", [])),
         )
 
     def guarda(
@@ -160,19 +231,35 @@ class _PerfilRestringido:
         """El motivo para parar ANTES de abrir conexión (R4-R8), o vacío si no hay."""
         if not self.grupo:
             return ""
+        r = self.rotulos
         # R4: roles propios. Uno vacío no coincide con nada.
         propios = (
-            ("PG_PERFIL_RESTRINGIDO_GROUP", self.grupo, otros_roles),
-            ("PG_PERFIL_RESTRINGIDO_LOGIN", self.login,
-             (*otros_roles, ("PG_PERFIL_RESTRINGIDO_GROUP", self.grupo))),
+            (f"{r.variable}_GROUP", self.grupo, otros_roles),
+            (f"{r.variable}_LOGIN", self.login,
+             (*otros_roles, (f"{r.variable}_GROUP", self.grupo))),
         )
         for variable, valor, contra in propios:
             for otra, otro in contra:
                 if valor and valor == otro:
                     return (
-                        f"{variable} ('{valor}') coincide con {otra}: el perfil restringido "
+                        f"{variable} ('{valor}') coincide con {otra}: el perfil {r.nombre} "
                         "necesita un grupo y un login propios"
                     )
+        if r is ROTULOS_POSTVENTA:
+            # F-156, R29: el restringido + lo suyo, ni más ni menos, y lo suyo protegido
+            conflicto = perfil_postventa_en_conflicto(
+                self.esquemas, restringido=self.base, vetados=vetados,
+                restringidos=restringidos,
+            )
+            if conflicto:
+                propios_pv = ", ".join(ESQUEMAS_PROPIOS_POSTVENTA)
+                return (
+                    "PG_PERFIL_POSTVENTA_SCHEMAS no es la lista del perfil restringido más "
+                    f"{propios_pv} ({', '.join(conflicto)}): tiene que ser exactamente "
+                    f"PG_PERFIL_RESTRINGIDO_SCHEMAS + {propios_pv}, y {propios_pv} tiene que "
+                    "estar en PG_VETOED_SCHEMAS y en PG_RESTRICTED_SCHEMAS"
+                )
+            return self._guarda_comun()
         # R5: nada que el estándar no lea, ni nada vetado o restringido
         conflicto = perfil_restringido_en_conflicto(
             self.esquemas, consumo=consumo, vetados=vetados,
@@ -185,11 +272,16 @@ class _PerfilRestringido:
                 "PG_CONSUMPTION_SCHEMAS y fuera de PG_VETOED_SCHEMAS, PG_RESTRICTED_SCHEMAS "
                 "y PG_TOTAL_VETOED_SCHEMAS"
             )
+        return self._guarda_comun()
+
+    def _guarda_comun(self) -> str:
+        """R6-R8, iguales para los dos perfiles."""
+        r = self.rotulos
         # R6: sin `_meta` el MCP no explica nada
         if ESQUEMA_DICCIONARIO not in self.esquemas:
             return (
-                f"PG_PERFIL_RESTRINGIDO_SCHEMAS no incluye {ESQUEMA_DICCIONARIO}: el MCP no "
-                "tendría diccionario para el perfil restringido"
+                f"{r.variable}_SCHEMAS no incluye {ESQUEMA_DICCIONARIO}: el MCP no "
+                f"tendría diccionario para el perfil {r.nombre}"
             )
         # R7: una exclusión que no apunta a nada protegido es una errata
         malas = excluidas_invalidas(self.excluidas, self.esquemas)
@@ -203,23 +295,24 @@ class _PerfilRestringido:
         sin_origen = origenes_de_adjuntos_sin_leer(self.esquemas, self.excluidas)
         if sin_origen:
             return (
-                f"el perfil restringido leería {OBJETO_ADJUNTOS} sin sus documentos de "
+                f"el perfil {r.nombre} leería {OBJETO_ADJUNTOS} sin sus documentos de "
                 f"origen ({', '.join(sin_origen)}): excluye también {OBJETO_ADJUNTOS} o "
                 "concédele esas tablas (F-139, D1)"
             )
         return ""
 
     def aplicar(self, pg: Any, dueno: str) -> _BloqueRestringido:
-        """El bloque nocturno del perfil (R9-R18). Siempre el ÚLTIMO, tras el total."""
+        """El bloque nocturno del perfil (R9-R18). Tras el total; el postventa, el último."""
+        r = self.rotulos
         if not self.grupo:
-            return _BloqueRestringido.no_aplica("(sin configurar)")
+            return _BloqueRestringido.no_aplica("(sin configurar)", r)
         if not pg.role_exists(self.grupo):
             logger.warning(
-                "apply_grants_restringido_inexistente",
+                f"apply_grants_{r.nombre}_inexistente",
                 role=self.grupo,
                 detalle="créalo con infra/sql/02_roles.sql",
             )
-            return _BloqueRestringido.no_aplica(f"{self.grupo} (no existe)")
+            return _BloqueRestringido.no_aplica(f"{self.grupo} (no existe)", r)
 
         # R18: sin login se comprueba solo el grupo (no expone nada: nadie conecta)
         if not self.login:
@@ -228,7 +321,7 @@ class _PerfilRestringido:
             login, estado_login = self.login, self.login
         else:
             logger.warning(
-                "apply_grants_restringido_login_inexistente",
+                f"apply_grants_{r.nombre}_login_inexistente",
                 role=self.login,
                 detalle="créalo con infra/sql/02_roles.sql",
             )
@@ -268,17 +361,17 @@ class _PerfilRestringido:
 
         if sobrantes:  # R15: no expone nada, pero la lista nominal miente
             logger.warning(
-                "apply_grants_restringido_excepcion_sobrante",
+                f"apply_grants_{r.nombre}_excepcion_sobrante",
                 role=self.grupo,
                 excepciones=sobrantes,
                 detalle="ya no leen la cartera: quítalas de EXCEPCIONES_FILTRACION_RESTRINGIDO",
             )
         if faltan:  # R18: leer de menos no expone nada
             logger.warning(
-                "apply_grants_restringido_incompleto",
+                f"apply_grants_{r.nombre}_incompleto",
                 role=login or self.grupo,
                 faltan=faltan,
-                detalle="le falta la pertenencia o el GRANT: punto 5 quinquies de "
+                detalle=f"le falta la pertenencia o el GRANT: punto {r.punto} de "
                         "infra/sql/02_roles.sql",
             )
 
@@ -286,42 +379,42 @@ class _PerfilRestringido:
         motivos: list[str] = []
         if filtran:
             motivos.append(
-                f"el perfil restringido '{self.grupo}' leería por vistas lo que no ve: "
+                f"el perfil {r.nombre} '{self.grupo}' leería por vistas lo que no ve: "
                 f"{', '.join(filtran)}. Ya se le han revocado; quita esa lectura de la "
                 "vista, exclúyela en PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES o, si el humano "
-                "lo decide, añádela a las excepciones de D4 (F-141)."
+                f"lo decide, añádela a las excepciones de D4 ({r.feature})."
             )
         if vigilados:
             motivos.append(
-                f"el perfil restringido '{self.grupo}' tiene objetos con «mayor» en el "
+                f"el perfil {r.nombre} '{self.grupo}' tiene objetos con «mayor» en el "
                 f"nombre sin excluir: {', '.join(vigilados)}. Ya se le han revocado; si son "
                 "el mayor analítico (F-127), añádelos a PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES "
-                "(F-141)."
+                f"({r.feature})."
             )
         for quien, leidas in indebidas.items():
             motivos.append(
-                f"el perfil restringido '{quien}' lee lo que no debe: {', '.join(leidas)}. "
+                f"el perfil {r.nombre} '{quien}' lee lo que no debe: {', '.join(leidas)}. "
                 "Es una concesión que esta nocturna no puede revocar (a PUBLIC, o de un "
-                "concedente que no es el dueño): ejecuta el punto 5 quinquies de "
-                "infra/sql/02_roles.sql y, si sigue, revoca la de PUBLIC (F-141)."
+                f"concedente que no es el dueño): ejecuta el punto {r.punto} de "
+                f"infra/sql/02_roles.sql y, si sigue, revoca la de PUBLIC ({r.feature})."
             )
         if pertenencias:
             motivos.append(
-                f"pertenencias indebidas del perfil restringido: {', '.join(pertenencias)}. "
+                f"pertenencias indebidas del perfil {r.nombre}: {', '.join(pertenencias)}. "
                 f"El login solo puede ser miembro de '{self.grupo}', y el grupo de ninguno "
-                "(punto 5 quinquies de infra/sql/02_roles.sql) (F-141)."
+                f"(punto {r.punto} de infra/sql/02_roles.sql) ({r.feature})."
             )
         return _BloqueRestringido(
             sentencias=sentencias,
             metadata={
-                "rol_restringido": self.grupo,
-                "login_restringido": estado_login,
-                "verificacion_restringido": indebidas or "ok",
-                "filtraciones_restringido": filtran or "ok",
-                "vigilados_restringido": vigilados or "ok",
-                "pertenencias_restringido": pertenencias or "ok",
-                "acceso_restringido": faltan or "ok",
-                "excepciones_sobrantes": sobrantes or "ok",
+                f"rol_{r.nombre}": self.grupo,
+                r.clave("login_restringido"): estado_login,
+                r.clave("verificacion_restringido"): indebidas or "ok",
+                r.clave("filtraciones_restringido"): filtran or "ok",
+                r.clave("vigilados_restringido"): vigilados or "ok",
+                r.clave("pertenencias_restringido"): pertenencias or "ok",
+                r.clave("acceso_restringido"): faltan or "ok",
+                r.clave("excepciones_sobrantes"): sobrantes or "ok",
             },
             motivos=motivos,
         )
@@ -329,16 +422,18 @@ class _PerfilRestringido:
 
 @dataclass(frozen=True, slots=True)
 class _BloqueRestringido:
-    """Lo que deja el bloque del perfil restringido: sentencias, `metadata` y motivos de FAILED."""
+    """Lo que deja el bloque de un perfil acotado: sentencias, `metadata` y motivos de FAILED."""
 
     sentencias: list[str]
     metadata: dict[str, Any]
     motivos: list[str]
 
     @classmethod
-    def no_aplica(cls, estado: str) -> _BloqueRestringido:
-        metadata: dict[str, Any] = {"rol_restringido": estado}
-        metadata.update(dict.fromkeys(CLAVES_RESTRINGIDO, "no aplica"))
+    def no_aplica(
+        cls, estado: str, rotulos: _Rotulos = ROTULOS_RESTRINGIDO
+    ) -> _BloqueRestringido:
+        metadata: dict[str, Any] = {f"rol_{rotulos.nombre}": estado}
+        metadata.update(dict.fromkeys(rotulos.claves, "no aplica"))
         return cls(sentencias=[], metadata=metadata, motivos=[])
 
 
@@ -468,6 +563,26 @@ class ApplyGrantsStep(PipelineStep):
         if error:
             return self._fallo(result, f"{error} (F-141); no se ha ejecutado nada.")
 
+        # F-156, R29: el perfil POSTVENTA. Mismas guardas, contra todos los
+        # anteriores (los del restringido incluidos) y con su lista exacta.
+        postventa = _PerfilRestringido.postventa_desde(pg_settings)
+        error = postventa.guarda(
+            otros_roles=(
+                ("PG_READONLY_ROLE", rol),
+                ("PG_RESTRICTED_ROLE", autorizado),
+                ("PG_TOTAL_ROLE", total),
+                ("PG_SET_ROLE", dueno),
+                ("PG_PERFIL_RESTRINGIDO_GROUP", perfil.grupo),
+                ("PG_PERFIL_RESTRINGIDO_LOGIN", perfil.login),
+            ),
+            consumo=consumo,
+            vetados=vetados,
+            restringidos=restringidos,
+            total_vetados=total_vetados,
+        )
+        if error:
+            return self._fallo(result, f"{error} (F-156); no se ha ejecutado nada.")
+
         pg = self._client or build_postgres_client(self._settings)
 
         try:
@@ -532,6 +647,9 @@ class ApplyGrantsStep(PipelineStep):
             # sentencias van solo a su grupo, y sus fallos se suman al mensaje.
             restringido = perfil.aplicar(pg, dueno)
             sentencias += restringido.sentencias
+            # F-156, R30: el perfil POSTVENTA, detrás del restringido y igual que él.
+            bloque_postventa = postventa.aplicar(pg, dueno)
+            sentencias += bloque_postventa.sentencias
         except Exception as e:  # el resto del pipeline ya ha terminado bien
             logger.error("apply_grants_fallido", role=rol, error=str(e))
             result.status = StepStatus.FAILED
@@ -552,6 +670,7 @@ class ApplyGrantsStep(PipelineStep):
             result.metadata["verificacion_total"] = "no aplica"
             result.metadata["acceso_total"] = "no aplica"
         result.metadata.update(restringido.metadata)
+        result.metadata.update(bloque_postventa.metadata)
 
         # F-136, R10 (D5): que el total lea DE MENOS no expone nada; se avisa.
         if faltan_total:
@@ -579,6 +698,7 @@ class ApplyGrantsStep(PipelineStep):
                 "(punto 5 ter) (F-136)."
             )
         motivos += restringido.motivos  # F-141, R19: en el mismo mensaje, detrás
+        motivos += bloque_postventa.motivos  # F-156, R30: y el postventa, el último
         if motivos:
             return self._fallo(result, " ".join(motivos))
 

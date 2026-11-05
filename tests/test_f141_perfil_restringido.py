@@ -30,8 +30,8 @@ LOGIN = "mcp_sigrid_dm_restringido"
 DUENO = "sigrid_dm_etl"
 #: F-146 (2026-10-21): sin `contabilidad` (el esquema entero, vetado como `tesoreria` y
 #: `personal`) y, por eso, sin objetos excluidos: las dos de contabilidad caen con su esquema.
-ESQUEMAS_R = ["mart", "cierre", "compras", "maestro", "retenciones", "descompuestos", "stg",
-              "aux", "_meta"]
+ESQUEMAS_R = ["mart", "cierre", "compras", "maestro", "retenciones", "descompuestos",
+              "postventa", "stg", "aux", "_meta"]  # + F-156 (D3)
 EXCLUIDAS_R: list[str] = []
 #: el consumo del estándar, que F-146 no cambia
 CONSUMO = [*ESQUEMAS_R, "contabilidad", "tesoreria", "personal"]
@@ -1288,7 +1288,7 @@ def test_f141_r21_la_contrasena_solo_del_entorno_y_sin_valor() -> None:
     )
     assert bloque in sql
     assert sql.count("PASSWORD :'restringido_pwd'") == 1
-    assert sql.count("PASSWORD") == 4, "las tres de antes y la del login restringido"
+    assert sql.count("PASSWORD") == 5, "las tres de antes, la del restringido y la del postventa (F-156)"
 
 
 def test_f141_r21_guarda_antes_de_crear_o_cambiar_nada() -> None:
@@ -1398,7 +1398,8 @@ def test_f141_r23_comprobacion_final() -> None:
     assert consulta
     assert set(re.findall(r"'(\w+)'", consulta.group(0))) == {
         DUENO, "sigrid_dm_app", ESTANDAR, AUTORIZADO, TOTAL, GRUPO, LOGIN,
-    }, "los siete roles, con rolsuper"
+        "sigrid_dm_perfil_postventa_ro", "mcp_sigrid_dm_postventa",  # + F-156
+    }, "los nueve roles, con rolsuper"
     assert (
         "FROM pg_auth_members AS m\n"
         "JOIN pg_roles AS r ON r.oid = m.member\n"
@@ -1446,7 +1447,8 @@ _PATRON_UPN = r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+"
 #: las personas del perfil total (F-136): el diccionario y los papeles dicen «perfil total»
 _PERSONAS = ("Antonio", "Vicente", "Pablo", "Gris")
 #: los únicos roles que `02_roles.sql` puede crear o a los que puede conceder
-_ROLES_DEL_REPOSITORIO = {DUENO, "sigrid_dm_app", ESTANDAR, AUTORIZADO, TOTAL, GRUPO, LOGIN}
+_ROLES_DEL_REPOSITORIO = {DUENO, "sigrid_dm_app", ESTANDAR, AUTORIZADO, TOTAL, GRUPO, LOGIN,
+                          "sigrid_dm_perfil_postventa_ro", "mcp_sigrid_dm_postventa"}  # + F-156
 
 
 def _ficheros_de_f141() -> list[Path]:

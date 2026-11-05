@@ -32,6 +32,8 @@ from __future__ import annotations
 import re
 from typing import Final
 
+from etl_sigrid.domain.postventa import TIPOS_POSTVENTA
+
 #: Las familias de documento (`con.tip`) cuyos adjuntos se indexan y su nombre
 #: publicado (D1 del humano, 2026-10-09: las cinco de compras, 199.042 enlaces).
 #: ÚNICA FUENTE: el `IN` de los dos filtros de ingesta y el `IN` y el `CASE`
@@ -100,14 +102,28 @@ def lista_familias_sql() -> str:
     return ", ".join(str(tip) for tip in sorted(FAMILIAS_ADJUNTOS))
 
 
+#: F-156 (R4, decisión del humano del 2026-11-03): la INGESTA de `rcg` y `gra`
+#: trae además los gráficos de postventa (707 unidad, 708 incidencia, 47 tarea),
+#: que indexa `postventa.documento_adjuntos`. El índice de compras no cambia:
+#: su SQL sigue filtrando por `FAMILIAS_ADJUNTOS`. Personal (43, 306) sigue fuera.
+TIPOS_INGESTA_GRAFICOS: Final[tuple[int, ...]] = tuple(
+    sorted(set(FAMILIAS_ADJUNTOS) | set(TIPOS_POSTVENTA))
+)
+
+
+def lista_tipos_ingesta_sql() -> str:
+    """Los tipos de la ingesta de gráficos para un `IN (...)`, ordenados (F-156, R4)."""
+    return ", ".join(str(tip) for tip in TIPOS_INGESTA_GRAFICOS)
+
+
 def filtro_rcg() -> str:
-    """El `where` exacto de `rcg` en `tables_sigrid.yaml` (R1, R3)."""
-    return f"con IN (SELECT ide FROM dbo.con WHERE tip IN ({lista_familias_sql()}))"
+    """El `where` exacto de `rcg` en `tables_sigrid.yaml` (R1, R3; F-156 R4)."""
+    return f"con IN (SELECT ide FROM dbo.con WHERE tip IN ({lista_tipos_ingesta_sql()}))"
 
 
 def filtro_gra() -> str:
-    """El `where` exacto de `gra` en `tables_sigrid.yaml` (R2, R3)."""
+    """El `where` exacto de `gra` en `tables_sigrid.yaml` (R2, R3; F-156 R4)."""
     return (
         "ide IN (SELECT r.gra FROM dbo.rcg r JOIN dbo.con c ON c.ide = r.con "
-        f"WHERE c.tip IN ({lista_familias_sql()}))"
+        f"WHERE c.tip IN ({lista_tipos_ingesta_sql()}))"
     )

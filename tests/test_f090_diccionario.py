@@ -171,7 +171,7 @@ def test_f090_r24_la_ficha_de_gra_da_las_exclusiones() -> None:
 
 
 def test_f090_r24_raw_yaml_cuenta_76() -> None:
-    assert "Son 80 tablas" in (DIR_DICCIONARIO / "raw.yaml").read_text(encoding="utf-8")
+    assert "Son 93 tablas" in (DIR_DICCIONARIO / "raw.yaml").read_text(encoding="utf-8")
 
 
 def test_f090_r24_global_version_y_recuento() -> None:

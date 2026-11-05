@@ -210,7 +210,7 @@ def test_f085_r27_la_regla_de_con_declara_los_campos_propios_nuevos() -> None:
 
 def test_f085_r25_raw_yaml_cuenta_72() -> None:
     texto = (DIR_DICCIONARIO / "raw.yaml").read_text(encoding="utf-8")
-    assert "Son 80 tablas" in texto  # +2 de F-090, +2 de F-138, +2 de F-140, +2 de F-150
+    assert "Son 93 tablas" in texto  # +2 de F-090, +2 de F-138, +2 de F-140, +2 de F-150, +13 de F-156
 
 
 # ===========================================================================
