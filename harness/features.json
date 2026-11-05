@@ -2494,12 +2494,12 @@
         "Datos personales de propietarios y contactos tratados según decida el humano (esquema restringido o fuera), nunca en el esquema general sin autorización",
         "Tests de humo del SQL y del dominio nuevos; `bash harness/init.sh` en verde"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "rigor": "estandar",
       "priority": 3,
       "branch": "feature/F-156-postventa",
-      "notes": "2026-11-03: anotada por el líder a petición del humano; sin medir aún en Sigrid. Tablas candidatas leídas de `azure-apps/sigrid_tablas.md` (upv, rcp, rcpint, auxrcp, auxtrcp, auxofc, act, tar, uve, uveref, auxuvetip, prmtpl). 2026-11-03: spec en `specs/F-156-postventa/`, medida en solo lectura (`progress/spec_F-156.md`): `act`, `uve`, `uveref` y `auxuvetip` están VACÍAS en Sigrid; entran `upv`, `rcp`, `rcpint`, `tar` (filtrada a reclamaciones), `tarres`, `obrofc`, catálogos, `auxgra`, 659 líneas de `log` y, si D1=A, `per` reducida. Revisada el mismo día con las decisiones del humano (D1=A con perfil nuevo «postventa», coste por obra de origen por las partidas de POSTV*, histórico con login): requirements.md. Pliego para `mcp-bbdd` en `specs/F-156-postventa/pliego_mcp_bbdd.md`. No implementar hasta cerrar F-153."
+      "notes": "2026-11-03: anotada por el líder a petición del humano; sin medir aún en Sigrid. Tablas candidatas leídas de `azure-apps/sigrid_tablas.md` (upv, rcp, rcpint, auxrcp, auxtrcp, auxofc, act, tar, uve, uveref, auxuvetip, prmtpl). 2026-11-03: spec en `specs/F-156-postventa/`, medida en solo lectura (`progress/spec_F-156.md`): `act`, `uve`, `uveref` y `auxuvetip` están VACÍAS en Sigrid; entran `upv`, `rcp`, `rcpint`, `tar` (filtrada a reclamaciones), `tarres`, `obrofc`, catálogos, `auxgra`, 659 líneas de `log` y, si D1=A, `per` reducida. Revisada el mismo día con las decisiones del humano (D1=A con perfil nuevo «postventa», coste por obra de origen por las partidas de POSTV*, histórico con login): requirements.md. Pliego para `mcp-bbdd` en `specs/F-156-postventa/pliego_mcp_bbdd.md`. No implementar hasta cerrar F-153. 2026-11-05: implementada, APROBADA en la pasada 2 (`progress/review_F-156.md`), merge `main` f3f644c; desplegada por el humano (imagen r20261105-1111, roles §14, ingesta, `build-postventa` 63 s, `apply-grants` con las seis verificaciones ok), diccionario v71 y MCP reiniciado. Queda el pliego en `mcp-bbdd` (su F-034)."
     },
     {
       "id": "F-157",
