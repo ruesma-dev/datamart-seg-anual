@@ -29,6 +29,8 @@ CURRENT_USER WITH INHERIT TRUE` delante, probado en PG16 (traza en §5) en desig
 (3) fichas de `postventa`, esquema y `R-POSTVENTA-RESTRINGIDA`: la máscara es heurística, los
 nombres propios del texto libre no se quitan y seis columnas van sin máscara; fuera «sin
 personas»; (4) `R-FRESCURA` «los nueve»; (5) `current.md` con la cifra real del presupuesto.
+Tras ello, `bash harness/init.sh` en verde sobre `a21c786`: 10509 passed, 312 skipped (43 min 34 s),
+PUERTA COBERTURA 100 % de 239 líneas.
 
 ## 2. Decisiones y desviaciones (justificadas)
 
