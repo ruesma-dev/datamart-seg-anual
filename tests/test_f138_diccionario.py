@@ -194,7 +194,7 @@ def test_f138_r26_version_recuento_y_pendientes() -> None:
 
 def test_f138_r26_raw_yaml() -> None:
     texto = (DIR_DICCIONARIO / "raw.yaml").read_text(encoding="utf-8")
-    assert "Son 80 tablas" in texto  # +2 de F-140, +2 de F-150
+    assert "Son 93 tablas" in texto  # +2 de F-140, +2 de F-150, +13 de F-156
     conala = _texto(_ficha("raw", "conala"))
     for dato in ("F-138", "45.747", "D3", "43", "`fec1`", "`creusu`", "LOGIN",
                  "compras_restringida", "grep -n \"^| conala \" azure-apps/sigrid_tablas.md"):

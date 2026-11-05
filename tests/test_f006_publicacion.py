@@ -678,6 +678,8 @@ def test_f006_r20_pipeline_publicar_va_entre_build_mart_y_apply_grants() -> None
         "build_retenciones",
         "build_personal",
         "build_contabilidad",
+        # F-156: el noveno, postventa. Nadie depende de el.
+        "build_postventa",
         # F-097: el septimo build, con su ingesta delante.
         "ingest_descompuestos",
         "build_descompuestos",

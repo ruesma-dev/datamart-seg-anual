@@ -1542,12 +1542,19 @@ tables:
   # `where` son LITERALMENTE `filtro_rcg()` y `filtro_gra()` del dominio, y
   # `tests/test_f090_ingesta_sql.py` falla si no. `check-raw-recuentos` cuenta
   # con el mismo `where`.
+  #
+  # F-156 (R4, decision del humano del 2026-11-03): el filtro trae ADEMAS los
+  # graficos de postventa (707 unidad, 708 incidencia, 47 tarea): 15.986
+  # enlaces medidos el 2026-11-03, todos de la empresa 1, que indexa
+  # `postventa.documento_adjuntos`. El indice de compras NO cambia: su SQL
+  # sigue filtrando las cinco familias. Personal (43, 306) sigue fuera.
+  # Los literales son `TIPOS_INGESTA_GRAFICOS` del dominio de adjuntos.
 
   - source_table: rcg
     target_table: rcg
     id_column: ide
     incremental_column: null   # medido 2026-10-09: `rcg` no tiene tiemod
-    where: "con IN (SELECT ide FROM dbo.con WHERE tip IN (12, 14, 15, 44, 46))"
+    where: "con IN (SELECT ide FROM dbo.con WHERE tip IN (12, 14, 15, 44, 46, 47, 707, 708))"
     exclude_columns: []
     # EL ENLACE documento <-> grafico: `con` el documento, `gra` el grafico,
     # `pos` la posicion. Medido el 2026-10-09 (F-090): 289.451 filas en total,
@@ -1561,7 +1568,7 @@ tables:
     target_table: gra
     id_column: ide
     incremental_column: null   # medido 2026-10-09: `gra` no tiene tiemod
-    where: "ide IN (SELECT r.gra FROM dbo.rcg r JOIN dbo.con c ON c.ide = r.con WHERE c.tip IN (12, 14, 15, 44, 46))"
+    where: "ide IN (SELECT r.gra FROM dbo.rcg r JOIN dbo.con c ON c.ide = r.con WHERE c.tip IN (12, 14, 15, 44, 46, 47, 707, 708))"
     exclude_columns:
       - ima    # BINARIO: el fichero incrustado (71 filas, 12,8 MB); el bueno esta en ruesma_rep
       - pul    # BINARIO: vacia hoy
@@ -1662,3 +1669,173 @@ tables:
       - totbas
       - totiva
       - totdoc
+
+  # ==========================================================================
+  # --- F-156: POSTVENTA ENTERA ----------------------------------------------
+  # Pedida por el humano el 2026-11-03 («traernos toda la info de postventa»).
+  # Medido contra Sigrid en solo lectura el 2026-11-03 (`progress/spec_F-156.md`):
+  # las 13 tablas suman ~78.000 filas (~15 s de lectura). Ninguna tiene
+  # `tiemod` util y la nocturna es `--full` (D5): carga completa. Lo publican
+  # `postventa` y `postventa_restringida` (`sql/postventa/`, `build_postventa`).
+  # Los `where` son LITERALMENTE los de `etl_sigrid/domain/postventa.py`
+  # (`filtro_tar`, `filtro_tarres`, `filtro_log`, `filtro_per`) y
+  # `tests/test_f156_ingesta_sql.py` falla si no. Las tablas `act`, `uve`,
+  # `uveref`, `auxuvetip`, `tartar` y demas de postventa estan VACIAS en
+  # Sigrid: no entran.
+  # ==========================================================================
+
+  - source_table: upv
+    target_table: upv
+    id_column: ide
+    incremental_column: null   # F-156: medido 2026-11-03, sin tiemod
+    where: null
+    exclude_columns: []
+    # F-156. LA UNIDAD POSTVENTA (propiedades de `con` tipo 707): obra,
+    # propietario, persona de contacto, garantias por tramo (`fecfin1` vicios,
+    # `fecfin2` habitabilidad; estructura solo tiene inicio), escrituracion,
+    # visita tecnica y tipologia. 1.328 filas el 2026-11-03 en 18 obras.
+    # `restel`/`resele` son contacto directo (751/871): solo los publica
+    # `postventa_restringida`.
+
+  - source_table: rcp
+    target_table: rcp
+    id_column: ide
+    incremental_column: null   # F-156: medido 2026-11-03, sin tiemod
+    where: null
+    exclude_columns: []
+    # F-156. LA INCIDENCIA (la reclamacion, propiedades de `con` tipo 708, el
+    # «parte de reclamacion» de Posventa): 22.179 filas el 2026-11-03, todas de
+    # la empresa 1. Unidad, fecha y hora, propietario, quien reclama, contacto,
+    # clase, tipo, motivo, forma de comunicacion, urgencia, ubicacion, oficio y
+    # `tex` (texto libre, max. 2.484 bytes). `tel`, `ele`, `fecpre` y `solrcp`
+    # vacias el 2026-11-03.
+
+  - source_table: rcpint
+    target_table: rcpint
+    id_column: ide
+    incremental_column: null   # F-156: medido 2026-11-03, sin tiemod
+    where: null
+    exclude_columns: []
+    # F-156. LOS INTERVINIENTES de cada incidencia (oficio de la obra y si es
+    # causante): 24.909 filas el 2026-11-03; 1.499 huerfanas de `rcp` (de
+    # incidencias borradas), que el SQL no publica.
+
+  - source_table: tar
+    target_table: tar
+    id_column: ide
+    incremental_column: null   # F-156: medido 2026-11-03, sin tiemod
+    where: "rcpide > 0"
+    exclude_columns: []
+    # F-156. LAS TAREAS de las incidencias (propiedades de `con` tipo 47, serie
+    # `REP2...`): 13.767 de las 16.434 de `tar` el 2026-11-03; las 2.666 sin
+    # reclamacion son tareas de obra y no entran. Coste y venta a 0 en el 100 %:
+    # Sigrid no liga la incidencia con su coste (D4).
+
+  - source_table: tarres
+    target_table: tarres
+    id_column: ide
+    incremental_column: null   # F-156: medido 2026-11-03, sin tiemod
+    where: "taride IN (SELECT ide FROM dbo.tar WHERE rcpide > 0)"
+    exclude_columns: []
+    # F-156. EL RECURSO DE CADA TAREA: solo `obrofcide` (el oficio-proveedor de
+    # la obra) tiene dato; fechas, cantidades y estado a 0. 13.767 de las 13.768
+    # filas el 2026-11-03 son de tareas de reclamacion.
+
+  - source_table: obrofc
+    target_table: obrofc
+    id_column: ide
+    incremental_column: null   # F-156: medido 2026-11-03, sin tiemod
+    where: null
+    exclude_columns: []
+    # F-156. LOS OFICIOS DE CADA OBRA con su proveedor: 1.084 filas el
+    # 2026-11-03 en 21 obras, 973 con proveedor.
+
+  - source_table: auxrcp
+    target_table: auxrcp
+    id_column: ide
+    incremental_column: null   # F-156: catalogo de 3 filas, carga completa
+    where: null
+    exclude_columns: []
+    # F-156. CLASES DE INCIDENCIA: 3 filas el 2026-11-03 (0001 Vicios o
+    # defectos, 0002 Habitabilidad/Instalaciones, 0003 Estructura).
+
+  - source_table: auxtrcp
+    target_table: auxtrcp
+    id_column: ide
+    incremental_column: null   # F-156: catalogo de 4 filas, carga completa
+    where: null
+    exclude_columns: []
+    # F-156. TIPOS DE INCIDENCIA: 4 filas el 2026-11-03 (PREVENTA, PRIMER
+    # LISTADO POSTVENTA, POST VENTA, VISITA DE CORTESIA).
+
+  - source_table: auxofc
+    target_table: auxofc
+    id_column: ide
+    incremental_column: null   # F-156: catalogo de 135 filas, carga completa
+    where: null
+    exclude_columns: []
+    # F-156. LOS OFICIOS: 135 filas el 2026-11-03.
+
+  - source_table: prmtpl
+    target_table: prmtpl
+    id_column: ide
+    incremental_column: null   # F-156: medido 2026-11-03, sin tiemod
+    where: null
+    exclude_columns: []
+    # F-156. LAS TIPOLOGIAS de cada promocion (la de la unidad, `upv.obrtplide`):
+    # 257 filas el 2026-11-03.
+
+  - source_table: auxgra
+    target_table: auxgra
+    id_column: ide
+    incremental_column: null   # F-156: catalogo de 48 filas, carga completa
+    where: null
+    exclude_columns: []
+    # F-156. LAS CLASES DE GRAFICO: 48 filas el 2026-11-03; PV001-PV006 son de
+    # postventa (PV002 «Fotos Reparaciones», `ide` 35, es el PARTE FIRMADO con
+    # el DNI manuscrito: familia REPARACION). F-090 no la traia (D4: en compras
+    # la clase esta a 0).
+
+  - source_table: log
+    target_table: log
+    id_column: ide
+    incremental_column: null   # F-156: recorte filtrado, carga completa
+    where: "tab = 'con' AND tip = 708 AND tex LIKE 'Cerrar parte (postventa-incidencias)%'"
+    exclude_columns: []        # lista blanca: no se declaran las dos (R17 de F-150)
+    include_columns:
+      - ide
+      - emp
+      - ori
+      - ope
+      - fec
+      - hor
+      - usu
+      - tab
+      - tip
+      - cod
+      - tex
+      - est
+    # F-156 (D8). UN RECORTE de `dbo.log` (8,59 M filas): solo los cierres que
+    # hace la aplicacion `postventa-incidencias` (escribe `con.est` = 9 y esta
+    # linea, no un paso de `rac`): 659 filas el 2026-11-03, desde el
+    # 2026-09-11, que creceran. Sin `res` ni `err`: en las lineas de cambio de
+    # campo llevan el texto libre de la incidencia. `dbo.log` entero es F-105.
+
+  - source_table: per
+    target_table: per
+    id_column: ide
+    incremental_column: null   # F-156: recorte filtrado, carga completa
+    where: "ide IN (SELECT recide FROM dbo.rcp UNION SELECT cntide FROM dbo.rcp UNION SELECT peride FROM dbo.upv)"
+    exclude_columns: []        # lista blanca: no se declaran las dos (R17 de F-150)
+    include_columns:
+      - ide
+      - nom
+      - tel
+      - tel2
+      - ele
+    # F-156 (D1 = A, «d1 ok», el humano, 2026-11-03). LAS PERSONAS que reclaman,
+    # el contacto de la incidencia y el de la unidad: 362 de las 666 de `per`
+    # el 2026-11-03. SOLO cinco columnas: `per` trae DNI (193), credenciales de
+    # i-Sigrid (200: `esiglog`, `esigpas`, `clamai`), direcciones y
+    # observaciones, y NINGUNA entra (R3, test que falla). Solo las lee
+    # `postventa_restringida`.

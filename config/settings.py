@@ -108,9 +108,13 @@ class SigridApiSettings(BaseSettings):
 # SIN los pagos de personal (nóminas, embargos, cuotas). La completa vive en
 # `tesoreria_restringida`, que NO entra aquí: está vetada al rol general y es
 # del autorizado, como la contabilidad completa (listas de abajo).
+#
+# F-156 (2026-11-04) añade `postventa`: unidades, incidencias, tareas, su
+# histórico y sus adjuntos, SIN datos personales (los textos van enmascarados).
+# Los datos personales viven en `postventa_restringida`, vetada como las otras.
 DEFAULT_CONSUMPTION_SCHEMAS = (
     "mart,cierre,compras,maestro,retenciones,personal,contabilidad,tesoreria,"
-    "descompuestos,stg,aux,_meta"
+    "descompuestos,postventa,stg,aux,_meta"
 )
 
 # Esquemas que el rol GENERAL de lectura (`PG_READONLY_ROLE`, el del MCP y
@@ -131,11 +135,18 @@ DEFAULT_CONSUMPTION_SCHEMAS = (
 #                             nombran trabajadores y bajas (F-138, D9: «solo
 #                             para el perfil admin y no el estándar»): solo
 #                             para el rol autorizado
+#   postventa_restringida     los datos personales de postventa: propietarios,
+#                             reclamantes y contactos con teléfono y correo, y
+#                             los textos íntegros (F-156, «d1 ok» del humano el
+#                             2026-11-03): para el rol autorizado y el perfil
+#                             postventa
 #   raw                       la copia literal de Sigrid, con todo lo anterior
 #                             y más (ver el comentario de arriba)
 #
 # Un esquema no puede estar a la vez aquí y en `DEFAULT_CONSUMPTION_SCHEMAS`.
-DEFAULT_VETOED_SCHEMAS = "contabilidad_restringida,tesoreria_restringida,compras_restringida,raw"
+DEFAULT_VETOED_SCHEMAS = (
+    "contabilidad_restringida,tesoreria_restringida,compras_restringida,postventa_restringida,raw"
+)
 
 # El rol AUTORIZADO (F-135): grupo NOLOGIN que lee la contabilidad completa. Lo
 # crea `infra/sql/02_roles.sql`; quién es miembro lo decide Negocio (Juan
@@ -153,7 +164,10 @@ DEFAULT_VETOED_SCHEMAS = "contabilidad_restringida,tesoreria_restringida,compras
 # solo un aviso). El renombre lo hace `infra/sql/02_roles.sql`.
 DEFAULT_RESTRICTED_ROLE = "sigrid_dm_autorizado_ro"
 NOMBRE_AUTORIZADO_RETIRADO = "sigrid_dm_restringido_ro"
-DEFAULT_RESTRICTED_SCHEMAS = "contabilidad_restringida,tesoreria_restringida,compras_restringida"
+# F-156: y los datos personales de postventa (`postventa_restringida`).
+DEFAULT_RESTRICTED_SCHEMAS = (
+    "contabilidad_restringida,tesoreria_restringida,compras_restringida,postventa_restringida"
+)
 
 # El login de acceso TOTAL del MCP (F-136): lee lo mismo que el rol general más
 # la contabilidad completa, por PERTENENCIA a los dos grupos (`02_roles.sql`,
@@ -199,10 +213,26 @@ DEFAULT_TOTAL_VETOED_SCHEMAS = "raw"
 # el perfil.
 DEFAULT_PERFIL_RESTRINGIDO_GROUP = "sigrid_dm_perfil_restringido_ro"
 DEFAULT_PERFIL_RESTRINGIDO_LOGIN = "mcp_sigrid_dm_restringido"
+#
+# F-156 (D3): `postventa` también la lee (sin datos personales).
 DEFAULT_PERFIL_RESTRINGIDO_SCHEMAS = (
-    "mart,cierre,compras,maestro,retenciones,descompuestos,stg,aux,_meta"
+    "mart,cierre,compras,maestro,retenciones,descompuestos,postventa,stg,aux,_meta"
 )
 DEFAULT_PERFIL_RESTRINGIDO_EXCLUDED_TABLES = ""
+
+# El perfil POSTVENTA del MCP (F-156, D1 = A, «d1 ok» del humano el 2026-11-03):
+# el CUARTO perfil, para el departamento de postventa. Ve EXACTAMENTE lo del
+# perfil restringido más `postventa_restringida` (propietarios, reclamantes y
+# contactos con teléfono y correo, textos íntegros), y abre los partes firmados
+# (adjuntos REPARACION, con el DNI manuscrito del cliente: D9). Como el
+# restringido: un grupo NOLOGIN con los permisos y un login miembro, los dos de
+# `infra/sql/02_roles.sql` (punto 5 sexies); lista EXPLÍCITA y lo que no está se
+# le veta cada noche. `apply_grants` FALLA sin conectar si la lista no es la del
+# restringido + `postventa_restringida` (`perfil_postventa_en_conflicto`).
+# Grupo vacío = no se mira el perfil.
+DEFAULT_PERFIL_POSTVENTA_GROUP = "sigrid_dm_perfil_postventa_ro"
+DEFAULT_PERFIL_POSTVENTA_LOGIN = "mcp_sigrid_dm_postventa"
+DEFAULT_PERFIL_POSTVENTA_SCHEMAS = DEFAULT_PERFIL_RESTRINGIDO_SCHEMAS + ",postventa_restringida"
 
 # Tablas que el rol del MCP NO puede leer, aunque su esquema esté en la lista
 # de arriba. Formato `esquema.tabla`, separadas por comas.
@@ -382,6 +412,20 @@ class PostgresSettings(BaseSettings):
                     "restringido NO lee aunque su esquema sea suyo (F-141, D2). Vacía "
                     "por defecto desde F-146.",
     )
+    perfil_postventa_group: str = Field(
+        DEFAULT_PERFIL_POSTVENTA_GROUP,
+        description="Grupo NOLOGIN del perfil POSTVENTA del MCP (F-156). Vacío = no se "
+                    "mira el perfil; si no existe, apply_grants avisa y sigue.",
+    )
+    perfil_postventa_login: str = Field(
+        DEFAULT_PERFIL_POSTVENTA_LOGIN,
+        description="Login del perfil postventa (F-156), miembro SOLO de su grupo.",
+    )
+    perfil_postventa_schemas: str = Field(
+        DEFAULT_PERFIL_POSTVENTA_SCHEMAS,
+        description="Esquemas que lee el perfil postventa (F-156): los del restringido "
+                    "más postventa_restringida, ni más ni menos.",
+    )
     # --- Troceo del build de stg.plan_mensual (F-019) ----------------------
     # El 2026-08-09 ese build llenó el disco del servidor compartido (93,4 %) y
     # dejó a albaranes y partes en solo-lectura diez minutos. Estos tres valores
@@ -518,6 +562,11 @@ class PostgresSettings(BaseSettings):
     def perfil_restringido_schema_list(self) -> list[str]:
         """`perfil_restringido_schemas` como lista, sin blancos ni vacíos (F-141)."""
         return [s.strip() for s in self.perfil_restringido_schemas.split(",") if s.strip()]
+
+    @property
+    def perfil_postventa_schema_list(self) -> list[str]:
+        """`perfil_postventa_schemas` como lista, sin blancos ni vacíos (F-156)."""
+        return [s.strip() for s in self.perfil_postventa_schemas.split(",") if s.strip()]
 
     @property
     def perfil_restringido_excluded_table_list(self) -> list[str]:

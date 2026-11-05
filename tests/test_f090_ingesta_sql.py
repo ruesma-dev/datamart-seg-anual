@@ -26,6 +26,7 @@ import yaml
 from etl_sigrid.domain.documento_adjuntos import (
     COLUMNAS_EXCLUIDAS_GRA,
     FAMILIAS_ADJUNTOS,
+    TIPOS_INGESTA_GRAFICOS,
     filtro_gra,
     filtro_rcg,
 )
@@ -117,12 +118,14 @@ def test_f090_r1_el_comentario_de_rcg_da_cifras_y_motivo() -> None:
 
 
 def test_f090_r3_los_dos_filtros_llevan_exactamente_las_familias() -> None:
+    """F-156 (R4): las de compras MÁS las tres de postventa, y nada más."""
     for tabla in ("rcg", "gra"):
         familias = _familias_de(_tablas()[tabla]["where"])
-        assert familias == set(FAMILIAS_ADJUNTOS), (
+        assert familias == set(TIPOS_INGESTA_GRAFICOS), (
             f"`{tabla}` filtra {sorted(familias)}; el dominio dice "
-            f"{sorted(FAMILIAS_ADJUNTOS)} (R3)"
+            f"{sorted(TIPOS_INGESTA_GRAFICOS)} (R3)"
         )
+        assert set(FAMILIAS_ADJUNTOS) <= familias
 
 
 def test_f090_r3_los_filtros_salen_como_lectura_hacia_sigrid() -> None:
@@ -142,20 +145,23 @@ def test_f090_r4_ninguna_columna_de_binario_se_ingiere() -> None:
         assert columna in excluidas, f"`gra.{columna}` SE INGIERE: tiene que ir excluida (R4)"
 
 
-def test_f090_r5_no_se_ingiere_auxgra() -> None:
-    assert "auxgra" not in _tablas(), "`auxgra` no se ingiere (D4, R5)"
+def test_f090_r5_auxgra_solo_por_postventa() -> None:
+    """F-090 no la ingería (D4); F-156 la trae entera para la clase de gráfico de postventa."""
+    assert _tablas()["auxgra"]["where"] is None
 
 
-def test_f090_r5_ninguna_familia_de_personal_o_posventa_en_los_filtros() -> None:
+def test_f090_r5_ninguna_familia_de_personal_en_los_filtros() -> None:
+    """D2 sigue: personal fuera. Posventa (708) entra con F-156 (R4)."""
     for tabla in ("rcg", "gra"):
         familias = _familias_de(_tablas()[tabla]["where"])
-        for tip in (43, 306, 708):
+        for tip in (43, 306):
             assert tip not in familias, f"`{tabla}` trae la familia {tip} (D2, R5)"
 
 
 def test_f090_r6_el_censo_pasa_a_76() -> None:
-    assert len(_tablas()) == 80  # +2 de F-138, +2 de F-140, +2 de F-150
-    assert len(_lista_tablas()) == 80, "tabla declarada dos veces"
+    # +2 de F-138, +2 de F-140, +2 de F-150, +13 de F-156
+    assert len(_tablas()) == 93
+    assert len(_lista_tablas()) == 93, "tabla declarada dos veces"
     assert {"rcg", "gra"} <= set(_tablas())
 
 
