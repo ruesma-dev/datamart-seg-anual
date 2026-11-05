@@ -39,6 +39,11 @@ from tests.test_f006_formato import _dicc, _ficha, _regla
 #: fórmula de R17. Solo baja (trinquete: R19 falla si sobra más de
 #: `HOLGURA_TRINQUETE`). Historia, de la más reciente a la más antigua:
 #:
+#: * 34.056 · 2026-11-05, F-156 review pasada 1 (v71 en el arbol), SUBIDO con
+#:   motivo: la mascara de postventa es heuristica y la regla lo tiene que
+#:   decir. Reglas 7.804 (+16: `R-POSTVENTA-RESTRINGIDA` deja de prometer «sin
+#:   personas»), bloques 9.270 (+34: el esquema `postventa` igual), enrutado
+#:   16.982 sin cambio.
 #: * 34.006 · 2026-11-04, F-156 (diccionario v71 en el arbol), SUBIDO con
 #:   motivo: postventa, dos esquemas nuevos. Reglas 7.788 (+364: la nueva
 #:   `R-POSTVENTA-RESTRINGIDA`, bloqueante, con resumen, y el cuarto perfil en
@@ -78,7 +83,7 @@ from tests.test_f006_formato import _dicc, _ficha, _regla
 #:   todas las preguntas): 78.057.
 #: * 29.787 · 2026-10-22, F-147 T5: PROVISIONAL, la medida de T2 sobre la v58
 #:   (sin resúmenes todavía: reglas 2.233, enrutado 13.886, bloques 13.668).
-PRESUPUESTO_MAX = 34_006
+PRESUPUESTO_MAX = 34_056
 
 
 def _medir(dicc) -> PresupuestoContexto:

@@ -823,7 +823,7 @@ reglas:
       `tesoreria_restringida`, `compras_restringida` y
       `postventa_restringida`, que construyen el mismo `build_contabilidad`,
       `build_tesoreria`, `build_compras` y `build_postventa`) SI se construyen cada noche dentro de
-      `run-all`, y los ocho registran paso, asi que su fecha de build siempre es
+      `run-all`, y los nueve registran paso, asi que su fecha de build siempre es
       consultable. Lo que no cambia es que su paso NO es dependencia de ningun
       otro: si `build_cierre`, `build_compras`, `build_maestros`,
       `build_retenciones`, `build_personal`, `build_contabilidad`,
@@ -1163,18 +1163,23 @@ reglas:
       que F-094 en las retenciones: efectos antiguos no punteados.
 
   - codigo: R-POSTVENTA-RESTRINGIDA
-    titulo: Postventa sin personas; los contactos solo en postventa_restringida
+    titulo: Los contactos de postventa solo en postventa_restringida; la mascara no es total
     severidad: bloqueante
     ambito: [postventa, postventa_restringida]
     resumen: >-
-      Responde de postventa con `postventa`, sin personas y con textos
-      enmascarados. Propietarios, reclamantes, contactos y textos íntegros,
-      solo en `postventa_restringida` (perfiles postventa y total) y solo si
-      los piden; nunca se suman con la general.
+      Responde con `postventa`: sin fichas de clientes, teléfonos y correos
+      enmascarados (un nombre en el texto libre sí puede salir).
+      Contactos y textos íntegros, solo en `postventa_restringida` (perfiles
+      postventa y total); nunca se suman con la general.
     regla: >-
       Por defecto se responde con `postventa`: incidencias, unidades, tareas,
-      historico, adjuntos y coste, sin personas y con el texto libre
-      enmascarado (`[TELEFONO]`, `[CORREO]`). Quien es el propietario, quien
+      historico, adjuntos y coste, sin las fichas de propietarios,
+      reclamantes ni contactos. La mascara del texto libre es HEURISTICA: solo
+      cambia por `[TELEFONO]` y `[CORREO]` lo que tiene forma de telefono o
+      correo; un nombre propio escrito en el texto NO se quita, y `ubicacion`,
+      `urgencia`, `espacios`, `nombre_unidad` y, en adjuntos, `nombre_fichero`
+      y `descripcion` van sin mascara. No cites nombres de personas que
+      aparezcan en esos textos. Quien es el propietario, quien
       reclamo, como contactarle o que dice el texto integro solo esta en
       `postventa_restringida`, que leen el perfil postventa y el total; ni el
       estandar ni el restringido. Las dos tablas nunca se suman ni se unen
@@ -2014,13 +2019,13 @@ esquemas:
     pasos_etl: [ingest_descompuestos, build_descompuestos]
 
   postventa:
-    titulo: Postventa de las viviendas entregadas, sin personas
+    titulo: Postventa de las viviendas entregadas, sin fichas de clientes
     para_que_sirve: >-
       Unidades entregadas y sus garantias, incidencias (las reclamaciones del
       cliente), tareas, el historico de estados con tiempos de resolucion
       (`postventa.v_estado_incidencias`), los adjuntos y el coste de facturas
-      por obra de origen (`postventa.v_coste_obra`). Sin personas: textos
-      enmascarados (`R-POSTVENTA-RESTRINGIDA`).
+      por obra de origen (`postventa.v_coste_obra`). Sin fichas de clientes;
+      telefonos y correos, enmascarados (`R-POSTVENTA-RESTRINGIDA`).
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_postventa]

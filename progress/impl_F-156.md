@@ -23,6 +23,13 @@ local, sin push. **T16 (despliegue) NO ejecutada**: es del humano (§5).
 | `docs/ARCHITECTURE.md`, `CLAUDE.md`, `specs/F-006-mcp-azure/design_detalle.md`, `azure-apps/datamart_seg_anual.md` | Esquemas, perfil postventa, 16 pasos, 93 tablas, enlace al pliego; inventario 287 |
 | `tests/` | `test_f156_{dominio,ingesta_sql,grants,pipeline,diccionario}.py` (196 tests); al día los que fijaban listas, roles, censo y pasos (f006, f024, f037, f047, f057, f066, f074, f079, f085, f090, f097, f107, f135-f141, f146-f148, f150) |
 
+**Review pasada 1 (CHANGES_REQUESTED, 2026-11-05), corregida:** (1) vuelta atrás con el SHA de
+`main` (`9dcd0aa`) y `git rev-parse main` en el paso 0; (2) `DROP OWNED BY` con el `GRANT ... TO
+CURRENT_USER WITH INHERIT TRUE` delante, probado en PG16 (traza en §5) en design §12 y runbook §14;
+(3) fichas de `postventa`, esquema y `R-POSTVENTA-RESTRINGIDA`: la máscara es heurística, los
+nombres propios del texto libre no se quitan y seis columnas van sin máscara; fuera «sin
+personas»; (4) `R-FRESCURA` «los nueve»; (5) `current.md` con la cifra real del presupuesto.
+
 ## 2. Decisiones y desviaciones (justificadas)
 
 - **Máscara también en `motivo` y `oficios_obra.comentario`** (la spec la pedía en descripción y
@@ -37,7 +44,7 @@ local, sin push. **T16 (despliegue) NO ejecutada**: es del humano (§5).
 - **`ESQUEMAS_DEL_DATAMART` pasó de T9 a T13**: exige entrada en `esquemas` de `00_global.yaml`.
 - **R34 leído como `ejemplos_preguntas` de las fichas**, no como preguntas de aceptación nuevas:
   `test_f006_reglas` fija la batería P1-P26; añadirlas era tocar otra feature.
-- **`PRESUPUESTO_MAX` de F-147 subido con motivo a 34.006** (+2.719: regla nueva, 13 fichas de
+- **`PRESUPUESTO_MAX` de F-147 subido con motivo a 34.006**, y a 34.056 en la review (pasada 1, la máscara heurística) (+2.719: regla nueva, 13 fichas de
   consumo y 2 esquemas). `R-PERFILES` recortada para seguir ≤ 1.000 caracteres (test F-147 B).
 - **`R-FRESCURA` se titula «Nueve esquemas…»**; su resumen, ≤ 250.
 - **Tests de otras features actualizados** (solo cifras y listas, con comentario F-156): el censo
@@ -63,7 +70,7 @@ local, sin push. **T16 (despliegue) NO ejecutada**: es del humano (§5).
   `t` en `postventa`/`postventa_restringida`/`_meta`, `f` en `contabilidad`, `tesoreria`,
   `personal`, `raw` y las otras `*_restringida`, sin privilegios propios. Servidor parado al final.
 - `publicar_diccionario` con el doble de F-024: SUCCESS, v71, 287 objetos, 2459 columnas,
-  cobertura 100 %. `contexto_bbdd` medido: 34.006 (reglas 7.788, enrutado 16.982, bloques 9.236).
+  cobertura 100 %. `contexto_bbdd` medido: 34.006 (reglas 7.788, enrutado 16.982, bloques 9.236); tras la review (pasada 1), 34.056 (reglas 7.804, bloques 9.270).
 - **Nada contra Azure ni Sigrid** salvo lecturas de la fase de spec. Sin push.
 
 ## 4. Fase RED (comandos y salida real)
@@ -113,7 +120,9 @@ Fuera de 00:00-05:00 UTC, desde la raíz. `<PY>` = `.venv/Scripts/python.exe`; `
 de solo lectura con `pg._bootstrap_done = True` (design §12); `$dsn` del administrador.
 
 0. Anotar el tag del job (`az containerapp job show -n caj-datamart-seg-dev -g rg-datamart-seg-dev
-   --query "properties.template.containers[0].image" -o tsv`) y el recuento de `rcg` de compras.
+   --query "properties.template.containers[0].image" -o tsv`), `git rev-parse main` (el
+   2026-11-05 era **`9dcd0aa`**; si `main` se mueve antes del merge, vale el nuevo) y el recuento
+   de `rcg` de compras.
 1. `infra/70_build_image.ps1` y `infra/85_update_job.ps1 -Tag <nuevo>`.
 2. Contraseña en `kv-mcp-bbdd-dev/pg-password-postventa` → `POSTVENTA_PWD`; `psql -X -v
    ON_ERROR_STOP=1 -f infra/sql/02_roles.sql $dsn` (runbook §14) → «mcp_sigrid_dm_postventa:
@@ -131,10 +140,30 @@ de solo lectura con `pg._bootstrap_done = True` (design §12); `$dsn` del admini
    del MCP y pruebas por perfil.
 10. Primera nocturna: `<PY> main.py timings`.
 
-**Vuelta atrás** (design §12): job al tag del paso 0; `git switch --detach` a la punta previa;
-`DROP SCHEMA postventa_restringida, postventa CASCADE` y `DROP TABLE` de las 13 de `raw` como
-`sigrid_dm_etl`; `DROP ROLE` de login y grupo postventa como administrador; reingesta de `rcg` y
-`gra`; `publicar-diccionario` y `apply-grants`.
+**Vuelta atrás** (design §12): job al tag del paso 0; `git switch --detach 9dcd0aa` (el SHA del
+paso 0); `DROP SCHEMA postventa_restringida, postventa CASCADE` y `DROP TABLE` de las 13 de `raw`
+como `sigrid_dm_etl`; como administrador `DROP ROLE IF EXISTS mcp_sigrid_dm_postventa; GRANT
+sigrid_dm_perfil_postventa_ro TO CURRENT_USER WITH INHERIT TRUE; DROP OWNED BY
+sigrid_dm_perfil_postventa_ro; DROP ROLE IF EXISTS sigrid_dm_perfil_postventa_ro;`; reingesta de
+`rcg` y `gra`; `publicar-diccionario` y `apply-grants`.
+
+**El `GRANT` del administrador, probado** (review pasada 1, punto 2; PostgreSQL 16 desechable,
+2026-11-05, `adm_azure` = `LOGIN NOSUPERUSER CREATEROLE`, roles de prueba `pv_grupo_prueba` y
+`pv_login_prueba` creados por él como `02_roles.sql`). Tras el alta, su pertenencia al grupo:
+```
+       rol       |     miembro     | admin_option | inherit_option | set_option
+ pv_grupo_prueba | adm_azure       | t            | f              | f
+```
+Vuelta atrás SIN el `GRANT` (`psql -X -v ON_ERROR_STOP=1 -c "DROP ROLE IF EXISTS pv_login_prueba;
+DROP OWNED BY pv_grupo_prueba; DROP ROLE IF EXISTS pv_grupo_prueba;"`):
+```
+ERROR:  permission denied to drop objects
+DETALLE:  Only roles with privileges of role "pv_grupo_prueba" may drop objects owned by it.
+exit=1      (y los dos roles siguen: el -c es una transacción)
+```
+CON `GRANT pv_grupo_prueba TO CURRENT_USER WITH INHERIT TRUE;` delante del `DROP OWNED BY`:
+`DROP ROLE` / `GRANT ROLE` / `DROP OWNED` / `DROP ROLE`, `exit=0`, roles restantes: ninguno,
+`pg_default_acl`: 0.
 
 ## 6. Fuera de alcance y lo que falta
 

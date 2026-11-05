@@ -20,7 +20,7 @@ Implementer. Spec aprobada por el humano el 2026-11-04 («si lanza»). Tarea en 
 - T1-T14 hechas y commiteadas (T13 diccionario, T14 documentación; `azure-apps` commit local
   `8dc4b04`, sin push). Diccionario del árbol hoy: **v71, 287 objetos, 2459 columnas, 137 de
   consumo**, 23 reglas (nueva `R-POSTVENTA-RESTRINGIDA`), SIN publicar. Presupuesto de F-147
-  subido con motivo a 34.212. Nada lanzado contra Azure salvo lecturas; el PostgreSQL desechable
+  subido con motivo a 34.056 (34.006 en la implementación; +50 por la review). Nada lanzado contra Azure salvo lecturas; el PostgreSQL desechable
   local ya está parado. T15 y T17 hechas: `init.sh` verde (10509 passed, cobertura 100 % de 239
   líneas), mutación 19/20 muertos (el superviviente, equivalente). Pendiente: review y T16 MANUAL.
 

@@ -191,10 +191,11 @@ solo perfiles postventa y total; nunca se suman). `R-PERFILES` gana el cuarto pe
 Fuera de 00:00-05:00 UTC, desde la raíz. `<PY>` = `.venv/Scripts/python.exe`; `<Q>` = `<PY> -c
 "import main, sys; pg = main._get_pg(); pg._bootstrap_done = True;
 print(pg.filas_solo_lectura(sys.argv[1], 60))" "<consulta>"`; `$dsn`, la del administrador
-(cabecera de `02_roles.sql`). Vuelta atrás del código: la punta de `main` previa al merge.
+(cabecera de `02_roles.sql`). Vuelta atrás del código: el SHA de `main` del paso 0 (hoy `9dcd0aa`).
 
 0. Tag actual: `az containerapp job show -n caj-datamart-seg-dev -g rg-datamart-seg-dev
-   --query "properties.template.containers[0].image" -o tsv` (anotarlo). Recuento de compras:
+   --query "properties.template.containers[0].image" -o tsv` y `git rev-parse main` (anotar
+   los dos; el SHA era `9dcd0aa` el 2026-11-05: si `main` se movió, vale el nuevo). Compras:
    `<Q> "SELECT count(*) FROM raw.rcg r JOIN raw.con c ON c.ide = r.con AND c.tip IN (12, 14, 15, 44, 46)"`.
 1. `powershell -NoProfile -File infra/70_build_image.ps1` y `powershell -NoProfile -File
    infra/85_update_job.ps1 -Tag <tag nuevo>`; el `az` del paso 0 acaba en él.
@@ -214,22 +215,22 @@ print(pg.filas_solo_lectura(sys.argv[1], 60))" "<consulta>"`; `$dsn`, la del adm
    postventa.v_estado_incidencias GROUP BY 1"` → R17; cronometrar (≤ ~1 s; el MCP corta a 30 s).
 8. `<PY> main.py publicar-diccionario` (versión nueva); `check-diccionario` (antes da 1, lo
    esperado), `check-declarados` y `check-unicidad --timeout 300` → OK.
-9. Enviar `pliego_mcp_bbdd.md` a `mcp-bbdd`; desplegado allí, reinicio del MCP (`az containerapp
-   show -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --query properties.latestReadyRevisionName -o tsv`
-   y `az containerapp revision restart -g rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --revision <revision>
-   -o none`) y sus pruebas por perfil; anotarlo en `progress/impl_F-156.md`.
+9. Enviar `pliego_mcp_bbdd.md` a `mcp-bbdd`; desplegado allí, `az containerapp revision restart -g
+   rg-mcp-bbdd-dev -n ca-mcp-bbdd-dev --revision <latestReadyRevisionName> -o none` y pruebas por perfil.
 10. Primera nocturna: `<PY> main.py timings` (ingesta nueva y `build_postventa`).
 
 **Vuelta atrás** (en este orden):
 
 1. `powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag del paso 0>`, comprobado con el `az` del paso 0.
-2. `git switch --detach <punta de main previa al merge>`.
+2. `git switch --detach <SHA de main del paso 0>` (hoy `9dcd0aa`).
 3. `psql -X -v ON_ERROR_STOP=1 -c "SET ROLE sigrid_dm_etl; DROP SCHEMA IF EXISTS
    postventa_restringida CASCADE; DROP SCHEMA IF EXISTS postventa CASCADE; DROP TABLE IF EXISTS
    raw.upv, raw.rcp, raw.rcpint, raw.tar, raw.tarres, raw.obrofc, raw.auxrcp, raw.auxtrcp,
-   raw.auxofc, raw.prmtpl, raw.auxgra, raw.log, raw.per;" $dsn` y, como administrador, `psql -X
-   -v ON_ERROR_STOP=1 -c "DROP ROLE IF EXISTS mcp_sigrid_dm_postventa; DROP OWNED BY
-   sigrid_dm_perfil_postventa_ro; DROP ROLE IF EXISTS sigrid_dm_perfil_postventa_ro;" $dsn`.
+   raw.auxofc, raw.prmtpl, raw.auxgra, raw.log, raw.per;" $dsn` y, como administrador (no es
+   superusuario: sin el GRANT, «permission denied to drop objects», probado en PG16), `psql -X -v
+   ON_ERROR_STOP=1 -c "DROP ROLE IF EXISTS mcp_sigrid_dm_postventa; GRANT sigrid_dm_perfil_postventa_ro
+   TO CURRENT_USER WITH INHERIT TRUE; DROP OWNED BY sigrid_dm_perfil_postventa_ro; DROP ROLE IF
+   EXISTS sigrid_dm_perfil_postventa_ro;" $dsn`.
 4. `<PY> main.py ingest --table rcg --full` y `--table gra --full` (el `where` viejo).
 5. `<PY> main.py publicar-diccionario` (fichas del árbol local) y `<PY> main.py apply-grants`;
    `check-declarados` → OK. Borrar el secreto `pg-password-postventa` si ya no se usará.

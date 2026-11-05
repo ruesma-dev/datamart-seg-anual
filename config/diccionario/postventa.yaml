@@ -10,10 +10,13 @@
 #
 # LAS COSAS QUE HAY QUE SABER ANTES DE ESCRIBIR UNA CONSULTA AQUI:
 #
-# 1. **Aqui NO hay personas.** Propietarios, reclamantes, contactos, telefonos,
+# 1. **Aqui NO estan las fichas de clientes.** Propietarios, reclamantes, contactos, telefonos,
 #    correos y el texto libre INTEGRO viven en `postventa_restringida`, que solo
 #    leen el perfil postventa y el total (`R-POSTVENTA-RESTRINGIDA`). Los textos
-#    de este esquema van ENMASCARADOS (`[TELEFONO]`, `[CORREO]`).
+#    de este esquema van ENMASCARADOS (`[TELEFONO]`, `[CORREO]`), pero la mascara
+#    es HEURISTICA: un nombre propio en el texto libre NO se quita, y `ubicacion`,
+#    `urgencia`, `espacios`, `nombre_unidad`, `nombre_fichero` y la `descripcion`
+#    de los adjuntos van sin mascara (review F-156, pasada 1).
 # 2. **El estado actual y desde cuando, en `v_estado_incidencias`**: una parte
 #    de los cierres la escribe la aplicacion `postventa-incidencias` sin paso en
 #    `rac`; esa vista y `incidencia_procesos` ya lo resuelven.
@@ -211,8 +214,9 @@ objetos:
       solo el 1 tiene nombre documentado, «Escrita» (12.810); el 0 (1.945) y
       el 3 (7.424) no se saben. `urgencia` solo esta en 7.434.
 
-      Texto (`descripcion`, `descripcion_larga`, `motivo`) ENMASCARADO; el
-      integro y las personas, en `postventa_restringida`. Desde cuando esta en
+      Texto (`descripcion`, `descripcion_larga`, `motivo`) ENMASCARADO. LA MASCARA ES HEURISTICA: solo cambia por `[TELEFONO]` y `[CORREO]` lo que tiene forma de telefono o de correo; un NOMBRE PROPIO escrito en el texto libre NO se quita.
+      `ubicacion` y `urgencia` van sin mascara. El integro y las fichas de
+      las personas, en `postventa_restringida`. Desde cuando esta en
       su estado y cuanto tardo: `postventa.v_estado_incidencias`.
     grano: >-
       Una fila por incidencia, identificada por `incidencia_id` (`rcp.ide`),
@@ -391,6 +395,7 @@ objetos:
       **SIN COSTE**: el coste y la venta de las tareas estan a 0 en el 100 %
       en Sigrid y no se publican. El coste de postventa esta en
       `postventa.v_coste_obra`. El empleado asignado va solo por id.
+      `descripcion` y `texto` van enmascarados, pero lA MASCARA ES HEURISTICA: solo cambia por `[TELEFONO]` y `[CORREO]` lo que tiene forma de telefono o de correo; un NOMBRE PROPIO escrito en el texto libre NO se quita.
     grano: >-
       Una fila por tarea, identificada por `tarea_id` (`tar.ide`). Varias por
       incidencia.
@@ -673,7 +678,9 @@ objetos:
       **DNI MANUSCRITO**: la familia REPARACION (clase de grafico PV002
       «Fotos Reparaciones», 4.427) es casi siempre el PARTE FIRMADO por el
       cliente (3.874 se llaman asi), con su DNI escrito a mano dentro.
-      `subido_por` es el LOGIN de quien subio el fichero.
+      `subido_por` es el LOGIN de quien subio el fichero. **`nombre_fichero` y
+      `descripcion` van SIN mascara**: los pone quien sube el fichero y pueden
+      llevar el nombre del cliente.
     grano: >-
       Una fila por enlace de grafico, identificada por `adjunto_id`
       (`rcg.ide`, unica tambien frente al indice de compras).
@@ -934,7 +941,11 @@ objetos:
       construye el esquema.
     descripcion: >-
       Enmascara el texto libre del esquema general: los correos pasan a
-      `[CORREO]` y los telefonos a `[TELEFONO]`. Los mismos patrones que el
+      `[CORREO]` y los telefonos a `[TELEFONO]`. LA MASCARA ES HEURISTICA: solo cambia por `[TELEFONO]` y `[CORREO]` lo que tiene forma de telefono o de correo; un NOMBRE PROPIO escrito en el texto libre NO se quita. Se aplica a
+      `descripcion`, `descripcion_larga` y `motivo` de incidencias,
+      `descripcion` y `texto` de tareas y `comentario` de oficios; NO a
+      `ubicacion`, `urgencia`, `espacios`, `nombre_unidad` ni a `nombre_fichero`
+      y `descripcion` de los adjuntos. Los mismos patrones que el
       dominio (`etl_sigrid/domain/postventa.py`); el texto integro, solo en
       `postventa_restringida.textos`.
     grano: null

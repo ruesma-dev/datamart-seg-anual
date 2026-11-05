@@ -1027,7 +1027,13 @@ perfiles postventa y total (D9). Su feature y su despliegue son de `mcp-bbdd`.
 
 - **P2 o P4 fallan**: `02_roles.sql` es reejecutable; lo que va dentro del
   `BEGIN` se deshace solo. Se repite desde P2.
-- **Hay que retirar el perfil**: como administrador, `DROP OWNED BY
-  sigrid_dm_perfil_postventa_ro; DROP ROLE mcp_sigrid_dm_postventa; DROP ROLE
-  sigrid_dm_perfil_postventa_ro;` y borrar el secreto. Los esquemas los retira
+- **Hay que retirar el perfil**: como administrador, `DROP ROLE
+  mcp_sigrid_dm_postventa; GRANT sigrid_dm_perfil_postventa_ro TO CURRENT_USER
+  WITH INHERIT TRUE; DROP OWNED BY sigrid_dm_perfil_postventa_ro; DROP ROLE
+  sigrid_dm_perfil_postventa_ro;` y borrar el secreto. **El `GRANT` no sobra**: el
+  administrador de Azure no es superusuario, y quien crea un rol con
+  `CREATEROLE` en PostgreSQL 16 solo recibe su pertenencia con ADMIN, sin
+  INHERIT; sin él, `DROP OWNED BY` falla con «permission denied to drop
+  objects» (probado en un PostgreSQL 16 desechable el 2026-11-05, F-156) y, en
+  un `-c` con varias sentencias, no se aplica ninguna. Los esquemas los retira
   la vuelta atrás de `design.md` § 12.
