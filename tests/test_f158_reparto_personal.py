@@ -115,6 +115,16 @@ def test_f158_r1_la_formula_por_acumulado() -> None:
 
 def test_f158_r1_sin_pendiente_no_hay_reparto() -> None:
     assert dom.repartir_personal([], D(0), D(0)) == []
+    # Sin la guarda, un mes a cero de una partida sin pendiente dividiría por 0.
+    assert dom.repartir_personal([(_mes(0), D(0), False)], D(0), D(0)) == []
+
+
+def test_f158_r1_multiplica_antes_de_dividir_como_el_sql() -> None:
+    """0,17 x 0,13 / 0,26 = 0,085 exacto (ROUND -> 0,09, como PostgreSQL); al
+    revés, 0,17 / 0,26 x 0,13 = 0,08499... y el céntimo cambiaría de mes."""
+    reparto = [(_mes(0), D("0.13"), False), (_mes(1), D("0.13"), False)]
+    assert dom.repartir_personal(reparto, D("0.26"), D("0.17")) == [
+        (_mes(0), D("0.09")), (_mes(1), D("0.08"))]
 
 
 # ===========================================================================
