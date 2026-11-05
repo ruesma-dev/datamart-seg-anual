@@ -9,6 +9,22 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-05 · F-157 · `pending` · spec escrita, a la espera de la PARADA 1 · rama `feature/F-157-planificacion-fase0`
+
+Spec-author. Spec en `specs/F-157-planificacion-fase0/`, medida en Azure en solo lectura
+(`progress/spec_F-157.md`). Sin código. **No implementar hasta cerrar F-156.** Hallazgos: la fase
+0 con `plafec` está en 144 obras de coste y 139 de venta; ~1,25 M filas a publicar (103 s de
+SELECT); el 97 % de las partidas planificadas acaba en el 100 % con la regla del master; sin
+reparto, ~110 M€ de coste y ~51 M€ de venta; la 0726 da 83 partidas y 312 filas (2026-10 a
+2028-07) con ≤ 0,03 € de redondeo por partida. `mart` lee el ámbito 3/7 de `plan_mensual` sin
+filtrar `version`: por eso la recomendación es una tabla propia. Decisiones para el humano
+(recomendada en negrita en `requirements.md`): D1 tabla propia `stg.plan_mensual_fase0`; D2
+función `stg.fn_explotar_planif` solo para la tabla nueva; D3 vista de cobertura; D4 redondeo
+del master; D5 desplegar en SÁBADO (el sello fuerza una noche completa: +~100 min si no es
+domingo); D6 solo ámbitos 3 y 7; D7 sin regla dura nueva; D8 `mart` no se toca. Queda además
+para Control de Costes: el cuadre con la pantalla de Sigrid (no está documentada en ningún
+sitio) en la 0726 y en una obra con `plamed = 2`.
+
 ## 2026-11-04 · F-156 · `in_progress` · implementando · rama `feature/F-156-postventa`
 
 Implementer. Spec aprobada por el humano el 2026-11-04 («si lanza»). Tarea en curso: ver
