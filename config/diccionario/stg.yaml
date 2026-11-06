@@ -454,11 +454,11 @@ objetos:
           la regla del master: un cero intermedio es un estorno; un cero final
           arrastra el ultimo valor positivo.
         unidad: "%"
-        agregacion: ultimo_valor
+        agregacion: promedio
       pct_mes:
         significado: El porcentaje de ESE mes, diferencia con el acumulado anterior.
         unidad: "%"
-        agregacion: suma_solo_dentro_del_mes
+        agregacion: promedio
       precio_unitario:
         significado: Precio unitario de la partida en la fase 0, con seis decimales.
         unidad: EUR
