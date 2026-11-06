@@ -16,6 +16,8 @@ Flujo:
         07_version_master_vigente.sql  - TRUNCATE + INSERT (parametrizado con cod=15)
 
         08_plan_mensual.sql            - por tramos (F-019) y acotado (F-025)
+        09_plan_mensual_fase0.sql      - la fase 0 (3 y 7) repartida en el tiempo
+                                         (F-157): acotado, de una pasada
 
 Cada sub-step se registra en _meta.etl_runs con su tiempo y filas procesadas.
 
@@ -105,7 +107,15 @@ FILTROS_EN_FASE0 = 1
 # lo publicado igual que cambiar `08_plan_mensual.sql`.
 #
 # El orden es significativo (entra en el hash) y es el de ejecución.
-FICHEROS_DEL_SELLO = ("00_functions.sql", "06_presupuesto.sql", "08_plan_mensual.sql")
+#
+# `09_plan_mensual_fase0.sql` entra con F-157 (R16), al final: un cambio en su
+# regla tiene que alcanzar a todas las obras, no solo a las vivas.
+FICHEROS_DEL_SELLO = (
+    "00_functions.sql",
+    "06_presupuesto.sql",
+    "08_plan_mensual.sql",
+    "09_plan_mensual_fase0.sql",
+)
 
 # El sub-paso que compone el plan de la noche. Como la puerta de F-024, se
 # registra en `_meta.etl_runs` para que aparezca en `timings` con su duración y
@@ -280,6 +290,28 @@ def componer_sql_presupuesto(sql_texto: str, obras: Sequence[int]) -> str:
     return componer_borrado_derivado("presupuesto", obras) + "\n" + filtrado
 
 
+def componer_sql_fase0(sql_texto: str, obras: Sequence[int]) -> str:
+    """`09_plan_mensual_fase0.sql` acotado a las obras del plan (F-157, R13).
+
+    Gemela de `componer_sql_presupuesto`: una sola pasada, el marcador contado
+    ANTES de enviar nada y el borrado derivado delante, con la misma lista y en
+    el mismo texto (una transacción). Si el marcador falta o se repite, no se
+    compone: sin él el `INSERT` reconstruiría todas las obras.
+    """
+    apariciones = sql_texto.count(MARCADOR_FILTRO_FASE0)
+    if apariciones != FILTROS_EN_FASE0:
+        raise ValueError(
+            f"El SQL de plan_mensual_fase0 debe contener el marcador "
+            f"{MARCADOR_FILTRO_FASE0} exactamente {FILTROS_EN_FASE0} vez y "
+            f"aparece {apariciones}. Sin la sustitución se ejecutaría sin "
+            f"filtrar por las obras del plan: no se ejecuta."
+        )
+
+    lista = _lista_de_obras(obras)
+    filtrado = sql_texto.replace(MARCADOR_FILTRO_FASE0, f"ARRAY[{lista}]::BIGINT[]")
+    return componer_borrado_derivado("plan_mensual_fase0", obras) + "\n" + filtrado
+
+
 def sello_vigente_del_repositorio(settings) -> str:
     """`sha256` del SQL del build y de sus parámetros (R17).
 
@@ -320,6 +352,9 @@ class _SubStep:
     es_plan_ventana: bool = False
     # Sub-paso acotado a las obras del plan, de una sola pasada (F-025, DA-2).
     acotado: bool = False
+    # La fase 0 repartida en el tiempo (F-157): acotada como la anterior, de
+    # una pasada y con la puerta de disco de F-019 delante.
+    acotado_fase0: bool = False
 
 
 class BuildStgStep(PipelineStep):
@@ -429,6 +464,15 @@ class BuildStgStep(PipelineStep):
                 "plan_mensual",
                 por_tramos=True,
             ),
+            # F-157. DESPUÉS de `build_plan_mensual` y el último: lee
+            # `stg.presupuesto` de esta noche y no lo lee nadie de `stg`.
+            _SubStep(
+                "build_plan_mensual_fase0",
+                "09_plan_mensual_fase0.sql",
+                "stg",
+                "plan_mensual_fase0",
+                acotado_fase0=True,
+            ),
         ]
 
         table_stats: dict[str, int] = {}
@@ -446,6 +490,8 @@ class BuildStgStep(PipelineStep):
                     self._componer_plan(pg)
                 elif sub.por_tramos:
                     self._build_plan_mensual_por_tramos(pg, sql_path)
+                elif sub.acotado_fase0:
+                    self._build_plan_mensual_fase0(pg, sql_path)
                 elif sub.acotado:
                     self._build_presupuesto_acotado(pg, sql_path)
                 else:
@@ -687,7 +733,7 @@ class BuildStgStep(PipelineStep):
         )
 
     def _higiene_de_las_tablas_acotadas(self, pg: PostgresClient) -> None:
-        """`VACUUM (ANALYZE)` de las dos tablas acotadas (T14, §9.1).
+        """`VACUUM (ANALYZE)` de las tablas acotadas (T14, §9.1; F-157 suma la tercera).
 
         **Avisa y no tumba.** El borrado derivado deja tuplas muertas cada
         noche en un `B1ms` sin créditos, donde el autovacuum llega tarde; pero
@@ -745,6 +791,61 @@ class BuildStgStep(PipelineStep):
             self._denunciar_obras_sobrantes(pg, "presupuesto", obras)
 
         self._registrar_construidas(pg, obras, "presupuesto")
+        return filas
+
+    def _build_plan_mensual_fase0(self, pg: PostgresClient, sql_path: Path) -> int:
+        """`stg.plan_mensual_fase0` para las obras del plan (F-157, R12-R15).
+
+        Mismas obras que `build_plan_mensual` esta noche y de UNA pasada: el 09
+        no tiene ventanas fuera de `stg.fn_explotar_planif`, que ve un solo
+        `planif`. Sin obras no se toca la tabla (R14). Antes de escribir pasa
+        la puerta de disco de F-019 (R15): ocupación por encima del límite o
+        imposible de medir → `PlanMensualAbortado`, sin borrar nada, y el bucle
+        de `run` deja el sub-paso en FAILED.
+
+        La puerta se escribe aquí y no se extrae de la de los tramos: aquella
+        registra el FAILED de su tramo y lista las obras hechas, y cambiarla
+        para compartirla tocaría la conducta de F-019 sin necesidad.
+
+        NO escribe en `_meta.obra_build`: la frescura de la obra es la de
+        `stg.presupuesto` de esa noche (design § 6).
+        """
+        obras = self._obras_a_reconstruir()
+        if not obras:
+            logger.info(
+                "plan_mensual_fase0_sin_obras_que_reconstruir",
+                nota="ninguna obra entra esta noche: la tabla no se toca (R14)",
+            )
+            return 0
+
+        total_gb = self._settings.postgres.disco_total_gb
+        limite_pct = self._settings.postgres.disco_limite_pct
+        try:
+            ocupacion_pct = pg.medir_ocupacion_disco_pct(total_gb)
+        except Exception as error:
+            raise PlanMensualAbortado(
+                f"no se pudo medir la ocupación del disco antes de "
+                f"plan_mensual_fase0: {error}. No se ejecuta a ciegas."
+            ) from error
+        if ocupacion_pct > limite_pct:
+            raise PlanMensualAbortado(
+                f"ocupación del disco {ocupacion_pct} % por encima del límite "
+                f"{limite_pct} % antes de plan_mensual_fase0: el servidor es "
+                f"compartido y el build para aquí."
+            )
+
+        filas = pg.execute_sql_text(
+            componer_sql_fase0(sql_path.read_text(encoding="utf-8"), list(obras))
+        )
+        logger.info(
+            "plan_mensual_fase0_acotado",
+            obras=len(obras),
+            filas=filas,
+            ocupacion_pct=ocupacion_pct,
+        )
+
+        if self._plan and self._plan.completa:
+            self._denunciar_obras_sobrantes(pg, "plan_mensual_fase0", obras)
         return filas
 
     def _denunciar_obras_sobrantes(
