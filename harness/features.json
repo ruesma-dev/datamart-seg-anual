@@ -2529,12 +2529,12 @@
         "Fichas del diccionario actualizadas y versión nueva; `bash harness/init.sh` en verde",
         "Despliegue MANUAL del humano con los pasos de `specs/F-158-hotfix-devengo-negativo/design.md` §6: imagen, job, `build-tesoreria` suelto, `apply-grants`, 0 negativos en `tesoreria.devengo_pendiente_contrato_mes`, y vuelta atrás a `fbf43dd`"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "rigor": "estandar",
       "priority": 0,
       "branch": "feature/F-158-hotfix-devengo-negativo",
-      "notes": "2026-11-05: HOTFIX pedido por el líder; spec escrita por el spec-author en su worktree desde `main` (fbf43dd), sin código. Diagnóstico y alternativas en `progress/spec_F-158.md`; pendiente de la PARADA 1."
+      "notes": "2026-11-06: APROBADA (`progress/review_F-158.md`), merge `main` 3d72d06, desplegada (imagen r20261106-0813, `build-tesoreria` 357 s, 0 negativos), diccionario v72. 2026-11-05: HOTFIX pedido por el líder; spec escrita por el spec-author en su worktree desde `main` (fbf43dd), sin código. Diagnóstico y alternativas en `progress/spec_F-158.md`; pendiente de la PARADA 1."
     }
   ]
 }

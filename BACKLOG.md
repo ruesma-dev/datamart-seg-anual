@@ -3,13 +3,11 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **146 features**, 74 abiertas (1 en curso, 1 con la spec lista, 0 bloqueadas y 72 en backlog) y 72 terminadas.
+Resumen: **146 features**, 73 abiertas (0 en curso, 1 con la spec lista, 0 bloqueadas y 72 en backlog) y 73 terminadas.
 
 ## En curso
 
-| # | Feature | Prioridad | Rigor | Rama |
-|---|---|---|---|---|
-| F-158 | Hotfix: un céntimo negativo en el coste por contrato (guarda R50) tumba build_tesoreria | 0 | estandar | `feature/F-158-hotfix-devengo-negativo` |
+_Ninguna feature en curso._
 
 ## Spec lista
 
@@ -102,6 +100,7 @@ _Ninguna feature bloqueada._
 
 | # | Feature | Prioridad | Rigor |
 |---|---|---|---|
+| F-158 | Hotfix: un céntimo negativo en el coste por contrato (guarda R50) tumba build_tesoreria | 0 | estandar |
 | F-001 | Comando 'version' en el CLI | 1 | estandar |
 | F-006 | MCP de bases de datos como servicio en cloud | 1 | critico |
 | F-025 | Las obras cerradas no se reconstruyen cada noche: acotar el build de stg y mart a lo que se mueve | 1 | critico |
@@ -176,12 +175,6 @@ _Ninguna feature bloqueada._
 | F-142 | Que cualquier IA pueda leer los adjuntos: `abrir_adjunto` devuelve el contenido CONVERTIDO (texto por página, o imagen si es un escaneo) de PDF y ofimática, también Word 97 y Excel antiguos, y el original a petición | 74 | estandar |
 
 ## Detalle
-
-### F-158 · Hotfix: un céntimo negativo en el coste por contrato (guarda R50) tumba build_tesoreria
-
-estado **en curso** · prioridad 0 · rigor `estandar` · SDD sí · rama `feature/F-158-hotfix-devengo-negativo`
-
-Las nocturnas del 2026-11-04 y del 05-11 fallaron en `build_tesoreria` (sub-paso `devengo_pendiente`): «el coste por contrato no cuadra con la obra-mes en 0 obras o tiene 1 importes negativos», la guarda R50 de `sql/tesoreria/07_devengo_pendiente.sql` (F-150 N17). La transacción vuelve atrás: las tablas de `07` siguen siendo las del 03-11. Causa medida en solo lectura el 05-11 (`progress/spec_F-158.md`): en `_dev_reparto` el pendiente y el personal de cada partida se reparten en los meses redondeando cada uno por su lado; con cuota de personal 0,999999 (1-0707, partida 392521 CI.1.1, pendiente 57.749,95) el último mes (2027-10) queda con 8.249,97 de pendiente y 8.250,02 de personal, y el paso 5 bis publica -0,05 sin contrato. Fallo del reparto, no dato de Sigrid; lo destapó el 04-11 que la partida 392522 pasara a cuota 1 por partes nuevos de octubre y dejara de compensarlo. Arreglo recomendado (A): el personal del mes por ACUMULADO sobre el pendiente ya repartido, con su espejo en el dominio.
 
 ### F-157 · La planificación en el tiempo de la fase 0 (Previsto) de coste y venta: el reparto mensual por partida que el jefe de obra mete en Sigrid no llega a `stg.plan_mensual`
 
@@ -620,6 +613,12 @@ RENUMERADA el 2026-09-29 al integrar main en la rama de F-052: se ficho como F-0
 estado **pendiente** · prioridad 78 · rigor `estandar` · SDD sí · rama `feature/F-143-tipo-contrato-compra`
 
 Nace el 2026-10-17 de la decisión D5 = A del humano en F-128: F-128 no ingiere catálogos nuevos y «el tipo de contrato de compra (cocide) pasa al backlog como feature aparte». QUÉ ES: `cocide` («Tipo de contrato de compra», índice a `auxobrcoc`, «Obras: Tipos de contratos compra») está en `ctr`, `dca`, `dcf` (y en `com`, `dco`, `dcp`, `defpli`, según `azure-apps/sigrid_tablas.md`). LO MEDIDO EL 2026-10-17 en `raw` (Azure, solo lectura): `ctr.cocide` informado en 14.453 de 19.137 contratos (75,5 %, 19 valores distintos); `dcf.cocide` en 15.726 facturas (9,4 %); `dca.cocide` en 37.157 albaranes (11,8 %); el catálogo tiene ~20 valores. La columna ya se ingiere en las tres tablas; el catálogo `auxobrcoc` NO se ingiere y ningún SQL del datamart usa `cocide` hoy. HAY QUE: ingerir `auxobrcoc` (catálogo pequeño, refresco completo) y publicar el tipo de contrato (id y nombre) AL FINAL de `compras.contratos` y, si la spec lo justifica, de `compras.albaranes` y `compras.facturas` (en F-128 están inventariados como CATALOGO_NO_INGERIDO). La spec decide si en el documento se publica o se hereda del contrato.
+
+### F-158 · Hotfix: un céntimo negativo en el coste por contrato (guarda R50) tumba build_tesoreria
+
+estado **terminada** · prioridad 0 · rigor `estandar` · SDD sí · rama `feature/F-158-hotfix-devengo-negativo`
+
+Las nocturnas del 2026-11-04 y del 05-11 fallaron en `build_tesoreria` (sub-paso `devengo_pendiente`): «el coste por contrato no cuadra con la obra-mes en 0 obras o tiene 1 importes negativos», la guarda R50 de `sql/tesoreria/07_devengo_pendiente.sql` (F-150 N17). La transacción vuelve atrás: las tablas de `07` siguen siendo las del 03-11. Causa medida en solo lectura el 05-11 (`progress/spec_F-158.md`): en `_dev_reparto` el pendiente y el personal de cada partida se reparten en los meses redondeando cada uno por su lado; con cuota de personal 0,999999 (1-0707, partida 392521 CI.1.1, pendiente 57.749,95) el último mes (2027-10) queda con 8.249,97 de pendiente y 8.250,02 de personal, y el paso 5 bis publica -0,05 sin contrato. Fallo del reparto, no dato de Sigrid; lo destapó el 04-11 que la partida 392522 pasara a cuota 1 por partes nuevos de octubre y dejara de compensarlo. Arreglo recomendado (A): el personal del mes por ACUMULADO sobre el pendiente ya repartido, con su espejo en el dominio.
 
 ### F-001 · Comando 'version' en el CLI
 

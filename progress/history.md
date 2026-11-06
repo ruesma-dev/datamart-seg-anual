@@ -2022,3 +2022,25 @@ compras de `rcg` 201.475 → 201.482 tras el `where` nuevo. `check-unicidad`
 sin colisiones (sigue sin comprobar `stg.plan_mensual` por timeout).
 Merge `main` f3f644c, `dev` 43f7f61. FUERA: el pliego del MCP (`mcp-bbdd`
 F-034) y el coste de personal de postventa.
+
+## F-158 — Hotfix: el céntimo negativo en el coste por contrato · 2026-11-06
+
+Rama `feature/F-158-hotfix-devengo-negativo`. APROBADO en la pasada 1
+(`progress/review_F-158.md`); spec en `specs/F-158-hotfix-devengo-negativo/`.
+
+Las nocturnas del 04-11 y del 05-11 cayeron en `build_tesoreria` por la guarda
+R50: -0,05 EUR en `tesoreria.devengo_pendiente_contrato_mes` (1-0707, 2027-10,
+CI sin contrato, partida 392521). El paso 5 repartía pendiente y personal por
+separado, cada uno con su resto en el último mes, y con cuota 0,999999 el
+personal superaba al pendiente. Ahora el personal va por ACUMULADO sobre el
+pendiente ya repartido (`domain/proyeccion_caja.py::repartir_personal` y su
+espejo SQL). Fuera (D2): el mes negativo del plan de 1-0702. Corregida de paso
+la errata de la ficha de tareas de postventa.
+
+Desplegado: imagen r20261106-0813, `build-tesoreria` SUCCESS en 357 s,
+`apply-grants` con las cuatro verificaciones ok, diccionario v72, MCP
+reiniciado (carga la v72). Medido en Azure el 06-11: 0 importes negativos,
+0 meses con personal mayor que el pendiente, 1-0707 2027-10 CI = 0,35 EUR.
+La nocturna del 06-11 (imagen vieja) ya salió en SUCCESS porque ese día el
+negativo volvió a compensarse: el defecto era real y seguía latente.
+Merge `main` 3d72d06, `dev` dd834a9.
