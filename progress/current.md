@@ -9,6 +9,22 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-06 · F-104 · `spec_ready` · spec escrita · rama `feature/F-104-retenciones-cliente`
+
+Spec-author, en su worktree desde `main` `da6c36f`; sin código, va a la PARADA 1. Spec en
+`specs/F-104-retenciones-cliente/`; mediciones en solo lectura (Azure, 08:55-09:45 UTC) en
+`progress/spec_F-104.md`. Hallazgo: los 1.956 efectos «vivos» con baja (19,93 M) **están
+agrupados** (en `cob` el original queda en `est 1` con `fecbaj` = fecha del AGR; 90,4 % casan con
+un AGR de su cuenta ese día) y el AGR/DIV lleva `retide = 0`, así que `movimientos` lo pierde. Lo
+vivo: 10,50 M en efectos de las cuentas 43x8 frente a 15,49 M de su contabilidad. La «retención de
+1,68 M€ de F-150» se identifica como ESPACIO PROMOCIÓN VIII (0686): facturas sin efecto de retención.
+Decisiones para el humano (design.md §7): **D1** estado por la precedencia de F-094 (A, recomendada);
+**D2** meter AGR/DIV de las cuentas de retención con `origen_retencion` (A); **D3** cuentas por
+prefijo 43x8 `tip 17`, provisional hasta `cli.cueretide` de F-040 (A); **D4** manda la
+contabilidad (A); **D5** obra del saldo contable fuera; **D6** confirmar la identificación del
+1,68 M; **D7** la caja de F-150 no suma la retención sin efecto (fuera); **D8** lista de descuadres
+a Administración. F-104 puede ir sin F-040.
+
 ## 2026-11-05 · F-158 · implementado (T1-T5), pendiente de review · rama `feature/F-158-hotfix-devengo-negativo`
 
 Implementer, en el worktree del agente; spec aprobada (D1 = A, D2 fuera, D3 v72, D4 sin

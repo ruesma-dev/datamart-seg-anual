@@ -1634,12 +1634,12 @@
         "Conciliadas las tres cifras (22,16 M publicado, 13,81 M contable, ~2,2 M saneado) o declarada por escrito la parte que no se puede conciliar y por que",
         "El orden de magnitud de cliente deja de estar SIN VERIFICAR en el diccionario, con su fuente medida"
       ],
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "rigor": "estandar",
       "priority": 3,
       "branch": "feature/F-104-retenciones-cliente",
-      "notes": "2026-10-27: prioridad 21 -> 3 por orden del humano (tras F-150 van F-040 y F-104)."
+      "notes": "2026-10-27: prioridad 21 -> 3 por orden del humano (tras F-150 van F-040 y F-104). 2026-11-06: spec escrita en specs/F-104-retenciones-cliente/ (mediciones en progress/spec_F-104.md); decisiones D1-D8 para el humano en design.md §7."
     },
     {
       "id": "F-105",
