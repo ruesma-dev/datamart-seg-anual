@@ -695,7 +695,12 @@ def test_f025_r14_al_terminar_se_hace_vacuum_de_las_dos_tablas(
     pg = PgVentana()
     ejecutar(pg, monkeypatch)
 
-    assert set(pg.vacuums) == {("stg", "plan_mensual"), ("stg", "presupuesto")}
+    # F-157 (R16) suma la tercera tabla acotada, `plan_mensual_fase0`.
+    assert set(pg.vacuums) == {
+        ("stg", "plan_mensual"),
+        ("stg", "presupuesto"),
+        ("stg", "plan_mensual_fase0"),
+    }
 
 
 def test_f025_r14_un_vacuum_que_falla_avisa_pero_NO_tumba_la_noche(  # noqa: N802

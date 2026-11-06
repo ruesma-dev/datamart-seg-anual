@@ -64,6 +64,10 @@ GRUPO_B_FUNCIONES = (
     # llaman desde `08_plan_mensual.sql`; `cierre.fn_mes_de_fase` las envuelve.
     "stg.fn_parse_mes_texto",
     "stg.fn_mes_de_fase",
+    # F-157 (2026-11-06): la regla del master para leer un `planif`, en una sola
+    # copia. Se llama desde `09_plan_mensual_fase0.sql`, y
+    # `stg.plan_mensual_fase0` ya publica su resultado en sus columnas de %.
+    "stg.fn_explotar_planif",
     "cierre.fn_mes_de_version_master",
     "compras.fn_tipo_documento",
     "compras.fn_serie",

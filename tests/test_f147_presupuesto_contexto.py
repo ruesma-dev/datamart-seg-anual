@@ -39,6 +39,13 @@ from tests.test_f006_formato import _dicc, _ficha, _regla
 #: fórmula de R17. Solo baja (trinquete: R19 falla si sobra más de
 #: `HOLGURA_TRINQUETE`). Historia, de la más reciente a la más antigua:
 #:
+#: * 34.253 · 2026-11-06, F-157 (diccionario v73 en el arbol), SUBIDO con
+#:   motivo: la fase 0 repartida en el tiempo. Enrutado 17.179 (+197: dos
+#:   fichas recomendadas nuevas de `stg`, `plan_mensual_fase0` con dos preguntas
+#:   y `v_plan_mensual_fase0_cobertura` con una, ya acortadas: sin ellas «como
+#:   reparte por meses la venta de hoy de la obra X» no llega a la tabla y el
+#:   agente la busca en `stg.plan_mensual`); reglas 7.804 y bloques 9.270 sin
+#:   cambio (`R-IMPORTE-MES` gana un objeto en su `ambito`, que no se sirve).
 #: * 34.056 · 2026-11-05, F-156 review pasada 1 (v71 en el arbol), SUBIDO con
 #:   motivo: la mascara de postventa es heuristica y la regla lo tiene que
 #:   decir. Reglas 7.804 (+16: `R-POSTVENTA-RESTRINGIDA` deja de prometer «sin
@@ -83,7 +90,7 @@ from tests.test_f006_formato import _dicc, _ficha, _regla
 #:   todas las preguntas): 78.057.
 #: * 29.787 · 2026-10-22, F-147 T5: PROVISIONAL, la medida de T2 sobre la v58
 #:   (sin resúmenes todavía: reglas 2.233, enrutado 13.886, bloques 13.668).
-PRESUPUESTO_MAX = 34_056
+PRESUPUESTO_MAX = 34_253
 
 
 def _medir(dicc) -> PresupuestoContexto:
