@@ -1997,3 +1997,50 @@ historial 72.942 (hasta F-133). `build-compras` 636 s; la vista entera en
 0,48 s; grants 49/49. `check-unicidad` sin colisiones (sigue sin comprobar
 `stg.plan_mensual` por timeout, ya conocido). Merge `main` bec363c, `dev`
 036206c. FUERA: el historial de pasos de los albaranes (F-133).
+
+## F-156 — Postventa entera · 2026-11-05
+
+Rama `feature/F-156-postventa`. APROBADO en la pasada 2
+(`progress/review_F-156.md`); spec en `specs/F-156-postventa/`.
+
+Dos esquemas nuevos: `postventa` (unidades, incidencias, tareas, su histórico
+de estados con fecha y login, adjuntos por familia y el coste por obra de
+origen, solo facturas, `v_coste_obra`), sin personas y con el texto
+enmascarado, y `postventa_restringida` con los datos personales. Cuarto
+perfil del MCP, `sigrid_dm_perfil_postventa_ro` / `mcp_sigrid_dm_postventa`:
+lo del restringido más `postventa_restringida`; el total también lo ve
+(`R-POSTVENTA-RESTRINGIDA`). 13 tablas raw nuevas (raw 93).
+
+Desplegado: imagen r20261105-1111, roles por el runbook §14, diccionario v71
+(287 objetos), MCP reiniciado (carga la v71). Medido en Azure el 05-11:
+22.180 incidencias, 1.328 unidades, 13.768 tareas; adjuntos INCIDENCIA
+10.035, REPARACION 4.445, UNIDAD 830, TAREA 699; coste ligado 2.589.481 EUR
+y sin obra 536.651 EUR; estados PASO 19.494, CIERRE_APLICACION 671, ALTA
+2.015 (la vista en 0,2 s). `build-postventa` 63 s; `apply-grants` con las
+seis verificaciones ok; login postventa: 5 denegadas y 4 leídas;
+compras de `rcg` 201.475 → 201.482 tras el `where` nuevo. `check-unicidad`
+sin colisiones (sigue sin comprobar `stg.plan_mensual` por timeout).
+Merge `main` f3f644c, `dev` 43f7f61. FUERA: el pliego del MCP (`mcp-bbdd`
+F-034) y el coste de personal de postventa.
+
+## F-158 — Hotfix: el céntimo negativo en el coste por contrato · 2026-11-06
+
+Rama `feature/F-158-hotfix-devengo-negativo`. APROBADO en la pasada 1
+(`progress/review_F-158.md`); spec en `specs/F-158-hotfix-devengo-negativo/`.
+
+Las nocturnas del 04-11 y del 05-11 cayeron en `build_tesoreria` por la guarda
+R50: -0,05 EUR en `tesoreria.devengo_pendiente_contrato_mes` (1-0707, 2027-10,
+CI sin contrato, partida 392521). El paso 5 repartía pendiente y personal por
+separado, cada uno con su resto en el último mes, y con cuota 0,999999 el
+personal superaba al pendiente. Ahora el personal va por ACUMULADO sobre el
+pendiente ya repartido (`domain/proyeccion_caja.py::repartir_personal` y su
+espejo SQL). Fuera (D2): el mes negativo del plan de 1-0702. Corregida de paso
+la errata de la ficha de tareas de postventa.
+
+Desplegado: imagen r20261106-0813, `build-tesoreria` SUCCESS en 357 s,
+`apply-grants` con las cuatro verificaciones ok, diccionario v72, MCP
+reiniciado (carga la v72). Medido en Azure el 06-11: 0 importes negativos,
+0 meses con personal mayor que el pendiente, 1-0707 2027-10 CI = 0,35 EUR.
+La nocturna del 06-11 (imagen vieja) ya salió en SUCCESS porque ese día el
+negativo volvió a compensarse: el defecto era real y seguía latente.
+Merge `main` 3d72d06, `dev` dd834a9.
