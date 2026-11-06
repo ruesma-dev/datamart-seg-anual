@@ -160,6 +160,43 @@ def repartir_pendiente(
     return reparto
 
 
+def repartir_personal(
+    reparto: Sequence[tuple[date, Decimal, bool]],
+    pendiente: Decimal,
+    pendiente_personal: Decimal,
+) -> list[tuple[date, Decimal]]:
+    """Reparte el personal pendiente de una partida en sus meses (F-158, R1).
+
+    `reparto` es la salida de `repartir_pendiente` para `pendiente`. El
+    personal del mes `m` sale por ACUMULADO sobre ese pendiente ya repartido:
+    `ROUND(pp x A(m) / p, 2) - ROUND(pp x A(m-1) / p, 2)`, con `A(m)` la suma
+    del pendiente repartido hasta `m` inclusive y `A(0)` = 0 (multiplicar
+    antes de dividir, como el SQL).
+
+    Por qué no dos repartos independientes del plan (el de `fbf43dd`): cada
+    uno deja su resto en el último mes, y con una cuota de 0,999999 los dos
+    restos se cruzan. La partida 392521 de 1-0707 (pendiente 57.749,95,
+    personal 57.749,89) acababa con 8.249,97 de pendiente y 8.250,02 de
+    personal en 2027-10: -0,05 sin contrato y la guarda R50 tumbando la noche.
+
+    Garantía (R2, R3): con `0 ≤ pp ≤ p` y cada mes ≥ 0, `0 ≤ personal ≤
+    pendiente del mes` (el `ROUND` es monótono y `pp / p ≤ 1`) y la suma es
+    `pp` exacta (telescópica: `A` final = `p`). Sin perfil hay una fila, que
+    recibe el personal entero. Sin pendiente, no hay reparto.
+    """
+    if pendiente == 0:
+        return []
+    resultado: list[tuple[date, Decimal]] = []
+    acumulado = _CERO
+    anterior = _CERO
+    for mes, importe, _es_retraso in reparto:
+        acumulado += importe
+        hasta_aqui = _redondear(pendiente_personal * acumulado / pendiente)
+        resultado.append((mes, hasta_aqui - anterior))
+        anterior = hasta_aqui
+    return resultado
+
+
 # ---------------------------------------------------------------------------
 # El contrato con el cliente de una partida: coeficientes e IVA (F-150, R7, R18)
 # ---------------------------------------------------------------------------

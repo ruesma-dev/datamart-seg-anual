@@ -869,8 +869,10 @@ objetos:
         nulo_significa: COSTE.
       importe_pendiente_personal:
         significado: >-
-          La parte de PERSONAL propio de `importe_pendiente` en el mes (el mismo
-          reparto). Se paga en dos tramos, sin plazo, retencion ni IVA:
+          La parte de PERSONAL propio de `importe_pendiente` en el mes,
+          repartido por acumulado sobre `importe_pendiente` (F-158): nunca lo
+          supera en un mes y la suma por partida es su personal pendiente al
+          centimo. Se paga en dos tramos, sin plazo, retencion ni IVA:
           `importe_personal_neto` e `importe_personal_irpf_ss`, que la suman al
           centimo; el resto del coste va por contrato o por H02 (F-150, N16,
           N18).
@@ -1110,7 +1112,9 @@ objetos:
       `tesoreria.condiciones_contrato_compra`. La fila de `contrato_id`
       vacio es el RESTO, sin contrato: va con H02 de su `categoria`. Es el
       ingrediente de los pasos 4 y 5 de la receta (`tesoreria.hipotesis_caja`).
-      **No es caja**: devengo SIN IVA.
+      **No es caja**: devengo SIN IVA. Ninguna fila con contrato es negativa,
+      y la fila sin contrato solo es negativa por un mes negativo del plan de
+      la version (F-158: el personal ya no supera el pendiente de su mes).
 
       **CUANTO CUBRE**: medido el 2026-10-31 en las 21 obras de la receta, 48,9
       de 112,85 M EUR (43 %; 0686: 1,64 de 2,39). Lo que no enlaza es devengo
