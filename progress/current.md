@@ -24,6 +24,10 @@ prefijo 43x8 `tip 17`, provisional hasta `cli.cueretide` de F-040 (A); **D4** ma
 contabilidad (A); **D5** obra del saldo contable fuera; **D6** confirmar la identificación del
 1,68 M; **D7** la caja de F-150 no suma la retención sin efecto (fuera); **D8** lista de descuadres
 a Administración. F-104 puede ir sin F-040.
+`bash harness/init.sh` en el worktree: **ROJO solo por entorno**, como en F-158: falta `.env` (no
+versionado, no se copia) → `[KO] Falta .env` y `test_f006_t26_cli_dry_run_no_toca_la_base` falla
+(1 failed, 256 passed, 15 min). Puerta de tamaño en verde (97/150, 188/250). El diff es solo
+documentación y `features.json`: la puerta completa se pasa desde el checkout principal.
 
 ## 2026-11-05 · F-158 · implementado (T1-T5), pendiente de review · rama `feature/F-158-hotfix-devengo-negativo`
 
