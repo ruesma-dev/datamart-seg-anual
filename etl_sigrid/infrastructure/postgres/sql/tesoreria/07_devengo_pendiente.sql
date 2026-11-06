@@ -80,7 +80,8 @@
 --   4. La partida de COSTE gana `cuota_personal` (`cuota_personal` del dominio:
 --      partes / real a origen, tope 1; CP, 0), `fuente_personal` y
 --      `pendiente_personal` = pendiente x cuota al centimo.
---   5. El reparto lleva tambien la parte de personal (el mismo reparto), la
+--   5. El reparto lleva tambien la parte de personal, por acumulado sobre el
+--      pendiente del mes (F-158), `repartir_personal` del dominio; la
 --      obra-mes la publica y la guarda de la suma la mira. El personal se paga
 --      el ULTIMO DIA del mes de su devengo: regla fija de la receta, no una
 --      hipotesis; aqui solo se separa.
@@ -596,7 +597,6 @@ WITH perfil AS (
         d.pendiente_con_coeficientes,
         ROUND(d.pendiente_con_coeficientes * pr.importe_mes / d.total_perfil, 2) AS parte_con_coef,
         d.pendiente_personal,
-        ROUND(d.pendiente_personal * pr.importe_mes / d.total_perfil, 2) AS parte_personal,
         ROW_NUMBER() OVER (PARTITION BY pr.obra_id, pr.concepto, pr.partida_id ORDER BY pr.anio_mes DESC) AS desde_el_final
     FROM perfil pr
     JOIN _dev_partida d ON d.obra_id = pr.obra_id AND d.concepto = pr.concepto AND d.partida_id = pr.partida_id
@@ -611,14 +611,32 @@ WITH perfil AS (
         r.anio_mes,
         CASE WHEN r.desde_el_final = 1 THEN r.pendiente - (r.suma_partes - r.parte) ELSE r.parte END AS importe,
         CASE WHEN r.desde_el_final = 1 THEN r.pendiente_con_coeficientes - (r.suma_partes_con_coef - r.parte_con_coef) ELSE r.parte_con_coef END AS importe_con_coef,
-        CASE WHEN r.desde_el_final = 1 THEN r.pendiente_personal - (r.suma_partes_personal - r.parte_personal) ELSE r.parte_personal END AS importe_personal
+        r.pendiente AS pendiente_partida,
+        r.pendiente_personal
     FROM (
         SELECT x.*,
                SUM(x.parte) OVER (PARTITION BY x.obra_id, x.concepto, x.partida_id) AS suma_partes,
-               SUM(x.parte_con_coef) OVER (PARTITION BY x.obra_id, x.concepto, x.partida_id) AS suma_partes_con_coef,
-               SUM(x.parte_personal) OVER (PARTITION BY x.obra_id, x.concepto, x.partida_id) AS suma_partes_personal
+               SUM(x.parte_con_coef) OVER (PARTITION BY x.obra_id, x.concepto, x.partida_id) AS suma_partes_con_coef
         FROM partes x
     ) r
+)
+, repartido_personal AS (
+    -- F-158: el personal, por acumulado sobre el pendiente del mes
+    -- (`repartir_personal` del dominio). Dos repartos independientes del plan
+    -- cruzaban sus restos en el ultimo mes (1-0707, cuota 0,999999: 8.250,02 de
+    -- personal sobre 8.249,97 de pendiente, -0,05 sin contrato y R50 en rojo).
+    -- Con cuota en [0, 1]: 0 <= personal <= pendiente en cada mes y la suma es
+    -- `pendiente_personal` exacta. `pendiente_partida` > 0 (`partes` filtra
+    -- `d.pendiente > 0`); en VENTA el personal es NULL y sigue NULL. Un solo mes
+    -- por (obra, concepto, partida) en `perfil`: la ventana no tiene empates.
+    SELECT q.*,
+           ROUND(q.pendiente_personal * q.acumulado / q.pendiente_partida, 2)
+         - ROUND(q.pendiente_personal * (q.acumulado - q.importe) / q.pendiente_partida, 2) AS importe_personal
+    FROM (
+        SELECT x.*,
+               SUM(x.importe) OVER (PARTITION BY x.obra_id, x.concepto, x.partida_id ORDER BY x.anio_mes) AS acumulado
+        FROM repartido x
+    ) q
 )
 , sin_perfil AS (
     -- D19-A: sin perfil restante, al primer mes pendiente y marcado.
@@ -634,7 +652,7 @@ SELECT pr.obra_id, pr.concepto, pr.partida_id, pr.anio_mes,
 FROM perfil pr
 UNION ALL
 SELECT r.obra_id, r.concepto, r.partida_id, r.anio_mes, 0::NUMERIC, r.importe, 0::NUMERIC, r.importe_con_coef, r.importe_personal
-FROM repartido r
+FROM repartido_personal r
 UNION ALL
 SELECT s.obra_id, s.concepto, s.partida_id, s.anio_mes, 0::NUMERIC, s.importe, s.importe, s.importe_con_coef, s.importe_personal
 FROM sin_perfil s;
@@ -1121,7 +1139,7 @@ COMMENT ON TABLE tesoreria.devengo_pendiente_partida IS
 'F-140. Por (obra, partida, concepto) con plan en la ultima version master (V): plan desde el mes de V, plan del intervalo (mes de V a ultimo cierre), ejecutado real del intervalo, plan restante tras el cierre, pendiente = max(0, plan desde V - ejecutado) y sobre_ejecutado. F-150, solo en VENTA: el contrato con el cliente de la partida (de la misma obra), su coeficiente de venta (el del contrato y, si no, el del master de V: certificacion 9 o venta 11; nunca una media de obra) con su fuente y el del master aparte, pendiente_con_coeficientes, y el IVA y la retencion del contrato con su fuente (CONTRATO o SIN). F-150 (N16), solo en COSTE: cuota_personal (coste de los partes de personal propio hasta el cierre entre lo real a origen de la partida, tope 1; CP, 0), fuente_personal (PARTES, SIN_PARTES, CP) y pendiente_personal (N18: se paga en dos tramos, el neto el ultimo dia del mes de su devengo, fin de mes, y el IRPF + SS el ultimo dia del mes siguiente, por la cuota de su empresa en reparto_pago_personal; el reparto vive en devengo_pendiente_obra_mes). Devengo SIN IVA: no es caja. Clave: obra_id, partida_id, concepto.';
 
 COMMENT ON TABLE tesoreria.devengo_pendiente_obra_mes IS
-'F-140. El pendiente de cada partida repartido en proporcion a su plan restante (al centimo, el resto al ultimo mes; sin perfil, al primer mes pendiente y en importe_retraso_sin_perfil), por (obra, mes, concepto, categoria), con el plan restante de V. Suma = la de devengo_pendiente_partida. F-150, solo en VENTA: el pendiente con coeficientes repartido igual (y su cociente, solo para leer), el IVA y la retencion del contrato de cada partida sobre esa parte (redondeados al final) y las bases sin ellos, sobre las que van H12 y H10. F-150 (N16), solo en COSTE: importe_pendiente_personal, el personal del mes (mismo reparto). F-150 (N18): importe_personal_neto (se paga el ultimo dia de ese mes, fin de mes) e importe_personal_irpf_ss (el IRPF + la Seguridad Social, el ultimo dia del mes SIGUIENTE, aunque la obra ya no devengue), por la cuota de su empresa en reparto_pago_personal; suman importe_pendiente_personal al centimo. Lo que lleva coeficientes no se suma con el coste ni con la venta sin ellos. Devengo SIN IVA: no es caja. Clave: obra_id, anio_mes, concepto, categoria.';
+'F-140. El pendiente de cada partida repartido en proporcion a su plan restante (al centimo, el resto al ultimo mes; sin perfil, al primer mes pendiente y en importe_retraso_sin_perfil), por (obra, mes, concepto, categoria), con el plan restante de V. Suma = la de devengo_pendiente_partida. F-150, solo en VENTA: el pendiente con coeficientes repartido igual (y su cociente, solo para leer), el IVA y la retencion del contrato de cada partida sobre esa parte (redondeados al final) y las bases sin ellos, sobre las que van H12 y H10. F-150 (N16), solo en COSTE: importe_pendiente_personal, el personal del mes, repartido por acumulado sobre importe_pendiente (F-158): nunca lo supera en un mes. F-150 (N18): importe_personal_neto (se paga el ultimo dia de ese mes, fin de mes) e importe_personal_irpf_ss (el IRPF + la Seguridad Social, el ultimo dia del mes SIGUIENTE, aunque la obra ya no devengue), por la cuota de su empresa en reparto_pago_personal; suman importe_pendiente_personal al centimo. Lo que lleva coeficientes no se suma con el coste ni con la venta sin ellos. Devengo SIN IVA: no es caja. Clave: obra_id, anio_mes, concepto, categoria.';
 
 COMMENT ON TABLE tesoreria.devengo_corte_obra IS
 'F-140. Por (obra, concepto): la version V, su mes, el ultimo cierre, las sumas de devengo_pendiente_partida con lo adelantado, lo retrasado, lo ejecutado sin plan de V y lo pendiente sin perfil, el real a origen hasta el cierre, el plan total de V y la frontera con tesoreria.efectos del sentido del concepto (cartera viva y emitida tras el cierre, CON IVA). F-150, solo en VENTA: el hueco de facturacion de H26, NETO POR OBRA: la venta real a origen con coeficientes (la de partidas sin coeficiente, con la media de la obra, declarada aparte) menos lo facturado (raw.dvf), con suelo 0, lo facturado por delante (que no se cobra) y el IVA y la retencion del hueco por el peso de cada contrato. F-150, solo en COSTE: la parte de coste proporcional (CP, estructura) de la cartera viva y de la emitida tras el cierre, por la categoria de las partidas de la factura de cada efecto; el CP no es caja de la obra y se resta. F-150 (N16), solo en COSTE: pendiente_personal, el personal pendiente de la obra (N18: el neto a fin de mes y pendiente_personal_irpf_ss, el IRPF + SS, a fin del mes siguiente). F-150 (N17), solo en COSTE: pendiente_enlazado_contrato, lo que de ese pendiente va por contrato de compra (devengo_pendiente_contrato_mes). Clave: obra_id, concepto.';

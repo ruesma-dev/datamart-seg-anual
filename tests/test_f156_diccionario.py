@@ -174,7 +174,11 @@ def test_f156_r11_el_general_no_documenta_columnas_personales() -> None:
 
 
 def test_f156_r34_la_version_sube_en_uno() -> None:
-    assert _global()["version"] == VERSION_ANTERIOR + 1
+    # F-158 subió a la v72: lo que fija F-156 es su v71 y su nota, no que sea la
+    # última (el patrón de F-153 y F-155).
+    assert _global()["version"] >= VERSION_ANTERIOR + 1
+    texto = (RAIZ / "config" / "diccionario" / "00_global.yaml").read_text(encoding="utf-8")
+    assert "# version 71 (F-156, 2026-11-" in texto.split("\nversion:", 1)[0]
 
 
 def test_f156_r34_los_dos_esquemas() -> None:

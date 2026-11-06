@@ -9,6 +9,34 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-05 · F-158 · implementado (T1-T5), pendiente de review · rama `feature/F-158-hotfix-devengo-negativo`
+
+Implementer, en el worktree del agente; spec aprobada (D1 = A, D2 fuera, D3 v72, D4 sin
+sandbox). T1-T5 hechas, un commit por tarea (`4e46f0f`..`b7c091d`): `repartir_personal` en el
+dominio, el paso 5 de `07` con el personal por acumulado, fichas y v72, errata de postventa.
+Informe: `progress/impl_F-158.md`, con las desviaciones: el plan de 392521 reconstruido de los
+cinco importes del diagnóstico, `test_f156_r34` a `>=` y la mutación manual. Quedan T6
+(despliegue MANUAL del humano) y la puerta completa de `init.sh` en un checkout con `.env`.
+`features.json` sin tocar: F-156 sigue `in_progress` en el árbol.
+
+## 2026-11-05 · F-158 · `pending` · spec escrita (HOTFIX) · rama `feature/F-158-hotfix-devengo-negativo`
+
+Spec-author, en su worktree desde `main` `fbf43dd`; sin código, va a la PARADA 1. Las nocturnas
+del 04-11 y 05-11 fallan en `build_tesoreria` por la guarda R50 (`07_devengo_pendiente.sql`):
+una fila de -0,05 sin contrato en 1-0707 / 2027-10 / CI, por el redondeo independiente del
+pendiente y del personal en `_dev_reparto` (cuota 0,999999). Fallo del reparto, no dato de
+Sigrid. Diagnóstico medido en solo lectura y alternativas: `progress/spec_F-158.md`; spec en
+`specs/F-158-hotfix-devengo-negativo/` (pasos MANUAL y vuelta atrás a `fbf43dd` en design §6).
+Decisiones para el humano: **D1** alternativa A (recomendada: personal por acumulado) o C (relajar
+R50, parche); **D2** el mes negativo del plan de 1-0702 se deja como está (recomendado); **D3**
+diccionario v72 tras la v71 de F-156; **D4** sandbox SQL sí o no.
+`bash harness/init.sh` en el worktree: **ROJO por entorno, no por la spec**: el worktree no
+tiene `.env` (no versionado; no se copia, regla dura) → `[KO] Falta .env` y
+`test_f006_t26_cli_dry_run_no_toca_la_base` falla al validar `SigridApiSettings` (256 passed
+antes de parar). Puertas de tamaño (58/150, 145/250) y cobertura (N/A) en verde. El diff es solo
+documentación y `features.json`. Hay que pasar la puerta desde el checkout principal (con `.env`)
+tras fusionar la rama.
+
 ## 2026-11-04 · F-156 · `in_progress` · implementando · rama `feature/F-156-postventa`
 
 Implementer. Spec aprobada por el humano el 2026-11-04 («si lanza»). Tarea en curso: ver

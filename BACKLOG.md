@@ -3,11 +3,13 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **145 features**, 73 abiertas (0 en curso, 1 con la spec lista, 0 bloqueadas y 72 en backlog) y 72 terminadas.
+Resumen: **146 features**, 74 abiertas (1 en curso, 1 con la spec lista, 0 bloqueadas y 72 en backlog) y 72 terminadas.
 
 ## En curso
 
-_Ninguna feature en curso._
+| # | Feature | Prioridad | Rigor | Rama |
+|---|---|---|---|---|
+| F-158 | Hotfix: un céntimo negativo en el coste por contrato (guarda R50) tumba build_tesoreria | 0 | estandar | `feature/F-158-hotfix-devengo-negativo` |
 
 ## Spec lista
 
@@ -174,6 +176,12 @@ _Ninguna feature bloqueada._
 | F-142 | Que cualquier IA pueda leer los adjuntos: `abrir_adjunto` devuelve el contenido CONVERTIDO (texto por página, o imagen si es un escaneo) de PDF y ofimática, también Word 97 y Excel antiguos, y el original a petición | 74 | estandar |
 
 ## Detalle
+
+### F-158 · Hotfix: un céntimo negativo en el coste por contrato (guarda R50) tumba build_tesoreria
+
+estado **en curso** · prioridad 0 · rigor `estandar` · SDD sí · rama `feature/F-158-hotfix-devengo-negativo`
+
+Las nocturnas del 2026-11-04 y del 05-11 fallaron en `build_tesoreria` (sub-paso `devengo_pendiente`): «el coste por contrato no cuadra con la obra-mes en 0 obras o tiene 1 importes negativos», la guarda R50 de `sql/tesoreria/07_devengo_pendiente.sql` (F-150 N17). La transacción vuelve atrás: las tablas de `07` siguen siendo las del 03-11. Causa medida en solo lectura el 05-11 (`progress/spec_F-158.md`): en `_dev_reparto` el pendiente y el personal de cada partida se reparten en los meses redondeando cada uno por su lado; con cuota de personal 0,999999 (1-0707, partida 392521 CI.1.1, pendiente 57.749,95) el último mes (2027-10) queda con 8.249,97 de pendiente y 8.250,02 de personal, y el paso 5 bis publica -0,05 sin contrato. Fallo del reparto, no dato de Sigrid; lo destapó el 04-11 que la partida 392522 pasara a cuota 1 por partes nuevos de octubre y dejara de compensarlo. Arreglo recomendado (A): el personal del mes por ACUMULADO sobre el pendiente ya repartido, con su espejo en el dominio.
 
 ### F-157 · La planificación en el tiempo de la fase 0 (Previsto) de coste y venta: el reparto mensual por partida que el jefe de obra mete en Sigrid no llega a `stg.plan_mensual`
 

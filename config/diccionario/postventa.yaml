@@ -395,7 +395,7 @@ objetos:
       **SIN COSTE**: el coste y la venta de las tareas estan a 0 en el 100 %
       en Sigrid y no se publican. El coste de postventa esta en
       `postventa.v_coste_obra`. El empleado asignado va solo por id.
-      `descripcion` y `texto` van enmascarados, pero lA MASCARA ES HEURISTICA: solo cambia por `[TELEFONO]` y `[CORREO]` lo que tiene forma de telefono o de correo; un NOMBRE PROPIO escrito en el texto libre NO se quita.
+      `descripcion` y `texto` van enmascarados, pero la mascara es heuristica: solo cambia por `[TELEFONO]` y `[CORREO]` lo que tiene forma de telefono o de correo; un NOMBRE PROPIO escrito en el texto libre NO se quita.
     grano: >-
       Una fila por tarea, identificada por `tarea_id` (`tar.ide`). Varias por
       incidencia.
