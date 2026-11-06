@@ -149,7 +149,7 @@ COLUMNAS_R1 = [
 
 @pytest.mark.parametrize(("columna", "tipo"), COLUMNAS_R1)
 def test_f157_r1_columna_con_su_tipo(columna: str, tipo: str) -> None:
-    assert re.search(rf"^\s*{columna}\s+{re.escape(tipo)}\b", _tabla_ddl(), re.M), columna
+    assert re.search(rf"^\s*{columna}\s+{re.escape(tipo)}(?!\w)", _tabla_ddl(), re.M), columna
 
 
 def test_f157_r1_sin_columnas_de_mas_ni_version() -> None:
