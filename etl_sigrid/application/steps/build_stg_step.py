@@ -87,6 +87,14 @@ MARCADOR_FILTRO_PRESUPUESTO = "/*F025_FILTRO_OBRAS*/"
 # `06_presupuesto.sql` no tiene ramas: su `WHERE` es uno solo.
 FILTROS_EN_PRESUPUESTO = 1
 
+# --- La fase 0 repartida en el tiempo (F-157) ------------------------------
+# El marcador de `09_plan_mensual_fase0.sql`. Nombre propio por la misma razón
+# que el de F-025: cada fichero se compone con su función y su recuento.
+MARCADOR_FILTRO_FASE0 = "/*F157_FILTRO_OBRAS*/"
+
+# Va una sola vez, en la CTE de `raw.obrfasamb`: filtra por obra antes del JOIN.
+FILTROS_EN_FASE0 = 1
+
 # Los ficheros cuyo texto entra en el SELLO del SQL (R17). Si cambia cualquiera
 # de ellos, esa noche se reconstruyen TODAS las obras: sin esto, un arreglo
 # como el de F-052 solo alcanzaría a las 40 obras vivas y las otras 880

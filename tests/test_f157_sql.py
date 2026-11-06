@@ -43,7 +43,7 @@ def _normal(texto: str) -> str:
 def _funcion() -> str:
     """El cuerpo de `stg.fn_explotar_planif` dentro de `00_functions.sql`."""
     texto = _sql("00_functions.sql")
-    inicio = texto.index("CREATE OR REPLACE FUNCTION stg.fn_explotar_planif")
+    inicio = texto.index("-- fn_explotar_planif (F-157)")
     fin = texto.index("$$;", texto.index("AS $$", inicio)) + 3
     return texto[inicio:fin]
 
