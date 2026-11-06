@@ -4,8 +4,8 @@ Precondición: F-156 cerrada (una sola `in_progress`) y PARADA 1 resuelta (D1-D8
 `requirements.md`; si el humano elige otra opción, el spec-author revisa la spec antes de T1).
 Rama `feature/F-157-planificacion-fase0` desde `main`.
 
-- [ ] T1: Fase RED: `tests/test_f157_dominio.py`, `tests/test_f157_sql.py` y `tests/test_f157_step.py` (design § 10), en rojo con la traza guardada  |  Verificación: `pytest tests/test_f157_dominio.py tests/test_f157_sql.py tests/test_f157_step.py` falla por lo esperado
-- [ ] T2: Oráculo `etl_sigrid/domain/planif.py` (`explotar_planif`, `conservar`, `PosicionPlanif`) con los casos de R9 (R5, R6, R8-R10)  |  Verificación: `pytest tests/test_f157_dominio.py`
+- [x] T1: Fase RED: `tests/test_f157_dominio.py`, `tests/test_f157_sql.py` y `tests/test_f157_step.py` (design § 10), en rojo con la traza guardada  |  Verificación: `pytest tests/test_f157_dominio.py tests/test_f157_sql.py tests/test_f157_step.py` falla por lo esperado
+- [x] T2: Oráculo `etl_sigrid/domain/planif.py` (`explotar_planif`, `conservar`, `PosicionPlanif`) con los casos de R9 (R5, R6, R8-R10)  |  Verificación: `pytest tests/test_f157_dominio.py`
 - [ ] T3: `stg.fn_explotar_planif` al final de `sql/stg/00_functions.sql` (design § 5.1, R8)  |  Verificación: `pytest tests/test_f157_sql.py -k "funcion or r5 or r8"`
 - [ ] T4: DDL de `stg.plan_mensual_fase0` y vista `stg.v_plan_mensual_fase0_cobertura` en `sql/stg/01_ddl.sql` (design § 5.3, R1, R11)  |  Verificación: `pytest tests/test_f157_sql.py -k "r1 or r11"`
 - [ ] T5: `sql/stg/09_plan_mensual_fase0.sql` (design § 5.2, R2-R4, R6, R7, R10)  |  Verificación: `pytest tests/test_f157_sql.py`
