@@ -3,11 +3,13 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **146 features**, 73 abiertas (0 en curso, 1 con la spec lista, 0 bloqueadas y 72 en backlog) y 73 terminadas.
+Resumen: **146 features**, 73 abiertas (1 en curso, 1 con la spec lista, 0 bloqueadas y 71 en backlog) y 73 terminadas.
 
 ## En curso
 
-_Ninguna feature en curso._
+| # | Feature | Prioridad | Rigor | Rama |
+|---|---|---|---|---|
+| F-157 | La planificación en el tiempo de la fase 0 (Previsto) de coste y venta: el reparto mensual por partida que el jefe de obra mete en Sigrid no llega a `stg.plan_mensual` | 1 | estandar | `feature/F-157-planificacion-fase0` |
 
 ## Spec lista
 
@@ -23,7 +25,6 @@ _Ninguna feature bloqueada._
 
 | # | Feature | Prioridad | Rigor | Rama |
 |---|---|---|---|---|
-| F-157 | La planificación en el tiempo de la fase 0 (Previsto) de coste y venta: el reparto mensual por partida que el jefe de obra mete en Sigrid no llega a `stg.plan_mensual` | 1 | estandar | `feature/F-157-planificacion-fase0` |
 | F-040 | El lado de ingresos: ventas, certificaciones y clientes | 2 | critico | `feature/F-040-ingresos` |
 | F-104 | La retencion de CLIENTE no esta saneada: 22,16 M EUR «vivos» de los que 19,93 M tienen fecha de baja, y la contabilidad dice 13,81 M | 3 | estandar | `feature/F-104-retenciones-cliente` |
 | F-151 | La función de caja proyectada (fase 2): `tesoreria.fn_caja_proyectada(obra, hipótesis del usuario)` | 5 | critico | `feature/F-151-funcion-caja-proyectada` |
@@ -178,7 +179,7 @@ _Ninguna feature bloqueada._
 
 ### F-157 · La planificación en el tiempo de la fase 0 (Previsto) de coste y venta: el reparto mensual por partida que el jefe de obra mete en Sigrid no llega a `stg.plan_mensual`
 
-estado **pendiente** · prioridad 1 · rigor `estandar` · SDD sí · rama `feature/F-157-planificacion-fase0`
+estado **en curso** · prioridad 1 · rigor `estandar` · SDD sí · rama `feature/F-157-planificacion-fase0`
 
 Pedida por Juan Romero (Control de Costes) el 2026-11-05: «el datamart publica el importe total de cada partida en fase 0 (Previsto) en coste y en venta, pero no su planificación en el tiempo» (pantalla de Sigrid «Planificación en el tiempo (por partidas)»). COMPROBADO por el líder el 2026-11-05, solo lectura: (1) en el código, `stg/08_plan_mensual.sql` solo explota `raw.obrparpre.planif` para los master (ámbitos 8 y 11, anclados en `obrfasamb.plafec`); de los ámbitos 3 y 7 solo publica los cierres reales (`fase_num >= 1`), así que la fase 0 de coste y venta no se reparte nunca. (2) En los datos: `raw.obrfasamb` tiene `plafec` en la fase 0 en 144 obras de coste (ámbito 3) y 139 de venta (ámbito 7), de 2015-05 a 2026-10. En la 0726 (CENTRO SOCIOSANITARIO LAGUNA NORTE, obra 2817778) la venta fase 0 (ámbito 7, 23.928.969,90 €, el total que cita Juan) tiene `plafec` 2026-10-01 y `planif` en 83 de sus 1.460 partidas (acumulado por meses separado por `|`, termina en 1, p. ej. `0|0|0|0|0.15|0.85|1`); su coste fase 0 (ámbito 3, 1.545 partidas) NO tiene `planif` ni `plafec` en esa obra, y sus master 0 y 1 (8/11) tampoco tienen `plafec` (por eso no tienen meses, como dice Juan). `stg.plan_mensual` de la 0726 solo tiene ámbito 3 versión 1 (31 filas). QUÉ HACER: publicar el reparto mensual de la fase 0 (ámbitos 3 y 7) por partida con porcentaje e importe de cada mes, con la misma explosión que los master (`planif` acumulado → porcentaje del mes, anclado en `plafec`), sin mezclarlo con los cierres reales (versión 0 hoy no existe en 3/7: decidir si va en `plan_mensual` con versión 0 o en un objeto propio, y cuidar la clave de `stg.plan_mensual` y lo que cruza `pm.version` con `stg.fases.numero_fase` en `cierre/`). Medir cuántas partidas tienen `planif` en fase 0, cuántas suman 100 % y qué pasa con las que no tienen. Para que Juan compare la planificación viva del jefe de obra con la del master vigente y el coste con la venta antes de guardar el master.
 

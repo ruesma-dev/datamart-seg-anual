@@ -298,3 +298,70 @@ BEGIN
         RAISE NOTICE 'Añadida columna stg.plan_mensual.es_deshacer';
     END IF;
 END $$;
+
+
+-- ---------------------------------------------------------------------------
+-- stg.plan_mensual_fase0 (F-157): el presupuesto vivo de hoy (fase 0) de coste
+-- (ámbito 3) y venta (ámbito 7), repartido en el tiempo con el `planif` que el
+-- jefe de obra mete en Sigrid («Planificación en el tiempo (por partidas)»).
+--
+-- Tabla PROPIA y no filas `version = 0` en `stg.plan_mensual`: `mart` publica
+-- todo el ámbito 3/7 de `plan_mensual` como Coste/Venta Real sin mirar
+-- `version` (F-157 D1). Sin `version` ni `BIGSERIAL`: la clave es la de
+-- negocio, y empieza por `obra_id` para el borrado derivado de F-025. La
+-- construye `09_plan_mensual_fase0.sql`; los tipos son los de sus homónimas de
+-- `plan_mensual`.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS stg.plan_mensual_fase0 (
+    presupuesto_id       BIGINT        NOT NULL,
+    obra_id              BIGINT        NOT NULL,
+    partida_id           BIGINT        NOT NULL,
+    ambito_id            INTEGER       NOT NULL,
+    mes_inicio           DATE          NOT NULL,           -- mes de raw.obrfasamb.plafec (posición 1)
+    anio_mes             DATE          NOT NULL,
+    posicion_mes         INTEGER       NOT NULL,
+    pct_acumulado        NUMERIC(18,6) NOT NULL,
+    pct_mes              NUMERIC(18,6) NOT NULL,
+    precio_unitario      NUMERIC(20,6) NOT NULL,
+    can_mes              NUMERIC(20,6) NOT NULL,
+    can_origen           NUMERIC(20,6) NOT NULL,
+    importe_mes          NUMERIC(18,2) NOT NULL,
+    importe_origen       NUMERIC(18,2) NOT NULL,
+    importe_mes_raw      NUMERIC(18,2) NULL,
+    importe_origen_raw   NUMERIC(18,2) NULL,
+    importe_partida      NUMERIC(18,2) NULL,               -- stg.presupuesto.importe de la partida
+    _built_at            TIMESTAMP     NOT NULL DEFAULT NOW(),
+    CONSTRAINT pk_plan_mensual_fase0 PRIMARY KEY (obra_id, ambito_id, partida_id, anio_mes),
+    CONSTRAINT ck_plan_mensual_fase0_ambito CHECK (ambito_id IN (3, 7))
+);
+CREATE INDEX IF NOT EXISTS idx_plan_mensual_fase0_anio_mes ON stg.plan_mensual_fase0 (anio_mes);
+
+-- La cobertura (F-157 D3): por obra y ámbito con fase 0, cuánto del total está
+-- repartido en el tiempo. Las partidas sin `planif` no tienen filas en la tabla
+-- (el ETL no inventa reparto); aquí se ve lo que les falta. El LATERAL va por
+-- la clave primaria de la tabla, así que filtrar la vista por obra no barre.
+CREATE OR REPLACE VIEW stg.v_plan_mensual_fase0_cobertura AS
+SELECT
+    pp.obra_id,
+    pp.ambito_id,
+    MIN(pl.mes_inicio)                                                   AS mes_inicio,
+    COUNT(*)                                                             AS partidas,
+    COUNT(pl.mes_inicio)                                                 AS partidas_planificadas,
+    COALESCE(SUM(pp.importe), 0)::NUMERIC(18,2)                          AS importe_fase0,
+    COALESCE(SUM(pp.importe) FILTER (WHERE pl.mes_inicio IS NOT NULL), 0)::NUMERIC(18,2)
+                                                                         AS importe_planificado,
+    (COALESCE(SUM(pp.importe), 0)
+     - COALESCE(SUM(pp.importe) FILTER (WHERE pl.mes_inicio IS NOT NULL), 0))::NUMERIC(18,2)
+                                                                         AS importe_sin_planificar
+FROM stg.presupuesto pp
+LEFT JOIN LATERAL (
+    SELECT f.mes_inicio
+    FROM stg.plan_mensual_fase0 f
+    WHERE f.obra_id    = pp.obra_id
+      AND f.ambito_id  = pp.ambito_id
+      AND f.partida_id = pp.partida_id
+    LIMIT 1
+) pl ON TRUE
+WHERE pp.fase_num = 0
+  AND pp.ambito_id IN (3, 7)
+GROUP BY pp.obra_id, pp.ambito_id;

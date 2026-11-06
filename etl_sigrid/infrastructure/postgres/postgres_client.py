@@ -511,11 +511,11 @@ ON CONFLICT (obra_id) DO UPDATE SET
     firma_actual_at = EXCLUDED.firma_actual_at
 """
 
-#: Las dos tablas que la ventana acota. El nombre se valida contra esta tupla
+#: Las tablas que la ventana acota (F-157 suma `plan_mensual_fase0`). El nombre se valida contra esta tupla
 #: antes de interpolarlo en `SQL_OBRAS_CON_FILAS`: es la única interpolación de
 #: identificador de todo el bloque y no puede depender de la buena fe de quien
 #: llame.
-TABLAS_ACOTADAS = ("plan_mensual", "presupuesto")
+TABLAS_ACOTADAS = ("plan_mensual", "presupuesto", "plan_mensual_fase0")
 
 # OBRAS QUE HOY TIENEN FILAS. Solo se consulta en la reconstrucción completa, y
 # solo para NOMBRAR las que no están en el censo (ver `fetch_obras_con_filas`:

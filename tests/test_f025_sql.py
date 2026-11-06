@@ -267,7 +267,8 @@ def test_f025_r13_la_tabla_de_obras_con_filas_se_valida_contra_una_lista() -> No
     puede venir de fuera: se valida contra `TABLAS_ACOTADAS` antes. Es el mismo
     cuidado que tiene `componer_sql_tramo` con las obras del tramo."""
     assert "{tabla}" in SQL_OBRAS_CON_FILAS
-    assert TABLAS_ACOTADAS == ("plan_mensual", "presupuesto")
+    # F-157 (R16) suma la fase 0 repartida en el tiempo.
+    assert TABLAS_ACOTADAS == ("plan_mensual", "presupuesto", "plan_mensual_fase0")
 
 
 @pytest.mark.parametrize("tabla", ["obras", "plan_mensual; DROP TABLE x", ""])

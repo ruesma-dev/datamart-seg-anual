@@ -787,7 +787,13 @@
 # `importe_pendiente` y nunca lo supera en un mes; `devengo_pendiente_contrato_mes`
 # dice que su fila sin contrato solo es negativa por un mes negativo del plan.
 # Errata de postventa («la mascara es heuristica»). Sin objetos ni columnas nuevas.
-version: 72
+# version 73 (F-157, 2026-11-06): LA FASE 0 REPARTIDA EN EL TIEMPO. Nacen
+# `stg.plan_mensual_fase0` (el presupuesto vivo de hoy, coste 3 y venta 7,
+# repartido por meses con el `planif` del jefe de obra y la regla del master) y
+# `stg.v_plan_mensual_fase0_cobertura` (cuanto de la fase 0 esta repartido);
+# `R-IMPORTE-MES` alcanza la tabla nueva y la ficha de `stg.plan_mensual` deja de
+# decir que guarda la fase 0. Sin regla nueva.
+version: 73
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -873,6 +879,7 @@ reglas:
       - mart.v_pbi_fact_categoria
       - mart.v_fact_periodificado
       - stg.plan_mensual
+      - stg.plan_mensual_fase0
       - cierre.fact_cierre_mensual
       - cierre.v_pbi_cierre_resumen
       - cierre.v_pbi_cierre_indirectos_detalle
