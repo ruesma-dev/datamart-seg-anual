@@ -3,11 +3,9 @@ Revisión completa (pasada 1), diff da6c36f..06a92f0 (`main` = da6c36f, merge en
 <!-- progress/review_F-157.md -->
 # F-157 · Review · la fase 0 repartida en el tiempo
 
-**Veredicto: APPROVED**, con una condición: la puerta completa de `bash harness/init.sh` que
-pasa el líder sobre 06a92f0 (en la copia con `.env`) debe salir verde, con `PUERTA COBERTURA`
-en `[OK]`. En el worktree `init.sh` sale rojo solo por falta de `.env` (está prohibido
-crearlo): es rojo del entorno.
-
+**Veredicto: APPROVED.** La puerta completa del líder sobre 06a92f0, en la copia con `.env`,
+salió VERDE: 10.610 passed, 0 failed y tamaño en verde. Ahí la cobertura sale N/A (HEAD
+detached), así que la medí yo sobre la rama: **100 % de 71 líneas cambiadas** (umbral 80 %).
 **Rigor:** `estandar`, declarado en `features.json`. Exige RED, cobertura ≥ 80 % de lo
 cambiado y mutación muestreada (20 mutantes, semilla 20260820). RM5 no aplica.
 
@@ -79,13 +77,11 @@ y F-149: 4.439 tests en 22 min.
 9. **Nulos en `NOT NULL`.** Es un riesgo declarado, con el mismo contrato que la rama master;
    `dec_*` ya llega con `COALESCE` desde el 06. Queda abierto `can`/`pre` NULL: ver la
    observación 1.
-10. **El log de `init.sh`.** El comando se lanzó sin cambios.
-11. **Los tres arreglos que destapó la suite completa:** `N:N`, `promedio` y el recuento.
-    Correctos.
+10. **El log de `init.sh`:** comando sin cambios. 11. **`N:N`, `promedio` y el recuento:** bien.
 
 ## Checkpoints
 
-- C1: [x] `init.sh` en verde, CONDICIONADO a la puerta del líder (en el worktree solo falla
+- C1: [x] `init.sh` verde en la puerta del líder (en el worktree solo falla
   el entorno). [x] Están los ficheros del arnés.
 - C2: [x] Una sola feature `in_progress`. [x] La rama es la de la feature. [x] `current.md`
   está al día. N/A `history.md`: la feature aún no está en `done`.
@@ -99,7 +95,7 @@ y F-149: 4.439 tests en 22 min.
   § 12, con sus comandos. [x] Dobles: `PgFase0` solo añade `medir_ocupacion_disco_pct` y
   `count_rows`, con la firma real, y los vigila `test_f025_contrato_cliente.py`.
 - C4 bis: [x] Rigor declarado. [x] RED con la salida real; el commit 21672ad solo trae tests.
-  [x] Cobertura: el informe da 100 % de 71 líneas; la confirma la puerta del líder.
+  [x] Cobertura: 100 % de 71 líneas, medida por mí sobre la rama.
   - N/A justificado: no hay `mutacion_F-157.md`, porque la línea base exige el `.env`. Lo
     sustituyen el recálculo y los 20 mutantes de la herramienta, ejecutados por mí (20/20).
   - [x] Muertos comprobados, ejecutados por mí. N/A justificado: sin informe de la
@@ -138,11 +134,7 @@ Ninguno bloqueante. Observaciones para el líder:
 2. **Un borde sin impacto.** `str.strip()` quita `\t` y `\n`, pero `trim()` de PostgreSQL
    solo quita espacios. Una posición que sea solo `\t` desaparece en el oráculo y en el SQL
    cuenta como 0. El SQL sigue igual que el master. No pido cambio.
-3. **Campañas manuales.** Que la tabla del informe traiga el texto exacto original → mutado
-   y el número de fallos, o que se versione el script: el scratchpad no dura.
+3. **Campañas manuales:** el texto exacto y los fallos van en la tabla (el scratchpad no dura).
 
-## Automejora (propuesta, no aplicada)
-
-Es la segunda feature seguida, tras F-158, con la línea base de mutación roja por el entorno.
-Propongo un `--tests` en `harness.mutacion` que acote la suite, o un modo «muestra sobre una
-copia», para que un worktree sin `.env` pueda producir un `mutacion_F-XXX.md` válido.
+**Automejora (propuesta, no aplicada):** segunda feature, tras F-158, con la línea base de
+mutación roja por el entorno. Propongo un `--tests` en `harness.mutacion` que acote la suite.
