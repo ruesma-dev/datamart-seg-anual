@@ -617,12 +617,12 @@
         "Contraste por obra de la venta producida con coeficientes frente a lo certificado a origen (sugerencia de Juan Romero, 27-10: el ámbito certificación «no es referente para la fase 0, pero sí arroja datos buenos en la certificación fase n»), y los conceptos certificados FUERA del coeficiente (revisión de precios, contradictorios) identificados",
         "La spec estima el impacto en la ventana nocturna antes de comprometerse"
       ],
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "rigor": "critico",
       "priority": 2,
       "branch": "feature/F-040-ingresos",
-      "notes": "2026-10-27: prioridad 46 -> 5 por orden del humano, tras el correo de Juan Romero; criterios de aceptación ampliados con sus tres peticiones. 2026-10-27: prioridad 5 -> 2 por orden del humano (tras F-150 van F-040 y F-104). 2026-10-27: añadido el contraste venta con coeficientes frente a certificado y los conceptos fuera de coeficiente (revisión de precios), que F-150 deja fuera y declara como aviso. Medido: el IVA del contrato (`obrctr.ivaide`) coincide con el de `cer` y `dvf` por `ctride` en todos los contratos."
+      "notes": "2026-11-06: spec escrita (specs/F-040-ingresos/, mediciones en progress/spec_F-040.md); propone fase 1 aquí y fase 2 (contraste completo y conceptos fuera de coeficiente) como feature nueva (D1). 2026-10-27: prioridad 46 -> 5 por orden del humano, tras el correo de Juan Romero; criterios de aceptación ampliados con sus tres peticiones. 2026-10-27: prioridad 5 -> 2 por orden del humano (tras F-150 van F-040 y F-104). 2026-10-27: añadido el contraste venta con coeficientes frente a certificado y los conceptos fuera de coeficiente (revisión de precios), que F-150 deja fuera y declara como aviso. Medido: el IVA del contrato (`obrctr.ivaide`) coincide con el de `cer` y `dvf` por `ctride` en todos los contratos."
     },
     {
       "id": "F-041",

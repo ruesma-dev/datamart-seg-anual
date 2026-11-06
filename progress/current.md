@@ -9,6 +9,29 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+
+## 2026-11-06 · F-040 · `spec_ready` · spec escrita · rama `feature/F-040-ingresos`
+
+Spec-author, en su worktree desde `main` `da6c36f`; sin código, va a la PARADA 1. Spec en
+`specs/F-040-ingresos/` (138/150 y 207/250 líneas); mediciones en solo lectura (Sigrid y Azure,
+08:52-10:40 UTC) en `progress/spec_F-040.md`. Hallazgos que cambian el plan del backlog: `obrcer`
+está VACÍA; `cer.idefac` y `cer.feccob` a 0 en las 6.308 certificaciones; el enlace
+certificación → factura es `cerprodes` (4.106 certificaciones, 98 % de las emitidas) y factura →
+cobro es `cob.conide` (93 % de los efectos); `cerpro` no baja a partida (5 de 6.362); 571 clientes
+con NIF de persona (solo 26 marcados). Ventana: +10-20 s de lectura, < 1 %.
+Decisiones para el humano: **D1** partir en dos fases, fase 2 = contraste completo y conceptos
+fuera de coeficiente como feature nueva (recomendada A); **D2** personas físicas enmascaradas en
+`ventas`, sin esquema restringido nuevo (A); **D3** esquema `ventas`; **D4** garantía = clases 4 y
+5 con el `RETESP` aparte (A); **D5** `ventas` para estándar y total, no restringido ni postventa
+(A); **D6** `dvf` en lista blanca de 24 columnas. Frontera con F-104 (en paralelo): F-040 no toca
+`sql/retenciones` ni `sql/tesoreria`; F-104 se queda el estado, el CIF y el cuadre de la
+retención de cliente y necesita `raw.cli`, `raw.dvfrec` y `ventas.facturas`.
+`bash harness/init.sh` en el worktree: **ROJO por entorno, no por la spec**: sin `.env` (no se
+copia, regla dura) → `[KO] Falta .env` y `test_f006_t26_cli_dry_run_no_toca_la_base` falla al
+validar `SigridApiSettings` (256 passed antes de parar, como en F-158). Tamaño 138/150 y 207/250
+en verde. El diff es solo documentación y `features.json`: la puerta completa, desde el checkout
+principal con `.env` tras fusionar.
+
 ## 2026-11-05 · F-158 · implementado (T1-T5), pendiente de review · rama `feature/F-158-hotfix-devengo-negativo`
 
 Implementer, en el worktree del agente; spec aprobada (D1 = A, D2 fuera, D3 v72, D4 sin

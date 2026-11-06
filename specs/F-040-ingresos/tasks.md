@@ -1,0 +1,23 @@
+# F-040 · Tareas (fase 1)
+
+Precondición: decisiones D1-D6 de `requirements.md` validadas por el humano; una sola feature
+`in_progress`. Rigor `critico`: fase RED con traza, cobertura y mutación sin supervivientes sin
+test. Un commit por tarea (`F-040 Tn: ...`).
+
+- [ ] T1: Fase RED: `tests/test_f040_dominio.py`, `tests/test_f040_ingesta.py` y `tests/test_f040_sql.py` (design § 10), en rojo y con la traza guardada  |  Verificación: `pytest tests/test_f040_dominio.py tests/test_f040_ingesta.py tests/test_f040_sql.py` falla por lo esperado
+- [ ] T2: Dominio `etl_sigrid/domain/ventas.py`: constantes, `normalizar_cif`, `es_persona_fisica`, `cif_valido`, `clase_recargo`, `estado_seguimiento` (design § 3)  |  Verificación: `pytest tests/test_f040_dominio.py`
+- [ ] T3: `config/tables_sigrid.yaml`: las 7 tablas con su comentario y `dvf` a 24 columnas (R1-R3); censo 93 -> 100 y `COLUMNAS_DVF`/listas blancas en los tests que lo fijan (R4); borrar `config/tables_sigrid_venta_snippet.yaml`  |  Verificación: `pytest tests/test_f040_ingesta.py tests/test_f150_ingesta.py tests/test_f066_ingesta_raw.py tests/test_f074_ingesta_censo.py tests/test_f156_ingesta_sql.py`
+- [ ] T4: `sql/ventas/00_setup.sql` y `01_clientes.sql` con el enmascarado (R5-R8)  |  Verificación: `pytest tests/test_f040_sql.py -k "r5 or r6 or r7 or r8 or setup"`
+- [ ] T5: `02_facturas.sql`: `facturas`, `factura_lineas`, `factura_recargos` (R9-R12)  |  Verificación: `pytest tests/test_f040_sql.py -k "r9 or r10 or r11 or r12"`
+- [ ] T6: `03_certificaciones.sql`: `certificaciones` y `certificacion_recargos`, a cuenta / a origen / `base_origen_contrato` (R13-R16)  |  Verificación: `pytest tests/test_f040_sql.py -k "r13 or r14 or r15 or r16"`
+- [ ] T7: `04_enlace.sql` y `05_vistas.sql`: `certificacion_factura`, `cobertura_enlace`, `v_factura_cobro`, `v_seguimiento_certificacion`, `v_contraste_certificado_obra` (R17-R21)  |  Verificación: `pytest tests/test_f040_sql.py -k "r17 or r18 or r19 or r20 or r21" tests/test_f040_dominio.py`
+- [ ] T8: `06_guardas.sql` (R7, R22)  |  Verificación: `pytest tests/test_f040_sql.py -k "r22 or guarda"`
+- [ ] T9: Fase RED de `tests/test_f040_pipeline.py`; `build_ventas_step.py` y `main.py` (`run-all` tras `build_retenciones`, `PASOS_CON_PERMISOS`, `build-ventas`) (R23); tests de pasos al día  |  Verificación: `pytest tests/test_f040_pipeline.py tests/test_f047_nocturna.py tests/test_f148_permisos_por_paso.py tests/test_f006_frescura.py tests/test_f024_cli.py`
+- [ ] T10: Fase RED de `tests/test_f040_grants.py`; `settings.py`, `.env.example` y `ESQUEMAS_DEL_DATAMART` (R24); tests de listas de esquemas al día  |  Verificación: `pytest tests/test_f040_grants.py tests/test_f135_grants.py tests/test_f138_grants.py tests/test_f156_grants.py tests/test_f141_perfil_restringido.py tests/test_f057_personal.py`
+- [ ] T11: `tests/test_f040_frontera.py`: `sql/retenciones` y `sql/tesoreria` sin diff respecto a `main` (R25)  |  Verificación: `pytest tests/test_f040_frontera.py`
+- [ ] T12: Fase RED de `tests/test_f040_diccionario.py`; `ventas.yaml`, `raw.yaml` (7 fichas + `dvf`) y `00_global.yaml` (versión +1, esquema, `R-VENTAS-TRES-CIFRAS`) (R26)  |  Verificación: `pytest tests/test_f040_diccionario.py tests/test_f006_fichas.py tests/test_f006_reglas.py tests/test_f147_presupuesto_contexto.py tests/test_f149_mcp_sin_reglas_no_publicadas.py tests/test_f085_diccionario.py`
+- [ ] T13: `docs/ARCHITECTURE.md`, mapa de `CLAUDE.md` y `../azure-apps/datamart_seg_anual.md` (commit local en `azure-apps`, sin push) (R27)  |  Verificación: `pytest tests/test_f040_diccionario.py -k architecture`; `git -C ../azure-apps log -1`
+- [ ] T14: Informe `progress/impl_F-040.md` con trazas RED, cobertura y la campaña de mutación del rigor `critico` (cada superviviente, con su test)  |  Verificación: `python -m harness.tamano --feature F-040`; `python -m harness.mutacion`
+- [ ] T15: Aviso al humano para `mcp-bbdd`: añadir `ventas` a la lista blanca de su `config.yaml` y reiniciar el MCP (fuera de este repositorio)  |  Verificación: MANUAL (humano), anotado en `progress/current.md`
+- [ ] T16: Despliegue tras APROBADO y merge: imagen con tag fechado, job, `python main.py ingest --full --table <t>` para cada una de las 7 tablas y `dvf`, `python main.py build-ventas`, `python main.py apply-grants`, `python main.py check-diccionario`, `python main.py publicar-diccionario`; medir R28 (tiempos de ingesta y build, `retenciones.movimientos` CLIENTE igual que la víspera, `ventas.cobertura_enlace`)  |  Verificación: MANUAL (humano), comandos y vuelta atrás en design § 11
+- [ ] T17: Ejecutar `bash harness/init.sh` en verde  |  Verificación: `bash harness/init.sh`

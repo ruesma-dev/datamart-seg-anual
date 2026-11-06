@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **146 features**, 73 abiertas (0 en curso, 1 con la spec lista, 0 bloqueadas y 72 en backlog) y 73 terminadas.
+Resumen: **146 features**, 73 abiertas (0 en curso, 2 con la spec lista, 0 bloqueadas y 71 en backlog) y 73 terminadas.
 
 ## En curso
 
@@ -13,6 +13,7 @@ _Ninguna feature en curso._
 
 | # | Feature | Prioridad | Rigor | Rama |
 |---|---|---|---|---|
+| F-040 | El lado de ingresos: ventas, certificaciones y clientes | 2 | critico | `feature/F-040-ingresos` |
 | F-111 | Los nombres de partida se resuelven por codigo en los niveles del arbol y en la dimension de costes indirectos: 10.593 filas con un escalon con el nombre de otra partida | 18 | estandar | `feature/F-111-nombres-partida-por-ancestro` |
 
 ## Bloqueadas
@@ -24,7 +25,6 @@ _Ninguna feature bloqueada._
 | # | Feature | Prioridad | Rigor | Rama |
 |---|---|---|---|---|
 | F-157 | La planificación en el tiempo de la fase 0 (Previsto) de coste y venta: el reparto mensual por partida que el jefe de obra mete en Sigrid no llega a `stg.plan_mensual` | 1 | estandar | `feature/F-157-planificacion-fase0` |
-| F-040 | El lado de ingresos: ventas, certificaciones y clientes | 2 | critico | `feature/F-040-ingresos` |
 | F-104 | La retencion de CLIENTE no esta saneada: 22,16 M EUR «vivos» de los que 19,93 M tienen fecha de baja, y la contabilidad dice 13,81 M | 3 | estandar | `feature/F-104-retenciones-cliente` |
 | F-151 | La función de caja proyectada (fase 2): `tesoreria.fn_caja_proyectada(obra, hipótesis del usuario)` | 5 | critico | `feature/F-151-funcion-caja-proyectada` |
 | F-054 | Glosario de negocio para la IA (`_meta.glosario`): qué significan en Ruesma la valorada, el incurrido, el ABC o la liquidatoria, y dónde están en el datamart | 6 | documental | `feature/F-054-conocimiento-de-negocio` |
@@ -184,7 +184,7 @@ Pedida por Juan Romero (Control de Costes) el 2026-11-05: «el datamart publica 
 
 ### F-040 · El lado de ingresos: ventas, certificaciones y clientes
 
-estado **pendiente** · prioridad 2 · rigor `critico` · SDD sí · rama `feature/F-040-ingresos`
+estado **spec lista** · prioridad 2 · rigor `critico` · SDD sí · rama `feature/F-040-ingresos`
 
 Nacida el 2026-08-20 del analisis de dominio de F-006. Es el hueco caro y estructural del datamart: el lado del dinero que entra esta practicamente ausente, y sin el no hay flujo de caja completo ni analisis de cliente. Tres bloques. (1) VENTAS: dvf y dvfpro -facturas de venta y sus lineas, que llevan paride- no se ingieren; hay un config/tables_sigrid_venta_snippet.yaml preparado y sin integrar desde hace tiempo. Su ausencia deja ademas muerta la vista retenciones.v_src_lineas_venta, que existe vacia por diseno, y por eso las retenciones de cliente no tienen respaldo de atribucion a obra ni CIF. (2) CERTIFICACIONES a cliente: cer, cerpro -lineas con paride- y obrcer -con prorea, cerobr, cerrev, ceraac- son el eslabon que falta entre la produccion y el cobro; hoy tenemos la produccion como importe y el efecto de cobro, pero nada en medio. (3) CLIENTES: la tabla cli no se ingiere. Solo conocemos el nombre del cliente via con.res desde obr.entide, asi que no se puede responder ni quienes son nuestros diez mayores clientes ni nada que exija su CIF o su clasificacion. Depende de la capacidad del ETL: son tablas grandes y F-035 esta midiendo el tiempo de carga; la spec debe estimar el impacto en la ventana nocturna antes de comprometerse. ================ PEDIDA POR JUAN ROMERO (Dir. Admon y Control de Costes) por correo, recordado el 2026-10-27, y subida por el humano ese día de la prioridad 46 a la 5, justo detrás de F-054. Lo que pide, en sus palabras: (a) «Certificaciones a cliente: el documento de certificación (número, mes, a origen / a cuenta, estado)»; (b) «Facturas de venta: cabecera y líneas. La tabla de líneas de venta de Sigrid (dvfpro) no se está cargando, y por eso la retención de garantía de las facturas de venta sale siempre vacía»; (c) «Enlace certificación – factura – cobro, para poder seguir una certificación hasta que se cobra». La cuarta petición del mismo correo (forma de pago por defecto de la ficha del proveedor) va aparte, en F-152. MEDIDO EL 2026-10-27 en solo lectura (21 obras con devengo pendiente de F-140): `cer` y `dvf` se enlazan con la obra por `cenide` (= `obr.cenide`), llevan `totbas`/`totiva`/`fecdoc`, y su IVA efectivo coincide con el `obr.ivaide` de la ficha de la obra (21 % en 0690, 0697 y 0699; 0 % en las otras 16 con facturas, ninguna al 10 %); `obrcer` no tiene filas en esas 21 obras. Es la fuente de verdad del IVA de venta para la caja (H12 de `tesoreria.hipotesis_caja`), y `cer.feccob` («fecha de cobro, 0 pendiente») es un candidato al enlace con el cobro que la spec debe medir.
 
