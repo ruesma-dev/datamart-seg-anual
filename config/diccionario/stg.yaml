@@ -506,10 +506,11 @@ objetos:
         porque: Para el importe total de la partida en la fase 0 y sus decimales.
       - de: obra_id
         a: stg.v_plan_mensual_fase0_cobertura.obra_id
-        cardinalidad: "N:1"
+        cardinalidad: "N:N"
         porque: >-
-          Para saber cuanto de la fase 0 de la obra esta repartido; se une por
-          `(obra_id, ambito_id)`.
+          Para saber cuanto de la fase 0 de la obra esta repartido. La vista da
+          una fila por `(obra_id, ambito_id)`: se une por las dos columnas, o
+          el coste y la venta se cruzan y duplican importes.
     ejemplos_preguntas:
       - Reparto por meses de la venta de hoy de la 0726
       - Venta viva por meses frente al master vigente
