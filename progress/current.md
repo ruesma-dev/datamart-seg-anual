@@ -9,6 +9,22 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-07 · F-159 · `pending` · spec escrita (HOTFIX 2) · rama `feature/F-159-hotfix-devengo-negativo-2`
+
+Spec-author, en su worktree desde `main` `93fc38c`; sin código, va a la PARADA 1. La nocturna del
+07-11 (con F-158) volvió a caer en R50 (04:52 y 06:30 UTC); `tesoreria` sigue con lo del 06-11
+08:38. Medido en solo lectura (`progress/spec_F-159.md`): la fila es 1-0710/2026-11/CD sin
+contrato, **-18.791.769,87**; viene de la partida 404326 de la V13 nueva (CUATRIMESTRAL OCT-26,
+creada en Sigrid el 06-11), plan -1.079,94 / +1.080,00 tras el cierre (0 intermedio del `planif`,
+estorno legítimo): `total_perfil` 0,06 y el reparto con pesos con signo lo amplifica. Clase de la
+D2 de F-158 en forma nueva; la observación 3 está latente, no es la causa. Recomendada A: perfil =
+envolvente del plan neto acumulado + reparto por acumulado (0 negativos medidos). Decisiones para
+el humano en `progress/spec_F-159.md` §7: **D1** envolvente (A) o solo meses positivos (P);
+**D2** acumulado o resto al último; **D3** guarda nueva y R50 con la primera fila; **D4** no
+parchear R50 hasta el despliegue (tesoreria un día atrasada); **D5** diccionario v74 tras la v73
+de F-157; **D6** sin sandbox. Ojo: F-157 sigue `in_progress` en `features.json` aunque está
+mergeada en `main`; F-159 queda `pending` (prioridad 0) para no tener dos `in_progress`.
+
 ## 2026-11-06 · F-157 · `in_progress` · implementando · rama `feature/F-157-planificacion-fase0`
 
 Implementer, en el worktree del agente. Spec aprobada por el humano (la A en D1 a D8). `main`
