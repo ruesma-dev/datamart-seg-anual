@@ -665,6 +665,25 @@ SELECT s.obra_id, s.concepto, s.partida_id, s.anio_mes, 0::NUMERIC, s.importe, s
 FROM sin_perfil s;
 ANALYZE _dev_reparto;
 
+-- F-159 (R9): ningun mes del reparto es negativo ni su personal se sale de
+-- [0, mes]. Va ANTES de vaciar la obra-mes y dice la obra, la partida, el mes
+-- y el importe (R50 solo daba un recuento). Las filas del perfil llevan
+-- pendiente 0 y personal NULL: no disparan.
+DO $$
+DECLARE
+    fallo RECORD;
+BEGIN
+    SELECT obra_id, partida_id, anio_mes, pendiente, importe_personal INTO fallo
+      FROM _dev_reparto
+     WHERE pendiente < 0 OR importe_personal < 0 OR importe_personal > pendiente
+     ORDER BY obra_id, partida_id, anio_mes
+     LIMIT 1;
+    IF FOUND THEN
+        RAISE EXCEPTION 'devengo_pendiente: la partida % de la obra % reparte % en % (personal %): un mes no puede ser negativo',
+            fallo.partida_id, fallo.obra_id, fallo.pendiente, fallo.anio_mes, fallo.importe_personal;
+    END IF;
+END $$;
+
 TRUNCATE tesoreria.devengo_pendiente_obra_mes;
 
 INSERT INTO tesoreria.devengo_pendiente_obra_mes (
@@ -899,11 +918,18 @@ HAVING SUM(q.importe) <> 0;
 
 -- Guarda de R50: el reparto por contrato no crea ni pierde un centimo de la
 -- obra-mes (sin CP ni personal) y ningun importe es negativo. Si no, falla con
--- su recuento y TODA la transaccion vuelve a las tablas de ayer.
+-- su recuento y la fila MAS negativa (F-159, R10: el recuento solo no decia
+-- donde mirar), y TODA la transaccion vuelve a las tablas de ayer. La condicion
+-- no cambia; sin filas negativas, la primera sale NULL.
 DO $$
 DECLARE
     n_obras INTEGER;
     n_negativos INTEGER;
+    neg_obra TEXT;
+    neg_mes TEXT;
+    neg_categoria TEXT;
+    neg_contrato TEXT;
+    neg_importe TEXT;
 BEGIN
     SELECT count(*) INTO n_negativos
       FROM tesoreria.devengo_pendiente_contrato_mes
@@ -920,8 +946,14 @@ BEGIN
         ON c.obra_id = m.obra_id
      WHERE COALESCE(m.total, 0) IS DISTINCT FROM COALESCE(c.total, 0);
     IF n_obras > 0 OR n_negativos > 0 THEN
-        RAISE EXCEPTION 'devengo_pendiente: el coste por contrato no cuadra con la obra-mes en % obras o tiene % importes negativos',
-            n_obras, n_negativos;
+        SELECT obra_id, anio_mes, categoria, contrato_id, importe_pendiente
+          INTO neg_obra, neg_mes, neg_categoria, neg_contrato, neg_importe
+          FROM tesoreria.devengo_pendiente_contrato_mes
+         WHERE importe_pendiente < 0
+         ORDER BY importe_pendiente
+         LIMIT 1;
+        RAISE EXCEPTION 'devengo_pendiente: el coste por contrato no cuadra con la obra-mes en % obras o tiene % importes negativos (primera negativa: obra %, mes %, categoria %, contrato %, importe %)',
+            n_obras, n_negativos, neg_obra, neg_mes, neg_categoria, neg_contrato, neg_importe;
     END IF;
 END $$;
 
