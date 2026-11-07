@@ -2044,3 +2044,29 @@ reiniciado (carga la v72). Medido en Azure el 06-11: 0 importes negativos,
 La nocturna del 06-11 (imagen vieja) ya salió en SUCCESS porque ese día el
 negativo volvió a compensarse: el defecto era real y seguía latente.
 Merge `main` 3d72d06, `dev` dd834a9.
+
+## F-157 — La planificación en el tiempo de la fase 0 · 2026-11-07
+
+Rama `feature/F-157-planificacion-fase0`. APROBADO en la pasada 1
+(`progress/review_F-157.md`); spec en `specs/F-157-planificacion-fase0/`.
+Petición de Juan Romero (Control de Costes) del 05-11.
+
+`stg.plan_mensual_fase0`: el presupuesto vivo de hoy (fase 0, coste 3 y venta
+7) repartido en el tiempo con el `planif` del jefe de obra, desde
+`obrfasamb.plafec`; tabla propia porque `mart` publica los ámbitos 3/7 de
+`stg.plan_mensual` como la serie de cierres (Coste/Venta Real). Regla de
+explosión del master en `stg.fn_explotar_planif` (sin tocar el 08), oráculo
+`domain/planif.py`, vista `stg.v_plan_mensual_fase0_cobertura`, sub-paso
+`build_plan_mensual_fase0` acotado a las obras de la noche. Sin regla dura
+nueva; `mart` sin tocar (D8).
+
+Desplegado: imagen r20261106-1848 (viernes, no sábado: la nocturna del 07-11
+reconstruyó entero, `build_stg` 165 min, fin 06:34 UTC), diccionario v73,
+MCP reiniciado. Medido el 07-11: 1.265.519 filas en 135 obras, 239 MB,
+sub-paso 3,6 min; la 0726 con 1.504/1.546 partidas de coste y 1.438/1.461 de
+venta planificadas (el jefe de obra planificó tras la petición), cuadre con
+el total ≤ 1,43 EUR por obra. `check-declarados` (290), `check-cierres`
+(0 discrepancias) y `check-unicidad` (sin colisiones; `stg.plan_mensual`
+sigue sin comprobar por timeout) en verde. R20 (huella de antes y después) no
+se midió: no se tomó la huella previa; lo cubre `check-cierres`.
+Merge `main` 93fc38c, `dev` aa2b053.
