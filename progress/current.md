@@ -9,6 +9,30 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-07 · F-040 · `spec_ready` · spec revisada tras la PARADA 1 · rama `feature/F-040-ingresos`
+
+Spec-author, en su worktree; `main` (`93fc38c`) traído a la rama (merge `94f2a07`: conflictos en
+`BACKLOG.md`, regenerado, y en este fichero; `features.json` queda con F-157 `in_progress` y F-040
+`spec_ready`). Sin código. Recogidas las decisiones del humano: D1, D3, D5 = A; D4 = A provisional
+(`CLASES_GARANTIA = (4, 5)` en el dominio, único punto de decisión; el `RETESP` en su columna); D2 y
+D6 modificadas: nombre del cliente público para todos, CIF público solo de personas jurídicas, y lo
+personal (NIF de persona, direcciones, teléfono, correo, cabecera `entcif`/`entres`/`dir*` y textos
+de línea de personas) solo en el esquema nuevo **`ventas_restringida`** (perfil total, patrón F-138,
+pasos MANUAL con `02_roles.sql` en design § 9 y runbook § 15 nueva). Fase 2 creada como **F-160**
+(`pending`, prioridad 4 provisional; F-159 estaba reservado por la rama de un hotfix). Medido en
+Sigrid, solo lectura, 09:38-09:45 UTC: `progress/spec_F-040.md` § 8. Tamaños: requirements 148/150,
+design 247/250 (columnas y mapa de tests en `design_detalle.md`).
+**Decisiones abiertas para el humano** (propuesta del spec-author, cámbiese si no vale):
+(1) columnas de contacto de `cli`: `dir1`, `dir2`, `dircpo`, `dir`, `tel`, `tel2`, `ele`; fuera
+`fax`, `web`, `dirtex` (observaciones), duplicados «limpios» y municipio/provincia/país por id;
+(2) en `dvf` entran también las tres `dircon*`, vacías hoy, por ser «las `dir*`»; (3)
+`ventas.facturas` lleva el nombre ACTUAL del cliente (`cli.raz`), y el de la cabecera (`entres`,
+distinto en 571 facturas) va solo a la restringida, como dice D6; (4) id F-160 y su prioridad.
+Pendiente del líder: el correo a Juan Romero sobre el `RETESP` (D4).
+`bash harness/init.sh` en el worktree: ROJO solo por entorno, como el 06-11 (sin `.env`, que no se
+copia: `[KO] Falta .env` y `test_f006_t26_cli_dry_run_no_toca_la_base`; 256 passed antes de parar);
+tamaño y rama en verde. El diff es solo documentación y `features.json`.
+
 ## 2026-11-06 · F-040 · `spec_ready` · spec escrita · rama `feature/F-040-ingresos`
 
 Spec-author, en su worktree desde `main` `da6c36f`; sin código, va a la PARADA 1. Spec en

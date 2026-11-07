@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **146 features**, 73 abiertas (1 en curso, 2 con la spec lista, 0 bloqueadas y 70 en backlog) y 73 terminadas.
+Resumen: **147 features**, 74 abiertas (1 en curso, 2 con la spec lista, 0 bloqueadas y 71 en backlog) y 73 terminadas.
 
 ## En curso
 
@@ -27,6 +27,7 @@ _Ninguna feature bloqueada._
 | # | Feature | Prioridad | Rigor | Rama |
 |---|---|---|---|---|
 | F-104 | La retencion de CLIENTE no esta saneada: 22,16 M EUR «vivos» de los que 19,93 M tienen fecha de baja, y la contabilidad dice 13,81 M | 3 | estandar | `feature/F-104-retenciones-cliente` |
+| F-160 | Ventas fase 2: contraste producido / certificado de todas las obras y los conceptos certificados fuera de coeficiente | 4 | estandar | `feature/F-160-ventas-contraste-fase2` |
 | F-151 | La función de caja proyectada (fase 2): `tesoreria.fn_caja_proyectada(obra, hipótesis del usuario)` | 5 | critico | `feature/F-151-funcion-caja-proyectada` |
 | F-054 | Glosario de negocio para la IA (`_meta.glosario`): qué significan en Ruesma la valorada, el incurrido, el ABC o la liquidatoria, y dónde están en el datamart | 6 | documental | `feature/F-054-conocimiento-de-negocio` |
 | F-152 | La forma de pago por defecto de la ficha del proveedor (`prv.pagide` -> `auxpag`), junto a los días fijos y los meses sin pago que ya se publican | 7 | estandar | `feature/F-152-forma-pago-ficha-proveedor` |
@@ -194,6 +195,12 @@ Nacida el 2026-08-20 del analisis de dominio de F-006. Es el hueco caro y estruc
 estado **pendiente** · prioridad 3 · rigor `estandar` · SDD sí · rama `feature/F-104-retenciones-cliente`
 
 Decidido por el humano el 2026-09-23, prioridad 3. Sale de la decision H5 de la spec de F-095 («el lado cliente, fuera de F-095, feature propia tras F-094») y del hueco que deja F-094, que saneo SOLO el lado proveedor. EL PROBLEMA: `retenciones.movimientos` publica para CLIENTE **22.157.642,75 EUR en 2.196 efectos** como VIVA, y ese estado sale solo de `cob.fecrea` sin mirar `con.fecbaj` ni `con.est`, que es el defecto que F-094 corrigio en PROVEEDOR (donde lo vivo paso de 35,54 a 8,34 M EUR). **TRES CIFRAS QUE NO CUADRAN ENTRE SI**, todas medidas en solo lectura: lo que publica el datamart hoy, **22,16 M**; el saldo de las cuentas de retencion de cliente en la contabilidad, **13,81 M** (medido por el spec-author de F-095 el 2026-09-22); y lo que quedaria aplicando a `cob` el criterio de PROVEEDOR, **2,12 M** (misma medicion) o **2,23 M en 240 efectos** (medido por el MCP el 2026-09-23). **LO MEDIDO QUE APUNTA AL DEFECTO**: **1.956 de los 2.196 efectos «vivos» tienen `fecbaj` <> 0 y suman 19.928.538,74 EUR**, casi el 90 % del importe; y 2.096 efectos (21,08 M) tendrian la fecha prevista de cobro ya vencida, o sea el 95 % de la retencion de cliente vencida y sin cobrar, que no es creible. **LO QUE IMPIDE COPIAR EL CRITERIO DE PROVEEDOR, y por eso F-094 no lo toco**: en `cob` esos efectos con baja estan en `est` 1 (Pendiente) y NO en 14 (Agrupados) ni 15 (Divididos), asi que el mecanismo de agrupacion no es el mismo o no se registra igual. Hay que averiguar QUE les pasa de verdad antes de decidir el criterio. COMO SE EMPIEZA: revisar en Sigrid unos cuantos efectos de `cob` con `fecbaj` <> 0 y ver si se agruparon en otro efecto, se cobraron por otra via o siguen pendientes; y explicar la diferencia con los 13,81 M de la contabilidad (¿prescripciones, reclasificaciones, cuenta 4308?). MIENTRAS TANTO, el orden de magnitud publicado avisa de que la cifra de cliente esta SIN VERIFICAR (diccionario version 27, 2026-09-23). Coordinar con F-095, que decide si la fuente que manda es la contabilidad tambien en este lado.
+
+### F-160 · Ventas fase 2: contraste producido / certificado de todas las obras y los conceptos certificados fuera de coeficiente
+
+estado **pendiente** · prioridad 4 · rigor `estandar` · SDD sí · rama `feature/F-160-ventas-contraste-fase2`
+
+Nace de la D1 = A de F-040 (decisión del humano, 2026-11-07): F-040 publica certificaciones, facturas de venta, clientes y el enlace hasta el cobro, y deja el contraste de la venta producida con coeficientes frente a lo certificado SOLO para las 22 obras de la receta de caja (`ventas.v_contraste_certificado_obra`, que lee `tesoreria.devengo_corte_obra`). Esta fase lo extiende a TODAS las obras y separa los conceptos certificados FUERA del coeficiente (revisión de precios, contradictorios, órdenes de cambio). MEDIDO por F-040 el 2026-11-06 (`progress/spec_F-040.md` §§ 2-3): Sigrid NO los marca: `obrcer` (con `cerrev`) está VACÍA; `cerpro.paride` solo en 5 de 6.362 líneas, así que la certificación no baja a partida y el contraste solo puede ser por obra o contrato; los recargos `COEF_RECGG`/`COEF_RECBI`/`COEF_DESADJ` (clase 0) están en 1.286 de 6.308 certificaciones (en la mayoría de los CONTRATO PRINCIPAL el coeficiente va dentro del precio); 36 líneas dicen «revisión»/«contradictorio» (1,88 M€); los contratos lo insinúan por nombre («ORDENES DE CAMBIO», «PARTIDAS SIN COEFICIENTES», «MEDICIONES NO ACREDITADAS», «CONTRATO SIN PEM»). Hace falta el CRITERIO de Juan Romero (Control de Costes) antes de escribir la spec: cómo se reconoce un concepto fuera de coeficiente y contra qué producción se contrasta cada obra. Depende de F-040 en `done`. RELACIONADA con F-076 (los ámbitos de seguimiento 5 `VEN` «CERTIFICACION» y 13 `CER_PEC`, que llegan a `stg.presupuesto` y no al seguimiento): la spec debe decidir si el contraste lee esos ámbitos, los documentos `cer` de F-040 o los dos.
 
 ### F-151 · La función de caja proyectada (fase 2): `tesoreria.fn_caja_proyectada(obra, hipótesis del usuario)`
 

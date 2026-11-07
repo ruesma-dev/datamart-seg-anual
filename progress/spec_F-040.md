@@ -135,3 +135,32 @@ Fase 1 (esta spec) es barata en ventana y con dato limpio: ingesta de 7 tablas +
 esquema `ventas` con clientes, facturas, certificaciones, enlace y seguimiento hasta el cobro, y
 un contraste por obra limitado a las obras de la receta. El contraste completo y los conceptos
 fuera de coeficiente necesitan un criterio que hoy no está en Sigrid: fase 2 (D1).
+
+## 8. Revisión tras la PARADA 1 (2026-11-07, 09:38-09:45 UTC, solo lectura)
+
+Decisiones del humano recogidas en `requirements.md` (D1, D3, D5 = A; D4 = A provisional; D2 y D6
+modificadas: esquema nuevo `ventas_restringida`, solo perfil total). Medido en Sigrid por
+`sigrid-api` (`leer_sql`, tres `SELECT` de agregados; script fuera del repositorio, en el
+scratchpad de la sesión, con el `.env` del checkout principal sin tocarlo). Ninguna escritura.
+
+| `dvf` (15.734) | informadas | | `cli` (1.210) | informadas |
+|---|---:|---|---|---:|
+| `entcif` | 15.734 | | `dir1` / `dir2` | 1.162 / 68 |
+| `entres` | 15.733 | | `dir` (completa) | 1.151 |
+| `entcif` con forma de NIF de persona | 3.635 | | `dircpo` | 1.154 |
+| `entres` distinto de `cli.raz` | 571 | | `tel` / `tel2` | 73 / 55 |
+| `diremp1` / `dirdir1` | 15.733 / 15.565 | | `ele` | 96 |
+| `diremp2` / `dirdir2` | 1.566 / 1.565 | | `fax` / `web` / `dirtex` | 26 / 5 / 11 |
+| `diremp3` / `dirdir3` | 98 / 98 | | `ban` (cuenta) | 33 (fuera) |
+| `dircon1-3` | 0 | | `dniper`, `nomnom`, `nomape1`, `clamai`, `g3wpas` | 0 |
+| máx. longitud de `dirdir1` | 148 | | `numseg` / `facpdfele` | 3 / 1 |
+
+Personas físicas de `cli` (`perfis` <> 0 o NIF de persona): 572, de las que 566 con `dir1`, 559 con
+`dir`, 24 con teléfono y 68 con correo. `cli` tiene 1.210 filas (1.209 el 06-11).
+
+Consecuencias en la spec: `cli` entra con 7 columnas de contacto (no `fax`, `telsin`, `dirtex`,
+`web` ni los maestros de municipio/provincia/país, que no están en `raw`); `dvf` entra con
+`entcif`, `entres` y las nueve `dir*` (las `dircon*`, vacías, entran por ser «las `dir*`» de D6);
+`ventas.facturas` publica el nombre ACTUAL del cliente (`cli.raz`) y el de la cabecera, distinto en
+571 facturas, va solo a `ventas_restringida`. Ventana: columnas de texto corto, sin efecto medible.
+Fase 2 de D1: **F-160** (F-159 ya está reservado por la rama de un hotfix en curso).
