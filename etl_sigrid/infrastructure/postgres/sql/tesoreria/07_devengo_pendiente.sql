@@ -28,11 +28,13 @@
 --      plan de V; `pendiente` = max(0, plan desde V - ejecutado) y
 --      `sobre_ejecutado` el simetrico (`pendiente_partida` del dominio).
 --   5. `tesoreria.devengo_pendiente_obra_mes`: el pendiente de cada partida
---      repartido en proporcion a su plan en los meses posteriores al cierre
---      (los meses a cero no son perfil), redondeado al centimo y con el resto
---      en el ultimo mes (`repartir_pendiente` del dominio). Sin perfil, todo al
---      primer mes pendiente y tambien en `importe_retraso_sin_perfil`. Guarda:
---      la suma por (obra, concepto) iguala la de la partida al centimo.
+--      repartido por ACUMULADO sobre el plan NETO acumulado de V
+--      (un mes negativo se absorbe en los anteriores, F-159) en los meses
+--      posteriores al cierre (los meses a cero no son perfil), al centimo y
+--      con el pendiente entero hasta el ultimo mes (`repartir_pendiente` del
+--      dominio). Sin perfil, todo al primer mes pendiente y tambien en
+--      `importe_retraso_sin_perfil`. Guardas: ningun mes negativo (F-159) y la
+--      suma por (obra, concepto) iguala la de la partida al centimo.
 --   6. `tesoreria.devengo_corte_obra`: las sumas por (obra, concepto), con lo
 --      adelantado y lo retrasado del intervalo, lo ejecutado en partidas sin
 --      plan de V, el real a origen hasta el cierre, el plan total de V y la
@@ -586,39 +588,44 @@ WITH perfil AS (
     JOIN _dev_version v ON v.obra_id = p.obra_id AND v.concepto = p.concepto
     WHERE p.anio_mes >= v.mes_version AND (v.mes_ultimo_cierre IS NULL OR p.anio_mes > v.mes_ultimo_cierre) AND p.importe_mes <> 0
 )
+, envolvente AS (
+    -- F-159: el plan NETO acumulado de V. Un mes negativo (estorno de un 0
+    -- intermedio del planif) se absorbe en los meses anteriores: el peso
+    -- acumulado es el minimo de lo que queda por delante, con suelo 0, y nunca
+    -- baja. 1-0710/404326 (-1.079,94 y +1.080,00): todo a 2026-12, no
+    -- -19.438.920,00 en 2026-11 (R50 en rojo el 07-11). `total_perfil` es el
+    -- acumulado del ultimo mes: la fraccion peso / total esta en [0, 1].
+    SELECT a.*,
+           GREATEST(0, MIN(a.plan_acumulado) OVER (PARTITION BY a.obra_id, a.concepto, a.partida_id
+                       ORDER BY a.anio_mes DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)) AS peso_acumulado,
+           ROW_NUMBER() OVER (PARTITION BY a.obra_id, a.concepto, a.partida_id ORDER BY a.anio_mes DESC) AS desde_el_final
+    FROM (SELECT pr.*,
+                 SUM(pr.importe_mes) OVER (PARTITION BY pr.obra_id, pr.concepto, pr.partida_id
+                                          ORDER BY pr.anio_mes) AS plan_acumulado
+          FROM perfil pr) a
+)
 , partes AS (
-    SELECT
-        pr.obra_id,
-        pr.concepto,
-        pr.partida_id,
-        pr.anio_mes,
-        d.pendiente,
-        ROUND(d.pendiente * pr.importe_mes / d.total_perfil, 2) AS parte,
-        d.pendiente_con_coeficientes,
-        ROUND(d.pendiente_con_coeficientes * pr.importe_mes / d.total_perfil, 2) AS parte_con_coef,
-        d.pendiente_personal,
-        ROW_NUMBER() OVER (PARTITION BY pr.obra_id, pr.concepto, pr.partida_id ORDER BY pr.anio_mes DESC) AS desde_el_final
-    FROM perfil pr
-    JOIN _dev_partida d ON d.obra_id = pr.obra_id AND d.concepto = pr.concepto AND d.partida_id = pr.partida_id
+    -- Lo repartido HASTA cada mes, al centimo; el ultimo mes, el pendiente entero.
+    SELECT en.obra_id, en.concepto, en.partida_id, en.anio_mes,
+           d.pendiente, d.pendiente_personal,
+           CASE WHEN en.desde_el_final = 1 THEN d.pendiente
+                ELSE ROUND(d.pendiente * en.peso_acumulado / d.total_perfil, 2) END AS hasta,
+           CASE WHEN en.desde_el_final = 1 THEN d.pendiente_con_coeficientes
+                ELSE ROUND(d.pendiente_con_coeficientes * en.peso_acumulado / d.total_perfil, 2) END AS hasta_con_coef
+    FROM envolvente en
+    JOIN _dev_partida d ON d.obra_id = en.obra_id AND d.concepto = en.concepto AND d.partida_id = en.partida_id
     WHERE d.pendiente > 0 AND d.total_perfil > 0
 )
 , repartido AS (
-    -- El ultimo mes del perfil absorbe el redondeo: la suma es el pendiente.
-    SELECT
-        r.obra_id,
-        r.concepto,
-        r.partida_id,
-        r.anio_mes,
-        CASE WHEN r.desde_el_final = 1 THEN r.pendiente - (r.suma_partes - r.parte) ELSE r.parte END AS importe,
-        CASE WHEN r.desde_el_final = 1 THEN r.pendiente_con_coeficientes - (r.suma_partes_con_coef - r.parte_con_coef) ELSE r.parte_con_coef END AS importe_con_coef,
-        r.pendiente AS pendiente_partida,
-        r.pendiente_personal
-    FROM (
-        SELECT x.*,
-               SUM(x.parte) OVER (PARTITION BY x.obra_id, x.concepto, x.partida_id) AS suma_partes,
-               SUM(x.parte_con_coef) OVER (PARTITION BY x.obra_id, x.concepto, x.partida_id) AS suma_partes_con_coef
-        FROM partes x
-    ) r
+    -- Cada mes, lo de hasta el menos lo de hasta el anterior (`repartir_pendiente`):
+    -- con pendiente >= 0 cada mes queda en [0, pendiente] y la suma es exacta.
+    SELECT r.obra_id, r.concepto, r.partida_id, r.anio_mes,
+           r.hasta - COALESCE(LAG(r.hasta) OVER w, 0) AS importe,
+           r.hasta_con_coef - COALESCE(LAG(r.hasta_con_coef) OVER w, 0) AS importe_con_coef,
+           r.pendiente AS pendiente_partida,
+           r.pendiente_personal
+    FROM partes r
+    WINDOW w AS (PARTITION BY r.obra_id, r.concepto, r.partida_id ORDER BY r.anio_mes)
 )
 , repartido_personal AS (
     -- F-158: el personal, por acumulado sobre el pendiente del mes
@@ -790,9 +797,11 @@ END $$;
 -- 3. `_dev_ctr_reparto`: cada (partida, mes) del reparto, sin su personal, x
 --    las fracciones, al centimo por ACUMULADO en orden de contrato
 --    (`repartir_por_contratos`); el resto, a la fila sin contrato. Solo los
---    (partida, mes) con importe > 0: un mes NEGATIVO del plan de V (la 1-0702
---    tenia uno el 31-10, -0,11) va ENTERO sin contrato; repartido, daria trozos
---    negativos a cada contrato y la guarda R50 tumbaria la noche.
+--    (partida, mes) con importe > 0. Hasta F-159 un mes NEGATIVO del plan de V
+--    (la 1-0702 tenia uno el 31-10, -0,11) daba un (partida, mes) negativo que
+--    iba ENTERO sin contrato; desde F-159 el reparto sobre el plan neto no da
+--    ninguno (lo vigila la guarda del paso 5), y la condicion se queda porque
+--    protege el 0 (un mes anulado por un estorno posterior).
 -- 4. `TRUNCATE` + `INSERT` por (obra, mes, categoria, contrato) y la guarda de
 --    R50, que tumba la transaccion entera.
 -- Lo contratado pendiente de servir que supera el devengo NO se publica: no es
