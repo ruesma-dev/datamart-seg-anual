@@ -5,6 +5,6 @@
 - [x] T3: `07_devengo_pendiente.sql` paso 5: `envolvente`, `partes`, `repartido` y comentarios (design §3.1)  |  Verificación: `pytest tests/test_f159_reparto_envolvente.py -k "r8 or r11" tests/test_f140_sql.py tests/test_f150_sql.py tests/test_f150_personal.py tests/test_f150_contrato_compra.py` en verde
 - [x] T4: Guarda nueva tras `_dev_reparto` y mensaje de R50 con la primera fila negativa (design §3.2-3.3)  |  Verificación: `pytest tests/test_f159_reparto_envolvente.py -k "r9 or r10"` en verde
 - [x] T5: Fichas de `config/diccionario/tesoreria.yaml` (R12) y `version: 74` con su nota en `00_global.yaml`  |  Verificación: `pytest tests/test_f159_reparto_envolvente.py -k r12` y los tests del diccionario (F-006, F-158, F-157) en verde
-- [ ] T6: Campaña de mutación (alcance `repartir_pendiente`) y manual del SQL M1-M5 (design §5)  |  Verificación: informe en `progress/impl_F-159.md` con muertos y supervivientes analizados
+- [x] T6: Campaña de mutación (alcance `repartir_pendiente`) y manual del SQL M1-M5 (design §5)  |  Verificación: informe en `progress/impl_F-159.md` con muertos y supervivientes analizados
 - [ ] T7: Despliegue en Azure con los pasos de `design.md` §6 (reproducción en solo lectura, imagen, job, `build-tesoreria`, `apply-grants`, comprobaciones, diccionario v74)  |  Verificación: MANUAL (humano): 0 negativos en `devengo_pendiente_contrato_mes` y en `devengo_pendiente_obra_mes`, y `build_tesoreria` SUCCESS en `_meta.etl_runs`
 - [ ] T8: Ejecutar `bash harness/init.sh` en verde  |  Verificación: `bash harness/init.sh` exit 0
