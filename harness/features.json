@@ -2547,7 +2547,7 @@
         "Fichas del diccionario actualizadas y v74; `bash harness/init.sh` en verde",
         "Despliegue MANUAL del humano con los pasos de `specs/F-159-hotfix-devengo-negativo-2/design.md` §6: reproducción en solo lectura, imagen, job, `build-tesoreria` suelto, `apply-grants`, 0 negativos en `devengo_pendiente_contrato_mes` y `devengo_pendiente_obra_mes`, y vuelta atrás"
       ],
-      "status": "pending",
+      "status": "in_progress",
       "sdd": true,
       "rigor": "estandar",
       "priority": 0,
