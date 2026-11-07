@@ -1,7 +1,7 @@
 # F-159 · Tareas
 
 - [x] T1: Tests nuevos `tests/test_f159_reparto_envolvente.py` (R1-R12, design §5) y los de F-140/F-150/F-158 que fijan la fórmula vieja actualizados (design §2); RED sobre `93fc38c` anotado en `progress/impl_F-159.md`  |  Verificación: `.venv/Scripts/python.exe -m pytest tests/test_f159_reparto_envolvente.py` falla en R6/R8/R9/R10/R12
-- [ ] T2: `repartir_pendiente` con envolvente y acumulado en `etl_sigrid/domain/proyeccion_caja.py` (design §4)  |  Verificación: `pytest tests/test_f159_reparto_envolvente.py -k "r1 or r3 or r4 or r5 or r6" tests/test_f140_dominio.py tests/test_f150_coeficiente.py tests/test_f158_reparto_personal.py` en verde
+- [x] T2: `repartir_pendiente` con envolvente y acumulado en `etl_sigrid/domain/proyeccion_caja.py` (design §4)  |  Verificación: `pytest tests/test_f159_reparto_envolvente.py -k "r1 or r3 or r4 or r5 or r6" tests/test_f140_dominio.py tests/test_f150_coeficiente.py tests/test_f158_reparto_personal.py` en verde
 - [ ] T3: `07_devengo_pendiente.sql` paso 5: `envolvente`, `partes`, `repartido` y comentarios (design §3.1)  |  Verificación: `pytest tests/test_f159_reparto_envolvente.py -k "r8 or r11" tests/test_f140_sql.py tests/test_f150_sql.py tests/test_f150_personal.py tests/test_f150_contrato_compra.py` en verde
 - [ ] T4: Guarda nueva tras `_dev_reparto` y mensaje de R50 con la primera fila negativa (design §3.2-3.3)  |  Verificación: `pytest tests/test_f159_reparto_envolvente.py -k "r9 or r10"` en verde
 - [ ] T5: Fichas de `config/diccionario/tesoreria.yaml` (R12) y `version: 74` con su nota en `00_global.yaml`  |  Verificación: `pytest tests/test_f159_reparto_envolvente.py -k r12` y los tests del diccionario (F-006, F-158, F-157) en verde
