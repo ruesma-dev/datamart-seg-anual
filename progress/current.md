@@ -24,6 +24,9 @@ el humano en `progress/spec_F-159.md` §7: **D1** envolvente (A) o solo meses po
 parchear R50 hasta el despliegue (tesoreria un día atrasada); **D5** diccionario v74 tras la v73
 de F-157; **D6** sin sandbox. Ojo: F-157 sigue `in_progress` en `features.json` aunque está
 mergeada en `main`; F-159 queda `pending` (prioridad 0) para no tener dos `in_progress`.
+`bash harness/init.sh` en el worktree: ROJO solo por el entorno (falta `.env`, que no se copia;
+`test_f006_t26_cli_dry_run_no_toca_la_base` cae por eso con `-x`: 256 passed, 1 failed). Puertas
+de F-159: cobertura N/A (sin Python de producción) y tamaño dentro de topes (72/150, 208/250).
 
 ## 2026-11-06 · F-157 · `in_progress` · implementando · rama `feature/F-157-planificacion-fase0`
 
