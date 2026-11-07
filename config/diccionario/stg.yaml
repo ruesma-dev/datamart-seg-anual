@@ -55,7 +55,9 @@ objetos:
     descripcion: >-
       El nucleo temporal del datamart: la explosion MENSUAL del presupuesto, con
       una fila por cada mes en el que una partida tiene importe, para los cuatro
-      ambitos que usa el seguimiento. De aqui salen `mart` y `cierre`.
+      ambitos que usa el seguimiento. De aqui salen `mart` y `cierre`. La fase 0
+      (el presupuesto vivo de hoy de coste y venta) no esta aqui: su reparto en
+      el tiempo es `stg.plan_mensual_fase0` (F-157), y no se suma con esta.
 
       **ES EL OBJETO MAS PELIGROSO DEL DATAMART, Y ESTO NO ES UNA PREFERENCIA DE
       ENRUTADO SINO UNA ADVERTENCIA DE CORRECCION:** aqui conviven TODAS las
@@ -184,9 +186,11 @@ objetos:
       version:
         significado: >-
           El campo `fas` de Sigrid, y **significa dos cosas segun el ambito**: en
-          los REALES (3 y 7) es el MES —con `fas = 0` como el "Previsto" vivo— y
-          en los MASTER (8 y 11) es el NUMERO DE VERSION. Cruzar las dos
-          lecturas produce series temporales inventadas.
+          los REALES (3 y 7) es el MES de cada cierre (1 a N) y en los MASTER (8
+          y 11) es el NUMERO DE VERSION. Cruzar las dos lecturas produce series
+          temporales inventadas. Aqui NO hay filas de la fase 0 (el presupuesto
+          vivo de hoy): su reparto en el tiempo esta en `stg.plan_mensual_fase0`
+          (F-157).
 
           **Es el numero de fase ORIGINAL de Sigrid, sin renumerar, y por eso
           TIENE HUECOS en las 9 obras a las que la regla de un cierre por mes
@@ -365,6 +369,202 @@ objetos:
           importes no cuadraran.
     ejemplos_preguntas:
       - De donde sale el planificado de la obra X antes de elegir version
+
+  plan_mensual_fase0:
+    tipo: tabla
+    capa: preparacion
+    consumo_recomendado: true
+    descripcion: >-
+      El presupuesto vivo de hoy (fase 0), repartido en el tiempo. La fase 0 de
+      Sigrid ES el coste (ambito 3) y la venta (ambito 7) de la obra a dia de
+      hoy, el presupuesto que el jefe de obra va evolucionando; aqui esta su
+      reparto por meses, el de la pantalla de Sigrid «Planificacion en el tiempo
+      (por partidas)»: el `planif` de cada partida (% ACUMULADO por mes)
+      anclado en el `plafec` de la fase 0 de su obra y ambito, con la misma
+      regla que la planificacion del master (F-157). Es la foto de HOY: no
+      guarda historia, cada noche se rehace con lo que tenga Sigrid.
+
+      **NO SE SUMA NI SE UNE CON `stg.plan_mensual`.** Alli estan la serie de
+      cierres mensuales de los ambitos 3 y 7 (fases 1 a N: los escenarios Coste
+      Real y Venta Real de `mart`) y la planificacion del master (8 y 11, todas
+      sus versiones). Son otras fotos de la misma obra: la fase 0 se COMPARA con
+      ellas mes a mes (la venta de hoy frente a `mart.fact_seguimiento_mensual`
+      con `escenario = 'Venta Planificada'`, que es la version master vigente;
+      el coste de hoy frente a la venta de hoy en esta misma tabla), nunca se
+      acumula con ellas.
+
+      **SOLO ESTAN LAS PARTIDAS PLANIFICADAS.** Una partida sin `planif`, con
+      todo a cero o en una obra sin `plafec` en esa fase no tiene filas: el ETL
+      no inventa reparto. El 2026-11-05 lo planificado era ~86,5 % del importe
+      de coste y ~93,8 % del de venta en las obras con reparto; lo que falta,
+      por obra y ambito, esta en `stg.v_plan_mensual_fase0_cobertura`. Para el
+      total de la fase 0 de una obra, esa vista o `stg.presupuesto`, no la suma
+      de esta tabla.
+
+      **EL TOTAL DE UNA PARTIDA es `importe_origen` de su ultimo mes**, no la
+      suma de `importe_mes`: cada mes se redondea con los decimales de la obra,
+      como el master, y la suma puede descuadrar unos centimos (hasta 0,03 EUR
+      por partida en la 0726) con `importe_partida`.
+
+      DE CUANDO ES EL DATO: el de `stg.presupuesto` de la obra esa noche; para
+      una obra concreta, `_meta.v_frescura_obra` (una obra congelada lleva hasta
+      6 dias).
+    grano: >-
+      Una fila por (`obra_id`, `ambito_id`, `partida_id`, `anio_mes`), que es
+      su clave primaria. Solo ambitos 3 y 7 y solo meses con valor: los meses
+      anteriores al arranque de la partida (a cero sin movimiento) no estan.
+      Del orden de 1,25 M de filas en unas 140 obras.
+    clave_negocio: [obra_id, ambito_id, partida_id, anio_mes]
+    paso_etl: build_stg
+    refresco: nocturno
+    columnas:
+      presupuesto_id:
+        significado: >-
+          Fila de `stg.presupuesto` (fase 0) de la que sale el reparto: su
+          importe total esta alli.
+        agregacion: no_sumable
+      obra_id:
+        significado: Identificador de la obra en Sigrid.
+        agregacion: no_sumable
+      partida_id:
+        significado: Identificador de la partida en Sigrid.
+        agregacion: no_sumable
+      ambito_id:
+        significado: 3 = coste de hoy (fase 0); 7 = venta de hoy (fase 0).
+        valores: ["3", "7"]
+        agregacion: no_sumable
+      mes_inicio:
+        significado: >-
+          Primer mes del reparto: el mes de `raw.obrfasamb.plafec` de la fase 0
+          de esa obra y ambito (la posicion 1).
+        agregacion: no_sumable
+      anio_mes:
+        significado: >-
+          Mes de la fila, como fecha del dia 1: `mes_inicio` mas `posicion_mes`
+          menos uno.
+        agregacion: no_sumable
+      posicion_mes:
+        significado: >-
+          Posicion del mes en el `planif` de la partida, empezando en 1 en
+          `mes_inicio`. Puede tener huecos (meses a cero antes del arranque).
+        agregacion: no_sumable
+      pct_acumulado:
+        significado: >-
+          Porcentaje ACUMULADO planificado hasta ese mes, en tanto por uno, con
+          la regla del master: un cero intermedio es un estorno; un cero final
+          arrastra el ultimo valor positivo.
+        unidad: "%"
+        agregacion: promedio
+      pct_mes:
+        significado: El porcentaje de ESE mes, diferencia con el acumulado anterior.
+        unidad: "%"
+        agregacion: promedio
+      precio_unitario:
+        significado: Precio unitario de la partida en la fase 0, con seis decimales.
+        unidad: EUR
+        agregacion: no_sumable
+      can_mes:
+        significado: Cantidad planificada para ese mes (`cantidad * pct_mes`).
+        agregacion: suma_solo_dentro_del_mes
+      can_origen:
+        significado: Cantidad planificada acumulada hasta ese mes.
+        agregacion: ultimo_valor
+      importe_mes:
+        significado: >-
+          Importe planificado PARA ESE MES, redondeado con los decimales de la
+          obra como el master. Se suma entre meses para una serie; el total de
+          la partida es `importe_origen` de su ultimo mes.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+      importe_origen:
+        significado: >-
+          Importe planificado ACUMULADO hasta ese mes. Sumarlo a lo largo del
+          tiempo multiplica el resultado.
+        unidad: EUR
+        agregacion: ultimo_valor
+      importe_mes_raw:
+        significado: El importe del mes con el precio sin redondear, a dos decimales.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+      importe_origen_raw:
+        significado: Version sin redondear del acumulado.
+        unidad: EUR
+        agregacion: ultimo_valor
+      importe_partida:
+        significado: >-
+          Importe TOTAL de la partida en la fase 0 (`stg.presupuesto.importe`),
+          repetido en cada mes. No se suma entre meses.
+        unidad: EUR
+        agregacion: no_sumable
+      _built_at:
+        significado: Instante de construccion de la fila. Instrumentacion, no negocio.
+        agregacion: no_sumable
+    relaciones:
+      - de: presupuesto_id
+        a: stg.presupuesto.presupuesto_id
+        cardinalidad: "N:1"
+        porque: Para el importe total de la partida en la fase 0 y sus decimales.
+      - de: obra_id
+        a: stg.v_plan_mensual_fase0_cobertura.obra_id
+        cardinalidad: "N:N"
+        porque: >-
+          Para saber cuanto de la fase 0 de la obra esta repartido. La vista da
+          una fila por `(obra_id, ambito_id)`: se une por las dos columnas, o
+          el coste y la venta se cruzan y duplican importes.
+    ejemplos_preguntas:
+      - Reparto por meses de la venta de hoy de la 0726
+      - Venta viva por meses frente al master vigente
+      - Compara mes a mes el coste de hoy repartido con la venta de hoy repartida de una obra
+
+  v_plan_mensual_fase0_cobertura:
+    tipo: vista
+    capa: preparacion
+    consumo_recomendado: true
+    descripcion: >-
+      Cuanto del presupuesto vivo de hoy (fase 0) de cada obra esta repartido
+      en el tiempo en `stg.plan_mensual_fase0`. Una fila por obra y ambito (3
+      coste, 7 venta) con fase 0 en `stg.presupuesto`, tenga reparto o no: lo
+      que no tiene `planif` aparece en `importe_sin_planificar`. Es la que
+      contesta «cuanto de la fase 0 esta planificado» y el total de la fase 0
+      de la obra (`importe_fase0`).
+    grano: Una fila por (`obra_id`, `ambito_id`), solo ambitos 3 y 7.
+    clave_negocio: [obra_id, ambito_id]
+    paso_etl: build_stg
+    refresco: nocturno
+    columnas:
+      obra_id:
+        significado: Identificador de la obra en Sigrid.
+        agregacion: no_sumable
+      ambito_id:
+        significado: 3 = coste de hoy (fase 0); 7 = venta de hoy (fase 0).
+        valores: ["3", "7"]
+        agregacion: no_sumable
+      mes_inicio:
+        significado: Primer mes del reparto de la obra y ambito.
+        agregacion: no_sumable
+        nulo_significa: Ninguna partida de esa obra y ambito tiene reparto en el tiempo.
+      partidas:
+        significado: Partidas de la fase 0 de esa obra y ambito.
+        agregacion: suma
+      partidas_planificadas:
+        significado: Las que tienen filas en `stg.plan_mensual_fase0`.
+        agregacion: suma
+      importe_fase0:
+        significado: Importe total de la fase 0 (suma de `stg.presupuesto.importe`).
+        unidad: EUR
+        agregacion: suma
+      importe_planificado:
+        significado: Importe total de las partidas planificadas.
+        unidad: EUR
+        agregacion: suma
+      importe_sin_planificar:
+        significado: >-
+          La diferencia: el importe de la fase 0 que no esta repartido en el
+          tiempo y que `stg.plan_mensual_fase0` no contiene.
+        unidad: EUR
+        agregacion: suma
+    ejemplos_preguntas:
+      - Cuanto de la fase 0 de la obra X esta planificado
 
   presupuesto:
     tipo: tabla
@@ -1155,6 +1355,29 @@ objetos:
       implementacion de la regla (decision del humano del 2026-09-22):
       `stg.plan_mensual.anio_mes` la aplica una vez y `cierre.fn_mes_de_fase`
       la envuelve.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_stg
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_explotar_planif:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build, usada solo dentro del SQL que construye
+      `stg.plan_mensual_fase0`. Se documenta porque es la regla con la que se
+      lee el `planif` de la fase 0.
+    descripcion: >-
+      Explota UN `planif` (% acumulado por mes separado por `|`) en sus
+      posiciones con valor: `posicion_mes`, `pct_acumulado` y `pct_mes`, con la
+      regla del master de `stg.plan_mensual` (positivo literal; un cero con un
+      positivo despues es estorno; un cero final arrastra el ultimo positivo).
+      No filtra: el descarte lo aplica el build de `stg.plan_mensual_fase0`
+      (F-157).
     grano: null
     clave_negocio: []
     paso_etl: build_stg

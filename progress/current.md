@@ -9,7 +9,6 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-
 ## 2026-11-06 · F-040 · `spec_ready` · spec escrita · rama `feature/F-040-ingresos`
 
 Spec-author, en su worktree desde `main` `da6c36f`; sin código, va a la PARADA 1. Spec en
@@ -31,6 +30,42 @@ copia, regla dura) → `[KO] Falta .env` y `test_f006_t26_cli_dry_run_no_toca_la
 validar `SigridApiSettings` (256 passed antes de parar, como en F-158). Tamaño 138/150 y 207/250
 en verde. El diff es solo documentación y `features.json`: la puerta completa, desde el checkout
 principal con `.env` tras fusionar.
+
+## 2026-11-06 · F-157 · `in_progress` · implementando · rama `feature/F-157-planificacion-fase0`
+
+Implementer, en el worktree del agente. Spec aprobada por el humano (la A en D1 a D8). `main`
+(`da6c36f`: F-156 y F-158 en `done`, diccionario v72) traído a la rama; en F-157 el diccionario
+pasa a la **v73** (no a la 72 de la spec). Corrección del humano a la redacción: la fase 0 ES el
+presupuesto vivo de hoy (coste y venta reales de hoy); no se dice que «no es real». Tarea en
+curso y desviaciones: se anotan aquí y en `progress/impl_F-157.md`.
+**T1-T11 hechas** (un commit por tarea, `21672ad`..), pendiente de review. Desviaciones, todas
+justificadas en el informe: R18 sin test de `git diff` (sería permanente; el 08 lo fija F-073), la
+puerta de disco no se extrae a un helper (no tocar F-019), el oráculo redondea a 6 decimales, filtro
+de `plafec` inválido en el 09, ficha de `stg.fn_explotar_planif` + F-079 + enmienda de F-006 (290
+objetos) y `PRESUPUESTO_MAX` 34.253 con motivo. Mutación manual (21 mutantes, 1 equivalente).
+Diccionario del árbol hoy: **v73, 290 objetos, 2485 columnas, 139 de consumo**.
+`init.sh` del worktree: ROJO solo por el `.env` (test_f006_t26). Quedan T12 (MANUAL, sábado) y la
+puerta completa en una copia con `.env`.
+
+## 2026-11-05 · F-157 · `pending` · spec escrita, a la espera de la PARADA 1 · rama `feature/F-157-planificacion-fase0`
+
+Spec-author. Spec en `specs/F-157-planificacion-fase0/`, medida en Azure en solo lectura
+(`progress/spec_F-157.md`). Sin código. **No implementar hasta cerrar F-156.** Hallazgos: la fase
+0 con `plafec` está en 144 obras de coste y 139 de venta; ~1,25 M filas a publicar (103 s de
+SELECT); el 97 % de las partidas planificadas acaba en el 100 % con la regla del master; sin
+reparto, ~110 M€ de coste y ~51 M€ de venta; la 0726 da 83 partidas y 312 filas (2026-10 a
+2028-07) con ≤ 0,03 € de redondeo por partida. `mart` lee el ámbito 3/7 de `plan_mensual` sin
+filtrar `version`: por eso la recomendación es una tabla propia. Decisiones para el humano
+(recomendada en negrita en `requirements.md`): D1 tabla propia `stg.plan_mensual_fase0`; D2
+función `stg.fn_explotar_planif` solo para la tabla nueva; D3 vista de cobertura; D4 redondeo
+del master; D5 desplegar en SÁBADO (el sello fuerza una noche completa: +~100 min si no es
+domingo); D6 solo ámbitos 3 y 7; D7 sin regla dura nueva; D8 `mart` no se toca. Queda además
+para Control de Costes: el cuadre con la pantalla de Sigrid (no está documentada en ningún
+sitio) en la 0726 y en una obra con `plamed = 2`.
+`bash harness/init.sh` en el worktree del spec-author: ROJO por entorno, no por la spec (falta
+`.env` en el worktree y no se copia: `test_f006_t26_cli_dry_run_no_toca_la_base` cae en
+`SigridApiSettings` sin `base_url`); 256 tests pasados antes del corte y tamaños dentro de tope
+(requirements 132/150, design 250/250). Hay que repasarlo en el checkout principal.
 
 ## 2026-11-05 · F-158 · implementado (T1-T5), pendiente de review · rama `feature/F-158-hotfix-devengo-negativo`
 

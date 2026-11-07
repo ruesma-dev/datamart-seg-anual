@@ -99,8 +99,10 @@ confirmación cubre el plan que se enseñó, no lo que apareció después.
 - `etl_sigrid/infrastructure/postgres/` — cliente + `sql/` por capa:
   `raw` (implícito en ingesta), `stg/`, `mart/`, `cierre/`, `compras/`,
   `maestro/`, `retenciones/`, `personal/`, `contabilidad/`, `tesoreria/`,
-  `auxiliar/`, `descompuestos/`, `postventa/`. **`postventa/` (F-156)** son
-  unidades, incidencias, tareas, su histórico, sus adjuntos y el coste por obra
+  `auxiliar/`, `descompuestos/`, `postventa/`. En `stg/`, **`plan_mensual_fase0`
+  (F-157)** es el presupuesto vivo de hoy (fase 0, coste 3 y venta 7) repartido
+  en el tiempo con el `planif` del jefe de obra; no se suma con `plan_mensual`.
+  **`postventa/` (F-156)** son unidades, incidencias, tareas, su histórico, sus adjuntos y el coste por obra
   de origen (solo facturas), sin personas y con el texto enmascarado; los datos
   personales, en `postventa_restringida`, que solo leen el perfil postventa
   (el cuarto) y el total (`R-POSTVENTA-RESTRINGIDA`). **`tesoreria/` (F-037)** es la cartera de

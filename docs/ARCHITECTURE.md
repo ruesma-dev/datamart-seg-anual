@@ -237,10 +237,22 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
 - Ámbitos: amb=3 Coste Real, amb=7 Venta Real, amb=8 Master Coste,
   amb=11 Master Venta.
 - Master (amb 8/11): `fas` = número de VERSIÓN; planif explosionada.
-- Reales (amb 3/7): `fas` = MES; fas=0 = Previsto (foto viva),
-  fas=1..N cierres mensuales; planif NO explosionada;
-  importe del mes = diferencia con el mes anterior de la serie de la partida
-  (ver «La serie real es densa», F-118).
+- Reales (amb 3/7): `fas` = MES; fas=1..N cierres mensuales (su `planif` no se
+  explota); importe del mes = diferencia con el mes anterior de la serie de la
+  partida (ver «La serie real es densa», F-118).
+- **La fase 0 (fas=0) es el presupuesto vivo de hoy** de coste y venta: lo que
+  la obra cuesta y vende a día de hoy, que el jefe de obra va evolucionando sin
+  historia. Su total está en `stg.presupuesto` (`fase_num = 0`) y, desde F-157,
+  su reparto en el tiempo (la pantalla «Planificación en el tiempo (por
+  partidas)») en **`stg.plan_mensual_fase0`**: el `planif` de cada partida
+  anclado en el `plafec` de la fase 0, con la regla del master en una sola copia
+  (`stg.fn_explotar_planif`, con su oráculo `domain/planif.py`), y lo que queda
+  sin repartir en `stg.v_plan_mensual_fase0_cobertura`. Va en tabla propia y no
+  en `stg.plan_mensual` porque `mart` publica todo el ámbito 3/7 de esa tabla
+  como Coste/Venta Real sin mirar `version`: la fase 0 NO se suma con los
+  cierres (fases 1 a N) ni con la planificación del master, se compara con
+  ellos. La construye el sub-paso `build_plan_mensual_fase0` de `build_stg`,
+  acotado a las obras del plan y de una pasada; nadie fuera de `stg` la lee.
 - **EL MES DE UN CIERRE REAL LO DA SU TEXTO (F-051, absorbida en F-118).** El
   mes de cada fila real de `stg.plan_mensual` es `stg.fn_mes_de_fase`: manda el
   texto de la fase (`obrfas.res`, «Agosto 2026»), aunque discrepe de las fechas
@@ -1040,7 +1052,8 @@ actividad en los últimos doce meses. Esto no fue una mejora de rendimiento: fue
 la reparación de una avería.
 
 Desde F-025, `06_presupuesto.sql` y `08_plan_mensual.sql` se construyen **solo
-para las obras vivas**. Lo importante no es cuáles, sino **cómo se escribe**.
+para las obras vivas** (y desde F-157 también `09_plan_mensual_fase0.sql`, con su
+propio marcador y la tercera tabla acotada). Lo importante no es cuáles, sino **cómo se escribe**.
 
 #### El borrado se DERIVA de lo que se escribe (y esto cambia una invariante)
 
