@@ -3,11 +3,13 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **146 features**, 72 abiertas (0 en curso, 1 con la spec lista, 0 bloqueadas y 71 en backlog) y 74 terminadas.
+Resumen: **147 features**, 73 abiertas (1 en curso, 1 con la spec lista, 0 bloqueadas y 71 en backlog) y 74 terminadas.
 
 ## En curso
 
-_Ninguna feature en curso._
+| # | Feature | Prioridad | Rigor | Rama |
+|---|---|---|---|---|
+| F-159 | Hotfix 2: un mes negativo del plan de V se amplifica en el reparto del devengo y tumba build_tesoreria (guarda R50) | 0 | estandar | `feature/F-159-hotfix-devengo-negativo-2` |
 
 ## Spec lista
 
@@ -175,6 +177,12 @@ _Ninguna feature bloqueada._
 | F-142 | Que cualquier IA pueda leer los adjuntos: `abrir_adjunto` devuelve el contenido CONVERTIDO (texto por página, o imagen si es un escaneo) de PDF y ofimática, también Word 97 y Excel antiguos, y el original a petición | 74 | estandar |
 
 ## Detalle
+
+### F-159 · Hotfix 2: un mes negativo del plan de V se amplifica en el reparto del devengo y tumba build_tesoreria (guarda R50)
+
+estado **en curso** · prioridad 0 · rigor `estandar` · SDD sí · rama `feature/F-159-hotfix-devengo-negativo-2`
+
+La nocturna del 2026-11-07 (imagen r20261106-1848, ya con F-158) falló dos veces en `build_tesoreria` (04:52 y 06:30 UTC): «el coste por contrato no cuadra con la obra-mes en 0 obras o tiene 1 importes negativos», la guarda R50 de `sql/tesoreria/07_devengo_pendiente.sql`. `tesoreria` sigue con la construcción del 06-11 08:38. Causa medida en solo lectura el 07-11 (`progress/spec_F-159.md`): el paso 5 reparte el pendiente de cada partida en proporción a su plan de V con pesos CON SIGNO. La versión «PLANIFICACION CUATRIMESTRAL OCT-26» de 1-0710 (V13, creada en Sigrid el 06-11) trae en la partida 404326 (03.02.11) un 0 intermedio en el `planif` (99,994 % / 0 / 100 %) que `stg` convierte, con razón, en -1.079,94 en 2026-11 y +1.080,00 en 2026-12: `total_perfil` 0,06 y noviembre recibe -19.438.920,00 (1-0710/2026-11/CD sin contrato: -18.791.769,87). Es la clase de la D2 de F-158 (mes negativo del plan) en su forma amplificada; la observación 3 de su review (último mes negativo por redondeo) no salta hoy pero está latente. Arreglo recomendado (A): perfil = envolvente del plan NETO acumulado (un mes negativo se absorbe en los anteriores) y reparto por acumulado, con su espejo en el dominio; medido: 0 negativos y 0 descuadres. Relajar R50 publicaría -18,8 M€: descartado.
 
 ### F-040 · El lado de ingresos: ventas, certificaciones y clientes
 

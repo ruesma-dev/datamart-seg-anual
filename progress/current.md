@@ -54,6 +54,37 @@ rojo solo en `test_f006_t26`. La puerta completa la pasa el líder en una copia 
 worktree `wt_main` del scratchpad de la sesión). Si el equipo se suspende, pytest se para: dejarlo
 encendido durante la puerta (~80-105 min).
 
+## 2026-11-07 · F-159 · `in_progress` · implementando (HOTFIX 2) · rama `feature/F-159-hotfix-devengo-negativo-2`
+
+Implementer, en el worktree del agente. Spec aprobada por el humano: D1 = A (envolvente neta),
+D2 = acumulado, D3 = guarda nueva + R50 con la primera fila, D4 = no se relaja R50, D5 = v74,
+D6 = sin sandbox. `main` `70d4df7` mergeada en la rama. F-157 sigue `in_progress` en `main`
+(la cierra el líder aparte): durante este trabajo hay dos `in_progress` en la rama.
+Hechas T1-T6 (commits f664d39, 4966c73, 9d416ee, 314c204, 5166c0b, 6f67dad); informe en
+`progress/impl_F-159.md`. Afectados en verde (1215 passed), cobertura 100 % (16/16), mutación
+manual 26/27 muertos (1 equivalente). `init.sh` del worktree ROJO solo por entorno (2
+`in_progress` por orden del líder y sin `.env`); T8 (puerta completa) y T7 (despliegue
+MANUAL) pendientes del líder y del humano. Desviación menor: alias `r` en `repartido`.
+
+## 2026-11-07 · F-159 · `pending` · spec escrita (HOTFIX 2) · rama `feature/F-159-hotfix-devengo-negativo-2`
+
+Spec-author, en su worktree desde `main` `93fc38c`; sin código, va a la PARADA 1. La nocturna del
+07-11 (con F-158) volvió a caer en R50 (04:52 y 06:30 UTC); `tesoreria` sigue con lo del 06-11
+08:38. Medido en solo lectura (`progress/spec_F-159.md`): la fila es 1-0710/2026-11/CD sin
+contrato, **-18.791.769,87**; viene de la partida 404326 de la V13 nueva (CUATRIMESTRAL OCT-26,
+creada en Sigrid el 06-11), plan -1.079,94 / +1.080,00 tras el cierre (0 intermedio del `planif`,
+estorno legítimo): `total_perfil` 0,06 y el reparto con pesos con signo lo amplifica. Clase de la
+D2 de F-158 en forma nueva; la observación 3 está latente, no es la causa. Recomendada A: perfil =
+envolvente del plan neto acumulado + reparto por acumulado (0 negativos medidos). Decisiones para
+el humano en `progress/spec_F-159.md` §7: **D1** envolvente (A) o solo meses positivos (P);
+**D2** acumulado o resto al último; **D3** guarda nueva y R50 con la primera fila; **D4** no
+parchear R50 hasta el despliegue (tesoreria un día atrasada); **D5** diccionario v74 tras la v73
+de F-157; **D6** sin sandbox. Ojo: F-157 sigue `in_progress` en `features.json` aunque está
+mergeada en `main`; F-159 queda `pending` (prioridad 0) para no tener dos `in_progress`.
+`bash harness/init.sh` en el worktree: ROJO solo por el entorno (falta `.env`, que no se copia;
+`test_f006_t26_cli_dry_run_no_toca_la_base` cae por eso con `-x`: 256 passed, 1 failed). Puertas
+de F-159: cobertura N/A (sin Python de producción) y tamaño dentro de topes (72/150, 208/250).
+
 ## 2026-11-06 · F-157 · `in_progress` · implementando · rama `feature/F-157-planificacion-fase0`
 
 Implementer, en el worktree del agente. Spec aprobada por el humano (la A en D1 a D8). `main`

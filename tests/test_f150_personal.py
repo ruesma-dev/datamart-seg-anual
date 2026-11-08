@@ -220,13 +220,12 @@ def test_f150_r45_pendiente_personal_redondeado_y_solo_en_coste() -> None:
 
 
 def test_f150_r46_el_reparto_lleva_la_parte_de_personal() -> None:
-    """El último mes absorbe el redondeo del PENDIENTE; el personal se reparte
-    por ACUMULADO sobre ese pendiente ya repartido (F-158: con dos repartos
-    independientes, una cuota de 0,999999 dejaba el último mes con más personal
-    que pendiente); sin perfil, entero al primer mes pendiente."""
+    """El PENDIENTE se reparte por acumulado sobre el plan neto (F-159); el
+    personal, por ACUMULADO sobre ese pendiente ya repartido (F-158: con dos
+    repartos independientes, una cuota de 0,999999 dejaba el último mes con más
+    personal que pendiente); sin perfil, entero al primer mes pendiente."""
     texto = _devengo()
-    assert ("CASE WHEN r.desde_el_final = 1 THEN r.pendiente - (r.suma_partes - r.parte) "
-            "ELSE r.parte END AS importe") in texto
+    assert "r.hasta - COALESCE(LAG(r.hasta) OVER w, 0) AS importe" in texto
     assert ("ROUND(q.pendiente_personal * q.acumulado / q.pendiente_partida, 2) - "
             "ROUND(q.pendiente_personal * (q.acumulado - q.importe) / q.pendiente_partida, 2) "
             "AS importe_personal") in texto

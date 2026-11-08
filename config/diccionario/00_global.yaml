@@ -793,7 +793,16 @@
 # `stg.v_plan_mensual_fase0_cobertura` (cuanto de la fase 0 esta repartido);
 # `R-IMPORTE-MES` alcanza la tabla nueva y la ficha de `stg.plan_mensual` deja de
 # decir que guarda la fase 0. Sin regla nueva.
-version: 73
+#
+# version 74 (F-159, 2026-11-07): HOTFIX 2, EL MES NEGATIVO DEL PLAN. El
+# pendiente de cada partida se reparte en sus meses POR ACUMULADO sobre el plan
+# NETO acumulado de V: un mes negativo (estorno de un 0 intermedio del `planif`)
+# se absorbe en los anteriores en vez de amplificarse (1-0710, 07-11: -19,4 M
+# en un mes). Cambian las fichas de `importe_pendiente` de
+# `tesoreria.devengo_pendiente_obra_mes` (nunca negativo) y de
+# `tesoreria.devengo_pendiente_contrato_mes` (ninguna fila negativa). Sin
+# objetos, columnas ni reglas nuevos.
+version: 74
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 

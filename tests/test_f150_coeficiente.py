@@ -120,8 +120,10 @@ def test_f150_r14_el_reparto_con_coeficientes_suma_exacto() -> None:
     reparto = repartir_pendiente(con, PERFIL, date(2026, 11, 1))
     assert sum(i for _m, i, _r in reparto) == con == D("1237.90")
     assert [m for m, _i, _r in reparto] == [date(2026, 11, 1), date(2026, 12, 1), date(2027, 2, 1)]
-    # cada mes es el de F-140 con el pendiente con coeficientes: 1237,90 x 100/333 ...
-    assert [i for _m, i, _r in reparto] == [D("371.74"), D("743.48"), D("122.68")]
+    # el reparto de F-140 con el pendiente con coeficientes, por acumulado desde
+    # F-159: hasta noviembre 1237,90 x 100/333 = 371,74; hasta diciembre x 300/333
+    # = 1.115,23; y el resto.
+    assert [i for _m, i, _r in reparto] == [D("371.74"), D("743.49"), D("122.67")]
 
 
 def test_f150_r14_el_reparto_sin_perfil_va_entero_al_primer_mes() -> None:

@@ -118,7 +118,7 @@ def test_f157_r24_r_importe_mes_la_incluye() -> None:
 
 
 def test_f157_r24_la_version_sube_a_la_73() -> None:
-    assert _yaml("00_global.yaml")["version"] == VERSION_ANTERIOR + 1
+    assert _yaml("00_global.yaml")["version"] >= VERSION_ANTERIOR + 1, "F-159 la sube a 74"
     texto = (DIR_DICC / "00_global.yaml").read_text(encoding="utf-8")
     assert "# version 73 (F-157, 2026-11-" in texto.split("\nversion:", 1)[0]
 
