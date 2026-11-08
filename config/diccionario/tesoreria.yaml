@@ -745,8 +745,9 @@ objetos:
       y se declara su importe (su caja es F-154).
 
       **EL DEVENGO PENDIENTE, MES A MES** (F-140): el `pendiente` de cada
-      partida repartido en proporcion a su plan de V en los meses posteriores
-      al cierre, agregado por obra, mes, concepto y categoria. Es el perfil
+      partida repartido segun su plan NETO de V en los meses posteriores al
+      cierre (F-159: un mes negativo del plan se absorbe en los anteriores),
+      agregado por obra, mes, concepto y categoria. Es el perfil
       temporal sobre el que se aplican los plazos de cobro y pago. **No es
       caja** (`R-CAJA-HIPOTESIS`): mes de DEVENGO y SIN IVA.
 
@@ -812,6 +813,13 @@ objetos:
       importe_pendiente:
         significado: >-
           Pendiente repartido en ese mes: lo que se proyecta devengar. SIN IVA.
+          Cada partida reparte su pendiente POR ACUMULADO sobre el plan NETO
+          acumulado de V tras el cierre (F-159): un mes negativo del plan se
+          absorbe en los anteriores (es el estorno de un 0 intermedio del
+          `planif`), y lo repartido hasta cada mes es el pendiente x ese plan neto / el plan
+          total, al centimo. Nunca es negativo ni supera el pendiente de la
+          partida, y la partida suma su pendiente exacto. `importe_plan_restante`
+          sigue siendo el plan de V con su signo.
         unidad: EUR
         agregacion: suma
       importe_retraso_sin_perfil:
@@ -1112,9 +1120,10 @@ objetos:
       `tesoreria.condiciones_contrato_compra`. La fila de `contrato_id`
       vacio es el RESTO, sin contrato: va con H02 de su `categoria`. Es el
       ingrediente de los pasos 4 y 5 de la receta (`tesoreria.hipotesis_caja`).
-      **No es caja**: devengo SIN IVA. Ninguna fila con contrato es negativa,
-      y la fila sin contrato solo es negativa por un mes negativo del plan de
-      la version (F-158: el personal ya no supera el pendiente de su mes).
+      **No es caja**: devengo SIN IVA. Ninguna fila es negativa, con contrato
+      o sin el (F-158: el personal ya no supera el pendiente de su mes; F-159:
+      un mes negativo del plan de la version se absorbe en los anteriores y el
+      reparto de la partida nunca es negativo).
 
       **CUANTO CUBRE**: medido el 2026-10-31 en las 21 obras de la receta, 48,9
       de 112,85 M EUR (43 %; 0686: 1,64 de 2,39). Lo que no enlaza es devengo
