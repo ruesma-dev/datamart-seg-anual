@@ -9,81 +9,49 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-11-07 · CIERRE DE SESIÓN (líder) · leer esto primero
+## 2026-11-08 · CIERRE DE SESIÓN (líder) · leer esto primero
 
-**Hecho y desplegado:** F-156 (postventa) y F-158 (céntimo negativo) `done`. F-157 fusionada en
-`main` (`93fc38c`) y desplegada (imagen r20261106-1848, viernes y no sábado: la nocturna del 07-11
-hizo la reconstrucción completa, 165 min de `build_stg`, fin a las 06:34 UTC). Diccionario v73
-publicado por la nocturna y MCP reiniciado (carga la v73).
+**Nada `in_progress`.** Cerradas en esta tanda (todas desplegadas y medidas en Azure, ver
+`history.md`): F-156 postventa, F-157 fase 0 repartida en el tiempo, F-158 y F-159 hotfix del
+reparto del devengo. Imagen del job **r20261108-0945**, diccionario **v74**, MCP reiniciado (v74).
+`main` 534a0bf / `dev` 74328f3 (push pendiente del humano si no lo hizo).
 
-**Pendiente, por orden:**
-1. **F-159 · HOTFIX · urgente.** La nocturna del 07-11 volvió a caer en `build_tesoreria` (dos
-   veces, 04:52 y 06:30): R50, «1 importes negativos», con la imagen que YA lleva F-158. Diagnóstico
-   lanzado a un spec-author (worktree propio, rama `feature/F-159-hotfix-devengo-negativo-2`, salida
-   `progress/spec_F-159.md`): se le pide arreglo de RAÍZ de la clase (mes negativo del plan, D2 de
-   F-158, o resto negativo del último mes). Hasta desplegarlo, cada noche puede fallar en tesorería;
-   las tablas se quedan con la construcción buena del 06-11 08:38.
-2. **F-157 · cerrar.** Verificado el 07-11: 1.265.519 filas en 135 obras, 239 MB; la 0726 tiene
-   ya 1.504 de 1.546 partidas de coste y 1.438 de 1.461 de venta planificadas (el 05-11 eran 83 y
-   0: el jefe de obra planificó tras la petición de Juan), cuadre con el total ≤ 1,43 € por obra
-   (D4). Faltan R20 (huella de obras congeladas antes/después), R21 (`check-cierres`,
-   `check-unicidad`, `check-declarados`) y el commit de cierre. Mirar el tramo 61 de
-   `build_plan_mensual` (22 min frente a 1-5 los demás).
-3. **F-040 · spec en revisión.** Decisiones del humano el 07-11: D1, D3, D5 = A; D4 = A de momento
-   (RETESP aparte, en un solo punto de decisión, a la espera de Juan); **D6 cambia**: CIF, nombre y
-   direcciones de `dvf` se ingieren pero van a un esquema nuevo `ventas_restringida` (solo total);
-   **D2 cambia**: el NOMBRE del cliente es público también en personas físicas; NIF, direcciones y
-   descripción de líneas de personas físicas, solo en `ventas_restringida`. Un spec-author está
-   rehaciendo la spec en `.claude/worktrees/agent-a110c4068b1c41df8` (rama `feature/F-040-ingresos`).
-   Al volver: enseñar al humano el resumen del cambio (nuevo esquema restringido = pasos MANUAL
-   con `02_roles.sql`) y pedir el visto bueno antes de lanzar el implementer.
-4. **F-104 · spec aprobada** (lo recomendado en D1-D8; D6 = la retención de 1,68 M€ de la 0686,
-   cuenta 4308001634). Rama `feature/F-104-retenciones-cliente` en
-   `.claude/worktrees/agent-a9d9a8269385473d8`. Va DESPUÉS de F-040 (orden del humano).
-5. **Correo a Juan Romero** en Borradores de Outlook (el humano lo revisa y envía): criterio del
-   RETESP en venta, la contabilidad como cifra que manda en la retención de cliente, y los
-   descuadres (0686, LEVITT, MK MADRID II, ARCHER, SABINA, UNEXUM, PRORED). Su respuesta decide
-   la D4 de F-040.
-6. **El humano decidió no implementar F-040 ni F-104 en esta sesión:** se retoman en la siguiente.
+**Primero al volver:** comprobar la nocturna del 09-11 (la primera con F-159 en la imagen):
+`build_tesoreria` SUCCESS y 0 negativos en `tesoreria.devengo_pendiente_contrato_mes` y
+`devengo_pendiente_obra_mes` (coste y venta). Las del 07-11 y 08-11 cayeron en R50; el 08-11 a las
+08:51 se reconstruyó a mano con F-159 (SUCCESS, 0 negativos).
 
-**Push pendiente del humano:** `main` y `dev` con el cierre de sesión; `azure-apps` con F-157
-(`2ba73e3`) si no lo subió el viernes.
+**Siguiente feature: F-040** (ventas, certificaciones, clientes y cobro; prioridad 2, crítico).
+Spec REVISADA con las decisiones del humano del 07-11 en `.claude/worktrees/agent-a110c4068b1c41df8`,
+rama `feature/F-040-ingresos` (4c3f58e, con `main` 93fc38c dentro; hay que traer `main` 534a0bf):
+D1, D3, D5 = A; D4 = A provisional (RETESP aparte, en un único punto de decisión, a la espera de
+Juan); D6: CIF, nombre y direcciones de `dvf` a `ventas_restringida` (esquema nuevo, solo perfil
+total, pasos MANUAL con `02_roles.sql`); D2: el NOMBRE del cliente es público también en personas
+físicas, su NIF, direcciones y texto de líneas solo en `ventas_restringida`; fase 2 como F-160.
+**Pendiente:** enseñar al humano el resumen de la spec revisada y su visto bueno ANTES de lanzar el
+implementer (lo pidió: «antes de implementar la 40 y 104 guardamos y cerramos sesión»).
+
+**Después: F-104** (retención de cliente). Spec APROBADA (lo recomendado en D1-D8; D6 = 0686,
+cuenta 4308001634, 1,68 M€) en `.claude/worktrees/agent-a9d9a8269385473d8`, rama
+`feature/F-104-retenciones-cliente`. Orden del humano: F-040 y luego F-104.
+
+**Correo a Juan Romero** en Borradores de Outlook (el humano lo envía): RETESP en venta (decide
+la D4 de F-040), la contabilidad como cifra que manda en la retención de cliente y los descuadres
+(0686, LEVITT, MK MADRID II, ARCHER, SABINA, UNEXUM, PRORED).
+
+**Fuera de este repo:** `mcp-bbdd` F-034 (pliego del perfil postventa, sin empezar) y F-033 (sello
+de Signaturit en `abrir_adjunto`). Aviso de `arnes-base` 1.8.0 recibido (solo informativo; antes de
+actualizar, pasar lo afinado de `harness/rigor.json` a `rigor.local.json`).
+
+**Observaciones abiertas:** el tramo 61 de `build_plan_mensual` tardó 22 min el 07-11 (los demás
+1-5); `coeficiente_venta` negativo no tiene guarda en la venta con coeficientes (observación 3 de
+`review_F-159.md`, previa); propuesta repetida de los reviewers: `--tests` en `harness.mutacion`
+para correr la campaña sin `.env`.
 
 **Entorno:** los worktrees de subagente no tienen `.env` (prohibido copiarlo): su `init.sh` sale
-rojo solo en `test_f006_t26`. La puerta completa la pasa el líder en una copia con `.env` (el
-worktree `wt_main` del scratchpad de la sesión). Si el equipo se suspende, pytest se para: dejarlo
-encendido durante la puerta (~80-105 min).
-
-## 2026-11-07 · F-159 · `in_progress` · implementando (HOTFIX 2) · rama `feature/F-159-hotfix-devengo-negativo-2`
-
-Implementer, en el worktree del agente. Spec aprobada por el humano: D1 = A (envolvente neta),
-D2 = acumulado, D3 = guarda nueva + R50 con la primera fila, D4 = no se relaja R50, D5 = v74,
-D6 = sin sandbox. `main` `70d4df7` mergeada en la rama. F-157 sigue `in_progress` en `main`
-(la cierra el líder aparte): durante este trabajo hay dos `in_progress` en la rama.
-Hechas T1-T6 (commits f664d39, 4966c73, 9d416ee, 314c204, 5166c0b, 6f67dad); informe en
-`progress/impl_F-159.md`. Afectados en verde (1215 passed), cobertura 100 % (16/16), mutación
-manual 26/27 muertos (1 equivalente). `init.sh` del worktree ROJO solo por entorno (2
-`in_progress` por orden del líder y sin `.env`); T8 (puerta completa) y T7 (despliegue
-MANUAL) pendientes del líder y del humano. Desviación menor: alias `r` en `repartido`.
-
-## 2026-11-07 · F-159 · `pending` · spec escrita (HOTFIX 2) · rama `feature/F-159-hotfix-devengo-negativo-2`
-
-Spec-author, en su worktree desde `main` `93fc38c`; sin código, va a la PARADA 1. La nocturna del
-07-11 (con F-158) volvió a caer en R50 (04:52 y 06:30 UTC); `tesoreria` sigue con lo del 06-11
-08:38. Medido en solo lectura (`progress/spec_F-159.md`): la fila es 1-0710/2026-11/CD sin
-contrato, **-18.791.769,87**; viene de la partida 404326 de la V13 nueva (CUATRIMESTRAL OCT-26,
-creada en Sigrid el 06-11), plan -1.079,94 / +1.080,00 tras el cierre (0 intermedio del `planif`,
-estorno legítimo): `total_perfil` 0,06 y el reparto con pesos con signo lo amplifica. Clase de la
-D2 de F-158 en forma nueva; la observación 3 está latente, no es la causa. Recomendada A: perfil =
-envolvente del plan neto acumulado + reparto por acumulado (0 negativos medidos). Decisiones para
-el humano en `progress/spec_F-159.md` §7: **D1** envolvente (A) o solo meses positivos (P);
-**D2** acumulado o resto al último; **D3** guarda nueva y R50 con la primera fila; **D4** no
-parchear R50 hasta el despliegue (tesoreria un día atrasada); **D5** diccionario v74 tras la v73
-de F-157; **D6** sin sandbox. Ojo: F-157 sigue `in_progress` en `features.json` aunque está
-mergeada en `main`; F-159 queda `pending` (prioridad 0) para no tener dos `in_progress`.
-`bash harness/init.sh` en el worktree: ROJO solo por el entorno (falta `.env`, que no se copia;
-`test_f006_t26_cli_dry_run_no_toca_la_base` cae por eso con `-x`: 256 passed, 1 failed). Puertas
-de F-159: cobertura N/A (sin Python de producción) y tamaño dentro de topes (72/150, 208/250).
+rojo solo en `test_f006_t26`. La puerta completa la pasa el líder en una copia con `.env` (worktree
+`wt_main` en el scratchpad de la sesión anterior; si no existe, crear uno detached). Con el equipo
+encendido tarda 35-105 min.
 
 ## 2026-11-06 · F-157 · `in_progress` · implementando · rama `feature/F-157-planificacion-fase0`
 
