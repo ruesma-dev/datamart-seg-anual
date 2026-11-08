@@ -2511,12 +2511,12 @@
         "Los cierres reales y los master de `stg.plan_mensual` no cambian (mismas filas y mismos importes antes y después), y `cierre/` sigue cruzando solo las fases reales",
         "Ficha del diccionario con el objeto, la regla de que la fase 0 es planificación viva (no master ni cierre) y un ejemplo de pregunta; tests y `bash harness/init.sh` en verde"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "rigor": "estandar",
       "priority": 1,
       "branch": "feature/F-157-planificacion-fase0",
-      "notes": "2026-11-06: PARADA 1 resuelta por el humano (la A en D1 a D8); en implementación en la rama, diccionario v73 tras la v72 de F-158. 2026-11-05: anotada por el líder a petición del humano («añádelo a la feature como siguiente»): prioridad 1, la siguiente tras cerrar F-156."
+      "notes": "2026-11-07: APROBADA (`progress/review_F-157.md`), merge `main` 93fc38c, desplegada (imagen r20261106-1848), primera noche completa el 07-11 y diccionario v73. 2026-11-06: PARADA 1 resuelta por el humano (la A en D1 a D8); en implementación en la rama, diccionario v73 tras la v72 de F-158. 2026-11-05: anotada por el líder a petición del humano («añádelo a la feature como siguiente»): prioridad 1, la siguiente tras cerrar F-156."
     },
     {
       "id": "F-158",
