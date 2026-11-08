@@ -164,3 +164,38 @@ PostgreSQL**: lo hará la primera ejecución del paso 0 bis, antes de construir 
 
 Fuera del alcance (design §7): `stg`, `perfil`, `_dev_partida`, `repartir_personal`, 5 bis, las
 condiciones de R14/R50/R58, `importe_plan_restante`, `10_saldo_partida.sql`, `mart`, `cierre`.
+
+## `bash harness/init.sh` (T8: ROJO en el worktree, por el entorno)
+
+Ejecutado tal cual el 2026-11-07 sobre `5166c0b` (código completo; el informe, aún sin commit): **4 comprobaciones
+fallidas**, ninguna del código de F-159:
+
+- `Hay 2 features in_progress (F-157, F-159). Máximo 1.`: la orden del líder (desviación 4).
+- `Falta .env`: prohibido crearlo en el worktree.
+- `pytest`: `1 failed, 256 passed in 307.37s`, se para (`-x`) en
+  `test_f006_comandos.py::test_f006_t26_cli_dry_run_no_toca_la_base` (el `.env`).
+- `PUERTA COBERTURA: 0.0% de 16 líneas` porque ese pytest `-x` se para antes de llegar a los
+  tests de F-159; medida aparte, 100 % (abajo).
+- En verde: `PUERTA TAMAÑO: F-159 dentro de los topes (requirements 72/150, design 208/250,
+  impl 166/220)` y la rama.
+
+T8 queda sin marcar: la puerta completa la pasa el líder en una copia con `.env`.
+
+## Evidencias
+
+| Evidencia | Valor real |
+|---|---|
+| Tests de los ficheros afectados (F-159, F-158, F-150, F-140, F-147, F-149) | `python -m pytest tests/test_f159*.py tests/test_f158*.py tests/test_f150*.py tests/test_f140*.py tests/test_f147*.py tests/test_f149*.py -q`: **1215 passed, 1 skipped in 37.30s** |
+| Tests de F-006 (diccionario) | `python -m pytest tests/test_f006*.py -q --deselect ...::test_f006_t26_cli_dry_run_no_toca_la_base`: **2725 passed, 306 skipped, 21 failed in 8137.69s (2:15:37)**. Los 21 son `test_f006_comandos.py` (t26, t40, r28: el CLI) y `test_f006_reglas.py::test_f006_r9_la_regla_de_frescura_cita_el_pipeline_real`, TODOS con `ValidationError: 2 validation errors for SigridApiSettings (base_url, function_key: Field required)`: el `.env` que falta. Ninguno toca F-159 |
+| F-157 (versión del diccionario) | `test_f157_diccionario.py`: verde con la v74 (`>=`), dentro de los 90 de T5 |
+| Fichero nuevo | `tests/test_f159_reparto_envolvente.py`: **19 passed in 0.8 s** (RED: 13 failed, 6 passed) |
+| Cobertura de las líneas cambiadas | `coverage run -m pytest tests/test_f159_reparto_envolvente.py tests/test_f140_dominio.py tests/test_f150_coeficiente.py tests/test_f158_reparto_personal.py` + `coverage json` + `python -m harness.cobertura --base main --config harness/rigor.json`: **`PUERTA COBERTURA: 100.0% de 16 líneas cambiadas cubiertas (16/16, umbral 80%, nivel estandar; diff desde 70d4df75a1, merge-base con main)`** |
+| Mutantes | **27 generados, 26 muertos, 1 superviviente equivalente (D17)**; manual, suite acotada, 46,1 s (desviación 5) |
+| Tiempo de la suite | ficheros afectados 37,3 s; F-006 2 h 15 min (sin `.env`, con la máquina compartida por `init.sh` y la cobertura parte del tiempo); `init.sh` hasta su `-x`, 307 s |
+
+`ruff check` sobre `proyeccion_caja.py`: 1 aviso PREEXISTENTE (`RUF002`, el `×` de
+`iva_efectivo_compra`, línea 331, también en `93fc38c`); nada nuevo.
+
+Falta para cerrar: la puerta completa del líder con `.env`, el review contra `CHECKPOINTS.md`,
+el merge y el despliegue MANUAL (T7). Aviso para el reviewer: F-006 tarda más de 2 h en esta
+máquina.

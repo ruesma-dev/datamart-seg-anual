@@ -60,11 +60,11 @@ Implementer, en el worktree del agente. Spec aprobada por el humano: D1 = A (env
 D2 = acumulado, D3 = guarda nueva + R50 con la primera fila, D4 = no se relaja R50, D5 = v74,
 D6 = sin sandbox. `main` `70d4df7` mergeada en la rama. F-157 sigue `in_progress` en `main`
 (la cierra el líder aparte): durante este trabajo hay dos `in_progress` en la rama.
-Hechas T1-T5 (commits f664d39, 4966c73, 9d416ee, 314c204, 5166c0b). En curso: T6 (mutación
-manual con la suite acotada, como F-158: la línea base de `harness.mutacion` corre la suite
-entera y sale roja sin `.env`) e informe `progress/impl_F-159.md`. Desviación menor: en
-`repartido` el alias de `partes` es `r` (no `p` como en design §3.1) para no tocar las
-aserciones de F-158 sobre `r.pendiente AS pendiente_partida`. T7 (despliegue) es MANUAL.
+Hechas T1-T6 (commits f664d39, 4966c73, 9d416ee, 314c204, 5166c0b, 6f67dad); informe en
+`progress/impl_F-159.md`. Afectados en verde (1215 passed), cobertura 100 % (16/16), mutación
+manual 26/27 muertos (1 equivalente). `init.sh` del worktree ROJO solo por entorno (2
+`in_progress` por orden del líder y sin `.env`); T8 (puerta completa) y T7 (despliegue
+MANUAL) pendientes del líder y del humano. Desviación menor: alias `r` en `repartido`.
 
 ## 2026-11-07 · F-159 · `pending` · spec escrita (HOTFIX 2) · rama `feature/F-159-hotfix-devengo-negativo-2`
 
