@@ -344,7 +344,8 @@ def test_f040_r9_nada_de_la_cabecera_personal_en_el_esquema_general(fichero: str
     sql = _sql(fichero)
     for columna in (*v.COLUMNAS_PERSONALES_DVF, *v.COLUMNAS_CLI_CONTACTO):
         assert not re.search(rf"\.{columna}\b", sql), f"{fichero} lee `{columna}` (R9, R24)"
-    assert "ventas_restringida" not in sql, fichero
+    # Fuera de los literales (los COMMENT ON pueden remitir al esquema).
+    assert "ventas_restringida" not in re.sub(r"'[^']*'", "''", sql), fichero
 
 
 def test_f040_r9_estado_y_anulada() -> None:
