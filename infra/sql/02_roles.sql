@@ -266,7 +266,7 @@ GRANT CONNECT ON DATABASE sigrid_dm TO sigrid_dm_perfil_restringido_ro;
 GRANT CONNECT ON DATABASE sigrid_dm TO sigrid_dm_perfil_postventa_ro;
 
 -- 4. Esquemas del datamart. Los crea también el auto-bootstrap del ETL, pero
---    dejarlos aquí permite comprobar los dieciocho nada más provisionar.
+--    dejarlos aquí permite comprobar los veinte nada más provisionar.
 SET ROLE sigrid_dm_etl;
 CREATE SCHEMA IF NOT EXISTS raw;
 CREATE SCHEMA IF NOT EXISTS stg;
@@ -307,6 +307,14 @@ CREATE SCHEMA IF NOT EXISTS compras_restringida;
 -- `build-postventa`, que escribe en las dos.
 CREATE SCHEMA IF NOT EXISTS postventa;
 CREATE SCHEMA IF NOT EXISTS postventa_restringida;
+-- F-040: ventas. La GENERAL (`ventas`: clientes con su nombre, facturas de
+-- venta, certificaciones y cobro) la leen el general y el total; lo personal
+-- del cliente (`ventas_restringida`: NIF de la persona física, direcciones,
+-- teléfonos, correos y la cabecera de la factura) solo el autorizado: se le
+-- VETA al general (punto 5 ter). Antes del primer `build-ventas`, que escribe
+-- en las dos: sin el veto, lo personal quedaría sin proteger hasta la nocturna.
+CREATE SCHEMA IF NOT EXISTS ventas;
+CREATE SCHEMA IF NOT EXISTS ventas_restringida;
 RESET ROLE;
 
 -- 5. Permisos de lectura del MCP.
@@ -349,7 +357,8 @@ DECLARE
 BEGIN
     FOREACH esquema IN ARRAY ARRAY[
         'mart', 'cierre', 'compras', 'maestro', 'retenciones', 'personal',
-        'contabilidad', 'tesoreria', 'descompuestos', 'postventa', 'stg', 'aux', '_meta'
+        'contabilidad', 'tesoreria', 'descompuestos', 'postventa', 'ventas', 'stg', 'aux',
+        '_meta'
     ]
     LOOP
         EXECUTE format('GRANT USAGE ON SCHEMA %I TO mcp_sigrid_dm_ro', esquema);
@@ -483,7 +492,8 @@ RESET ROLE;
 --    («los pagos de nominas deben quedar restringidos», decisión del humano), y
 --    F-138 (2026-10-14) `compras_restringida`, las alarmas de recursos y partes
 --    («solo para el perfil admin y no el estándar») y F-156 (2026-11-04)
---    `postventa_restringida`, los datos personales de postventa («d1 ok»).
+--    `postventa_restringida`, los datos personales de postventa («d1 ok»), y
+--    F-040 (2026-11-09) `ventas_restringida`, lo personal del cliente (D2/D6).
 --    La lista es `DEFAULT_VETOED_SCHEMAS` de
 --    `config/settings.py` (un test lo vigila) y la sostiene cada noche
 --    `apply_grants`, que además COMPRUEBA en el catálogo que el rol general no
@@ -503,7 +513,7 @@ DECLARE
     vetado text;
     vetado_total text;
 BEGIN
-    FOREACH vetado IN ARRAY ARRAY['contabilidad_restringida', 'tesoreria_restringida', 'compras_restringida', 'postventa_restringida', 'raw']
+    FOREACH vetado IN ARRAY ARRAY['contabilidad_restringida', 'tesoreria_restringida', 'compras_restringida', 'postventa_restringida', 'ventas_restringida', 'raw']
     LOOP
         -- en una base recién creada el esquema puede no existir todavía
         IF to_regnamespace(vetado) IS NOT NULL THEN
@@ -550,13 +560,17 @@ ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl IN SCHEMA compras_restringida GR
 GRANT USAGE ON SCHEMA postventa_restringida TO sigrid_dm_autorizado_ro;
 GRANT SELECT ON ALL TABLES IN SCHEMA postventa_restringida TO sigrid_dm_autorizado_ro;
 ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl IN SCHEMA postventa_restringida GRANT SELECT ON TABLES TO sigrid_dm_autorizado_ro;
+-- F-040: y lo personal del cliente, igual (el total lo hereda).
+GRANT USAGE ON SCHEMA ventas_restringida TO sigrid_dm_autorizado_ro;
+GRANT SELECT ON ALL TABLES IN SCHEMA ventas_restringida TO sigrid_dm_autorizado_ro;
+ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl IN SCHEMA ventas_restringida GRANT SELECT ON TABLES TO sigrid_dm_autorizado_ro;
 
 DO $$
 DECLARE
     vetado text;
     vetado_total text;
 BEGIN
-    FOREACH vetado IN ARRAY ARRAY['contabilidad_restringida', 'tesoreria_restringida', 'compras_restringida', 'postventa_restringida', 'raw']
+    FOREACH vetado IN ARRAY ARRAY['contabilidad_restringida', 'tesoreria_restringida', 'compras_restringida', 'postventa_restringida', 'ventas_restringida', 'raw']
     LOOP
         IF to_regnamespace(vetado) IS NOT NULL THEN
             EXECUTE format(
@@ -789,7 +803,8 @@ COMMIT;
 
 -- 6. Comprobaciones. Deben salir: los 9 roles (`rolsuper = f` en todos;
 --    los dos del perfil restringido desde F-141 y los dos del postventa desde
---    F-156), sigrid_dm_app dentro de sigrid_dm_etl, y los dieciocho esquemas.
+--    F-156), sigrid_dm_app dentro de sigrid_dm_etl, y los veinte esquemas
+--    (`ventas` y `ventas_restringida` desde F-040).
 SELECT rolname, rolcanlogin, rolsuper, rolcreatedb, rolcreaterole
 FROM pg_roles
 WHERE rolname IN ('sigrid_dm_etl', 'sigrid_dm_app', 'mcp_sigrid_dm_ro',
@@ -810,7 +825,7 @@ WHERE nspname IN ('raw', 'stg', 'aux', 'mart', '_meta',
                   'cierre', 'compras', 'maestro', 'retenciones', 'personal',
                   'contabilidad', 'contabilidad_restringida', 'descompuestos',
                   'tesoreria', 'tesoreria_restringida', 'compras_restringida',
-                  'postventa', 'postventa_restringida')
+                  'postventa', 'postventa_restringida', 'ventas', 'ventas_restringida')
 ORDER BY nspname;
 
 -- F-068: las tablas excluidas NO deben aparecer aquí. CERO filas es el
@@ -825,23 +840,23 @@ ORDER BY table_name, privilege_type;
 -- F-135: el rol GENERAL no lee ningún esquema vetado. CERO filas en la primera
 -- consulta y `lee = f` en las cuatro filas de la segunda es el resultado
 -- correcto (`compras_restringida` desde F-138, `postventa_restringida` desde
--- F-156: cinco filas).
+-- F-156 y `ventas_restringida` desde F-040: seis filas).
 SELECT table_schema, table_name, privilege_type
 FROM information_schema.table_privileges
 WHERE grantee = 'mcp_sigrid_dm_ro'
-  AND table_schema IN ('contabilidad_restringida', 'tesoreria_restringida', 'compras_restringida', 'postventa_restringida', 'raw')
+  AND table_schema IN ('contabilidad_restringida', 'tesoreria_restringida', 'compras_restringida', 'postventa_restringida', 'ventas_restringida', 'raw')
 ORDER BY table_schema, table_name, privilege_type;
 
 SELECT nspname, has_schema_privilege('mcp_sigrid_dm_ro', nspname, 'USAGE') AS lee
 FROM pg_namespace
-WHERE nspname IN ('contabilidad_restringida', 'tesoreria_restringida', 'compras_restringida', 'postventa_restringida', 'raw')
+WHERE nspname IN ('contabilidad_restringida', 'tesoreria_restringida', 'compras_restringida', 'postventa_restringida', 'ventas_restringida', 'raw')
 ORDER BY nspname;
 
 -- F-136: el login TOTAL. Deben salir EXACTAMENTE dos pertenencias
 -- (`mcp_sigrid_dm_ro` y `sigrid_dm_autorizado_ro`, hereda = t, set_role = f);
 -- `raw = f`, `contabilidad_restringida = t`, `contabilidad = t`,
--- `tesoreria_restringida = t` (F-037), `compras_restringida = t` (F-138) y
--- `conecta = t`;
+-- `tesoreria_restringida = t` (F-037), `compras_restringida = t` (F-138),
+-- `ventas = t` y `ventas_restringida = t` (F-040) y `conecta = t`;
 -- y CERO filas en la última: no tiene ninguna concesión propia.
 SELECT g.rolname AS grupo, m.inherit_option AS hereda, m.set_option AS set_role,
        m.admin_option AS admin
@@ -859,6 +874,9 @@ SELECT has_schema_privilege('mcp_sigrid_dm_total', 'raw', 'USAGE') AS raw,
            AS tesoreria_restringida,
        has_schema_privilege('mcp_sigrid_dm_total', 'compras_restringida', 'USAGE')
            AS compras_restringida,
+       has_schema_privilege('mcp_sigrid_dm_total', 'ventas', 'USAGE') AS ventas,
+       has_schema_privilege('mcp_sigrid_dm_total', 'ventas_restringida', 'USAGE')
+           AS ventas_restringida,
        has_database_privilege('mcp_sigrid_dm_total', current_database(), 'CONNECT') AS conecta;
 
 SELECT table_schema, table_name, privilege_type
@@ -869,7 +887,7 @@ ORDER BY table_schema, table_name, privilege_type;
 -- F-141: el login del perfil RESTRINGIDO. Debe salir EXACTAMENTE una
 -- pertenencia (`sigrid_dm_perfil_restringido_ro`, hereda = t, set_role = f).
 -- Luego `t` en cada esquema suyo y `f` en `contabilidad` (F-146), `tesoreria`,
--- `personal`, `raw` y las tres `*_restringida`; `f` en las cuatro tablas de
+-- `personal`, `raw`, `ventas` (F-040) y las cinco `*_restringida`; `f` en las cuatro tablas de
 -- `contabilidad` y `t` en `compras.vencimientos` (vacío si el objeto aún no
 -- existe: base recién creada); `conecta = t`; y CERO filas en la última: el
 -- login no tiene ninguna concesión propia.
@@ -903,7 +921,10 @@ SELECT has_schema_privilege('mcp_sigrid_dm_restringido', 'tesoreria', 'USAGE') A
        has_schema_privilege('mcp_sigrid_dm_restringido', 'compras_restringida', 'USAGE')
            AS compras_restringida,
        has_schema_privilege('mcp_sigrid_dm_restringido', 'postventa_restringida', 'USAGE')
-           AS postventa_restringida;
+           AS postventa_restringida,
+       has_schema_privilege('mcp_sigrid_dm_restringido', 'ventas', 'USAGE') AS ventas,
+       has_schema_privilege('mcp_sigrid_dm_restringido', 'ventas_restringida', 'USAGE')
+           AS ventas_restringida;
 
 SELECT has_table_privilege('mcp_sigrid_dm_restringido', to_regclass('contabilidad.mayor'), 'SELECT')
            AS mayor,
@@ -925,7 +946,8 @@ ORDER BY table_schema, table_name, privilege_type;
 -- F-156: el login del perfil POSTVENTA. Debe salir EXACTAMENTE una pertenencia
 -- (`sigrid_dm_perfil_postventa_ro`, hereda = t, set_role = f). Luego `t` en
 -- `postventa`, `postventa_restringida` y `_meta`; `f` en `contabilidad`,
--- `tesoreria`, `personal`, `raw` y las otras tres `*_restringida`; `conecta = t`;
+-- `tesoreria`, `personal`, `raw`, `ventas` (F-040) y las otras cuatro
+-- `*_restringida`; `conecta = t`;
 -- y CERO filas en la última: el login no tiene ninguna concesión propia de
 -- tablas.
 SELECT g.rolname AS grupo, m.inherit_option AS hereda, m.set_option AS set_role,
@@ -950,6 +972,9 @@ SELECT has_schema_privilege('mcp_sigrid_dm_postventa', 'postventa', 'USAGE') AS 
            AS tesoreria_restringida,
        has_schema_privilege('mcp_sigrid_dm_postventa', 'compras_restringida', 'USAGE')
            AS compras_restringida,
+       has_schema_privilege('mcp_sigrid_dm_postventa', 'ventas', 'USAGE') AS ventas,
+       has_schema_privilege('mcp_sigrid_dm_postventa', 'ventas_restringida', 'USAGE')
+           AS ventas_restringida,
        has_database_privilege('mcp_sigrid_dm_postventa', current_database(), 'CONNECT') AS conecta;
 
 SELECT table_schema, table_name, privilege_type
