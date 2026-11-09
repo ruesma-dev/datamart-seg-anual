@@ -17,7 +17,7 @@
 --
 -- Tablas, ninguna vista: solo las lee el total.
 --
--- Lee de: raw.cli, raw.dvf, raw.dvfpro y ventas.facturas.
+-- Lee de: raw.cli, raw.con (tipo 4), raw.dvf, raw.dvfpro y ventas.facturas.
 -- Escribe en: ventas_restringida.clientes_contacto, factura_cabecera y
 --             factura_lineas_persona.
 -- ============================================================================
@@ -29,6 +29,7 @@ DROP TABLE IF EXISTS ventas_restringida.clientes_contacto CASCADE;
 CREATE TABLE ventas_restringida.clientes_contacto AS
 SELECT
     cl.ide                                                  AS cliente_id,
+    c.cod AS codigo_cliente,
     cl.raz                                                  AS nombre,
     cl.cif AS cif,
     ventas.fn_cif_normalizado(cl.cif)                       AS cif_normalizado,
@@ -41,12 +42,13 @@ SELECT
     cl.tel AS telefono,
     cl.tel2 AS telefono2,
     cl.ele AS correo
-FROM raw.cli cl;
+FROM raw.cli cl
+LEFT JOIN raw.con c ON c.ide = cl.ide AND c.tip = 4;
 
 ALTER TABLE ventas_restringida.clientes_contacto ADD PRIMARY KEY (cliente_id);
 
 COMMENT ON TABLE ventas_restringida.clientes_contacto IS
-'F-040. SOLO PERFIL TOTAL. Una fila por cliente (raw.cli): nombre, el CIF INTEGRO (tambien el de la persona fisica) y normalizado, es_persona_fisica, la direccion completa y en dos lineas, el codigo postal, dos telefonos y el correo. Se cruza con ventas.clientes por cliente_id. Clave: cliente_id.';
+'F-040. SOLO PERFIL TOTAL. Una fila por cliente (raw.cli): el codigo INTEGRO (con.cod, que puede ser un NIF), nombre, el CIF INTEGRO (tambien el de la persona fisica) y normalizado, es_persona_fisica, la direccion completa y en dos lineas, el codigo postal, dos telefonos y el correo. Se cruza con ventas.clientes por cliente_id. Clave: cliente_id.';
 
 CREATE TABLE ventas_restringida.factura_cabecera AS
 SELECT

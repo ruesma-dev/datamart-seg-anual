@@ -87,8 +87,8 @@ COLUMNAS = {
         "eslabon", "total", "enlazados", "importe_total", "importe_enlazado", "calculado_en",
     ),
     ("06_restringida.sql", "ventas_restringida.clientes_contacto"): (
-        "cliente_id", "nombre", "cif", "cif_normalizado", "es_persona_fisica", "direccion",
-        "direccion_linea1", "direccion_linea2", "codigo_postal", "telefono", "telefono2",
+        "cliente_id", "codigo_cliente", "nombre", "cif", "cif_normalizado",
+        "es_persona_fisica", "direccion", "direccion_linea1", "direccion_linea2", "codigo_postal", "telefono", "telefono2",
         "correo",
     ),
     ("06_restringida.sql", "ventas_restringida.factura_cabecera"): (
@@ -320,6 +320,18 @@ def test_f040_r7_cif_de_persona_fisica_a_null_y_nombre_publico() -> None:
     assert ("CASE WHEN b.es_persona_fisica THEN NULL ELSE b.cif_normalizado END "
             "AS cif_normalizado") in crea
     assert "b.nombre AS nombre" in crea
+
+
+def test_f040_r24_codigo_de_persona_o_con_forma_de_nif_a_null() -> None:
+    """R1-H1: el código (`con.cod`) se anula igual que el CIF, y además si tiene
+    forma de NIF de persona aunque el cliente no lo sea; íntegro, en la restringida."""
+    crea = _create("01_clientes.sql", "ventas.clientes")
+    assert ("CASE WHEN b.es_persona_fisica OR COALESCE(ventas.fn_cif_normalizado("
+            f"b.codigo_cliente) ~ '{v.PATRON_NIF_PERSONA}', FALSE) THEN NULL "
+            "ELSE b.codigo_cliente END AS codigo_cliente") in crea
+    contacto = _create("06_restringida.sql", "ventas_restringida.clientes_contacto")
+    assert "c.cod AS codigo_cliente" in contacto
+    assert "LEFT JOIN raw.con c ON c.ide = cl.ide AND c.tip = 4" in contacto
 
 
 def test_f040_r7_valido_y_repetido_se_calculan_antes_de_anular() -> None:
@@ -582,6 +594,9 @@ def test_f040_r24_guarda_de_lo_personal() -> None:
     guarda = _guarda()
     assert "FROM ventas.clientes WHERE cif IS NOT NULL AND (es_persona_fisica" in guarda
     assert "FROM ventas.facturas WHERE cif_cliente IS NOT NULL AND (es_persona_fisica" in guarda
+    assert ("FROM ventas.clientes WHERE codigo_cliente IS NOT NULL AND (es_persona_fisica "
+            "OR COALESCE(ventas.fn_cif_normalizado(codigo_cliente) ~ "
+            f"'{v.PATRON_NIF_PERSONA}', FALSE))") in guarda
     assert f"'{v.PATRON_NIF_PERSONA}'" in guarda
     assert "f.es_persona_fisica AND l.descripcion IS NOT NULL" in guarda
     assert "information_schema.columns" in guarda

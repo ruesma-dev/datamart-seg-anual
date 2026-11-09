@@ -20,9 +20,9 @@
 --     `ventas.fn_clase_recargo` no pierde ni duplica nada, sea cual sea
 --     `CLASES_GARANTIA` (D4).
 -- R24 · NADA PERSONAL EN `ventas`:
---   * ningun `cif` de `ventas.clientes` ni `cif_cliente` de `ventas.facturas`
---     de una persona fisica o con forma de NIF de persona (el patron de
---     `PATRON_NIF_PERSONA`);
+--   * ningun `cif` ni `codigo_cliente` de `ventas.clientes` ni `cif_cliente`
+--     de `ventas.facturas` de una persona fisica o con forma de NIF de persona
+--     (el patron de `PATRON_NIF_PERSONA`; el codigo, desde R1-H1 del review);
 --   * ninguna `descripcion` de linea de una factura de persona fisica;
 --   * ninguna columna del esquema `ventas` cuyo nombre empiece por un prefijo
 --     de `PREFIJOS_PROHIBIDOS_EN_VENTAS` (los de `ventas_restringida`).
@@ -95,6 +95,11 @@ BEGIN
     v_publicadas := (SELECT count(*) FROM ventas.clientes WHERE cif IS NOT NULL AND (es_persona_fisica OR COALESCE(ventas.fn_cif_normalizado(cif) ~ '^[0-9KLMXYZ][0-9]{7}[A-Z]$', FALSE)));
     IF v_publicadas <> 0 THEN
         RAISE EXCEPTION 'F-040 R24: ventas.clientes publica el CIF de % personas fisicas', v_publicadas;
+    END IF;
+
+    v_publicadas := (SELECT count(*) FROM ventas.clientes WHERE codigo_cliente IS NOT NULL AND (es_persona_fisica OR COALESCE(ventas.fn_cif_normalizado(codigo_cliente) ~ '^[0-9KLMXYZ][0-9]{7}[A-Z]$', FALSE)));
+    IF v_publicadas <> 0 THEN
+        RAISE EXCEPTION 'F-040 R24: ventas.clientes publica el codigo de % clientes persona fisica o con forma de NIF', v_publicadas;
     END IF;
 
     v_publicadas := (SELECT count(*) FROM ventas.facturas WHERE cif_cliente IS NOT NULL AND (es_persona_fisica OR COALESCE(ventas.fn_cif_normalizado(cif_cliente) ~ '^[0-9KLMXYZ][0-9]{7}[A-Z]$', FALSE)));

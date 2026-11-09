@@ -48,7 +48,12 @@ objetos:
         significado: Identificador del cliente en Sigrid (`cli.ide`).
         agregacion: clave_sustituta
       codigo_cliente:
-        significado: Codigo del cliente, tal y como se ve en Sigrid.
+        significado: >-
+          Codigo del cliente, tal y como se ve en Sigrid (`con.cod`). NULL si el
+          cliente es persona fisica o si el codigo tiene forma de NIF de persona
+          (quien da de alta al cliente puede escribir su DNI como codigo): el
+          integro esta en `ventas_restringida.clientes_contacto`. No sirve para
+          cruzar: se cruza por `cliente_id`.
       nombre:
         significado: Razon social o nombre del cliente, el ACTUAL (publico tambien si es persona fisica).
       cif:

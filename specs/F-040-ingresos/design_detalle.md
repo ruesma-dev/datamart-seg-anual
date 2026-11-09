@@ -31,7 +31,8 @@ dirección, 24 con teléfono y 68 con correo.
 
 - `clientes`: `cliente_id, codigo_cliente, nombre, cif, cif_normalizado, tipo_documento, pais,
   es_persona_fisica, cif_valido, cif_repetido, num_obras, num_facturas, num_certificaciones,
-  facturado_base, primera_factura, ultima_factura`.
+  facturado_base, primera_factura, ultima_factura`. `codigo_cliente` (`con.cod`) a NULL en persona
+  física o con forma de NIF de persona (enmienda R1-H1 del review, 2026-11-09).
 - `facturas`: `factura_id, codigo_factura, empresa_id, fecha_factura, clase, estado_codigo,
   estado_sigrid, anulada, cliente_id, nombre_cliente, cif_cliente, es_persona_fisica, obra_id,
   codigo_obra, obra_via, contrato_id, contrato_nombre, base, iva, total_sin_retencion, total,
@@ -57,8 +58,9 @@ dirección, 24 con teléfono y 68 con correo.
 
 **`ventas_restringida`**
 
-- `clientes_contacto`: `cliente_id, nombre, cif, cif_normalizado, es_persona_fisica, direccion,
-  direccion_linea1, direccion_linea2, codigo_postal, telefono, telefono2, correo`.
+- `clientes_contacto`: `cliente_id, codigo_cliente, nombre, cif, cif_normalizado, es_persona_fisica, direccion,
+  direccion_linea1, direccion_linea2, codigo_postal, telefono, telefono2, correo` (`codigo_cliente`
+  íntegro: enmienda R1-H1).
 - `factura_cabecera`: `factura_id, cliente_id, es_persona_fisica, nombre_cabecera, cif_cabecera,
   direccion_empresa_1, direccion_contacto_1, direccion_completa_1` (y lo mismo para 2 y 3).
 - `factura_lineas_persona`: `linea_id, factura_id, cliente_id, descripcion`.

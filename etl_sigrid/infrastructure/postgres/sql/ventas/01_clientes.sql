@@ -14,6 +14,12 @@
 -- `cif_valido` y `cif_repetido` se calculan ANTES de anular (R7): dicen algo
 -- del dato aunque el CIF no se vea. El CIF de la persona JURIDICA es publico.
 --
+-- EL CODIGO (`con.cod`, R1-H1 del review): lo escribe quien da de alta al
+-- cliente y puede ser su DNI. Se anula si el cliente es persona fisica o si,
+-- normalizado como un CIF, tiene forma de NIF de persona
+-- (`codigo_cliente_publicado` del dominio); integro, en
+-- `ventas_restringida.clientes_contacto`. La guarda lo vigila (R24).
+--
 -- LOS AGREGADOS (facturas, certificaciones y obras por cliente) se calculan
 -- ANTES de unir: cada CTE tiene su GROUP BY y el JOIN es 1:1 por cliente.
 -- Los importes de `raw` son `double precision`: se castean a NUMERIC.
@@ -66,7 +72,7 @@ WITH facturas_cliente AS (
 )
 SELECT
     b.cliente_id                                            AS cliente_id,
-    b.codigo_cliente                                        AS codigo_cliente,
+    CASE WHEN b.es_persona_fisica OR COALESCE(ventas.fn_cif_normalizado(b.codigo_cliente) ~ '^[0-9KLMXYZ][0-9]{7}[A-Z]$', FALSE) THEN NULL ELSE b.codigo_cliente END AS codigo_cliente,
     b.nombre                                                AS nombre,
     CASE WHEN b.es_persona_fisica THEN NULL ELSE b.cif END  AS cif,
     CASE WHEN b.es_persona_fisica THEN NULL ELSE b.cif_normalizado END AS cif_normalizado,
@@ -89,4 +95,4 @@ LEFT JOIN obras_cliente           oc ON oc.cliente_id = b.cliente_id;
 ALTER TABLE ventas.clientes ADD PRIMARY KEY (cliente_id);
 
 COMMENT ON TABLE ventas.clientes IS
-'F-040. Una fila por cliente de Sigrid (raw.cli): nombre (publico tambien en personas fisicas, D2), CIF tal cual y normalizado, tipo y pais, es_persona_fisica (perfis o NIF de persona), cif_valido (letra de control) y cif_repetido, calculados antes de anular; y por cliente, obras, facturas, certificaciones, lo facturado (base) y la primera y ultima factura. El CIF de la persona fisica va a NULL: integro, con el contacto, en ventas_restringida.clientes_contacto (solo perfil total). Clave: cliente_id.';
+'F-040. Una fila por cliente de Sigrid (raw.cli): el codigo (NULL en persona fisica o si tiene forma de NIF de persona), nombre (publico tambien en personas fisicas, D2), CIF tal cual y normalizado, tipo y pais, es_persona_fisica (perfis o NIF de persona), cif_valido (letra de control) y cif_repetido, calculados antes de anular; y por cliente, obras, facturas, certificaciones, lo facturado (base) y la primera y ultima factura. El CIF de la persona fisica va a NULL: integro, con el contacto, en ventas_restringida.clientes_contacto (solo perfil total). Clave: cliente_id.';

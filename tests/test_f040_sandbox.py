@@ -102,7 +102,8 @@ INSERT INTO raw.conest (ide, tip, est, cod, res) VALUES
   (3, 54, 3, '3', 'Emitida'), (4, 54, 4, '4', 'Aprobada por propiedad'),
   (5, 54, 2, '2', 'Aprobada por gerencia');
 -- Clientes: 1 sociedad, 2 DNI con separadores, 3 perfis 1 con CIF de sociedad,
--- 4 el CIF de 1 escrito de otra forma (repetido), 5 sin CIF.
+-- 4 el CIF de 1 escrito de otra forma (repetido) y un codigo (`con.cod`) con
+-- forma de NIF de persona (R1-H1), 5 sin CIF.
 INSERT INTO raw.cli (ide, tipcif, cifpai, cif, raz, perfis, dir, dir1, dircpo, tel, ele) VALUES
   (1, '01', 'ES', 'B12345678', 'ACME SA', 0, 'Calle A 1, Madrid', 'Calle A 1', '28001', '910000000', 'a@acme.es'),
   (2, '02', 'ES', '12345678-z', 'JUAN PEREZ', 0, 'Calle B 2', 'Calle B 2', '28002', '600000000', 'juan@x.es'),
@@ -111,7 +112,7 @@ INSERT INTO raw.cli (ide, tipcif, cifpai, cif, raz, perfis, dir, dir1, dircpo, t
   (5, '01', 'ES', '', 'SIN CIF', NULL, NULL, NULL, NULL, NULL, NULL);
 INSERT INTO raw.con (ide, tip, cod, res, emp, est, fecbaj) VALUES
   (1, 4, 'C1', 'ACME SA', 1, 0, 0), (2, 4, 'C2', 'JUAN PEREZ', 1, 0, 0),
-  (3, 4, 'C3', 'MARIA LOPEZ', 1, 0, 0), (4, 4, 'C4', 'ACME DUP', 1, 0, 0),
+  (3, 4, 'C3', 'MARIA LOPEZ', 1, 0, 0), (4, 4, '87654321-x', 'ACME DUP', 1, 0, 0),
   (5, 4, 'C5', 'SIN CIF', 1, 0, 0),
   (500, 3, '0500', 'OBRA 500', 1, 0, 0), (501, 3, '0501', 'OBRA 501', 1, 0, 0),
   (700, 30, 'CONT_PPAL', 'CONTRATO PRINCIPAL', 1, 0, 0),
@@ -312,6 +313,13 @@ def test_f040_sandbox_r5_r8_clientes(conexion) -> None:
     assert filas[3][:4] == ("MARIA LOPEZ", None, None, True)
     assert filas[4][1:6] == ("b-12.345.678", "B12345678", False, True, True)
     assert filas[5][1:6] == ("", None, False, False, False)
+    # R1-H1: el código, a NULL en persona física y con forma de NIF; = el dominio.
+    codigos = {c: f[12] for c, f in filas.items()}
+    assert codigos == {1: "C1", 2: None, 3: None, 4: None, 5: "C5"}
+    personas = {c: f[3] for c, f in filas.items()}
+    crudos = {1: "C1", 2: "C2", 3: "C3", 4: "87654321-x", 5: "C5"}
+    for c, crudo in crudos.items():
+        assert codigos[c] == v.codigo_cliente_publicado(crudo, personas[c]), c
 
 
 def test_f040_sandbox_r9_r11_facturas(conexion) -> None:
@@ -435,6 +443,9 @@ def test_f040_sandbox_r21_r23_restringida(conexion) -> None:
         SELECT cliente_id, cif, es_persona_fisica, direccion, telefono, correo
         FROM ventas_restringida.clientes_contacto""")}
     assert contacto[2] == ("12345678-z", True, "Calle B 2", "600000000", "juan@x.es")
+    codigos = dict(_filas(conexion, """SELECT cliente_id, codigo_cliente
+                                       FROM ventas_restringida.clientes_contacto"""))
+    assert codigos == {1: "C1", 2: "C2", 3: "C3", 4: "87654321-x", 5: "C5"}  # íntegros
     assert len(contacto) == 5
     cabecera = {f[0]: f[1:] for f in _filas(conexion, """
         SELECT factura_id, es_persona_fisica, nombre_cabecera, cif_cabecera,
@@ -464,6 +475,10 @@ def test_f040_sandbox_r24_r25_la_guarda_pasa_con_lo_construido(conexion) -> None
      "F-040 R24: ventas.clientes publica el CIF de 1 personas fisicas"),
     ("UPDATE ventas.clientes SET cif = 'X1234567L' WHERE cliente_id = 1",
      "F-040 R24: ventas.clientes publica el CIF de 1 personas fisicas"),
+    ("UPDATE ventas.clientes SET codigo_cliente = 'C2' WHERE cliente_id = 2",
+     "F-040 R24: ventas.clientes publica el codigo de 1 clientes persona fisica o con forma de NIF"),
+    ("UPDATE ventas.clientes SET codigo_cliente = '87654321X' WHERE cliente_id = 1",
+     "F-040 R24: ventas.clientes publica el codigo de 1 clientes persona fisica o con forma de NIF"),
     ("UPDATE ventas.facturas SET cif_cliente = 'B87654321' WHERE factura_id = 1002",
      "F-040 R24: ventas.facturas publica el CIF de una persona fisica en 1 facturas"),
     ("UPDATE ventas.factura_lineas SET descripcion = 'x' WHERE linea_id = 2003",

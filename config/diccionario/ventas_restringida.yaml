@@ -32,8 +32,8 @@ objetos:
       denied»: usa `ventas.clientes`, sin reintentar ni buscar otro camino
       (`R-VENTAS-RESTRINGIDA`).
 
-      **EL CONTACTO DE CADA CLIENTE**: el CIF INTEGRO, tambien el de la persona
-      fisica (que `ventas.clientes` publica a NULL), la direccion completa y en
+      **EL CONTACTO DE CADA CLIENTE**: el codigo y el CIF INTEGROS, tambien los
+      de la persona fisica (que `ventas.clientes` publica a NULL), la direccion completa y en
       dos lineas, el codigo postal, dos telefonos y el correo. Una fila por
       cliente, las mismas 1.210 que `ventas.clientes`.
     grano: >-
@@ -46,6 +46,11 @@ objetos:
       cliente_id:
         significado: Identificador del cliente (el de `ventas.clientes`).
         agregacion: clave_sustituta
+      codigo_cliente:
+        significado: >-
+          Codigo del cliente en Sigrid (`con.cod`), INTEGRO: puede ser el NIF de
+          la persona; `ventas.clientes` lo publica a NULL en persona fisica y
+          cuando tiene forma de NIF de persona.
       nombre:
         significado: Razon social o nombre del cliente, el actual.
       cif:

@@ -83,6 +83,22 @@ def test_f040_r6_es_persona_fisica(cif: str | None, perfis: int | None, esperado
     assert v.es_persona_fisica(cif, perfis) is esperado
 
 
+@pytest.mark.parametrize(("codigo", "persona", "esperado"), [
+    ("C1", False, "C1"),                    # el código de una sociedad, público
+    ("B12345678", False, "B12345678"),      # un CIF de sociedad como código, también
+    ("C2", True, None),                     # de persona física, nunca (R1-H1)
+    ("87654321-x", False, None),            # con forma de NIF de persona, tampoco
+    (" x1234567l ", False, None),           # NIE, con espacios y minúsculas
+    ("K1234567A", False, None),
+    (None, False, None),
+    ("", False, ""),                        # vacío no es un NIF: se deja tal cual
+])
+def test_f040_r24_codigo_cliente_publicado(codigo: str | None, persona: bool,
+                                           esperado: str | None) -> None:
+    """R1-H1: `con.cod` puede ser el NIF de una persona; a `ventas` no llega."""
+    assert v.codigo_cliente_publicado(codigo, persona) == esperado
+
+
 # ===========================================================================
 # R8 · cif_valido
 # ===========================================================================

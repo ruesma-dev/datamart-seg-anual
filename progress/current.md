@@ -19,7 +19,7 @@ diccionario v75; diecisiete pasos; presupuesto de F-147 a 37.042 con su motivo; 
 T3; una sandbox Postgres local extra (`tests/test_f040_sandbox.py`, salta sin DSN). `azure-apps`: commit
 local `882abce`, sin push. Pendiente del líder: la puerta con `.env` y la campaña de mutación (aquí
 aborta, ver el informe).
-Diccionario del árbol hoy: **v75, 316 objetos, 2653 columnas, 153 de consumo**.
+Diccionario del árbol hoy: **v75, 316 objetos, 2654 columnas, 153 de consumo**.
 Líder (09-11, 17:20 UTC): la primera puerta con `.env` sobre `6392b0d` salió ROJA solo en
 `test_f006_los_recuentos_de_current_son_los_de_hoy` (este fichero no decía los recuentos de la v75);
 corregido aquí y relanzada la puerta.

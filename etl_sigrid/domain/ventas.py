@@ -128,6 +128,21 @@ def es_persona_fisica(cif_normalizado: str | None, perfis: int | None) -> bool:
     return bool(cif_normalizado and re.match(PATRON_NIF_PERSONA, cif_normalizado))
 
 
+def codigo_cliente_publicado(codigo: str | None, persona_fisica: bool) -> str | None:
+    """El código del cliente (`con.cod`) que se publica en `ventas` (R24, R1-H1).
+
+    NULL si el cliente es persona física o si el código, normalizado como un
+    CIF, tiene forma de NIF de persona: en Sigrid el código lo escribe quien da
+    de alta al cliente y puede ser su DNI. El íntegro, en `ventas_restringida`.
+    """
+    if persona_fisica:
+        return None
+    normalizado = normalizar_cif(codigo)
+    if normalizado and re.match(PATRON_NIF_PERSONA, normalizado):
+        return None
+    return codigo
+
+
 # ---------------------------------------------------------------------------
 # R8 · CIF válido
 # ---------------------------------------------------------------------------
