@@ -49,47 +49,38 @@ En total son 66 ficheros (`git diff --stat main...HEAD`), con +6.301 y −210 l�
    solo se comprueba como literal.
 6. **Adiciones al dominio** que pide el SQL, para tener un oráculo único: `TIP_CLIENTE`,
    `repartir_recargos`, `ESLABONES_COBERTURA` y los patrones de CIF.
-7. **Fail-closed**: un CIF ilegible o un `perfis` desconocido se tratan como persona física, así
-   que van a `ventas_restringida` y no se publican.
+7. **Persona física, tal como la define R6** (corregido en el ciclo 1, H2: aquí decía «fail-closed»
+   y era falso). Es persona física si `perfis` <> 0 o si el CIF normalizado casa con
+   `PATRON_NIF_PERSONA`. Estos casos **NO** se tratan como persona física y su dato se publica en
+   `ventas`: `perfis` NULL (cuenta como 0); un CIF con prefijo de país (`ES12345678Z` no casa); y
+   una factura cuyo cliente no está en `raw.cli`, que sale `es_persona_fisica = FALSE` y publica
+   la descripción de sus líneas (`cif_cliente` y `nombre_cliente` salen NULL por el `LEFT JOIN`).
+   Solo una LÍNEA sin factura en `raw.dvf` se anula por defecto (`COALESCE(..., TRUE)`).
+   Propuestas para el humano en § 7.
 8. **Obra de la factura**: sale de la cabecera solo cuando la línea no trae centro. Así lo describe
    design § 4.
-9. **Tests de otras features puestos al día**, solo en listas y recuentos:
-   - `f006_formato`, `f006_frescura`, `f006_publicacion`, `f024_cli`
-   - `f037`, `f047`, `f057`, `f066`, `f074`, `f085`, `f090`, `f097`
-   - `f135`, `f138`, `f140`, `f141`, `f146`, `f147`, `f148`, `f150`, `f156`
-
-   En `f141` se mantiene su instantánea de `CONSUMO`, que es autocontenida, y solo cambia `esperado`.
+9. **Tests de otras features al día, solo listas y recuentos**: `f006_formato/_frescura/_publicacion`, `f024`,
+   `f037`, `f047`, `f057`, `f066`, `f074`, `f085`, `f090`, `f097`, `f135`, `f138`, `f140`, `f141` (su
+   instantánea de `CONSUMO`, autocontenida, se mantiene), `f146`, `f147`, `f148`, `f150`, `f156`.
 10. **Inventario de F-006 a 316 objetos**: `design.md` y una enmienda en `design_detalle.md` (de ahí
    lee el test).
-11. **Observación sin medir**: `ventas.clientes.codigo_cliente` (`con.cod`) podría contener un NIF
-   en personas físicas. Se propone comprobarlo en el paso MANUAL 6 de design § 9 con `<Q>` (por
-   ejemplo, cuántos códigos de personas físicas casan con el patrón de NIF). Si aparecen, se pasa
-   la columna a `ventas_restringida`.
+11. **`codigo_cliente` (`con.cod`)**: podía publicar un NIF. Resuelto en el código en el ciclo 1
+   (H1, § 7), no en el despliegue.
 
 ## 3. Verificación real
 
 - **Tests de F-040**: `F040_SANDBOX_DSN=... pytest tests/test_f040_*.py -q -p no:cacheprovider`
   → **2300 passed** en 15,29 s. Son 246 sin red ni base de datos y 2054 contra el PG16 local. Sin
   DSN: `246 passed, 2054 skipped`.
-- **`bash harness/init.sh` (T19)** en este worktree: **rojo, solo por el entorno**.
-  - `[KO] Falta .env`.
-  - pytest se para por `-x` en `test_f006_t26_cli_dry_run_no_toca_la_base` (`SigridApiSettings`:
-    `base_url` requerido) tras 256 passed.
-  - Por ese corte, su `PUERTA COBERTURA` da 52,0 % (77/148), una cifra que no representa el
-    cambio.
-  - `PUERTA TAMAÑO` OK (requirements 148/150, design 247/250); rama OK.
-  - Está prohibido crear `.env` aquí: el líder pasa la puerta completa en una copia con `.env`.
-- **Cobertura de las líneas cambiadas**, medida aparte:
-  - Comando: `coverage run -m pytest <los 31 ficheros de test que toca la rama>` con el DSN de la
-    sandbox, y después `harness.cobertura --base main`.
-  - Resultado: **`PUERTA COBERTURA: 100.0% de 148 líneas cambiadas cubiertas (148/148, umbral 80%,
-    nivel critico)`**.
-  - Ese subconjunto dio 3638 passed, 6 skipped y 1 failed en 554,63 s. El fallo,
-    `test_f024_r19_la_ayuda_ensena_el_umbral_y_el_paso_por_defecto`, es de entorno: `check-frescura
-    --help` pasa por `get_settings` y sin `.env` cae.
-  - Con la suite entera la cobertura solo puede subir.
-- **Dos fallos que solo son de entorno**: `test_f006_t26` y `test_f024_r19`. Los dos piden
-  `.env` y no tocan F-040.
+- **`bash harness/init.sh` (T19)** en este worktree: **rojo, solo por el entorno**: `[KO] Falta .env`, y
+  pytest se para por `-x` en `test_f006_t26` (`SigridApiSettings`: `base_url` requerido) tras 256
+  passed, así que su `PUERTA COBERTURA` (52,0 %, 77/148) no representa el cambio. `PUERTA TAMAÑO` y
+  rama OK. Crear `.env` aquí está prohibido: la puerta completa es del líder.
+- **Cobertura de las líneas cambiadas**, aparte: `coverage run -m pytest <los 31 ficheros de test
+  que toca la rama>` con la sandbox y `harness.cobertura --base main` → **`PUERTA COBERTURA: 100.0% de
+  148 líneas cambiadas cubiertas (148/148, umbral 80%, nivel critico)`** (3638 passed, 6 skipped, 1
+  failed en 554,63 s; con la suite entera solo puede subir). Fallos de entorno, que piden `.env` y no
+  tocan F-040: `test_f006_t26` y `test_f024_r19` (`check-frescura --help` pasa por `get_settings`).
 
 ## 4. Fase RED (comandos y salida real, recortada)
 
@@ -141,18 +132,13 @@ Las trazas completas se guardaron en el scratchpad de la sesión (`red_t1.txt`, 
 ## 5. Verificaciones MANUAL pendientes (del humano, tras APROBADO y merge a `main`)
 
 - **T18, despliegue**: pasos 0-9 de `specs/F-040-ingresos/design.md` § 9, con su vuelta atrás.
-  - Imagen.
-  - `02_roles.sql` como administrador ANTES del build, sin `*_PWD` (runbook § 15).
-  - Ingesta `--full` de las 7 tablas y `dvf`, y `check-raw-recuentos`.
-  - `build-ventas` y `apply-grants`.
-  - Prueba negativa y positiva por login.
-  - Cifras de R34: `retenciones.movimientos` CLIENTE igual antes y después.
-  - `publicar-diccionario` con la imagen del job.
-  - Añadido de este informe: medir `codigo_cliente` (§ 2.11).
+  Imagen; `02_roles.sql` como administrador ANTES del build, sin `*_PWD` (runbook § 15); ingesta
+  `--full` de las 7 tablas y `dvf` y `check-raw-recuentos`; `build-ventas` y `apply-grants`; prueba
+  negativa y positiva por login; R34 (`retenciones.movimientos` CLIENTE igual); `publicar-diccionario`.
 - **T17, `mcp-bbdd`** (fuera de este repositorio): `ventas` a la lista blanca del estándar y del
   total, `ventas_restringida` solo a la del total, y reinicio del MCP, que cachea el diccionario.
   Anotado en `progress/current.md` y en `azure-apps/datamart_seg_anual.md`.
-- **Push de `azure-apps`**: commit local `882abce`, a la espera del humano.
+- **Push de `azure-apps`**: commits locales `882abce` y `76e722c` (ciclo 1), a la espera del humano.
 
 ## 6. Fuera de alcance y lo que falta
 
@@ -167,11 +153,66 @@ Las trazas completas se guardaron en el scratchpad de la sesión (`red_t1.txt`, 
   - Review contra `CHECKPOINTS.md`.
   - Los pasos MANUAL de § 5.
 
+## 7. Ciclo 1 (review `progress/review_F-040.md`, CHANGES_REQUESTED)
+
+| Cambio | Commit | Qué |
+|---|---|---|
+| H1 | `3ca7aea` | `codigo_cliente` a NULL en persona física o si, normalizado, casa con `PATRON_NIF_PERSONA` (`01_clientes.sql`; oráculo `codigo_cliente_publicado` en el dominio). Íntegro en `ventas_restringida.clientes_contacto` (columna nueva, `LEFT JOIN raw.con` tipo 4, 1:1). Guarda R24 ampliada. Fichas, `design_detalle` § B (enmienda), `current.md` (2654 columnas) y `azure-apps` (`76e722c`) al día |
+| H2 | este | § 2.7 reescrito: qué casos NO son persona física |
+| H3 | `96b3630` | Frontera `0 < cobrado < 1` en el dominio (0,01, 0,50, 1, y 0,50 con emitido 0) y en la sandbox (vista = dominio; cobro REALIZADO en una transacción que se deshace) |
+| O2 | `d7f4fb1` | Fichas: `facturado_origen` incluye anuladas y rectificativas; la cobertura de efectos cuenta los de BAJA. `02_roles.sql`: «seis filas». Sin cambio de comportamiento |
+
+**RED de H1** (tests antes del código):
+```
+$ F040_SANDBOX_DSN=... .venv/Scripts/python.exe -m pytest tests/test_f040_dominio.py tests/test_f040_sql.py tests/test_f040_sandbox.py -q -p no:cacheprovider -rf --tb=line
+E   AttributeError: module 'etl_sigrid.domain.ventas' has no attribute 'codigo_cliente_publicado'
+E   assert "CASE WHEN b.es_persona_fisica OR COALESCE(ventas.fn_cif_normalizado(b.codigo_cliente) ~ '^[0-9KLMXYZ][0-9]{7}[A-Z]$', FALSE) THEN NULL ELSE b.codigo_cliente END AS codigo_cliente" in 'CREATE TABLE ventas.clie
+E   AssertionError: assert {2: 'C2', 1: ...54321-x', ...} == {1: 'C1', 2: ... 4: None, ...}
+E   psycopg.errors.UndefinedColumn: column "codigo_cliente" does not exist
+E   Failed: DID NOT RAISE RaiseException
+15 failed, 2199 passed in 20.31s
+```
+**RED de H3**: el código ya era correcto, así que la prueba es que el test mata al mutante. Se
+aplicó a mano `cobrado <= 0` -> `<= 1` en `ventas.py:228` y en `05_vistas.sql:95`, y se revirtió:
+```
+$ F040_SANDBOX_DSN=... .venv/Scripts/python.exe -m pytest tests/test_f040_dominio.py tests/test_f040_sandbox.py -q -p no:cacheprovider -k r18 -rf --tb=line
+E   AssertionError: assert 'PENDIENTE_COBRO' == 'COBRADA_PARCIAL'
+FAILED tests/test_f040_sandbox.py::test_f040_sandbox_r18_frontera_de_lo_cobrado[0.50-COBRADA_PARCIAL]
+7 failed, 20 passed, 2120 deselected in 5.62s
+```
+**Verde tras el ciclo**: `pytest tests/test_f040_*.py` con la sandbox → **2319 passed** (21,04 s).
+Con diccionario y permisos (`f040_diccionario`, `f040_grants`, `f147`, `f006_fichas`,
+`f006_contexto`, `f135`) → 1332 passed, 335 skipped. `harness/init.sh` no se lanzó aquí (sin `.env`).
+
+**Propuestas para el humano (H2; NO aplicadas, cambian R6)**. Ninguno de los tres casos se ha
+medido: el MCP no conectaba y en el worktree no hay `.env`.
+- (a) Quitar el prefijo de país (`ES`) antes de mirar el patrón de NIF, en `normalizar_cif` y
+  `fn_cif_normalizado`.
+- (b) Tratar como persona física la factura cuyo cliente no está en `raw.cli` (`COALESCE(..., TRUE)`
+  en `02_facturas.sql`), igual que la línea huérfana.
+- (c) `perfis` NULL: sin cambio. El patrón de NIF ya lo cubre si el CIF es de persona.
+
+Los tres casos se medirían en el paso MANUAL 6 con `<Q>`.
+
+**Supervivientes de `build_ventas_step.py`** (los cinco de la pasada RM4 del reviewer; para que el
+líder los traslade a `progress/mutacion_F-040.md`):
+- **L51 `slots=True`/`frozen=True` -> `False`** (dos): equivalentes. `_SubStep` solo se instancia
+  en `SUB_PASOS`, nadie le asigna ni añade atributos y `run` solo lee sus campos.
+- **L119 `exc_info=True` -> `False`**: solo quita la traza del log de error; `FAILED`,
+  `error_message` y el sub-paso (probados) no se mueven.
+- **L126 `rows = 0` -> `1`**: en los sub-pasos sin tabla destino (`setup`, `vistas`, `guardas`)
+  `rows` solo va al `logger.info` y no se suma a `total_rows`: `rows_processed` no cambia.
+- **L133 `round(…, 2)` -> `3`**: el `duration_s` del `logger.info`, solo log.
+Matarlos exigiría tests sobre el formato del log, deuda que el arnés pide no crear.
+
+**PG de pruebas**: el cluster `scratchpad/pgdata` (puerto 55440) seguía arrancado; se usó en este
+ciclo y se paró al terminar (`pg_ctl stop`: «servidor detenido»).
+
 ## Evidencias
 
 | Evidencia | Valor real |
 |---|---|
-| Tests ejecutados | Propios de F-040: **2300 passed**, 0 failed (246 sin base + 2054 en el PG16 local), 15,29 s. Subconjunto de la rama bajo cobertura: **3638 passed, 6 skipped, 1 failed** (el de entorno `test_f024_r19`). `init.sh`: 256 passed antes del corte por `-x` en `test_f006_t26` (entorno) |
+| Tests ejecutados | Ciclo 1: propios de F-040 **2319 passed**, 0 failed (21,04 s). Pasada 1: propios de F-040 **2300 passed**, 0 failed (246 sin base + 2054 en el PG16 local), 15,29 s. Subconjunto de la rama bajo cobertura: **3638 passed, 6 skipped, 1 failed** (el de entorno `test_f024_r19`). `init.sh`: 256 passed antes del corte por `-x` en `test_f006_t26` (entorno) |
 | Cobertura de líneas cambiadas | **100,0 % (148/148)**, `PUERTA COBERTURA` de `harness.cobertura --base main` sobre el subconjunto. La de `init.sh` en este worktree, 52,0 %, es por el corte de `-x` |
 | Mutantes | **Sin veredicto: la campaña no corre en este worktree. Queda para el líder.** `python -m harness.mutacion --feature F-040 --base main` (árbol limpio): alcance de 5 ficheros y 450 líneas de producción, 4 workers, y **exit=3**: «LÍNEA BASE SIN TERMINAR [...] la suite SIN MUTAR agotó los 600 s que se le concedieron (el suelo 'mutacion.timeout_por_mutante_s' multiplicado por la holgura de 5), con 4 worker(s) compitiendo por la máquina». Además, sin `.env` la línea base saldría roja (`test_f006_t26`, `test_f024_r19`) y la campaña abortaría igual. No se evaluó ningún mutante: 0 generados y 0 supervivientes. No se cambió `rigor.json` ni se acotó la suite (no improvisar). El SQL de `sql/ventas/` no se muta; lo cubren la sandbox (2054 tests) y los literales contra el dominio |
 | Tiempo de la suite | Subconjunto con cobertura: **554,63 s** (9 min 14 s). `init.sh` hasta el corte: 405,19 s. La suite entera no se completó aquí: con cobertura ronda las 4 h (F-156: 15.176 s) |

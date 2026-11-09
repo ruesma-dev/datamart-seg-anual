@@ -9,7 +9,19 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-11-09 · F-040 · `in_progress` · implementer: T1-T16 hechas, pendiente review · rama `feature/F-040-ingresos`
+## 2026-11-09 · F-040 · `in_progress` · implementer: ciclo 1 del review hecho, pendiente re-review · rama `feature/F-040-ingresos`
+
+Implementer, ciclo 1 (`progress/review_F-040.md`, CHANGES_REQUESTED). H1 `3ca7aea`: `codigo_cliente` a NULL
+en persona física o con forma de NIF; íntegro en `ventas_restringida.clientes_contacto` (columna
+nueva: el diccionario pasa a 2654 columnas); guarda R24 ampliada; `azure-apps` `76e722c` (local).
+H2: el informe § 2.7 ya no dice «fail-closed», sino qué casos NO son persona física, con tres
+propuestas para el humano (no aplicadas, cambian R6). H3 `96b3630`: frontera 0 < cobrado < 1 en
+dominio y sandbox. O2 `d7f4fb1`: solo fichas y un comentario. F-040 con la sandbox: 2319 passed. Los
+cinco supervivientes de `build_ventas_step.py`, justificados en el informe § 7, para
+`progress/mutacion_F-040.md`. PG de pruebas (`scratchpad/pgdata`, 55440) PARADO al terminar
+(`pg_ctl stop`: «servidor detenido»). Pendiente del líder: la puerta con `.env` y la mutación.
+
+Pasada 1:
 
 Implementer. T1-T15 con un commit cada una (`0e12304`..`549111c`) y T16, el informe
 `progress/impl_F-040.md`. T17 y T18 son MANUALES del humano y están preparadas (design § 9, runbook
