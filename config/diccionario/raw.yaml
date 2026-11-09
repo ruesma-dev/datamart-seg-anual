@@ -2448,7 +2448,7 @@ objetos:
     motivo_no_consumo: >-
       Recargos de certificacion en bruto. Publicados por linea en `ventas.certificacion_recargos` y repartidos en cuatro columnas en `ventas.certificaciones`.
     descripcion: >-
-      **LOS RECARGOS DE LA CERTIFICACION** (7.396 filas el 2026-11-06; F-040): coeficientes (clase 0: `COEF_RECGG`, `COEF_RECBI`, `COEF_DESADJ`) y retenciones (clase 1 `RETESP`, clases 4 y 5 `RET5T`, `RET5`, `RET10`). `docide` es la certificacion, `recide` el recargo (su codigo y nombre, en `con`), `cuo` la cuota. Se traen todas menos `tex` (texto libre). Sin datos personales.
+      **LOS RECARGOS DE LA CERTIFICACION** (7.396 filas el 2026-11-06; F-040): coeficientes (clase 0: `COEF_RECGG`, `COEF_RECBI`, `COEF_DESADJ`) y retenciones (clase 1 `RETESP`, clases 4 y 5 `RET5T`, `RET5`, `RET10`). `docide` es la certificacion, `recide` el recargo (su codigo y nombre, en `con`), `cuo` la cuota. **No se traen** 1 columna: solo `tex`, el texto libre. Sin datos personales.
 
       **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `cerrec`, y se localiza con `grep -n "^| cerrec " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
 
@@ -2502,7 +2502,7 @@ objetos:
     motivo_no_consumo: >-
       Recargos de factura de venta en bruto. Publicados por linea en `ventas.factura_recargos` y repartidos en cuatro columnas en `ventas.facturas`.
     descripcion: >-
-      **LOS RECARGOS DE LA FACTURA DE VENTA** (6.145 filas el 2026-11-06; F-040): coeficientes (clase 0) y retenciones que nos practica el cliente (clase 1 `RETESP` 16,78 M EUR, clases 4 y 5 `RET5T`, `RET5`, `RET10`, clase 3 de alquiler). `docide` es la factura, `recide` el recargo, `cuo` la cuota. Se traen todas menos `tex`. Sin datos personales. La retencion de cliente por documento la cuadra F-104.
+      **LOS RECARGOS DE LA FACTURA DE VENTA** (6.145 filas el 2026-11-06; F-040): coeficientes (clase 0) y retenciones que nos practica el cliente (clase 1 `RETESP` 16,78 M EUR, clases 4 y 5 `RET5T`, `RET5`, `RET10`, clase 3 de alquiler). `docide` es la factura, `recide` el recargo, `cuo` la cuota. **No se traen** 1 columna: solo `tex`, el texto libre. Sin datos personales. La retencion de cliente por documento la cuadra F-104.
 
       **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `dvfrec`, y se localiza con `grep -n "^| dvfrec " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
 
