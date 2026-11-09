@@ -802,7 +802,18 @@
 # `tesoreria.devengo_pendiente_obra_mes` (nunca negativo) y de
 # `tesoreria.devengo_pendiente_contrato_mes` (ninguna fila negativa). Sin
 # objetos, columnas ni reglas nuevos.
-version: 74
+#
+# version 75 (F-040, 2026-11-09): EL LADO DE INGRESOS. Esquemas `ventas`
+# (clientes con su nombre, facturas de venta con lineas y recargos,
+# certificaciones con los suyos, el enlace certificacion -> factura, su
+# cobertura y tres vistas: el cobro por factura, el seguimiento de cada
+# certificacion y el contraste por obra) y `ventas_restringida` (lo personal
+# del cliente, D2/D6 del humano: solo perfil total). Reglas nuevas
+# `R-VENTAS-TRES-CIFRAS` y `R-VENTAS-RESTRINGIDA`; `R-PERFILES` alcanza los dos
+# esquemas y `R-FRESCURA` el paso `build_ventas`. Siete tablas nuevas en `raw`
+# (`cli`, `cer`, `cerpro`, `cerrec`, `cerprodes`, `dvfpro`, `dvfrec`) y `dvf` a
+# 35 columnas.
+version: 75
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -830,23 +841,24 @@ reglas:
   # las reglas al acortarlas o fundirlas esta en la ficha de su objeto.
 
   - codigo: R-FRESCURA
-    titulo: Nueve esquemas pueden quedarse atras sin tumbar la noche
+    titulo: Diez esquemas pueden quedarse atras sin tumbar la noche
     severidad: bloqueante
-    ambito: [cierre, compras, compras_restringida, maestro, retenciones, personal, contabilidad, contabilidad_restringida, tesoreria, tesoreria_restringida, descompuestos, postventa, postventa_restringida]
+    ambito: [cierre, compras, compras_restringida, maestro, retenciones, personal, contabilidad, contabilidad_restringida, tesoreria, tesoreria_restringida, descompuestos, postventa, postventa_restringida, ventas, ventas_restringida]
     resumen: >-
-      Cita la fecha del dato en toda respuesta de cierre, compras, maestro,
-      retenciones, personal, contabilidad, tesorería, descompuestos o
-      postventa: cada uno se construye aparte y puede ir un día atrás. Fecha: «ESTADO POR
-      ESQUEMA» o `_meta.v_frescura`.
+      Cita la fecha en toda respuesta de cierre, compras, maestro,
+      retenciones, personal, contabilidad, tesorería, descompuestos, postventa
+      o ventas: cada uno se construye aparte y puede ir un día atrás. Fecha:
+      «ESTADO POR ESQUEMA» o `_meta.v_frescura`.
     regla: >-
-      Estos nueve esquemas (trece con `contabilidad_restringida`,
-      `tesoreria_restringida`, `compras_restringida` y
-      `postventa_restringida`, que construyen el mismo `build_contabilidad`,
-      `build_tesoreria`, `build_compras` y `build_postventa`) SI se construyen cada noche dentro de
-      `run-all`, y los nueve registran paso, asi que su fecha de build siempre es
+      Estos diez esquemas (catorce con `contabilidad_restringida`,
+      `tesoreria_restringida`, `compras_restringida`, `postventa_restringida`
+      y `ventas_restringida`, que construyen el mismo `build_contabilidad`,
+      `build_tesoreria`, `build_compras`, `build_postventa` y `build_ventas`)
+      SI se construyen cada noche dentro de
+      `run-all`, y los diez registran paso, asi que su fecha de build siempre es
       consultable. Lo que no cambia es que su paso NO es dependencia de ningun
       otro: si `build_cierre`, `build_compras`, `build_maestros`,
-      `build_retenciones`, `build_personal`, `build_contabilidad`,
+      `build_retenciones`, `build_ventas`, `build_personal`, `build_contabilidad`,
       `build_tesoreria`, `build_postventa` o `build_descompuestos` falla (o su ingesta
       `ingest_descompuestos`, que lo salta), la noche continua y termina, y ese
       esquema se queda con el dato de una noche anterior mientras `raw`, `stg` y
@@ -854,8 +866,9 @@ reglas:
       de build: `SELECT * FROM _meta.v_frescura WHERE paso = 'build_cierre'` (o
       `build_compras`, `build_maestros`, `build_retenciones`, `build_personal`,
       `build_contabilidad`, `build_tesoreria`, `build_postventa`,
-      `build_descompuestos`). `postventa.v_coste_obra` lee `compras` al
-      consultar: vale tambien la frescura de `build_compras`.
+      `build_ventas`, `build_descompuestos`). `postventa.v_coste_obra` lee
+      `compras` al consultar: vale tambien la frescura de `build_compras`; las
+      tres vistas de `ventas` leen `tesoreria`: vale la de `build_tesoreria`.
       `compras.vencimientos` es una vista de `tesoreria.efectos`: su frescura
       es la de `build_tesoreria`. Que el pipeline sea uno solo NO significa que
       todo el datamart tenga la misma frescura.
@@ -864,7 +877,7 @@ reglas:
       llaman —con el mismo nombre que tienen en `_meta.v_frescura.paso`, que es
       donde se consulta su frescura— `ingest_raw`, `load_excel_aux`,
       `build_stg`, `build_mart`, `build_maestros`, `build_tesoreria`,
-      `build_compras`, `build_retenciones`, `build_personal`,
+      `build_compras`, `build_retenciones`, `build_ventas`, `build_personal`,
       `build_contabilidad`, `build_postventa`, `ingest_descompuestos`,
       `build_descompuestos`, `build_cierre`, `publicar_diccionario` y
       `apply_grants`. Hasta el 2026-08-28 cuatro de
@@ -875,8 +888,9 @@ reglas:
       dentro de la nocturna y con la misma propiedad, y esta vez a proposito:
       un fallo del SQL de personal no puede dejar al `mart` sin construir.
       `contabilidad` (F-056, 2026-09-26), `descompuestos` (F-097,
-      2026-09-28), `tesoreria` (F-037, 2026-10-13) y `postventa` (F-156,
-      2026-11-04), igual. Dar un dato de cualquiera de los nueve sin fecha es dar una respuesta vieja con aplomo.
+      2026-09-28), `tesoreria` (F-037, 2026-10-13), `postventa` (F-156,
+      2026-11-04) y `ventas` (F-040, 2026-11-09), igual. Dar un dato de
+      cualquiera de los diez sin fecha es dar una respuesta vieja con aplomo.
 
   - codigo: R-IMPORTE-MES
     titulo: importe_mes no se suma entre meses; importe_origen ya es acumulado
@@ -1117,6 +1131,8 @@ reglas:
       - personal
       - compras_restringida
       - postventa_restringida
+      - ventas
+      - ventas_restringida
       - compras.documento_alarmas
       - compras.vencimientos
       - compras.v_facturas_pago
@@ -1136,7 +1152,8 @@ reglas:
       el consumo salvo `raw` y `*_restringida`; el RESTRINGIDO
       (administrativos), lo del estandar MENOS el esquema `contabilidad` entero
       (`contabilidad.mayor`, `contabilidad.saldos_cuenta_mes`; tampoco el mayor
-      analitico), `tesoreria` y `personal`. SI lee `retenciones` y `compras`.
+      analitico), `tesoreria` y `personal`, y tampoco `ventas` (F-040). SI
+      lee `retenciones` y `compras`.
       «restringida» = reservada al perfil total: los `*_restringida` son del
       perfil TOTAL y NO del perfil restringido (`postventa_restringida`,
       tambien del POSTVENTA). «permission denied» no se
@@ -1144,7 +1161,8 @@ reglas:
       desde los logins de `compras`, ni la cartera desde
       `compras.vencimientos`; responde que el perfil no lo incluye.
     motivo: >-
-      Humano: F-135, F-037, F-138, F-141, F-146 (2026-10-21), F-156. Se
+      Humano: F-135, F-037, F-138, F-141, F-146 (2026-10-21), F-156, F-040
+      (D2/D6, 2026-11-07). Se
       sirve entera: el MCP no filtra el diccionario por perfil. Lo que falta,
       en cada ficha.
 
@@ -1214,6 +1232,59 @@ reglas:
       no filtra el diccionario por perfil: sin esta regla el agente mezclaria
       el texto enmascarado con el integro o buscaria a las personas por otro
       camino.
+
+  - codigo: R-VENTAS-TRES-CIFRAS
+    titulo: Certificado, facturado y cobrado son tres cifras; no se suman ni se restan sin decirlo
+    severidad: bloqueante
+    ambito: [ventas]
+    resumen: >-
+      Certificado, facturado y cobrado son tres cifras: no las sumes ni restes
+      sin decirlo. A cuenta (sin recargos) no es la base (con coeficientes). Lo
+      cobrado por certificación no se suma si `factura_compartida`.
+    regla: >-
+      En `ventas` hay tres cifras que NO son la misma: lo certificado
+      (`ventas.certificaciones`, solo las que `cuenta`), lo facturado
+      (`ventas.facturas`, `base` sin IVA) y lo cobrado
+      (`ventas.v_factura_cobro`, REALIZADO). Restarlas es una medida que hay
+      que nombrar («certificado sin facturar», «facturado sin cobrar»), nunca
+      un total. En la certificacion, el importe a cuenta (`importe_a_cuenta`,
+      las lineas SIN recargos) no es la `base` (cabecera, con los
+      coeficientes en el 85 %): no se mezclan. El enlace certificacion ->
+      factura es N:M: si `factura_compartida` es verdadero, sumar lo facturado
+      o lo cobrado por certificacion cuenta dos veces la misma factura. Lo
+      cobrado por un agrupado `AGR` no se atribuye a ninguna factura hasta
+      F-104: dilo si pesa en la respuesta (`ventas.cobertura_enlace`).
+    motivo: >-
+      Medido el 2026-11-06/07 en solo lectura: 268 facturas son de dos
+      certificaciones y 71 certificaciones tienen dos facturas; la base de la
+      certificacion lleva los coeficientes en el 85 % y el a cuenta no; y
+      `cer.idefac` esta a 0 en las 6.308, asi que el unico enlace es
+      `cerprodes`. Sin la regla, «cuanto falta por cobrar de lo certificado»
+      sale restando cifras de granos distintos.
+
+  - codigo: R-VENTAS-RESTRINGIDA
+    titulo: Lo personal del cliente solo en ventas_restringida; el nombre es publico
+    severidad: bloqueante
+    ambito: [ventas, ventas_restringida]
+    resumen: >-
+      Responde con `ventas`: el nombre del cliente es público, pero el NIF de
+      la persona física, direcciones, teléfonos, correos y la cabecera de la
+      factura solo están en `ventas_restringida` (perfil total).
+    regla: >-
+      El nombre del cliente es publico en `ventas`, tambien el de la persona
+      fisica. Su NIF (`cif` NULL en `ventas.clientes` y `ventas.facturas`), las
+      direcciones, los telefonos y el correo del cliente, el nombre y el CIF de
+      la cabecera de cada factura y la descripcion de las lineas de las
+      facturas a persona fisica solo estan en `ventas_restringida`, que lee el
+      perfil total. «permission denied» no se rodea, y nunca se cruza por
+      nombre con otro esquema para sacar un NIF o una direccion. Un `cif` NULL
+      de persona fisica no es un cliente sin CIF.
+    motivo: >-
+      Decisiones D2 y D6 del humano, chat del 2026-11-07 (F-040): «los diez
+      mayores clientes» se pregunta por nombre, pero 572 clientes son personas
+      fisicas (arrendamientos, compraventas) y en 3.635 facturas la cabecera
+      lleva un NIF de persona. El MCP no filtra el diccionario por perfil: sin
+      la regla, el agente buscaria el NIF por otro camino.
 
   - codigo: R-CAJA-HIPOTESIS
     titulo: No hay caja proyectada; pasar devengo a caja exige declarar todas las hipotesis

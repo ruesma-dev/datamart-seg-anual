@@ -2430,7 +2430,7 @@ objetos:
     motivo_no_consumo: >-
       Lineas de certificacion en bruto. Sus importes, sumados por certificacion, estan en `ventas.certificaciones` (`importe_a_cuenta`, `importe_a_origen`, `importe_anterior`).
     descripcion: >-
-      **LAS LINEAS DE CERTIFICACION** (6.362 filas el 2026-11-06; F-040): `docide` es la certificacion (`cer`). `tot` es lo certificado en el periodo SIN recargos (a cuenta), `imporiori` el a origen y `imporiant` el anterior. 6.265 certificaciones tienen UNA linea. `paride` solo en 5 lineas: la certificacion no baja a partida. Se traen 18 de 86 columnas por lista blanca; `res` (la descripcion) entra en `raw` y no se publica.
+      **LAS LINEAS DE CERTIFICACION** (6.362 filas el 2026-11-06; F-040): `docide` es la certificacion (`cer`). `tot` es lo certificado en el periodo SIN recargos (a cuenta), `imporiori` el a origen y `imporiant` el anterior. 6.265 certificaciones tienen UNA linea. `paride` solo en 5 lineas: la certificacion no baja a partida. Se traen 18 de 86 columnas por lista blanca; `res` (la descripcion) entra en `raw` y no se publica. Sin datos personales.
 
       **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `cerpro`, y se localiza con `grep -n "^| cerpro " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
 
@@ -2484,7 +2484,7 @@ objetos:
     motivo_no_consumo: >-
       Lineas de factura de venta en bruto, con la descripcion libre de las facturas de personas fisicas. Publicadas en `ventas.factura_lineas` (descripcion NULL si el cliente es persona fisica) y la descripcion integra de esas, en `ventas_restringida.factura_lineas_persona`.
     descripcion: >-
-      **LAS LINEAS DE FACTURA DE VENTA** (29.273 filas el 2026-11-06; F-040): `docide` es la factura (`dvf`). Se traen 17 de 90 columnas por lista blanca; `res` (la descripcion) puede nombrar a la persona del arrendamiento o la compraventa y solo se publica integra en `ventas_restringida`. `linoriide` con `docoriide` apunta a la linea de certificacion de origen. Desde F-040 tambien la lee `retenciones.v_src_lineas_venta` (respaldo de obra; 0 efectos de cliente sin centro: no cambia ninguna cifra).
+      **LAS LINEAS DE FACTURA DE VENTA** (29.273 filas el 2026-11-06; F-040): `docide` es la factura (`dvf`). Se traen 17 de 90 columnas por lista blanca; `res` (la descripcion) puede nombrar a la persona del arrendamiento o la compraventa (dato personal) y solo se publica integra en `ventas_restringida`. `linoriide` con `docoriide` apunta a la linea de certificacion de origen. Desde F-040 tambien la lee `retenciones.v_src_lineas_venta` (respaldo de obra; 0 efectos de cliente sin centro: no cambia ninguna cifra).
 
       **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `dvfpro`, y se localiza con `grep -n "^| dvfpro " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
 
