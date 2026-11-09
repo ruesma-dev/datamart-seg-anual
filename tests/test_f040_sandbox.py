@@ -421,6 +421,30 @@ def test_f040_sandbox_r18_seguimiento_igual_al_dominio(conexion) -> None:
     assert compartida[4001] and compartida[4002] and not compartida[4007]
 
 
+@pytest.mark.parametrize(("cobrado", "esperado"), [
+    ("0.50", "COBRADA_PARCIAL"), ("0.01", "COBRADA_PARCIAL"), ("1.00", "COBRADA_PARCIAL"),
+    ("0.00", "PENDIENTE_COBRO"),
+])
+def test_f040_sandbox_r18_frontera_de_lo_cobrado(conexion, cobrado, esperado) -> None:
+    """R1-H3: lo cobrado entre 0 y 1 euro es COBRADA_PARCIAL, en la vista y en el
+    dominio. La 4006 (factura 1002, 36,70 emitidos en un efecto PREVISTO) recibe
+    un cobro REALIZADO de `cobrado`, dentro de una transacción que se deshace."""
+    with conexion.transaction(force_rollback=True):
+        conexion.execute("""INSERT INTO tesoreria.efectos
+                             VALUES (5011, 'COBRO', 1002, %s, 'REALIZADO', '2026-03-15')""",
+                         (_d(cobrado),))
+        estado, est, nfac, emitido, cobrado_vista = _uno(conexion, """
+            SELECT s.estado_seguimiento, k.estado_codigo, s.num_facturas, s.emitido, s.cobrado
+            FROM ventas.v_seguimiento_certificacion s
+            JOIN ventas.certificaciones k ON k.certificacion_id = s.certificacion_id
+            WHERE s.certificacion_id = 4006""")
+        nefe = _uno(conexion, """SELECT num_efectos FROM ventas.v_factura_cobro
+                                  WHERE factura_id = 1002""")[0]
+    assert cobrado_vista == _d(cobrado)
+    assert estado == esperado
+    assert estado == v.estado_seguimiento(est, nfac, int(nefe), emitido, cobrado_vista)
+
+
 def test_f040_sandbox_r19_contraste_solo_venta(conexion) -> None:
     filas = _filas(conexion, "SELECT * FROM ventas.v_contraste_certificado_obra")
     # Certificado de 500: 4001 100,10 + 4002 50 + 4004 20 (4003, borrador, no);

@@ -205,6 +205,10 @@ D = Decimal
     (4, 2, 1, D("100"), D("0"), "PENDIENTE_COBRO"),
     (4, 2, 1, D("100"), D("-5"), "PENDIENTE_COBRO"),
     (3, 1, 2, D("100"), D("50"), "COBRADA_PARCIAL"),
+    (3, 1, 2, D("100"), D("0.50"), "COBRADA_PARCIAL"),    # R1-H3: 0 < cobrado < 1
+    (3, 1, 2, D("100"), D("0.01"), "COBRADA_PARCIAL"),    # un céntimo ya es cobro
+    (3, 1, 2, D("100"), D("1"), "COBRADA_PARCIAL"),
+    (2, 1, 1, D("0"), D("0.50"), "COBRADA"),              # emitido 0 y medio euro
     (3, 1, 2, D("100"), D("99.98"), "COBRADA_PARCIAL"),   # a más de un céntimo
     (3, 1, 2, D("100"), D("99.99"), "COBRADA"),           # dentro del céntimo
     (3, 1, 2, D("100"), D("100"), "COBRADA"),
