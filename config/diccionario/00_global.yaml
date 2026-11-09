@@ -1155,14 +1155,14 @@ reglas:
       analitico), `tesoreria` y `personal`, y tampoco `ventas`. SI
       lee `retenciones` y `compras`.
       «restringida» = reservada al perfil total: los `*_restringida` son del
-      perfil TOTAL y NO del perfil restringido (`postventa_restringida`,
-      tambien del POSTVENTA). «permission denied» no se
+      perfil TOTAL y NO del perfil restringido. «permission denied» no se
       rodea: ni el mayor desde `retenciones.apuntes_contables`, ni personas
       desde los logins de `compras`, ni la cartera desde
       `compras.vencimientos`; responde que el perfil no lo incluye.
     motivo: >-
-      Humano: F-135, F-037, F-138, F-141, F-146, F-156 y F-040 (D2/D6). Se
-      sirve entera: el MCP no filtra por perfil. Lo que falta, en cada ficha.
+      Humano: F-135, F-037, F-138, F-141, F-146 (2026-10-21), F-156, F-040
+      (D2/D6). Se sirve entera: el MCP no filtra el diccionario por perfil. Lo
+      que falta, en cada ficha.
 
   - codigo: R-TESORERIA-ESTADO
     titulo: En la cartera de cobros y pagos BAJA no se suma, y fecha real vacia no es pendiente
