@@ -26,11 +26,8 @@ Sigrid: todo se verificó con tests y con un PostgreSQL 16 local desechable.
 | T15 | `549111c` | `ARCHITECTURE.md`, mapa de `CLAUDE.md`; `azure-apps/datamart_seg_anual.md` (commit local `882abce` en `azure-apps`, sin push) |
 | T16 | `01f4c9f` y el de este informe | `progress/current.md`, este informe, `tasks.md` |
 
-En total son 66 ficheros (`git diff --stat main...HEAD`), con +6.301 y −210 líneas. Del código nuevo, 8 ficheros SQL
-(`etl_sigrid/infrastructure/postgres/sql/ventas/`), 2 módulos Python y 8 ficheros de test
-`tests/test_f040_*.py`. Además se pusieron al día los tests de listas y censos de otras features (§ 2.9).
-
-`sql/retenciones/` y `sql/tesoreria/` **no se tocan** (R30, lo vigila `test_f040_frontera`).
+Pasada 1: 66 ficheros (+6.301/−210): 8 SQL en `sql/ventas/`, 2 módulos Python, 8 `tests/test_f040_*.py` y listas
+de otras features (§ 2.9). `sql/retenciones/` y `sql/tesoreria/` **no se tocan** (R30, `test_f040_frontera`).
 
 ## 2. Decisiones y desviaciones (justificadas)
 
@@ -146,12 +143,8 @@ Las trazas completas se guardaron en el scratchpad de la sesión (`red_t1.txt`, 
 - **F-104**: la conciliación de la retención de cliente por documento y el cobro de los `AGR`.
 - **D4 (garantía = clases 4 y 5)** es provisional, a la espera de Juan. Cambiarla es tocar solo
   `CLASES_GARANTIA` y `ventas.fn_clase_recargo`.
-- **Para cerrar**:
-  - Puerta completa con `.env` (líder).
-  - Campaña de mutación en una copia con `.env`, con menos workers o con el suelo de
-    `timeout_por_mutante_s` subido (ver Evidencias). Su análisis irá a `progress/mutacion_F-040.md`.
-  - Review contra `CHECKPOINTS.md`.
-  - Los pasos MANUAL de § 5.
+- **Para cerrar**: puerta completa con `.env` y campaña de mutación (líder, con su análisis en
+  `progress/mutacion_F-040.md`), re-review contra `CHECKPOINTS.md` y los pasos MANUAL de § 5.
 
 ## 7. Ciclo 1 (review `progress/review_F-040.md`, CHANGES_REQUESTED)
 
@@ -180,19 +173,14 @@ E   AssertionError: assert 'PENDIENTE_COBRO' == 'COBRADA_PARCIAL'
 FAILED tests/test_f040_sandbox.py::test_f040_sandbox_r18_frontera_de_lo_cobrado[0.50-COBRADA_PARCIAL]
 7 failed, 20 passed, 2120 deselected in 5.62s
 ```
-**Verde tras el ciclo**: `pytest tests/test_f040_*.py` con la sandbox → **2319 passed** (21,04 s).
-Con diccionario y permisos (`f040_diccionario`, `f040_grants`, `f147`, `f006_fichas`,
-`f006_contexto`, `f135`) → 1332 passed, 335 skipped. `harness/init.sh` no se lanzó aquí (sin `.env`).
+**Verde tras el ciclo**: `pytest tests/test_f040_*.py` con la sandbox → **2319 passed** (21,04 s); la suite
+entera, en «base roja». `harness/init.sh` no se lanzó aquí (sin `.env`).
 
-**Propuestas para el humano (H2; NO aplicadas, cambian R6)**. Ninguno de los tres casos se ha
-medido: el MCP no conectaba y en el worktree no hay `.env`.
-- (a) Quitar el prefijo de país (`ES`) antes de mirar el patrón de NIF, en `normalizar_cif` y
-  `fn_cif_normalizado`.
-- (b) Tratar como persona física la factura cuyo cliente no está en `raw.cli` (`COALESCE(..., TRUE)`
-  en `02_facturas.sql`), igual que la línea huérfana.
-- (c) `perfis` NULL: sin cambio. El patrón de NIF ya lo cubre si el CIF es de persona.
-
-Los tres casos se medirían en el paso MANUAL 6 con `<Q>`.
+**Propuestas para el humano (H2; NO aplicadas, cambian R6; sin medir: ni MCP ni `.env`)**: (a) quitar
+el prefijo de país (`ES`) antes del patrón de NIF (`normalizar_cif` y `fn_cif_normalizado`); (b)
+tratar como persona física la factura cuyo cliente no está en `raw.cli` (`COALESCE(..., TRUE)` en
+`02_facturas.sql`), como la línea huérfana; (c) `perfis` NULL, sin cambio (el patrón de NIF ya lo
+cubre). Se medirían en el paso MANUAL 6 con `<Q>`.
 
 **Supervivientes de `build_ventas_step.py`** (los cinco de la pasada RM4 del reviewer; para que el
 líder los traslade a `progress/mutacion_F-040.md`):
@@ -202,17 +190,31 @@ líder los traslade a `progress/mutacion_F-040.md`):
   `error_message` y el sub-paso (probados) no se mueven.
 - **L126 `rows = 0` -> `1`**: en los sub-pasos sin tabla destino (`setup`, `vistas`, `guardas`)
   `rows` solo va al `logger.info` y no se suma a `total_rows`: `rows_processed` no cambia.
-- **L133 `round(…, 2)` -> `3`**: el `duration_s` del `logger.info`, solo log.
-Matarlos exigiría tests sobre el formato del log, deuda que el arnés pide no crear.
+- **L133 `round(…, 2)` -> `3`**: el `duration_s` del `logger.info`, solo log. Matarlos exigiría tests
+  del formato del log, deuda que el arnés pide no crear.
 
-**PG de pruebas**: el cluster `scratchpad/pgdata` (puerto 55440) seguía arrancado; se usó en este
-ciclo y se paró al terminar (`pg_ctl stop`: «servidor detenido»).
+### Ciclo 1 · base roja (9 tests de otras features; el `-x` de `init.sh` y mi subconjunto los tapaban)
+
+| Arreglo | Commit | Qué protege el test y qué se cambió |
+|---|---|---|
+| B1 | `055033f` | R9 de F-006 (`R-SIGRID-CON` = barrido del SQL): punto 3 con `cli.cif`, `cli.raz`, `dvfpro.res`; punto 4 con `cerprodes` y sin `dvf` (ya se une a `con` en `02_facturas`) |
+| B2 | `58b5e0d` | R26 de F-006: fichas de `raw.cerrec` y `raw.dvfrec` con «**No se traen** 1 columna» (`tex`) |
+| B3 | `87dfaa3` | Inventario de F-079: grupo H con las 5 `ventas.fn_*` (como las de `postventa`, F-156) |
+| B4, B5 | `50d177f`, `126d334` | Censos de F-085 y F-138: 93 -> 100 tablas (+7 de F-040), con su motivo en el comentario |
+| B6, B8 | `9d148c8` (`B6` lo corrigió B8) | R-PERFILES ≤ 1.000: 978, quitando el paréntesis repetido del POSTVENTA (la primera frase ya lo dice); motivo entero, con la fecha de F-146 |
+| B7 | `0e6ea77` | F-147 R7: las dos reglas nuevas de F-040 en `REGLAS_TRAS_F147`, como F-140 y F-156 |
+
+Ningún tope ni sentido de test cambiado; el diccionario sigue en 316 objetos, 2654 columnas y 153 de consumo. **Suite entera sin `-x`**
+(`python -m pytest -q -p no:cacheprovider`, sobre `9d148c8`): `112 failed, 10944 passed, 2461 skipped, 2724 warnings in 1157.15s`.
+Los 112 son de ENTORNO, no 2: los CLI de 17 ficheros (`f006_comandos`, `f025_cli`, `f052_*`, `f078_sql`, `f118_check`...) caen en el `get_settings` del grupo sin `.env` (`SigridApiSettings`: `base_url`, `function_key`). Prueba: esos 17 ficheros con `SIGRID_API_BASE_URL`/`_FUNCTION_KEY` ficticios en el proceso (sin `.env` ni red) → `705 passed, 3 skipped`.
+
+**PG de pruebas** (`scratchpad/pgdata`, 55440): seguía arrancado; usado y parado (`pg_ctl stop`: «servidor detenido»).
 
 ## Evidencias
 
 | Evidencia | Valor real |
 |---|---|
-| Tests ejecutados | Ciclo 1: propios de F-040 **2319 passed**, 0 failed (21,04 s). Pasada 1: propios de F-040 **2300 passed**, 0 failed (246 sin base + 2054 en el PG16 local), 15,29 s. Subconjunto de la rama bajo cobertura: **3638 passed, 6 skipped, 1 failed** (el de entorno `test_f024_r19`). `init.sh`: 256 passed antes del corte por `-x` en `test_f006_t26` (entorno) |
+| Tests ejecutados | Suite entera sin `-x` (ciclo 1, `9d148c8`): **10944 passed, 2461 skipped, 112 failed**, todos de entorno (CLI sin `.env`; con `SIGRID_API_*` ficticios, 705 passed). Ciclo 1: propios de F-040 **2319 passed**, 0 failed (21,04 s). Pasada 1: propios de F-040 **2300 passed**, 0 failed (246 sin base + 2054 en el PG16 local), 15,29 s. Subconjunto de la rama bajo cobertura: **3638 passed, 6 skipped, 1 failed** (el de entorno `test_f024_r19`). `init.sh`: 256 passed antes del corte por `-x` en `test_f006_t26` (entorno) |
 | Cobertura de líneas cambiadas | **100,0 % (148/148)**, `PUERTA COBERTURA` de `harness.cobertura --base main` sobre el subconjunto. La de `init.sh` en este worktree, 52,0 %, es por el corte de `-x` |
-| Mutantes | **Sin veredicto: la campaña no corre en este worktree. Queda para el líder.** `python -m harness.mutacion --feature F-040 --base main` (árbol limpio): alcance de 5 ficheros y 450 líneas de producción, 4 workers, y **exit=3**: «LÍNEA BASE SIN TERMINAR [...] la suite SIN MUTAR agotó los 600 s que se le concedieron (el suelo 'mutacion.timeout_por_mutante_s' multiplicado por la holgura de 5), con 4 worker(s) compitiendo por la máquina». Además, sin `.env` la línea base saldría roja (`test_f006_t26`, `test_f024_r19`) y la campaña abortaría igual. No se evaluó ningún mutante: 0 generados y 0 supervivientes. No se cambió `rigor.json` ni se acotó la suite (no improvisar). El SQL de `sql/ventas/` no se muta; lo cubren la sandbox (2054 tests) y los literales contra el dominio |
-| Tiempo de la suite | Subconjunto con cobertura: **554,63 s** (9 min 14 s). `init.sh` hasta el corte: 405,19 s. La suite entera no se completó aquí: con cobertura ronda las 4 h (F-156: 15.176 s) |
+| Mutantes | **Sin veredicto: la campaña no corre en este worktree. Queda para el líder.** `python -m harness.mutacion --feature F-040 --base main` (árbol limpio): alcance de 5 ficheros y 450 líneas de producción, 4 workers, y **exit=3**: «LÍNEA BASE SIN TERMINAR [...] la suite SIN MUTAR agotó los 600 s que se le concedieron (el suelo 'mutacion.timeout_por_mutante_s' multiplicado por la holgura de 5), con 4 worker(s) compitiendo por la máquina». Además la línea base estaba roja: los de entorno y los 9 de § 7 «base roja», ya arreglados. No se evaluó ningún mutante: 0 generados y 0 supervivientes. No se cambió `rigor.json` ni se acotó la suite (no improvisar). El SQL de `sql/ventas/` no se muta; lo cubren la sandbox (2054 tests) y los literales contra el dominio |
+| Tiempo de la suite | Suite entera sin cobertura: **1157,15 s** (19 min 17 s). Subconjunto con cobertura: **554,63 s** (9 min 14 s). `init.sh` hasta el corte: 405,19 s. La suite entera no se completó aquí: con cobertura ronda las 4 h (F-156: 15.176 s) |

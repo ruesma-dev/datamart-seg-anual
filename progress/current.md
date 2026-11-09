@@ -21,6 +21,10 @@ cinco supervivientes de `build_ventas_step.py`, justificados en el informe § 7,
 `progress/mutacion_F-040.md`. PG de pruebas (`scratchpad/pgdata`, 55440) PARADO al terminar
 (`pg_ctl stop`: «servidor detenido»). Pendiente del líder: la puerta con `.env` y la mutación.
 
+Ciclo 1 · base roja: los 9 tests de otras features que vio la mutación del líder, arreglados (B1-B8,
+`055033f`..`9d148c8`). La suite entera sin `-x` da 112 failed y TODOS son de entorno: los CLI sin `.env`. Con
+`SIGRID_API_*` ficticios, esos 17 ficheros dan 705 passed (informe § 7). Diccionario: 316 objetos, 2654 columnas, 153 de consumo.
+
 Pasada 1:
 
 Implementer. T1-T15 con un commit cada una (`0e12304`..`549111c`) y T16, el informe
