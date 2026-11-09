@@ -154,7 +154,10 @@ objetos:
       cif_cliente:
         significado: CIF del cliente; NULL si es persona fisica.
       es_persona_fisica:
-        significado: Verdadero si el cliente es persona fisica.
+        significado: >-
+          Verdadero si el cliente es persona fisica, y tambien si el cliente no
+          esta en `raw.cli` o falta (enmienda del humano, 2026-11-10): entonces
+          `cif_cliente` y las descripciones de sus lineas van a NULL.
       obra_id:
         significado: Obra de la factura (centro de coste o, sin centro, cabecera).
         agregacion: no_sumable
@@ -241,7 +244,7 @@ objetos:
         significado: Orden de la linea dentro de la factura.
         agregacion: no_sumable
       descripcion:
-        significado: Texto de la linea; NULL si el cliente es persona fisica.
+        significado: Texto de la linea; NULL si el cliente es persona fisica, no esta en `raw.cli` o la factura no existe.
       cantidad:
         significado: Cantidad facturada en la linea, en su unidad.
         agregacion: no_sumable
@@ -554,7 +557,9 @@ objetos:
       ultima noche, por eslabon: certificaciones que cuentan con factura,
       facturas con efecto de cobro y efectos de cobro que apuntan a una
       factura (los agrupados `AGR` y las divisiones `DIV` no: lo explicara
-      F-104). Es la medida de lo que NO se puede seguir hasta el cobro: citala
+      F-104); y FACTURA_CLIENTE, facturas cuyo cliente esta en `raw.cli` (las
+      que no, `total - enlazados`, se publican como de persona fisica: enmienda
+      del humano, 2026-11-10). Es la medida de lo que NO se puede seguir hasta el cobro: citala
       cuando una respuesta dependa del enlace.
     grano: >-
       Una fila por eslabon del enlace, identificada por `eslabon`, clave
@@ -565,7 +570,7 @@ objetos:
     columnas:
       eslabon:
         significado: Que tramo del camino mide la fila.
-        valores: [CERTIFICACION_FACTURA, FACTURA_EFECTO, EFECTO_FACTURA]
+        valores: [CERTIFICACION_FACTURA, FACTURA_EFECTO, EFECTO_FACTURA, FACTURA_CLIENTE]
       total:
         significado: >-
           Numero de documentos del tramo (los que cuentan). Los eslabones de

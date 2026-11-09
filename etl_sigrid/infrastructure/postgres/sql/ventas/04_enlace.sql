@@ -12,19 +12,22 @@
 -- `JOIN raw.dvf` descarta un destino que no existe.
 --
 -- LA COBERTURA (R20): por noche y eslabon, cuantos documentos tienen el
--- siguiente y por cuanto importe. Tres eslabones:
+-- siguiente y por cuanto importe. Cuatro eslabones:
 --   CERTIFICACION_FACTURA: certificaciones que CUENTAN (estados 2-4) con factura.
 --   FACTURA_EFECTO: facturas con algun efecto de cobro (`raw.cob.conide`).
 --   EFECTO_FACTURA: efectos de cobro que apuntan a una factura. Lo que no
 --     (los agrupados `AGR`, las divisiones `DIV`) no se atribuye: lo explicara
 --     F-104.
+--   FACTURA_CLIENTE (R2-b, enmienda del humano, 2026-11-10): facturas cuyo
+--     cliente esta en `raw.cli`. Las que no se publican como de persona
+--     fisica; aqui se CUENTAN (total - enlazados), sin tumbar el paso.
 -- El eslabon de efectos lee `raw.cob` y no `tesoreria.efectos`: no espera a
 -- otro paso.
 --
 -- Importes de `raw` en `double precision`: se castean a NUMERIC (sin ROUND).
 --
--- Lee de: raw.cerprodes, raw.cerpro, raw.dvf, raw.cob, ventas.certificaciones
---         y ventas.facturas.
+-- Lee de: raw.cerprodes, raw.cerpro, raw.dvf, raw.cob, ventas.certificaciones,
+--         ventas.facturas y ventas.clientes.
 -- Escribe en: ventas.certificacion_factura, ventas.cobertura_enlace.
 -- ============================================================================
 
@@ -78,6 +81,13 @@ WITH certificaciones_enlazadas AS (
            SUM(COALESCE(c.tot, 0)::NUMERIC(18, 2)) FILTER (WHERE f.ide IS NOT NULL)
     FROM raw.cob c
     LEFT JOIN raw.dvf f ON f.ide = NULLIF(c.conide, 0)
+    UNION ALL
+    SELECT 4, 'FACTURA_CLIENTE'::VARCHAR(24),
+           count(*), count(c.cliente_id),
+           SUM(f.base),
+           SUM(f.base) FILTER (WHERE c.cliente_id IS NOT NULL)
+    FROM ventas.facturas f
+    LEFT JOIN ventas.clientes c ON c.cliente_id = f.cliente_id
 )
 SELECT
     s.eslabon                                               AS eslabon,
@@ -92,4 +102,4 @@ ORDER BY s.orden;
 ALTER TABLE ventas.cobertura_enlace ADD PRIMARY KEY (eslabon);
 
 COMMENT ON TABLE ventas.cobertura_enlace IS
-'F-040. La cobertura del enlace certificacion -> factura -> cobro de la ultima noche, una fila por eslabon: CERTIFICACION_FACTURA (certificaciones que cuentan, estados 2-4, con factura), FACTURA_EFECTO (facturas con efecto de cobro) y EFECTO_FACTURA (efectos de cobro con factura; los agrupados AGR no). Total, enlazados, importe total y enlazado (base, o importe del efecto) y el momento del calculo. Clave: eslabon.';
+'F-040. La cobertura del enlace certificacion -> factura -> cobro de la ultima noche, una fila por eslabon: CERTIFICACION_FACTURA (certificaciones que cuentan, estados 2-4, con factura), FACTURA_EFECTO (facturas con efecto de cobro) , EFECTO_FACTURA (efectos de cobro con factura; los agrupados AGR no) y FACTURA_CLIENTE (facturas con su cliente en raw.cli; las que no, publicadas como de persona fisica). Total, enlazados, importe total y enlazado (base, o importe del efecto) y el momento del calculo. Clave: eslabon.';

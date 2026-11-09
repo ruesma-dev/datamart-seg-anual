@@ -469,6 +469,19 @@ def test_f040_r15_base_origen_contrato_acumulada_solo_si_cuenta() -> None:
 # ===========================================================================
 
 
+def test_f040_r7_factura_de_cliente_ausente_es_persona() -> None:
+    """R2-b: la factura cuyo cliente no está en `raw.cli` cierra como persona física."""
+    crea = _create("02_facturas.sql", "ventas.facturas")
+    assert "COALESCE(vc.es_persona_fisica, TRUE) AS es_persona_fisica" in crea
+    assert "COALESCE(vc.es_persona_fisica, FALSE)" not in _sql("02_facturas.sql")
+
+
+def test_f040_r20_factura_cliente_cuenta_las_de_cliente_ausente() -> None:
+    crea = _create("04_enlace.sql", "ventas.cobertura_enlace")
+    assert "'FACTURA_CLIENTE'" in crea
+    assert "LEFT JOIN ventas.clientes c ON c.cliente_id = f.cliente_id" in crea
+
+
 def test_f040_r16_certificacion_factura_por_cerprodes() -> None:
     crea = _create("04_enlace.sql", "ventas.certificacion_factura")
     assert "FROM raw.cerprodes d" in crea
@@ -483,7 +496,7 @@ def test_f040_r20_cobertura_tres_eslabones_y_lee_cob() -> None:
     for eslabon in v.ESLABONES_COBERTURA:
         assert f"'{eslabon}'" in sql, eslabon
     assert v.ESLABONES_COBERTURA == ("CERTIFICACION_FACTURA", "FACTURA_EFECTO",
-                                     "EFECTO_FACTURA")
+                                     "EFECTO_FACTURA", "FACTURA_CLIENTE")
     assert "raw.cob" in sql
     assert "tesoreria." not in sql, "la cobertura no espera a otro paso"
 

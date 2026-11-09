@@ -464,7 +464,59 @@ def test_f040_sandbox_r20_cobertura(conexion) -> None:
         "CERTIFICACION_FACTURA": (6, 5, _d("213.10"), _d("193.10")),
         "FACTURA_EFECTO": (4, 3, _d("120.43"), _d("170.43")),
         "EFECTO_FACTURA": (5, 4, _d("239.22"), _d("206.22")),
+        "FACTURA_CLIENTE": (4, 4, _d("120.43"), _d("120.43")),  # R2-b
     }
+
+
+def test_f040_sandbox_r2b_factura_de_cliente_ausente_y_cif_con_prefijo(conexion) -> None:
+    """R2-a y R2-b (enmienda del humano, 2026-11-10), con el build entero
+    relanzado dentro de una transacción que se deshace: un cliente con NIF con
+    prefijo de país (6) y una factura de un cliente que no está en `raw.cli` (99)."""
+    with conexion.transaction(force_rollback=True):
+        conexion.execute("""
+            INSERT INTO raw.cli (ide, tipcif, cifpai, cif, raz, perfis) VALUES
+              (6, '02', 'ES', 'ES 87654321-x', 'PEDRO RUIZ', 0),
+              (7, '01', 'FR', 'FR12345678901', 'SOCIETE SA', 0);
+            INSERT INTO raw.con (ide, tip, cod, res, emp, est, fecbaj) VALUES
+              (6, 4, 'ES87654321X', 'PEDRO RUIZ', 1, 0, 0), (7, 4, 'C7', 'SOCIETE SA', 1, 0, 0),
+              (1005, 11, 'FV5', 'f5', 1, 2, 0), (1006, 11, 'FV6', 'f6', 1, 2, 0);
+            INSERT INTO raw.dvf (ide, cla, entide, cenide, ctride, fecdoc, totbas, totiva,
+                                 totdoc, obride, tot, totpag, entcif, entres) VALUES
+              (1005, 1, 6, 902, 0, 20260320, 10, 2.1, 12.1, 0, 12.1, 12.1, 'ES87654321X', 'PEDRO RUIZ'),
+              (1006, 1, 99, 902, 0, 20260321, 20, 4.2, 24.2, 0, 24.2, 24.2, '11111111H', 'ALGUIEN');
+            INSERT INTO raw.dvfpro (ide, docide, pos, res, can, pre, tot) VALUES
+              (2006, 1005, 1, 'Garaje de Pedro Ruiz', 1, 10, 10),
+              (2007, 1006, 1, 'Texto de un cliente que no existe', 1, 20, 20);
+        """)
+        for fichero in FICHEROS:
+            conexion.execute((_dir_sql() / fichero).read_text(encoding="utf-8"))
+        clientes = {f[0]: f[1:] for f in _filas(conexion, """
+            SELECT cliente_id, cif, cif_normalizado, es_persona_fisica, codigo_cliente
+            FROM ventas.clientes WHERE cliente_id IN (6, 7)""")}
+        facturas = {f[0]: f[1:] for f in _filas(conexion, """
+            SELECT factura_id, cif_cliente, es_persona_fisica FROM ventas.facturas
+            WHERE factura_id IN (1005, 1006)""")}
+        lineas = dict(_filas(conexion, """SELECT linea_id, descripcion FROM ventas.factura_lineas
+                                         WHERE linea_id IN (2006, 2007)"""))
+        persona = dict(_filas(conexion, """SELECT linea_id, descripcion
+                                          FROM ventas_restringida.factura_lineas_persona
+                                          WHERE linea_id IN (2006, 2007)"""))
+        contacto = dict(_filas(conexion, """SELECT cliente_id, cif_normalizado
+                                           FROM ventas_restringida.clientes_contacto
+                                           WHERE cliente_id = 6"""))
+        cobertura = _uno(conexion, """SELECT total, enlazados, importe_total, importe_enlazado
+                                     FROM ventas.cobertura_enlace
+                                     WHERE eslabon = 'FACTURA_CLIENTE'""")
+    # R2-a: el NIF con prefijo es de persona; la sociedad extranjera, pública.
+    assert clientes[6] == (None, None, True, None)
+    assert clientes[7] == ("FR12345678901", "FR12345678901", False, "C7")
+    assert contacto == {6: "87654321X"}
+    # R2-b: la factura de un cliente ausente cierra como persona física.
+    assert facturas == {1005: (None, True), 1006: (None, True)}
+    assert lineas == {2006: None, 2007: None}
+    assert persona == {2006: "Garaje de Pedro Ruiz", 2007: "Texto de un cliente que no existe"}
+    # Y se cuenta, sin tumbar el paso (la guarda ya pasó dentro del bucle).
+    assert cobertura == (6, 5, _d("150.43"), _d("130.43"))
 
 
 def test_f040_sandbox_r21_r23_restringida(conexion) -> None:

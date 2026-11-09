@@ -91,3 +91,9 @@ restringidos y consultas de `02_roles.sql`); `test_f006_formato.py` (esquemas),
 `test_f024_cli.py` (pasos y comando); `test_f006_fichas.py`, `test_f006_reglas.py`,
 `test_f147_*` y `test_f149_*` (fichas, reglas y presupuesto). Ninguno se relaja: se actualiza el
 valor fijado y se explica el porqué en el commit.
+
+**Enmienda del humano 2026-11-10 (ciclo 2, H2 a y b del review).** (a) `normalizar_cif` y
+`ventas.fn_cif_normalizado` quitan un prefijo de país de dos letras SOLO si lo que queda casa con
+`PATRON_NIF_PERSONA` (`PATRON_NIF_CON_PREFIJO_PAIS`); una sociedad con prefijo no cambia. (b) La
+factura cuyo cliente no está en `raw.cli` es de persona física (`COALESCE(..., TRUE)`); se cuenta en
+el cuarto eslabón de `ventas.cobertura_enlace`, `FACTURA_CLIENTE`, sin tumbar el paso.

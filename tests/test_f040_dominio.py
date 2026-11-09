@@ -108,6 +108,21 @@ def test_f040_r6_es_persona_fisica(cif: str | None, perfis: int | None, esperado
     assert v.es_persona_fisica(cif, perfis) is esperado
 
 
+@pytest.mark.parametrize(("persona_del_cliente", "esperado"), [
+    (True, True), (False, False),
+    (None, True),   # R2-b: cliente que no está en raw.cli (o factura sin cliente)
+])
+def test_f040_r7_factura_sin_cliente_es_persona(persona_del_cliente: bool | None,
+                                                 esperado: bool) -> None:
+    """R2-b (enmienda del humano, 2026-11-10): sin cliente que lo diga, se cierra."""
+    assert v.persona_fisica_de_factura(persona_del_cliente) is esperado
+
+
+def test_f040_r20_cuatro_eslabones() -> None:
+    assert v.ESLABONES_COBERTURA == ("CERTIFICACION_FACTURA", "FACTURA_EFECTO",
+                                     "EFECTO_FACTURA", "FACTURA_CLIENTE")
+
+
 @pytest.mark.parametrize(("codigo", "persona", "esperado"), [
     ("C1", False, "C1"),                    # el código de una sociedad, público
     ("B12345678", False, "B12345678"),      # un CIF de sociedad como código, también

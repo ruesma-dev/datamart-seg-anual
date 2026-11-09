@@ -24,6 +24,11 @@
 -- unico punto de la decision D4): coeficientes (clase 0), garantia (hoy 4 y
 -- 5), `RETESP` (clase 1, aparte mientras D4 no diga otra cosa) y otras.
 --
+-- PERSONA FISICA (R7; R2-b, enmienda del humano, 2026-11-10): la factura cuyo
+-- cliente no esta en `raw.cli` (o sin cliente) se trata como persona fisica
+-- (`persona_fisica_de_factura` del dominio): sin CIF ni descripcion en
+-- `ventas`. Las cuenta `ventas.cobertura_enlace` (FACTURA_CLIENTE).
+--
 -- LAS LINEAS (R13): la descripcion libre de las de un cliente persona fisica
 -- (o de una factura que no existe: falla cerrado) va a NULL; integra, en
 -- `ventas_restringida.factura_lineas_persona`. La linea de certificacion de
@@ -69,7 +74,7 @@ SELECT
     NULLIF(f.entide, 0)                                     AS cliente_id,
     vc.nombre                                               AS nombre_cliente,
     vc.cif                                                  AS cif_cliente,
-    COALESCE(vc.es_persona_fisica, FALSE)                   AS es_persona_fisica,
+    COALESCE(vc.es_persona_fisica, TRUE)                    AS es_persona_fisica,
     COALESCE(cc.obra_id, ob.ide)                            AS obra_id,
     COALESCE(cc.codigo_obra, obc.cod)                       AS codigo_obra,
     CASE WHEN cc.obra_id IS NOT NULL THEN 'CENTRO'

@@ -153,8 +153,9 @@ objetos:
 
       **LA DESCRIPCION INTEGRA DE LAS LINEAS QUE `ventas.factura_lineas`
       PUBLICA SIN ELLA**: las de un cliente persona fisica (pueden nombrar a la
-      persona del arrendamiento o la compraventa) y las de una factura que no
-      existe. Solo la descripcion: cantidades e importes, en la general.
+      persona del arrendamiento o la compraventa), las de una factura cuyo
+      cliente no esta en `raw.cli` (enmienda del humano, 2026-11-10) y las de
+      una factura que no existe. Solo la descripcion: cantidades e importes, en la general.
     grano: >-
       Una fila por linea de factura de venta, identificada por `linea_id`,
       clave primaria declarada.

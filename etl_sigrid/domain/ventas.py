@@ -138,6 +138,13 @@ def es_persona_fisica(cif_normalizado: str | None, perfis: int | None) -> bool:
     return bool(cif_normalizado and re.match(PATRON_NIF_PERSONA, cif_normalizado))
 
 
+def persona_fisica_de_factura(persona_del_cliente: bool | None) -> bool:
+    """La factura es de persona física si su cliente lo es o si no hay cliente
+    que lo diga (no está en `raw.cli`, o `entide` a 0): R2-b, enmienda del
+    humano del 2026-11-10. Su descripción va entonces a `ventas_restringida`."""
+    return True if persona_del_cliente is None else persona_del_cliente
+
+
 def codigo_cliente_publicado(codigo: str | None, persona_fisica: bool) -> str | None:
     """El código del cliente (`con.cod`) que se publica en `ventas` (R24, R1-H1).
 
@@ -224,9 +231,11 @@ ESTADOS_SEGUIMIENTO: Final[tuple[str, ...]] = (
 #: Lo cobrado a menos de un céntimo de lo emitido es «cobrada».
 TOLERANCIA_COBRO: Final[Decimal] = Decimal("0.01")
 
-#: R20: los tres eslabones de `ventas.cobertura_enlace`.
+#: R20: los eslabones de `ventas.cobertura_enlace`. El cuarto, FACTURA_CLIENTE
+#: (R2-b, enmienda del humano, 2026-11-10), cuenta las facturas cuyo cliente
+#: está en `raw.cli`: las que no, se tratan como persona física.
 ESLABONES_COBERTURA: Final[tuple[str, ...]] = (
-    "CERTIFICACION_FACTURA", "FACTURA_EFECTO", "EFECTO_FACTURA",
+    "CERTIFICACION_FACTURA", "FACTURA_EFECTO", "EFECTO_FACTURA", "FACTURA_CLIENTE",
 )
 
 

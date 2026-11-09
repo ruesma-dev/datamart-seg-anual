@@ -51,7 +51,8 @@ cliente, necesita `raw.cli`, `raw.dvfrec` y `ventas.facturas`, y explicará el c
   *Enmienda del humano 2026-11-10 (R2-a):* se normaliza quitando un prefijo de país de 2 letras solo si queda un NIF (R7, R24).
 - **R7.** MIENTRAS un cliente sea persona física, `ventas` debe publicar su nombre tal cual, pero su
   CIF (`cif`, `cif_normalizado`, `cif_cliente` de la factura) y la descripción de sus líneas de
-  factura a NULL; `cif_valido` y `cif_repetido` se calculan antes de anularlo.
+  factura a NULL; `cif_valido` y `cif_repetido` se calculan antes de anularlo. *Enmienda del humano
+  2026-11-10 (R2-b):* la factura cuyo cliente no está en `cli` (o sin cliente) cuenta como persona física.
 - **R8.** `cif_valido` debe comprobar la letra de control en DNI y NIE y la forma en CIF de sociedad;
   un CIF vacío no es válido.
 - **R9.** El sistema debe publicar `ventas.facturas`, una fila por `dvf`: id, código, empresa, fecha,
@@ -92,7 +93,7 @@ cliente, necesita `raw.cli`, `raw.dvfrec` y `ventas.facturas`, y explicará el c
   `tesoreria.devengo_corte_obra`: venta real a origen con coeficientes, certificado (estados 2-4),
   facturado y las dos diferencias, con signo.
 - **R20.** El sistema debe publicar `ventas.cobertura_enlace` (por noche y eslabón: certificaciones
-  emitidas con factura, facturas con efecto, efectos de cobro con factura), recuentos e importes.
+  emitidas con factura, facturas con efecto, efectos con factura y, R2-b, facturas con cliente), recuentos e importes.
 
 ## D · Esquema `ventas_restringida` (mismo paso)
 
@@ -102,7 +103,7 @@ cliente, necesita `raw.cli`, `raw.dvfrec` y `ventas.facturas`, y explicará el c
 - **R22.** El sistema debe publicar `ventas_restringida.factura_cabecera`, una fila por `dvf`: id,
   cliente, `es_persona_fisica`, `entres`, `entcif` y las nueve `dir*` (empresa, contacto y completa, 1-3).
 - **R23.** El sistema debe publicar `ventas_restringida.factura_lineas_persona`, una fila por línea
-  de `dvfpro` cuya factura es de un cliente persona física: línea, factura y descripción íntegra.
+  de `dvfpro` cuya factura es de persona física (R7, con R2-b): línea, factura y descripción íntegra.
 - **R24.** SI tras el build queda en `ventas` un CIF de persona física (o con forma de NIF de persona)
   en `clientes` o `facturas`, una descripción de línea de persona física, o una columna cuyo nombre
   empieza por `direccion`, `telefono`, `correo`, `cif_cabecera` o `nombre_cabecera`, ENTONCES una
