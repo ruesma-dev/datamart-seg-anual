@@ -2063,6 +2063,30 @@ esquemas:
     refresco: nocturno
     pasos_etl: [build_postventa]
 
+  ventas:
+    titulo: El lado de ingresos, clientes, facturas de venta, certificaciones y cobro
+    para_que_sirve: >-
+      Clientes con su nombre, facturas de venta con sus lineas y recargos,
+      certificaciones a cuenta y a origen, el enlace certificacion -> factura
+      (N:M) y el seguimiento hasta el cobro. Certificado, facturado y cobrado
+      son tres cifras (`R-VENTAS-TRES-CIFRAS`); lo personal del cliente esta en
+      `ventas_restringida` (`R-VENTAS-RESTRINGIDA`).
+    consumo_recomendado: true
+    refresco: nocturno
+    pasos_etl: [build_ventas]
+
+  ventas_restringida:
+    titulo: Lo personal del cliente (solo perfil total del MCP)
+    para_que_sirve: >-
+      El NIF de la persona fisica, direcciones, telefonos y correos del cliente,
+      la cabecera de cada factura y la descripcion de las lineas de las facturas
+      a persona fisica (F-040, D2/D6 del humano). Solo la lee el perfil total;
+      para los demas, «permission denied», que no se rodea
+      (`R-VENTAS-RESTRINGIDA`).
+    consumo_recomendado: true
+    refresco: nocturno
+    pasos_etl: [build_ventas]
+
   maestro:
     titulo: Maestros y dimensiones de consulta directa
     para_que_sirve: >-
