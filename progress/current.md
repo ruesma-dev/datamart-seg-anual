@@ -14,7 +14,7 @@
 Implementer. T1-T15 con un commit cada una (`0e12304`..`549111c`) y T16, el informe
 `progress/impl_F-040.md`. T17 y T18 son MANUALES del humano y están preparadas (design § 9, runbook
 § 15). T19: `init.sh` en este worktree sale rojo solo por la falta de `.env` (el líder pasa la puerta
-completa en una copia con `.env`). Desviaciones justificadas, en el informe § «Desviaciones»:
+completa en una copia con `.env`). Cobertura de las líneas cambiadas medida aparte: 100 % (148/148). Desviaciones justificadas, en el informe § «Desviaciones»:
 diccionario v75; diecisiete pasos; presupuesto de F-147 a 37.042 con su motivo; fichas de `raw` ya en
 T3; una sandbox Postgres local extra (`tests/test_f040_sandbox.py`, salta sin DSN). `azure-apps`: commit
 local `882abce`, sin push. Pendiente del líder: la puerta con `.env` y la campaña de mutación (aquí
