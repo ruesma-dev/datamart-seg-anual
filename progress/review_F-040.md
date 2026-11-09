@@ -1,140 +1,132 @@
 <!-- progress/review_F-040.md -->
-Revisión completa (pasada 1): `git diff main...6392b0d` (merge-base `66b4eb0`, punta `6392b0d`)
+Revisión incremental desde 6392b0d (pasada 2): `git diff 2dba699..39c21d4` (2dba699 = mi informe de la pasada 1)
 
 # F-040 · Review · Fase 1: ventas, certificaciones, clientes y cobro
 
-**Veredicto: CHANGES_REQUESTED.** Tres cambios concretos (§ Cambios requeridos) y, además, el
-veredicto final queda condicionado a la puerta completa y a la campaña de mutación que pasa el
-líder sobre `6392b0d` en la copia con `.env` (cifras exigidas en § Condiciones).
+**Veredicto: APPROVED (APROBADO), condicionado SOLO a la campaña de mutación** que corre el líder
+sobre `39c21d4` (cifras exigidas en § Condición). Si la campaña no las cumple, este veredicto no vale.
 
-**Nivel de rigor:** `critico`, declarado en `features.json`. Exige fase RED con traza, cobertura
-de lo cambiado ≥ 80 %, campaña de mutación con cero supervivientes salvo justificación aceptada
-por el humano, y RM5 (demostración ejecutable de UN equivalente, elegido por mí).
+**Nivel de rigor:** `critico` (declarado en `features.json`). Exige RED con traza, cobertura ≥ 80 %
+de lo cambiado, mutación con cero supervivientes salvo justificación aceptada por el humano, y RM5
+(demostración de UN equivalente, elegido por mí).
 
-Reviewer, 2026-11-09. Nada contra Azure ni Sigrid (el MCP no conectó: no medí `con.cod`). Sandbox y
-mutación en mi scratchpad (`revisor/`), PG16 propio en el puerto 55441; árbol de trabajo limpio.
+Reviewer, 2026-11-09. Nada contra Azure ni Sigrid. Sandbox y mutación en copias de mi scratchpad
+(`revisor/copia`, `revisor/copia2`), con un PG16 propio en el puerto 55441, ya parado. Árbol limpio.
 
-## Lo que verifiqué yo (no del informe)
+## Pasada 1 (6392b0d), en resumen
+
+CHANGES_REQUESTED por H1 (`ventas.clientes.codigo_cliente` = `con.cod` sin anular ni guarda), H2 (el
+§ 2.7 del informe prometía un «fail-closed» que el código no hace) y H3 (superviviente real
+`cobrado <= 0` → `<= 1` en `estado_seguimiento`). También una nota para el humano (O1) y varios
+menores (O2). Lo que entonces quedó comprobado sigue valiendo: R30 sin diff, permisos R27-R29
+coherentes, D4 con un único punto de decisión, casts a `NUMERIC` y RED real.
+
+## Pasada 2 · qué verifiqué
 
 | Comprobación | Resultado real |
 |---|---|
-| `init.sh` | No en el worktree (sin `.env`, rojo por entorno); la puerta completa es del líder |
-| Tests F-040 con sandbox (`F040_SANDBOX_DSN` a mi PG16) | **2300 passed** en 12,9 s, igual que el informe |
-| F-040 + `f024_cli` + `f047_nocturna` + `f148` | 2419 passed, 1 skipped, 1 failed: `test_f024_r19` (pide `.env`, entorno) |
-| RED | Las cuatro trazas (`red_t1/t10/t11/t14.txt`) existen y dicen lo que pega el informe |
-| R30 | `git diff --stat main...6392b0d -- sql/retenciones sql/tesoreria sql/compras sql/postventa grants.py apply_grants_step.py`: **vacío** |
-| Tests de otras features | Revisado el diff línea a línea: **solo listas, recuentos (93→100, 18→20) y el tope de F-147** (37.042, con desglose y motivo, precedente F-156). Ninguna aserción debilitada |
-| Permisos (R27-R29) | `settings`, `.env.example` y `02_roles.sql` coherentes: `ventas` en consumo (punto 5); `ventas_restringida` en los DOS `ARRAY` del 5 ter, no en el `ARRAY['raw']` del total; USAGE + SELECT + default privileges al autorizado; comprobaciones finales del estándar, total, restringido y postventa al día |
-| D4 / R12 | `CLASES_GARANTIA` solo en el dominio y el `IN (4, 5)` de `fn_clase_recargo`; el test exige que coincidan y que ningún otro SQL filtre por `reccla`. Las cuatro columnas son `FILTER` sobre un `CASE` total: no se solapan ni pierden nada |
-| `double precision` | Todo `SUM` de `raw` castea por fila a `NUMERIC(18,2)`; ningún `ROUND` en `sql/ventas/`. La guarda R25 usa el mismo cast en los dos lados |
-| Alcance (`harness.alcance`, base `main`) | 5 ficheros, 450 líneas: `settings.py`, `build_ventas_step.py`, `diccionario.py`, `ventas.py`, `main.py` (= el informe) |
-| Mutantes (`generar_mutantes`) | **57**: 12 en `build_ventas_step.py`, 45 en `ventas.py`, 0 en los otros tres |
-| Mutación RM4 (subconjunto, copia en scratchpad) | **57 evaluados, 51 muertos, 6 vivos** en 915 s con los 8 `test_f040_*` + `f024_cli`, `f047_nocturna`, `f148` (sandbox activa). Vivos: L51 `slots=True→False` y `frozen=True→False` (equivalentes), L119 `exc_info=True→False`, L126 `rows = 0→1` y L133 `round(…, 2→3)` (solo cambian el log: `rows_processed` no se mueve) de `build_ventas_step.py`; y **`ventas.py` L228 `cobrado <= 0` → `cobrado <= 1`: superviviente REAL** (H3) |
-| Ruff en lo nuevo | 5 avisos menores en tests (`SIM300`×3, `E741`, `SIM117`); `main.py` y `settings.py` sin avisos nuevos (71 = los de `main`) |
+| Puerta completa (líder, copia con `.env`, `39c21d4` exacto) | exit 0, **11056 passed, 2461 skipped**, 4733,98 s, «ENTORNO LISTO»; TAMAÑO OK. Los skipped de más son la sandbox de F-040 sin DSN |
+| `PUERTA COBERTURA` (líder, datos de esa ejecución, `--base main`) | **100,0 % (155/155)**, umbral 80 %, nivel `critico` |
+| Tests F-040 con mi sandbox | **2319 passed** en 22,3 s (eran 2300: +19 de H1 y H3) |
+| H1 (`3ca7aea`) | `01_clientes.sql`: `codigo_cliente` NULL si `es_persona_fisica` o si el código normalizado casa con `PATRON_NIF_PERSONA`; íntegro en `ventas_restringida.clientes_contacto` (`LEFT JOIN raw.con` tipo 4, 1:1 por `ide`); guarda R24 ampliada a `codigo_cliente`. Hay oráculo en el dominio (`codigo_cliente_publicado`), con los literales del SQL atados a él por test. La sandbox cubre la persona física con código propio, el código con forma de NIF en una sociedad (`87654321-x`) y dos casos que tumban la guarda. Fichas y `design_detalle` (enmienda), al día |
+| H2 (`445608c`) | § 2.7 reescrito: dice qué NO es persona física. Las propuestas (a) y (b), sin aplicar y pendientes del humano |
+| H3 (`96b3630`) | Fronteras 0,01 / 0,50 / 1 y «emitido 0» en el dominio, y la vista = el dominio en la sandbox. **Lo reproduje** en `copia2`: `cobrado <= 1` → 1 failed, y `cobrado < 0` → 1 failed |
+| O2 (`d7f4fb1`) | Fichas de `facturado_origen` y `cobertura_enlace` al día; `02_roles.sql`: «seis filas». Sin cambio de comportamiento |
+| Base roja B1-B9 | Línea por línea, más abajo: **ningún test relajado** |
+| Alcance (`harness.alcance`, `39c21d4`) | 5 ficheros, **465 líneas** (eran 450). **58 mutantes**: 12 en `build_ventas_step.py` y **46** en `ventas.py` (+1: L141, `and` → `or` en `codigo_cliente_publicado`) |
+| Mutante nuevo L141 (RM4, `copia2`) | **Muerto**: 1 failed en `test_f040_dominio`/`_sandbox` |
+| RM5 (equivalente elegido: L51 `frozen=True → False`) | Sobrevive a 2419 tests en mi RM4 de la pasada 1, y `grep` confirma que nadie asigna atributos a un `_SubStep` de ventas (los tests solo parchean `SUB_PASOS` con `monkeypatch`). Equivalente demostrado |
 
-## Hallazgos
+## La base roja (B1-B9): ¿se relajó algún test?
 
-**H1 · `ventas.clientes.codigo_cliente` puede publicar un NIF (bloqueante).** Sale de `con.cod`
-sin filtro (`01_clientes.sql`, `c.cod AS codigo_cliente`) y la guarda R24 (`07_guardas.sql`) solo
-mira `cif` y `cif_cliente`. El propio implementer lo señala (§ 2.11) y lo aplaza a una medición
-MANUAL **después** del merge y del despliegue: es decir, el dato llegaría primero al perfil
-estándar y se miraría después. D2 y R24 («un CIF con forma de NIF de persona en `clientes`») piden
-lo contrario, y en rigor `critico` con datos personales el orden no es negociable.
-
-**H2 · El informe afirma un «fail-closed» que el código no hace.** § 2.7: «un CIF ilegible o un
-`perfis` desconocido se tratan como persona física». Falso: `perfis` NULL cuenta como 0, un CIF
-como `ES12345678Z` no casa con el patrón y se publica, y una factura de un `entide` ausente de
-`raw.cli` sale `es_persona_fisica = FALSE` (`02_facturas.sql`) y publica sus descripciones. El
-código cumple R6 tal como está escrito; lo falso es la garantía que el humano leerá.
-
-**H3 · Superviviente real en `estado_seguimiento` (bloqueante en `critico`).** Con `cobrado <= 1`
-ningún test falla: falta el caso frontera de lo cobrado entre 0 y 1 € (p. ej. `cobrado =
-Decimal("0.50")`, `emitido = 100` → `COBRADA_PARCIAL`). El `CASE` de `05_vistas.sql` replica la
-frontera, así que el test debe ir al dominio y a la sandbox (`r18_seguimiento_igual_al_dominio`).
-
-**O1 · La guarda R24 avisa, pero no retira (no bloqueante; para el humano).** `execute_sql_file`
-hace `COMMIT` por fichero: si `07_guardas.sql` revienta, lo filtrado ya está en `ventas` y legible
-por el estándar hasta que alguien actúe. Opción: vaciar o revocar `ventas` si falla `guardas`, o
-llevar R24 dentro de la transacción de `01`/`02`. Cambia el diseño: PARADA 1.
-
-**O2 · Menores.** `v_contraste_certificado_obra` y `facturado` suman también las facturas anuladas
-(`anulada`) y las rectificativas: es la base de Sigrid, pero la ficha no lo dice. `02_roles.sql`
-mantiene «`lee = f` en las cuatro filas» junto a «seis filas» (texto viejo). `cobertura_enlace`
-cuenta efectos BAJA de `raw.cob` en `FACTURA_EFECTO`/`EFECTO_FACTURA`.
+- **B1, `R-SIGRID-CON`** (`055033f`). Cambia la regla, no el test (R9 de F-006, que barre el SQL).
+  Punto 3: `cli.cif`, `cli.raz` y `dvfpro.res` se leen de su tabla, cierto en `01`, `06` y
+  `02_facturas`. Punto 4: entra `cerprodes`, que no se une a `con` (`04_enlace`), y sale `dvf`, que
+  ahora sí se une (`02_facturas`, `LEFT JOIN raw.con c ON c.ide = f.ide`). Es correcto: la regla
+  dice lo que hace el SQL.
+- **B6 y B8, `R-PERFILES`** (`a404042`, `9d148c8`). El tope de 1.000 caracteres no cambia. Del texto
+  sale el paréntesis «`postventa_restringida`, también del POSTVENTA». Comprobado contra `main`: la
+  primera frase de la `regla` («POSTVENTA = RESTRINGIDO + `postventa_restringida`») y el `resumen`
+  lo siguen diciendo, así que la semántica para el MCP no se pierde. El `motivo` conserva la fecha
+  de F-146 que exige su test y quita solo la de F-040, que estaba repetida. `ventas` y
+  `ventas_restringida` siguen en el `ambito`.
+- **B2**: fichas de `cerrec` y `dvfrec` con «No se traen 1 columna». **B3**: grupo H del
+  inventario de F-079 (las cinco `ventas.fn_*`, como las de postventa en F-156). **B4/B5**: censos
+  93 → 100. **B7**: las dos reglas nuevas en `REGLAS_TRAS_F147`, como F-140 y F-156. Todo son
+  altas en listas o recuentos; ninguna aserción se debilita.
+- Por qué no salieron antes: el `-x` de `init.sh` cortaba en el fallo de entorno, y así las
+  tapaba. La lección va a Automejora.
 
 ## Checkpoints
 
 | Punto | Estado | Motivo |
 |---|---|---|
-| C1 `init.sh` exit 0 | [ ] | Pendiente del líder. Su primera pasada con `.env` salió ROJA en `test_f006_los_recuentos_de_current_son_los_de_hoy` (`current.md` sin los recuentos de v75); lo ha corregido en el worktree (sin commitear) y relanzado |
-| C2 una sola `in_progress`, rama, `current.md` | [x] | F-040 la única; rama `feature/F-040-ingresos` |
-| C2 `history.md` de las `done` | N/A | F-040 no está `done` |
-| C3 hexagonal | [x] | `domain/ventas.py` solo `re`, `decimal`, `typing`; el paso en `application`, el SQL en `infrastructure` |
-| C3 primera línea, sin prints, sin secretos | [x] | Comprobado en los 24 ficheros nuevos; `02_roles.sql` y runbook § 15 sin `*_PWD` |
-| C3 semántica Sigrid | [ ] | H1 (`codigo_cliente`) |
-| C3 bis documentos de fuera | N/A | La feature no trae documentos externos |
-| C4 cada requisito con test | [x] | Tabla siguiente; R34 es MANUAL (T18) |
-| C4 unit tests sin red ni BBDD | [x] | La sandbox salta sin `F040_SANDBOX_DSN` y crea/borra su propia base |
-| C4 MANUAL listadas | [x] | design § 9, impl § 5, `current.md` |
-| C4 dobles comparados con el original | [x] | La sandbox usa los tipos reales de la ingesta (`double precision`, `smallint`) |
-| C4 bis rigor declarado | [x] | `critico` |
-| C4 bis fase RED con salida real | [x] | Cuatro trazas reales, verificadas en disco |
-| C4 bis cobertura | [ ] | 148/148 medido aparte por el implementer; falta la `PUERTA COBERTURA` de la puerta completa |
-| C4 bis mutación, RM1, RM2, sin «NO VÁLIDA» | [ ] | No existe aún `progress/mutacion_F-040.md` (la campaña del implementer abortó, exit 3) |
-| C4 bis supervivientes analizados, RM5 | [ ] | H3 + los cinco de log/equivalentes por justificar |
-| C4 bis RM6 | N/A | No se quitó código defensivo |
-| C4 bis campaña manual por cero mutantes | N/A | La automática genera 57 |
-| C4 bis «Evidencias» con los cuatro números | [x] | Con la mutación sin veredicto, dicho así |
-| C4 ter rutas sensibles | N/A | F-040 no declara `informe` extra en `features.json` |
-| C5 `tasks.md` | [ ] | T17-T18 MANUAL tras merge (aceptable); T19 (puerta) pendiente |
-| C5 sin temporales | [x] | Árbol limpio salvo la edición del líder en `current.md` |
-| C5 `features.json` real | [x] | `in_progress` |
+| C1 `init.sh` exit 0 | [x] | Líder, `39c21d4`, con `.env` |
+| C2 una `in_progress`, rama, `current.md` | [x] | |
+| C2 `history.md` | N/A | F-040 aún no está `done` |
+| C3 hexagonal | [x] | El dominio solo usa `re`, `decimal` y `typing` |
+| C3 primera línea, sin prints ni secretos | [x] | También en el delta |
+| C3 semántica Sigrid | [x] | H1 resuelto |
+| C3 bis | N/A | No entran documentos de fuera |
+| C4 cada requisito con test | [x] | Tabla siguiente. R34 es MANUAL (T18) |
+| C4 unit tests sin red ni BBDD | [x] | La sandbox salta sin DSN y crea y borra su propia base |
+| C4 MANUAL listadas | [x] | design § 9, impl § 5 |
+| C4 dobles = original | [x] | Tipos reales de la ingesta |
+| C4 bis rigor | [x] | `critico` |
+| C4 bis RED | [x] | Pasada 1: cuatro trazas. Ciclo 1: RED de H1 (15 failed) y de H3, que mata el mutante a mano |
+| C4 bis cobertura | [x] | 100 % (155/155) |
+| C4 bis mutación, RM1, RM2, sin «NO VÁLIDA» | [ ] | **Condición**: campaña en marcha |
+| C4 bis supervivientes, RM5 | [x] / condición | RM5 hecho (L51 `frozen`); el resto, al llegar el informe |
+| C4 bis RM6 | N/A | No se quitó código defensivo: H1 añade defensa |
+| C4 bis campaña manual por cero mutantes | N/A | Hay 58 |
+| C4 bis «Evidencias» | [x] | Al día con el ciclo 1 |
+| C4 ter | N/A | F-040 no declara `informe` |
+| C5 `tasks.md` | [x] | T1-T16 `[x]`. T17-T18 son MANUALES tras el merge, por diseño. T19 cumplido por la puerta del líder: marcarla al cerrar |
+| C5 sin temporales / `features.json` | [x] | |
 
-## Cobertura requisito → test
+## Cobertura requisito → test (`tests/test_f040_*`)
 
-| Requisitos | Tests (`tests/test_f040_*`) |
+| Requisitos | Tests |
 |---|---|
-| R1-R4 | `ingesta`: `r1_*` (20 columnas exactas, lista negra, prohibida → falla), `r2_*`, `r3_*` (35 y prohibida → falla), `r4_*`; censos en f066/f074/f090/f150/f156 |
-| R5-R8 | `dominio` `r6_*`, `r8_*`; `sql` `r5_*`, `r6_*`, `r7_*`, `r8_*`; `sandbox_r5_r8_clientes`, `sandbox_r6_r8_funciones_iguales_al_oraculo` (2.000 CIF) |
-| R9-R13 | `sql` `r9_*`, `r10_*`, `r11_*`, `r12_*`, `r13_*`; `dominio` `r11_*`, `r12_*`; `sandbox_r9_r11`, `r11_*`, `r13_*` |
-| R14-R15 | `sql` `r14_*`, `r15_*`; `sandbox_r14_r15_certificaciones` |
-| R16-R20 | `sql` `r16_*`-`r20_*`; `dominio` `r18_*`; `sandbox_r16`-`r20` |
-| R21-R23 | `sql` `r21_*`-`r23_*`, `restringida_solo_en_su_esquema`; `sandbox_r21_r23` |
-| R24-R25 | `sql` `r24_*`, `r25_*`; `sandbox_r24_r25_*` (pasa y revienta con la cifra en 6 casos); `pipeline` `r25_*` |
-| R26 | `pipeline` `r26_*` (16 tests); f024/f047/f148 |
-| R27-R29 | `grants` `r27_*`-`r29_*` (21 tests); f037/f135/f138/f156 |
-| R30 | `frontera` `r30_*` (diff vacío, verificado también a mano) |
+| R1-R4 | `ingesta` `r1_*`-`r4_*`; censos en f066, f074, f085, f090, f138, f150 y f156 |
+| R5-R8 | `dominio` `r6_*`, `r8_*`, `r24_codigo_cliente_publicado`; `sql` `r5_*`-`r8_*`; `sandbox_r5_r8_*`, `r6_r8_*` |
+| R9-R13 | `sql` `r9_*`-`r13_*`; `dominio` `r11_*`, `r12_*`; `sandbox_r9_r11`, `r11_*`, `r13_*` |
+| R14-R20 | `sql` `r14_*`-`r20_*`; `dominio` `r18_*` (con las fronteras de H3); `sandbox_r14`-`r20`, `r18_frontera_de_lo_cobrado` |
+| R21-R25 | `sql` `r21_*`-`r25_*`, `r24_codigo_de_persona_o_con_forma_de_nif_a_null`; `sandbox_r21_r23`, `r24_r25_*` (8 casos que tumban la guarda) |
+| R26-R30 | `pipeline` `r26_*`; `grants` `r27_*`-`r29_*`; `frontera` `r30_*` |
 | R31-R33 | `diccionario` `r31_*`-`r33_*` |
-| R34 | MANUAL (T18, design § 9 paso 6) |
+| R34 | MANUAL (T18) |
 
-## Cambios requeridos
+## Condición (lo único pendiente)
 
-1. **H1.** En `etl_sigrid/infrastructure/postgres/sql/ventas/01_clientes.sql`, publicar
-   `codigo_cliente` a NULL si `es_persona_fisica` **o** si el código normalizado casa con
-   `PATRON_NIF_PERSONA` (el íntegro, si hace falta, a `ventas_restringida.clientes_contacto`);
-   añadir a `07_guardas.sql` la comprobación de `codigo_cliente` con el mismo patrón; un caso en
-   `tests/test_f040_sandbox.py` (persona con `con.cod` = su NIF) que haga saltar la guarda, y la
-   ficha de `config/diccionario/ventas.yaml` (línea 50) al día. Alternativa aceptable: medir antes
-   del merge, en solo lectura, cuántos `con.cod` de tipo 4 casan con el patrón, y dejar la cifra
-   en el informe; si es 0, basta la guarda.
-2. **H2.** Corregir `progress/impl_F-040.md` § 2.7: o se borra la frase, o se hace verdad (y
-   entonces con test). Mínimo: decir que `perfis` NULL, un CIF con prefijo de país y una factura de
-   un cliente ausente de `raw.cli` se tratan como persona JURÍDICA.
+`progress/mutacion_F-040.md` del líder sobre `39c21d4`, con:
+- la fila «SHA de HEAD medido» = `39c21d4…` completo (RM1);
+- línea base terminada y verde, sin «⚠ CAMPAÑA NO VÁLIDA» y con «Sin veredicto (base rota)» = 0;
+- **58 mutantes**;
+- un tiempo coherente (RM2);
+- como mucho **los cinco supervivientes de `build_ventas_step.py`**: L51 `slots`, L51 `frozen`,
+  L119 `exc_info`, L126 `rows = 0 → 1` y L133 `round 2 → 3`, cada uno con su justificación (están
+  en impl § 7). Doy por buenos los equivalentes y los que solo tocan el log. En `critico` hace
+  falta además que **el humano acepte esa justificación por escrito**.
 
-3. **H3.** Test frontera de `estado_seguimiento` con `0 < cobrado < 1` en
-   `tests/test_f040_dominio.py` y el mismo caso en la sandbox (vista = dominio). Los cinco vivos
-   de `build_ventas_step.py`, justificados en `progress/mutacion_F-040.md` (o matados con test).
+Cualquier otro superviviente, o uno de `ventas.py`, reabre la review. Si la campaña tarda menos de
+60 s, la reejecuto entera.
 
-## Condiciones (lo que necesito del líder para cerrar)
+## Opinión sobre las propuestas H2, pendientes del humano (no condicionan el veredicto)
 
-- **Puerta:** `bash harness/init.sh` sobre `6392b0d` (o el commit con los cambios) con exit 0, nº
-  de passed, y la línea `PUERTA COBERTURA` en `[OK]` con su porcentaje.
-- **Mutación:** `progress/mutacion_F-040.md` con SHA completo de HEAD, línea base terminada (sin
-  «⚠ CAMPAÑA NO VÁLIDA» ni «Sin veredicto (base rota)»), **57 mutantes**, y cada superviviente con
-  su análisis. Por mi pasada RM4 espero como mínimo el de `ventas.py` L228 (real, H3) y los cinco de `build_ventas_step.py` (equivalentes o de log, a justificar uno a uno); si salen más, cada uno trae
-  test o justificación. RM5: reproduciré la demostración del equivalente que elija.
+- **(a) Quitar el prefijo de país** antes del patrón de NIF: **a favor**, pero solo si lo que queda
+  casa con el patrón (`ES12345678Z` → `12345678Z`). Así, un CIF de sociedad que empiece por `ES`
+  seguido de otra cosa no se toca. Va en dominio y SQL a la vez, con el test de literales.
+- **(b) Tratar como persona física la factura cuyo cliente falta en `raw.cli`**: **a favor**. Es
+  coherente con la línea huérfana, que ya se trata así, y el coste es esconder alguna descripción
+  de más. Mejor aún si una guarda cuenta cuántas facturas tienen `entide` fuera de `raw.cli`.
+- **(c) `perfis` NULL sin cambio**: de acuerdo.
+- **O1** sigue en pie para el humano. Hoy, si la guarda R24 salta, el paso queda FAILED, pero lo
+  filtrado ya está commiteado en `ventas`.
 
 ## Automejora (propuesta, no aplicada)
 
-Que el diseño de toda guarda de datos personales en un SQL aparte diga qué pasa con lo ya publicado
-si salta (O1); candidato a C4 ter de `CHECKPOINTS.md` y a `arnes-base`.
+- En rigor `critico`, que el implementer pase la suite entera **sin `-x`** antes de pedir review:
+  B1-B9 eran fallos reales que el `-x` de `init.sh` tapaba detrás de los de entorno.
+- Que el diseño de toda guarda de datos personales que vaya en un SQL aparte diga qué pasa con lo
+  ya publicado si salta (O1). Ambas valen para `arnes-base`.
