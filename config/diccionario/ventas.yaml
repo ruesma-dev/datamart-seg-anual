@@ -562,7 +562,10 @@ objetos:
         significado: Que tramo del camino mide la fila.
         valores: [CERTIFICACION_FACTURA, FACTURA_EFECTO, EFECTO_FACTURA]
       total:
-        significado: Numero de documentos del tramo (los que cuentan).
+        significado: >-
+          Numero de documentos del tramo (los que cuentan). Los eslabones de
+          efectos leen `raw.cob` entero: cuentan tambien los efectos dados de
+          BAJA en tesoreria.
         agregacion: no_sumable
       enlazados:
         significado: Cuantos de ellos tienen el siguiente eslabon.
@@ -704,7 +707,10 @@ objetos:
         significado: Base certificada a origen, solo las certificaciones que cuentan, en EUR.
         agregacion: suma
       facturado_origen:
-        significado: Base facturada a origen de la obra, en EUR.
+        significado: >-
+          Base facturada a origen de la obra, en EUR, como la suma Sigrid:
+          incluye las facturas anuladas (`anulada`) y las rectificativas, con su
+          signo.
         agregacion: suma
       pendiente_certificar:
         significado: Venta real menos lo certificado, con signo, en EUR.

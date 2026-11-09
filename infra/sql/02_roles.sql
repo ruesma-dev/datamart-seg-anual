@@ -838,9 +838,9 @@ WHERE grantee = 'mcp_sigrid_dm_ro'
 ORDER BY table_name, privilege_type;
 
 -- F-135: el rol GENERAL no lee ningún esquema vetado. CERO filas en la primera
--- consulta y `lee = f` en las cuatro filas de la segunda es el resultado
--- correcto (`compras_restringida` desde F-138, `postventa_restringida` desde
--- F-156 y `ventas_restringida` desde F-040: seis filas).
+-- consulta y `lee = f` en las seis filas de la segunda es el resultado
+-- correcto (eran cuatro; `compras_restringida` desde F-138,
+-- `postventa_restringida` desde F-156 y `ventas_restringida` desde F-040).
 SELECT table_schema, table_name, privilege_type
 FROM information_schema.table_privileges
 WHERE grantee = 'mcp_sigrid_dm_ro'
