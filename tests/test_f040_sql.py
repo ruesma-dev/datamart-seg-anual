@@ -159,6 +159,14 @@ def _alias_publicados(create: str) -> list[str]:
     return re.findall(r" AS (\w+)", final)
 
 
+def _cte(create: str, nombre: str) -> str:
+    """El cuerpo de la CTE `nombre`: desde `nombre AS (` hasta la siguiente CTE."""
+    inicio = create.index(f"{nombre} AS (")
+    siguiente = re.search(r", \w+ AS \(", create[inicio + len(nombre):])
+    fin = inicio + len(nombre) + siguiente.start() if siguiente else create.rindex("SELECT ")
+    return create[inicio:fin]
+
+
 def _lista(tupla: tuple[int, ...]) -> str:
     return "(" + ", ".join(str(x) for x in tupla) + ")"
 
@@ -299,9 +307,11 @@ def test_f040_r5_agregados_antes_de_unir() -> None:
     """Facturas, certificaciones y obras se cuentan por cliente ANTES del JOIN."""
     crea = _create("01_clientes.sql", "ventas.clientes")
     for cte in ("facturas_cliente", "certificaciones_cliente", "obras_cliente"):
-        cuerpo = crea[crea.index(f"{cte} AS ("):]
-        cuerpo = cuerpo[: cuerpo.index(")", cuerpo.index("GROUP BY"))]
-        assert "GROUP BY" in cuerpo, cte
+        assert "GROUP BY" in _cte(crea, cte), f"{cte} sin GROUP BY propio: se agrega antes de unir"
+    final = crea[crea.rindex("SELECT "):]
+    for cte, alias in (("facturas_cliente", "fc"), ("certificaciones_cliente", "kc"),
+                       ("obras_cliente", "oc")):
+        assert f"LEFT JOIN {cte} {alias} ON {alias}.cliente_id = b.cliente_id" in final, cte
 
 
 def test_f040_r7_cif_de_persona_fisica_a_null_y_nombre_publico() -> None:
@@ -314,12 +324,12 @@ def test_f040_r7_cif_de_persona_fisica_a_null_y_nombre_publico() -> None:
 
 def test_f040_r7_valido_y_repetido_se_calculan_antes_de_anular() -> None:
     crea = _create("01_clientes.sql", "ventas.clientes")
-    base = crea[crea.index("base AS ("): crea.index("SELECT", crea.index("base AS (") + 12)]
-    assert "ventas.fn_cif_normalizado(cl.cif)" in crea
-    assert "ventas.fn_cif_valido(" in crea
-    assert "count(*) OVER (PARTITION BY" in crea
-    assert "ventas.fn_es_persona_fisica(" in crea
-    assert "base" in base
+    base = crea[crea.index("base AS ("): crea.rindex("SELECT ")]
+    assert "cl.cif AS cif" in base, "en `base` el CIF todavía está entero"
+    assert "ventas.fn_cif_valido(ventas.fn_cif_normalizado(cl.cif)) AS cif_valido" in base
+    assert ("ELSE count(*) OVER (PARTITION BY ventas.fn_cif_normalizado(cl.cif)) > 1 "
+            "END AS cif_repetido") in base
+    assert "ventas.fn_es_persona_fisica(ventas.fn_cif_normalizado(cl.cif), cl.perfis::INT)" in base
     final = crea[crea.rindex("SELECT "):]
     assert "b.cif_valido AS cif_valido" in final and "b.cif_repetido AS cif_repetido" in final
 
@@ -379,7 +389,9 @@ def test_f040_r11_cuatro_columnas_por_la_funcion_y_agregadas_antes(
 def test_f040_r13_descripcion_null_de_persona_fisica() -> None:
     crea = _create("02_facturas.sql", "ventas.factura_lineas")
     assert "FROM raw.dvfpro l" in crea
-    assert "CASE WHEN f.es_persona_fisica THEN NULL ELSE l.res END AS descripcion" in crea
+    # Falla cerrado: una línea cuya factura no existe tampoco publica su texto.
+    assert ("CASE WHEN COALESCE(f.es_persona_fisica, TRUE) THEN NULL ELSE l.res END "
+            "AS descripcion") in crea
     assert "LEFT JOIN ventas.facturas f ON f.factura_id = l.docide" in crea
 
 
@@ -517,7 +529,9 @@ def test_f040_r22_cabecera_con_las_once_columnas_personales() -> None:
 def test_f040_r23_lineas_de_persona_fisica_integras() -> None:
     crea = _create("06_restringida.sql", "ventas_restringida.factura_lineas_persona")
     assert "FROM raw.dvfpro l" in crea
-    assert "JOIN ventas.facturas f ON f.factura_id = l.docide AND f.es_persona_fisica" in crea
+    assert "LEFT JOIN ventas.facturas f ON f.factura_id = l.docide" in crea
+    # Las mismas que `ventas.factura_lineas` deja sin descripción (falla cerrado).
+    assert "WHERE COALESCE(f.es_persona_fisica, TRUE)" in crea
     assert "l.res AS descripcion" in crea
 
 
