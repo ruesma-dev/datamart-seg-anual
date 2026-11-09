@@ -9,6 +9,61 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-09 · F-040 · `in_progress` · PARADA 1 confirmada, implementer lanzado · rama `feature/F-040-ingresos`
+
+Líder. El humano confirma la propuesta («si») y con ella aprueba la spec revisada del 07-11.
+`main` 534a0bf traído a la rama: conflictos solo en `BACKLOG.md` (regenerado), `features.json`
+(F-159 de `main` + F-160 de la rama; F-040 a `in_progress`) y este fichero. Diccionario: **v75**
+(`main` ya en v74 por F-159; la spec decía v74). `run-all` pasa a diecisiete pasos. Implementer en
+este worktree con T1-T16 de `specs/F-040-ingresos/tasks.md`; T17-T18 MANUALES del humano; T19 (la
+puerta completa con `.env`) la pasa el líder. Tarea en curso y desviaciones: aquí y en
+`progress/impl_F-040.md`.
+
+## 2026-11-08 · CIERRE DE SESIÓN (líder) · leer esto primero
+
+**Nada `in_progress`.** Cerradas en esta tanda (todas desplegadas y medidas en Azure, ver
+`history.md`): F-156 postventa, F-157 fase 0 repartida en el tiempo, F-158 y F-159 hotfix del
+reparto del devengo. Imagen del job **r20261108-0945**, diccionario **v74**, MCP reiniciado (v74).
+`main` 534a0bf / `dev` 74328f3 (push pendiente del humano si no lo hizo).
+
+**Nocturna del 09-11 COMPROBADA (líder, 2026-11-09, solo lectura):** la primera con F-159 en la
+imagen. Lote `20261109T000032Z-e8c578`, 157 pasos SUCCESS, una sola réplica, fin 05:12 UTC;
+`build_tesoreria` SUCCESS (03:15-03:26, 592.660 filas) y 0 negativos en
+`tesoreria.devengo_pendiente_contrato_mes` (5.212 filas) y `devengo_pendiente_obra_mes` (643).
+F-159 queda verificada en producción. R31 de F-148, cerrada (ver su sección).
+
+**Siguiente feature: F-040** (ventas, certificaciones, clientes y cobro; prioridad 2, crítico).
+Spec REVISADA con las decisiones del humano del 07-11 en `.claude/worktrees/agent-a110c4068b1c41df8`,
+rama `feature/F-040-ingresos` (4c3f58e, con `main` 93fc38c dentro; hay que traer `main` 534a0bf):
+D1, D3, D5 = A; D4 = A provisional (RETESP aparte, en un único punto de decisión, a la espera de
+Juan); D6: CIF, nombre y direcciones de `dvf` a `ventas_restringida` (esquema nuevo, solo perfil
+total, pasos MANUAL con `02_roles.sql`); D2: el NOMBRE del cliente es público también en personas
+físicas, su NIF, direcciones y texto de líneas solo en `ventas_restringida`; fase 2 como F-160.
+**Pendiente:** enseñar al humano el resumen de la spec revisada y su visto bueno ANTES de lanzar el
+implementer (lo pidió: «antes de implementar la 40 y 104 guardamos y cerramos sesión»).
+
+**Después: F-104** (retención de cliente). Spec APROBADA (lo recomendado en D1-D8; D6 = 0686,
+cuenta 4308001634, 1,68 M€) en `.claude/worktrees/agent-a9d9a8269385473d8`, rama
+`feature/F-104-retenciones-cliente`. Orden del humano: F-040 y luego F-104.
+
+**Correo a Juan Romero** en Borradores de Outlook (el humano lo envía): RETESP en venta (decide
+la D4 de F-040), la contabilidad como cifra que manda en la retención de cliente y los descuadres
+(0686, LEVITT, MK MADRID II, ARCHER, SABINA, UNEXUM, PRORED).
+
+**Fuera de este repo:** `mcp-bbdd` F-034 (pliego del perfil postventa, sin empezar) y F-033 (sello
+de Signaturit en `abrir_adjunto`). Aviso de `arnes-base` 1.8.0 recibido (solo informativo; antes de
+actualizar, pasar lo afinado de `harness/rigor.json` a `rigor.local.json`).
+
+**Observaciones abiertas:** el tramo 61 de `build_plan_mensual` tardó 22 min el 07-11 (los demás
+1-5); `coeficiente_venta` negativo no tiene guarda en la venta con coeficientes (observación 3 de
+`review_F-159.md`, previa); propuesta repetida de los reviewers: `--tests` en `harness.mutacion`
+para correr la campaña sin `.env`.
+
+**Entorno:** los worktrees de subagente no tienen `.env` (prohibido copiarlo): su `init.sh` sale
+rojo solo en `test_f006_t26`. La puerta completa la pasa el líder en una copia con `.env` (worktree
+`wt_main` en el scratchpad de la sesión anterior; si no existe, crear uno detached). Con el equipo
+encendido tarda 35-105 min.
+
 ## 2026-11-07 · F-040 · `spec_ready` · spec revisada tras la PARADA 1 · rama `feature/F-040-ingresos`
 
 Spec-author, en su worktree; `main` (`93fc38c`) traído a la rama (merge `94f2a07`: conflictos en

@@ -2044,3 +2044,55 @@ reiniciado (carga la v72). Medido en Azure el 06-11: 0 importes negativos,
 La nocturna del 06-11 (imagen vieja) ya salió en SUCCESS porque ese día el
 negativo volvió a compensarse: el defecto era real y seguía latente.
 Merge `main` 3d72d06, `dev` dd834a9.
+
+## F-157 — La planificación en el tiempo de la fase 0 · 2026-11-07
+
+Rama `feature/F-157-planificacion-fase0`. APROBADO en la pasada 1
+(`progress/review_F-157.md`); spec en `specs/F-157-planificacion-fase0/`.
+Petición de Juan Romero (Control de Costes) del 05-11.
+
+`stg.plan_mensual_fase0`: el presupuesto vivo de hoy (fase 0, coste 3 y venta
+7) repartido en el tiempo con el `planif` del jefe de obra, desde
+`obrfasamb.plafec`; tabla propia porque `mart` publica los ámbitos 3/7 de
+`stg.plan_mensual` como la serie de cierres (Coste/Venta Real). Regla de
+explosión del master en `stg.fn_explotar_planif` (sin tocar el 08), oráculo
+`domain/planif.py`, vista `stg.v_plan_mensual_fase0_cobertura`, sub-paso
+`build_plan_mensual_fase0` acotado a las obras de la noche. Sin regla dura
+nueva; `mart` sin tocar (D8).
+
+Desplegado: imagen r20261106-1848 (viernes, no sábado: la nocturna del 07-11
+reconstruyó entero, `build_stg` 165 min, fin 06:34 UTC), diccionario v73,
+MCP reiniciado. Medido el 07-11: 1.265.519 filas en 135 obras, 239 MB,
+sub-paso 3,6 min; la 0726 con 1.504/1.546 partidas de coste y 1.438/1.461 de
+venta planificadas (el jefe de obra planificó tras la petición), cuadre con
+el total ≤ 1,43 EUR por obra. `check-declarados` (290), `check-cierres`
+(0 discrepancias) y `check-unicidad` (sin colisiones; `stg.plan_mensual`
+sigue sin comprobar por timeout) en verde. R20 (huella de antes y después) no
+se midió: no se tomó la huella previa; lo cubre `check-cierres`.
+Merge `main` 93fc38c, `dev` aa2b053.
+
+## F-159 — Hotfix 2: el mes negativo del plan amplificado en el reparto · 2026-11-08
+
+Rama `feature/F-159-hotfix-devengo-negativo-2`. APROBADO en la pasada 1
+(`progress/review_F-159.md`); spec en `specs/F-159-hotfix-devengo-negativo-2/`.
+
+Las nocturnas del 07-11 y del 08-11 (ya con F-158) cayeron en `build_tesoreria`
+por R50: 1-0710, 2026-11, CD sin contrato, -18.791.769,87 EUR. La nueva V13 de
+1-0710 («PLANIFICACION CUATRIMESTRAL OCT-26», creada el 06-11) trae en la
+partida 404326 un 0 intermedio (estorno legítimo): tras el cierre, -1.079,94 en
+noviembre y +1.080,00 en diciembre. El paso 5 repartía con pesos CON SIGNO y
+total 0,06: amplificaba x18.000. Ahora el perfil es la ENVOLVENTE NETA
+(`W'(m) = max(0, min_{k>=m} W(k))`) y el reparto va por ACUMULADO: cada mes en
+[0, p] y suma exacta, en coste y en venta (la venta no tenía R50). Cierra
+también el borde del último mes (observación 3 de la review de F-158). Guarda
+nueva en el paso 5 con obra, partida y mes, y R50 nombra su primera fila.
+
+Desplegado: imagen r20261108-0945, `build-tesoreria` SUCCESS en 308 s,
+`apply-grants` con las cuatro verificaciones ok, diccionario v74, MCP
+reiniciado (carga la v74). Medido en Azure el 08-11: 0 importes negativos en
+el coste por contrato y en la obra-mes (coste y venta), 0 meses con personal
+mayor que el pendiente; 1-0710 por mes entre 144.728,18 y 1.605.544,59 EUR de
+coste (pendiente 5,42 M) y entre 135.477,47 y 1.021.781,17 de venta (4,51 M).
+La reproducción previa en solo lectura (paso 0 bis) no se hizo: el propio
+`build-tesoreria` era la prueba, sin riesgo (un fallo deja `tesoreria` como
+estaba). Merge `main` 0ea9d38, `dev` 2a15b31.

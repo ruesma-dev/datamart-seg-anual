@@ -67,12 +67,28 @@ def test_f158_r6_el_caso_tiene_los_numeros_del_diagnostico() -> None:
     assert pendiente_personal(PENDIENTE_392521, CUOTA_392521) == D("57749.89")
 
 
+def _repartir_pendiente_de_fbf43dd(pendiente, perfil, primer_mes):
+    """Copia PRIVADA del `repartir_pendiente` de `fbf43dd` (y de `93fc38c`):
+    cada mes redondeado por su lado y el resto al último. F-159 lo cambió por
+    el acumulado sobre la envolvente; este test documenta el RED de F-158."""
+    meses = sorted((mes, plan) for mes, plan in perfil if plan != 0)
+    total = sum((plan for _mes, plan in meses), D(0))
+    reparto = []
+    acumulado = D(0)
+    for mes, plan in meses[:-1]:
+        importe = (pendiente * plan / total).quantize(D("0.01"), rounding="ROUND_HALF_UP")
+        acumulado += importe
+        reparto.append((mes, importe, False))
+    reparto.append((meses[-1][0], pendiente - acumulado, False))
+    return reparto
+
+
 def test_f158_r6_el_algoritmo_de_ayer_daba_el_negativo() -> None:
-    """El RED, escrito: dos `repartir_pendiente` independientes (el paso 5 de
-    `fbf43dd`) dejan el último mes con más personal que pendiente."""
+    """El RED, escrito: dos repartos independientes (el paso 5 de `fbf43dd`)
+    dejan el último mes con más personal que pendiente."""
     pp = pendiente_personal(PENDIENTE_392521, CUOTA_392521)
-    pendiente = repartir_pendiente(PENDIENTE_392521, PERFIL_392521, _mes(0))
-    personal = repartir_pendiente(pp, PERFIL_392521, _mes(0))
+    pendiente = _repartir_pendiente_de_fbf43dd(PENDIENTE_392521, PERFIL_392521, _mes(0))
+    personal = _repartir_pendiente_de_fbf43dd(pp, PERFIL_392521, _mes(0))
     assert pendiente[-1][1] == D("8249.97")
     assert personal[-1][1] == D("8250.02")
     assert pendiente[-1][1] - personal[-1][1] == D("-0.05")
@@ -86,9 +102,10 @@ def test_f158_r6_el_caso_1_0707_no_da_personal_mayor_que_pendiente() -> None:
     for (mes, importe, _), (_, parte) in zip(reparto, personal, strict=True):
         assert D(0) <= parte <= importe, mes
     assert sum(parte for _, parte in personal) == pp
-    # El último mes: el pendiente de siempre y un personal que no lo supera.
-    assert reparto[-1][1] == D("8249.97")
-    assert personal[-1][1] <= D("8249.97")
+    # El último mes: el pendiente (8.249,99 desde F-159, por acumulado; 8.249,97
+    # con el resto al último) y un personal que no lo supera.
+    assert reparto[-1][1] == D("8249.99")
+    assert personal[-1][1] <= D("8249.99")
 
 
 # ===========================================================================
@@ -218,11 +235,11 @@ def test_f158_r7_el_sql_sigue_al_dominio() -> None:
 
 
 def test_f158_r7_el_pendiente_y_los_coeficientes_no_cambian() -> None:
+    """F-158 no los cambió; F-159 sí (los dos, por acumulado sobre la envolvente
+    del plan neto: `tests/test_f159_reparto_envolvente.py`)."""
     paso = _paso_5()
-    assert ("CASE WHEN r.desde_el_final = 1 THEN r.pendiente - (r.suma_partes - r.parte) "
-            "ELSE r.parte END AS importe") in paso
-    assert ("CASE WHEN r.desde_el_final = 1 THEN r.pendiente_con_coeficientes - "
-            "(r.suma_partes_con_coef - r.parte_con_coef) ELSE r.parte_con_coef END "
+    assert "r.hasta - COALESCE(LAG(r.hasta) OVER w, 0) AS importe" in paso
+    assert ("r.hasta_con_coef - COALESCE(LAG(r.hasta_con_coef) OVER w, 0) "
             "AS importe_con_coef") in paso
     assert "WHERE d.pendiente > 0 AND d.total_perfil > 0" in paso
     assert "d.pendiente_personal AS importe_personal, TRUE AS es_retraso" in paso
@@ -295,7 +312,8 @@ def test_f158_r10_fichas() -> None:
     assert "nunca lo supera en un mes" in personal
     assert "f-158" in personal
     contrato = _plano(_objeto("devengo_pendiente_contrato_mes")["descripcion"])
-    assert "la fila sin contrato solo es negativa por un mes negativo del plan" in contrato
+    # F-159: con el reparto sobre el plan neto, ni la fila sin contrato es negativa.
+    assert "la fila sin contrato solo es negativa" not in contrato
     assert "f-158" in contrato
 
 

@@ -3,19 +3,18 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **147 features**, 74 abiertas (1 en curso, 2 con la spec lista, 0 bloqueadas y 71 en backlog) y 73 terminadas.
+Resumen: **148 features**, 73 abiertas (1 en curso, 1 con la spec lista, 0 bloqueadas y 71 en backlog) y 75 terminadas.
 
 ## En curso
 
 | # | Feature | Prioridad | Rigor | Rama |
 |---|---|---|---|---|
-| F-157 | La planificación en el tiempo de la fase 0 (Previsto) de coste y venta: el reparto mensual por partida que el jefe de obra mete en Sigrid no llega a `stg.plan_mensual` | 1 | estandar | `feature/F-157-planificacion-fase0` |
+| F-040 | El lado de ingresos: ventas, certificaciones y clientes | 2 | critico | `feature/F-040-ingresos` |
 
 ## Spec lista
 
 | # | Feature | Prioridad | Rigor | Rama |
 |---|---|---|---|---|
-| F-040 | El lado de ingresos: ventas, certificaciones y clientes | 2 | critico | `feature/F-040-ingresos` |
 | F-111 | Los nombres de partida se resuelven por codigo en los niveles del arbol y en la dimension de costes indirectos: 10.593 filas con un escalon con el nombre de otra partida | 18 | estandar | `feature/F-111-nombres-partida-por-ancestro` |
 
 ## Bloqueadas
@@ -103,6 +102,7 @@ _Ninguna feature bloqueada._
 | # | Feature | Prioridad | Rigor |
 |---|---|---|---|
 | F-158 | Hotfix: un céntimo negativo en el coste por contrato (guarda R50) tumba build_tesoreria | 0 | estandar |
+| F-159 | Hotfix 2: un mes negativo del plan de V se amplifica en el reparto del devengo y tumba build_tesoreria (guarda R50) | 0 | estandar |
 | F-001 | Comando 'version' en el CLI | 1 | estandar |
 | F-006 | MCP de bases de datos como servicio en cloud | 1 | critico |
 | F-025 | Las obras cerradas no se reconstruyen cada noche: acotar el build de stg y mart a lo que se mueve | 1 | critico |
@@ -130,6 +130,7 @@ _Ninguna feature bloqueada._
 | F-149 | Lo que sirve el MCP no nombra reglas que no se publican: fuera las citas a `R-SIGRID-CON` del bloque de convenciones y de las fichas de `compras` | 1 | estandar |
 | F-150 | La receta de la caja (fase 1): el procedimiento de devengo a caja en el diccionario, el coeficiente de venta por partida y los reparto en varios meses | 1 | estandar |
 | F-155 | Hotfix: ofertas compartidas entre comparativos rompen build_compras | 1 | estandar |
+| F-157 | La planificación en el tiempo de la fase 0 (Previsto) de coste y venta: el reparto mensual por partida que el jefe de obra mete en Sigrid no llega a `stg.plan_mensual` | 1 | estandar |
 | F-009 | Inventario del entorno Azure existente | 2 | documental |
 | F-042 | La clave de mart.fact_seguimiento_mensual esta rota: 8.778 combinaciones duplicadas | 2 | critico |
 | F-056 | El mayor y el plan de cuentas como arbol: stg y mart sobre la contabilidad (raw por F-066) | 2 | critico |
@@ -178,15 +179,9 @@ _Ninguna feature bloqueada._
 
 ## Detalle
 
-### F-157 · La planificación en el tiempo de la fase 0 (Previsto) de coste y venta: el reparto mensual por partida que el jefe de obra mete en Sigrid no llega a `stg.plan_mensual`
-
-estado **en curso** · prioridad 1 · rigor `estandar` · SDD sí · rama `feature/F-157-planificacion-fase0`
-
-Pedida por Juan Romero (Control de Costes) el 2026-11-05: «el datamart publica el importe total de cada partida en fase 0 (Previsto) en coste y en venta, pero no su planificación en el tiempo» (pantalla de Sigrid «Planificación en el tiempo (por partidas)»). COMPROBADO por el líder el 2026-11-05, solo lectura: (1) en el código, `stg/08_plan_mensual.sql` solo explota `raw.obrparpre.planif` para los master (ámbitos 8 y 11, anclados en `obrfasamb.plafec`); de los ámbitos 3 y 7 solo publica los cierres reales (`fase_num >= 1`), así que la fase 0 de coste y venta no se reparte nunca. (2) En los datos: `raw.obrfasamb` tiene `plafec` en la fase 0 en 144 obras de coste (ámbito 3) y 139 de venta (ámbito 7), de 2015-05 a 2026-10. En la 0726 (CENTRO SOCIOSANITARIO LAGUNA NORTE, obra 2817778) la venta fase 0 (ámbito 7, 23.928.969,90 €, el total que cita Juan) tiene `plafec` 2026-10-01 y `planif` en 83 de sus 1.460 partidas (acumulado por meses separado por `|`, termina en 1, p. ej. `0|0|0|0|0.15|0.85|1`); su coste fase 0 (ámbito 3, 1.545 partidas) NO tiene `planif` ni `plafec` en esa obra, y sus master 0 y 1 (8/11) tampoco tienen `plafec` (por eso no tienen meses, como dice Juan). `stg.plan_mensual` de la 0726 solo tiene ámbito 3 versión 1 (31 filas). QUÉ HACER: publicar el reparto mensual de la fase 0 (ámbitos 3 y 7) por partida con porcentaje e importe de cada mes, con la misma explosión que los master (`planif` acumulado → porcentaje del mes, anclado en `plafec`), sin mezclarlo con los cierres reales (versión 0 hoy no existe en 3/7: decidir si va en `plan_mensual` con versión 0 o en un objeto propio, y cuidar la clave de `stg.plan_mensual` y lo que cruza `pm.version` con `stg.fases.numero_fase` en `cierre/`). Medir cuántas partidas tienen `planif` en fase 0, cuántas suman 100 % y qué pasa con las que no tienen. Para que Juan compare la planificación viva del jefe de obra con la del master vigente y el coste con la venta antes de guardar el master.
-
 ### F-040 · El lado de ingresos: ventas, certificaciones y clientes
 
-estado **spec lista** · prioridad 2 · rigor `critico` · SDD sí · rama `feature/F-040-ingresos`
+estado **en curso** · prioridad 2 · rigor `critico` · SDD sí · rama `feature/F-040-ingresos`
 
 Nacida el 2026-08-20 del analisis de dominio de F-006. Es el hueco caro y estructural del datamart: el lado del dinero que entra esta practicamente ausente, y sin el no hay flujo de caja completo ni analisis de cliente. Tres bloques. (1) VENTAS: dvf y dvfpro -facturas de venta y sus lineas, que llevan paride- no se ingieren; hay un config/tables_sigrid_venta_snippet.yaml preparado y sin integrar desde hace tiempo. Su ausencia deja ademas muerta la vista retenciones.v_src_lineas_venta, que existe vacia por diseno, y por eso las retenciones de cliente no tienen respaldo de atribucion a obra ni CIF. (2) CERTIFICACIONES a cliente: cer, cerpro -lineas con paride- y obrcer -con prorea, cerobr, cerrev, ceraac- son el eslabon que falta entre la produccion y el cobro; hoy tenemos la produccion como importe y el efecto de cobro, pero nada en medio. (3) CLIENTES: la tabla cli no se ingiere. Solo conocemos el nombre del cliente via con.res desde obr.entide, asi que no se puede responder ni quienes son nuestros diez mayores clientes ni nada que exija su CIF o su clasificacion. Depende de la capacidad del ETL: son tablas grandes y F-035 esta midiendo el tiempo de carga; la spec debe estimar el impacto en la ventana nocturna antes de comprometerse. ================ PEDIDA POR JUAN ROMERO (Dir. Admon y Control de Costes) por correo, recordado el 2026-10-27, y subida por el humano ese día de la prioridad 46 a la 5, justo detrás de F-054. Lo que pide, en sus palabras: (a) «Certificaciones a cliente: el documento de certificación (número, mes, a origen / a cuenta, estado)»; (b) «Facturas de venta: cabecera y líneas. La tabla de líneas de venta de Sigrid (dvfpro) no se está cargando, y por eso la retención de garantía de las facturas de venta sale siempre vacía»; (c) «Enlace certificación – factura – cobro, para poder seguir una certificación hasta que se cobra». La cuarta petición del mismo correo (forma de pago por defecto de la ficha del proveedor) va aparte, en F-152. MEDIDO EL 2026-10-27 en solo lectura (21 obras con devengo pendiente de F-140): `cer` y `dvf` se enlazan con la obra por `cenide` (= `obr.cenide`), llevan `totbas`/`totiva`/`fecdoc`, y su IVA efectivo coincide con el `obr.ivaide` de la ficha de la obra (21 % en 0690, 0697 y 0699; 0 % en las otras 16 con facturas, ninguna al 10 %); `obrcer` no tiene filas en esas 21 obras. Es la fuente de verdad del IVA de venta para la caja (H12 de `tesoreria.hipotesis_caja`), y `cer.feccob` («fecha de cobro, 0 pendiente») es un candidato al enlace con el cobro que la spec debe medir.
 
@@ -628,6 +623,12 @@ estado **terminada** · prioridad 0 · rigor `estandar` · SDD sí · rama `feat
 
 Las nocturnas del 2026-11-04 y del 05-11 fallaron en `build_tesoreria` (sub-paso `devengo_pendiente`): «el coste por contrato no cuadra con la obra-mes en 0 obras o tiene 1 importes negativos», la guarda R50 de `sql/tesoreria/07_devengo_pendiente.sql` (F-150 N17). La transacción vuelve atrás: las tablas de `07` siguen siendo las del 03-11. Causa medida en solo lectura el 05-11 (`progress/spec_F-158.md`): en `_dev_reparto` el pendiente y el personal de cada partida se reparten en los meses redondeando cada uno por su lado; con cuota de personal 0,999999 (1-0707, partida 392521 CI.1.1, pendiente 57.749,95) el último mes (2027-10) queda con 8.249,97 de pendiente y 8.250,02 de personal, y el paso 5 bis publica -0,05 sin contrato. Fallo del reparto, no dato de Sigrid; lo destapó el 04-11 que la partida 392522 pasara a cuota 1 por partes nuevos de octubre y dejara de compensarlo. Arreglo recomendado (A): el personal del mes por ACUMULADO sobre el pendiente ya repartido, con su espejo en el dominio.
 
+### F-159 · Hotfix 2: un mes negativo del plan de V se amplifica en el reparto del devengo y tumba build_tesoreria (guarda R50)
+
+estado **terminada** · prioridad 0 · rigor `estandar` · SDD sí · rama `feature/F-159-hotfix-devengo-negativo-2`
+
+La nocturna del 2026-11-07 (imagen r20261106-1848, ya con F-158) falló dos veces en `build_tesoreria` (04:52 y 06:30 UTC): «el coste por contrato no cuadra con la obra-mes en 0 obras o tiene 1 importes negativos», la guarda R50 de `sql/tesoreria/07_devengo_pendiente.sql`. `tesoreria` sigue con la construcción del 06-11 08:38. Causa medida en solo lectura el 07-11 (`progress/spec_F-159.md`): el paso 5 reparte el pendiente de cada partida en proporción a su plan de V con pesos CON SIGNO. La versión «PLANIFICACION CUATRIMESTRAL OCT-26» de 1-0710 (V13, creada en Sigrid el 06-11) trae en la partida 404326 (03.02.11) un 0 intermedio en el `planif` (99,994 % / 0 / 100 %) que `stg` convierte, con razón, en -1.079,94 en 2026-11 y +1.080,00 en 2026-12: `total_perfil` 0,06 y noviembre recibe -19.438.920,00 (1-0710/2026-11/CD sin contrato: -18.791.769,87). Es la clase de la D2 de F-158 (mes negativo del plan) en su forma amplificada; la observación 3 de su review (último mes negativo por redondeo) no salta hoy pero está latente. Arreglo recomendado (A): perfil = envolvente del plan NETO acumulado (un mes negativo se absorbe en los anteriores) y reparto por acumulado, con su espejo en el dominio; medido: 0 negativos y 0 descuadres. Relajar R50 publicaría -18,8 M€: descartado.
+
 ### F-001 · Comando 'version' en el CLI
 
 estado **terminada** · prioridad 1 · rigor `estandar` · SDD no · rama `feature/F-001-cli-version`
@@ -789,6 +790,12 @@ Pedida por el humano el 2026-10-26, nace de la P2 de la review de F-140 y de su 
 estado **terminada** · prioridad 1 · rigor `estandar` · SDD no · rama `feature/F-155-ofertas-compartidas`
 
 La nocturna del 2026-10-31 falló dos veces en `build_compras` (sub-paso `comparativos`): `could not create unique index "comparativo_ofertas_pkey" DETAIL: Key (oferta_id)=(2796053) is duplicated`. Compras se quedó en el 30-10 y `compras.v_estado_documentos` (13_estado_documentos.sql, F-132) no existe (check-declarados KO). Causa medida en solo lectura: en Sigrid se creó el comparativo COM26/0014 (`raw.comprv.comide` 2865169) reutilizando las 6 MISMAS ofertas (docide 2795986, 2796015, 2796032, 2796039, 2796053, 2799121) del 0697.0_0037 (comide 2793682); `raw.comprv` 72.113 filas y 72.107 `docide` distintos. `compras.comparativo_ofertas` (08_comparativos.sql) tenía PRIMARY KEY (oferta_id) = `dco.ide`.
+
+### F-157 · La planificación en el tiempo de la fase 0 (Previsto) de coste y venta: el reparto mensual por partida que el jefe de obra mete en Sigrid no llega a `stg.plan_mensual`
+
+estado **terminada** · prioridad 1 · rigor `estandar` · SDD sí · rama `feature/F-157-planificacion-fase0`
+
+Pedida por Juan Romero (Control de Costes) el 2026-11-05: «el datamart publica el importe total de cada partida en fase 0 (Previsto) en coste y en venta, pero no su planificación en el tiempo» (pantalla de Sigrid «Planificación en el tiempo (por partidas)»). COMPROBADO por el líder el 2026-11-05, solo lectura: (1) en el código, `stg/08_plan_mensual.sql` solo explota `raw.obrparpre.planif` para los master (ámbitos 8 y 11, anclados en `obrfasamb.plafec`); de los ámbitos 3 y 7 solo publica los cierres reales (`fase_num >= 1`), así que la fase 0 de coste y venta no se reparte nunca. (2) En los datos: `raw.obrfasamb` tiene `plafec` en la fase 0 en 144 obras de coste (ámbito 3) y 139 de venta (ámbito 7), de 2015-05 a 2026-10. En la 0726 (CENTRO SOCIOSANITARIO LAGUNA NORTE, obra 2817778) la venta fase 0 (ámbito 7, 23.928.969,90 €, el total que cita Juan) tiene `plafec` 2026-10-01 y `planif` en 83 de sus 1.460 partidas (acumulado por meses separado por `|`, termina en 1, p. ej. `0|0|0|0|0.15|0.85|1`); su coste fase 0 (ámbito 3, 1.545 partidas) NO tiene `planif` ni `plafec` en esa obra, y sus master 0 y 1 (8/11) tampoco tienen `plafec` (por eso no tienen meses, como dice Juan). `stg.plan_mensual` de la 0726 solo tiene ámbito 3 versión 1 (31 filas). QUÉ HACER: publicar el reparto mensual de la fase 0 (ámbitos 3 y 7) por partida con porcentaje e importe de cada mes, con la misma explosión que los master (`planif` acumulado → porcentaje del mes, anclado en `plafec`), sin mezclarlo con los cierres reales (versión 0 hoy no existe en 3/7: decidir si va en `plan_mensual` con versión 0 o en un objeto propio, y cuidar la clave de `stg.plan_mensual` y lo que cruza `pm.version` con `stg.fases.numero_fase` en `cierre/`). Medir cuántas partidas tienen `planif` en fase 0, cuántas suman 100 % y qué pasa con las que no tienen. Para que Juan compare la planificación viva del jefe de obra con la del master vigente y el coste con la venta antes de guardar el master.
 
 ### F-009 · Inventario del entorno Azure existente
 

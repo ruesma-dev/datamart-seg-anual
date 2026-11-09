@@ -618,12 +618,12 @@
         "Lo personal del cliente (NIF de persona física, direcciones, teléfono, correo, cabecera de la factura y descripción de las líneas de personas físicas) solo en el esquema nuevo `ventas_restringida`, que lee solo el perfil total; el nombre del cliente y el CIF de las personas jurídicas, públicos en `ventas` (D2 y D6 del humano, 2026-11-07)",
         "La spec estima el impacto en la ventana nocturna antes de comprometerse"
       ],
-      "status": "spec_ready",
+      "status": "in_progress",
       "sdd": true,
       "rigor": "critico",
       "priority": 2,
       "branch": "feature/F-040-ingresos",
-      "notes": "2026-11-07: PARADA 1 resuelta por el humano: D1, D3 y D5 = A (fase 2 en F-160); D4 = A provisional (garantía = clases 4 y 5, `RETESP` aparte; el líder pregunta a Juan Romero y el cambio es una constante del dominio); D6 modificada (entcif, entres y dir* de dvf, y el contacto de cli, se ingieren y van solo a `ventas_restringida`); D2 modificada (nombre público también para personas físicas; su NIF, direcciones, teléfono, correo y textos de línea, solo en `ventas_restringida`). Spec revisada por el spec-author. 2026-11-06: spec escrita (specs/F-040-ingresos/, mediciones en progress/spec_F-040.md); propone fase 1 aquí y fase 2 (contraste completo y conceptos fuera de coeficiente) como feature nueva (D1). 2026-10-27: prioridad 46 -> 5 por orden del humano, tras el correo de Juan Romero; criterios de aceptación ampliados con sus tres peticiones. 2026-10-27: prioridad 5 -> 2 por orden del humano (tras F-150 van F-040 y F-104). 2026-10-27: añadido el contraste venta con coeficientes frente a certificado y los conceptos fuera de coeficiente (revisión de precios), que F-150 deja fuera y declara como aviso. Medido: el IVA del contrato (`obrctr.ivaide`) coincide con el de `cer` y `dvf` por `ctride` en todos los contratos."
+      "notes": "2026-11-09: spec APROBADA por el humano tras la PARADA 1 del líder («si»); in_progress, implementer lanzado. Diccionario: v74 -> v75 (main ya en v74 por F-159). 2026-11-07: PARADA 1 resuelta por el humano: D1, D3 y D5 = A (fase 2 en F-160); D4 = A provisional (garantía = clases 4 y 5, `RETESP` aparte; el líder pregunta a Juan Romero y el cambio es una constante del dominio); D6 modificada (entcif, entres y dir* de dvf, y el contacto de cli, se ingieren y van solo a `ventas_restringida`); D2 modificada (nombre público también para personas físicas; su NIF, direcciones, teléfono, correo y textos de línea, solo en `ventas_restringida`). Spec revisada por el spec-author. 2026-11-06: spec escrita (specs/F-040-ingresos/, mediciones en progress/spec_F-040.md); propone fase 1 aquí y fase 2 (contraste completo y conceptos fuera de coeficiente) como feature nueva (D1). 2026-10-27: prioridad 46 -> 5 por orden del humano, tras el correo de Juan Romero; criterios de aceptación ampliados con sus tres peticiones. 2026-10-27: prioridad 5 -> 2 por orden del humano (tras F-150 van F-040 y F-104). 2026-10-27: añadido el contraste venta con coeficientes frente a certificado y los conceptos fuera de coeficiente (revisión de precios), que F-150 deja fuera y declara como aviso. Medido: el IVA del contrato (`obrctr.ivaide`) coincide con el de `cer` y `dvf` por `ctride` en todos los contratos."
     },
     {
       "id": "F-041",
@@ -2512,12 +2512,12 @@
         "Los cierres reales y los master de `stg.plan_mensual` no cambian (mismas filas y mismos importes antes y después), y `cierre/` sigue cruzando solo las fases reales",
         "Ficha del diccionario con el objeto, la regla de que la fase 0 es planificación viva (no master ni cierre) y un ejemplo de pregunta; tests y `bash harness/init.sh` en verde"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "rigor": "estandar",
       "priority": 1,
       "branch": "feature/F-157-planificacion-fase0",
-      "notes": "2026-11-06: PARADA 1 resuelta por el humano (la A en D1 a D8); en implementación en la rama, diccionario v73 tras la v72 de F-158. 2026-11-05: anotada por el líder a petición del humano («añádelo a la feature como siguiente»): prioridad 1, la siguiente tras cerrar F-156."
+      "notes": "2026-11-07: APROBADA (`progress/review_F-157.md`), merge `main` 93fc38c, desplegada (imagen r20261106-1848), primera noche completa el 07-11 y diccionario v73. 2026-11-06: PARADA 1 resuelta por el humano (la A en D1 a D8); en implementación en la rama, diccionario v73 tras la v72 de F-158. 2026-11-05: anotada por el líder a petición del humano («añádelo a la feature como siguiente»): prioridad 1, la siguiente tras cerrar F-156."
     },
     {
       "id": "F-158",
@@ -2536,6 +2536,24 @@
       "priority": 0,
       "branch": "feature/F-158-hotfix-devengo-negativo",
       "notes": "2026-11-06: APROBADA (`progress/review_F-158.md`), merge `main` 3d72d06, desplegada (imagen r20261106-0813, `build-tesoreria` 357 s, 0 negativos), diccionario v72. 2026-11-05: HOTFIX pedido por el líder; spec escrita por el spec-author en su worktree desde `main` (fbf43dd), sin código. Diagnóstico y alternativas en `progress/spec_F-158.md`; pendiente de la PARADA 1."
+    },
+    {
+      "id": "F-159",
+      "title": "Hotfix 2: un mes negativo del plan de V se amplifica en el reparto del devengo y tumba build_tesoreria (guarda R50)",
+      "description": "La nocturna del 2026-11-07 (imagen r20261106-1848, ya con F-158) falló dos veces en `build_tesoreria` (04:52 y 06:30 UTC): «el coste por contrato no cuadra con la obra-mes en 0 obras o tiene 1 importes negativos», la guarda R50 de `sql/tesoreria/07_devengo_pendiente.sql`. `tesoreria` sigue con la construcción del 06-11 08:38. Causa medida en solo lectura el 07-11 (`progress/spec_F-159.md`): el paso 5 reparte el pendiente de cada partida en proporción a su plan de V con pesos CON SIGNO. La versión «PLANIFICACION CUATRIMESTRAL OCT-26» de 1-0710 (V13, creada en Sigrid el 06-11) trae en la partida 404326 (03.02.11) un 0 intermedio en el `planif` (99,994 % / 0 / 100 %) que `stg` convierte, con razón, en -1.079,94 en 2026-11 y +1.080,00 en 2026-12: `total_perfil` 0,06 y noviembre recibe -19.438.920,00 (1-0710/2026-11/CD sin contrato: -18.791.769,87). Es la clase de la D2 de F-158 (mes negativo del plan) en su forma amplificada; la observación 3 de su review (último mes negativo por redondeo) no salta hoy pero está latente. Arreglo recomendado (A): perfil = envolvente del plan NETO acumulado (un mes negativo se absorbe en los anteriores) y reparto por acumulado, con su espejo en el dominio; medido: 0 negativos y 0 descuadres. Relajar R50 publicaría -18,8 M€: descartado.",
+      "acceptance": [
+        "Spec SDD aprobada por el humano (PARADA 1) con las decisiones D1-D6 de `progress/spec_F-159.md`",
+        "Cada (partida, mes) del reparto del pendiente está en [0, pendiente de la partida] y la partida suma su pendiente al céntimo con perfiles con signo; test de regresión con el caso real de 1-0710 (partida 404326) en RED antes y en verde después, sin red ni BBDD",
+        "El personal sigue por acumulado (F-158) y en [0, mes]; el paso 5 bis y las condiciones de R14, R50 y R58 no cambian; una guarda nueva nombra la partida y el mes de un reparto negativo",
+        "Fichas del diccionario actualizadas y v74; `bash harness/init.sh` en verde",
+        "Despliegue MANUAL del humano con los pasos de `specs/F-159-hotfix-devengo-negativo-2/design.md` §6: reproducción en solo lectura, imagen, job, `build-tesoreria` suelto, `apply-grants`, 0 negativos en `devengo_pendiente_contrato_mes` y `devengo_pendiente_obra_mes`, y vuelta atrás"
+      ],
+      "status": "done",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 0,
+      "branch": "feature/F-159-hotfix-devengo-negativo-2",
+      "notes": "2026-11-08: APROBADA (`progress/review_F-159.md`), merge `main` 0ea9d38, desplegada (imagen r20261108-0945, `build-tesoreria` SUCCESS, 0 negativos en coste y venta), diccionario v74. Lo de antes (pendiente de la PARADA 1) queda superado. 2026-11-07: HOTFIX pedido por el líder; spec escrita por el spec-author en su worktree desde `main` (93fc38c), sin código. Diagnóstico y alternativas en `progress/spec_F-159.md`; pendiente de la PARADA 1."
     },
     {
       "id": "F-160",
