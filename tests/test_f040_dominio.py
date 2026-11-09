@@ -63,6 +63,31 @@ def test_f040_r6_normalizar_cif(crudo: str | None, esperado: str | None) -> None
     assert v.normalizar_cif(crudo) == esperado
 
 
+@pytest.mark.parametrize(("crudo", "normalizado", "persona"), [
+    # R2-a (enmienda del humano, 2026-11-10): el prefijo de país se quita SOLO si
+    # lo que queda es un NIF de persona.
+    ("ES12345678Z", "12345678Z", True),
+    ("es-12.345.678-z", "12345678Z", True),
+    ("ESX1234567L", "X1234567L", True),
+    ("PTK1234567A", "K1234567A", True),
+    ("ESB12345678", "ESB12345678", False),      # sociedad española con prefijo
+    ("FR12345678901", "FR12345678901", False),  # IVA intracomunitario francés
+    ("DE123456789", "DE123456789", False),
+    ("PT123456789", "PT123456789", False),
+    ("ES1234567Z", "ES1234567Z", False),        # 7 cifras: no es NIF
+    ("E12345678Z", "E12345678Z", False),        # una sola letra no es prefijo
+    ("ESES12345678Z", "ESES12345678Z", False),  # se quita un prefijo, no dos
+    ("1212345678Z", "1212345678Z", False),      # el prefijo son letras
+])
+def test_f040_r6_prefijo_de_pais(crudo: str, normalizado: str, persona: bool) -> None:
+    assert v.normalizar_cif(crudo) == normalizado
+    assert v.es_persona_fisica(v.normalizar_cif(crudo), 0) is persona
+
+
+def test_f040_r6_el_patron_con_prefijo_es_el_del_nif() -> None:
+    assert v.PATRON_NIF_CON_PREFIJO_PAIS == "^[A-Z]{2}" + v.PATRON_NIF_PERSONA[1:]
+
+
 @pytest.mark.parametrize(("cif", "perfis", "esperado"), [
     ("12345678Z", 0, True),     # DNI
     ("X1234567L", 0, True),     # NIE
@@ -89,6 +114,8 @@ def test_f040_r6_es_persona_fisica(cif: str | None, perfis: int | None, esperado
     ("C2", True, None),                     # de persona física, nunca (R1-H1)
     ("87654321-x", False, None),            # con forma de NIF de persona, tampoco
     (" x1234567l ", False, None),           # NIE, con espacios y minúsculas
+    ("ES12345678Z", False, None),           # R2-a: con prefijo de país, tampoco
+    ("ESB12345678", False, "ESB12345678"),  # sociedad con prefijo: público
     ("K1234567A", False, None),
     (None, False, None),
     ("", False, ""),                        # vacío no es un NIF: se deja tal cual

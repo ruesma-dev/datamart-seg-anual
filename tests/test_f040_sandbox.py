@@ -250,7 +250,10 @@ def _d(x: str) -> Decimal:
 
 CIFS = ["B12345678", "12345678Z", "12345678A", "X1234567L", "Y1234567X", "Z1234567R",
         "Z1234567T", "K1234567A", "A1234567J", "A1234567K", "I12345678", "", " ", None,
-        "b-12.345 678", "1234", "ESB12345678", "00000000T", "12345678Z1", "x 1234567-l"]
+        "b-12.345 678", "1234", "ESB12345678", "00000000T", "12345678Z1", "x 1234567-l",
+        # R2-a: prefijo de país, de persona y de sociedad.
+        "ES12345678Z", "es 12345678-z", "ESX1234567L", "FR12345678901", "DE123456789",
+        "ES1234567Z", "ESES12345678Z", "E12345678Z"]
 
 
 def _cifs_aleatorios(n: int, semilla: int = 40) -> list[str]:
@@ -262,6 +265,8 @@ def _cifs_aleatorios(n: int, semilla: int = 40) -> list[str]:
         largo = azar.choice([7, 8, 9, 9, 9, 10])
         cuerpo = "".join(azar.choice("0123456789") for _ in range(max(largo - 2, 0)))
         cif = azar.choice(cabezas) + cuerpo + azar.choice(colas)
+        if azar.random() < 0.2:
+            cif = azar.choice(["ES", "PT", "FR", "E", "ES-"]) + cif  # R2-a
         if azar.random() < 0.2:
             cif = cif.lower()
         if azar.random() < 0.2:
@@ -499,6 +504,12 @@ def test_f040_sandbox_r24_r25_la_guarda_pasa_con_lo_construido(conexion) -> None
      "F-040 R24: ventas.clientes publica el CIF de 1 personas fisicas"),
     ("UPDATE ventas.clientes SET cif = 'X1234567L' WHERE cliente_id = 1",
      "F-040 R24: ventas.clientes publica el CIF de 1 personas fisicas"),
+    ("UPDATE ventas.clientes SET cif = 'ES12345678Z' WHERE cliente_id = 1",
+     "F-040 R24: ventas.clientes publica el CIF de 1 personas fisicas"),
+    ("UPDATE ventas.clientes SET codigo_cliente = 'es87654321x' WHERE cliente_id = 1",
+     "F-040 R24: ventas.clientes publica el codigo de 1 clientes persona fisica o con forma de NIF"),
+    ("UPDATE ventas.facturas SET cif_cliente = 'PT12345678Z' WHERE factura_id = 1001",
+     "F-040 R24: ventas.facturas publica el CIF de una persona fisica en 1 facturas"),
     ("UPDATE ventas.clientes SET codigo_cliente = 'C2' WHERE cliente_id = 2",
      "F-040 R24: ventas.clientes publica el codigo de 1 clientes persona fisica o con forma de NIF"),
     ("UPDATE ventas.clientes SET codigo_cliente = '87654321X' WHERE cliente_id = 1",

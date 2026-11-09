@@ -48,6 +48,7 @@ cliente, necesita `raw.cli`, `raw.dvfrec` y `ventas.facturas`, y explicará el c
   (base) y la primera y última factura.
 - **R6.** `es_persona_fisica` debe ser verdadero SI `perfis` <> 0 O el CIF normalizado tiene forma de
   NIF de persona (`[0-9KLMXYZ]` + 7 dígitos + letra); dominio y función SQL, iguales en los mismos casos.
+  *Enmienda del humano 2026-11-10 (R2-a):* se normaliza quitando un prefijo de país de 2 letras solo si queda un NIF (R7, R24).
 - **R7.** MIENTRAS un cliente sea persona física, `ventas` debe publicar su nombre tal cual, pero su
   CIF (`cif`, `cif_normalizado`, `cif_cliente` de la factura) y la descripción de sus líneas de
   factura a NULL; `cif_valido` y `cif_repetido` se calculan antes de anularlo.

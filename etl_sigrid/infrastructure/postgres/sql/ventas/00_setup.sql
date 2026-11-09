@@ -37,11 +37,14 @@ EXCEPTION WHEN OTHERS THEN
 END $$;
 
 -- R5 · El CIF normalizado (`normalizar_cif`): mayusculas, sin espacios,
--- puntos ni guiones; vacio = NULL.
+-- puntos ni guiones; vacio = NULL. R2-a (enmienda del humano, 2026-11-10): un
+-- prefijo de pais de dos letras se quita SOLO si lo que queda es un NIF de
+-- persona (`PATRON_NIF_CON_PREFIJO_PAIS`); una sociedad con prefijo, igual.
 CREATE OR REPLACE FUNCTION ventas.fn_cif_normalizado(c TEXT)
 RETURNS TEXT
 LANGUAGE sql IMMUTABLE AS $$
-    SELECT NULLIF(upper(regexp_replace(c, '[\s.-]', '', 'g')), '');
+    SELECT CASE WHEN n ~ '^[A-Z]{2}[0-9KLMXYZ][0-9]{7}[A-Z]$' THEN substr(n, 3) ELSE n END
+    FROM (SELECT NULLIF(upper(regexp_replace(c, '[\s.-]', '', 'g')), '') AS n) s;
 $$;
 
 -- R6 · Persona fisica (`es_persona_fisica`): `perfis` <> 0 o un CIF

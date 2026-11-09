@@ -62,14 +62,19 @@ objetos:
           (su NIF solo esta en `ventas_restringida`), que se distingue con
           `es_persona_fisica`.
       cif_normalizado:
-        significado: CIF en mayusculas y sin espacios, puntos ni guiones. NULL si es persona fisica.
+        significado: >-
+          CIF en mayusculas y sin espacios, puntos ni guiones, y sin prefijo de
+          pais si lo que queda es un NIF de persona (enmienda del humano,
+          2026-11-10). NULL si es persona fisica.
       tipo_documento:
         significado: Tipo de documento de identidad que declara Sigrid (`tipcif`).
         agregacion: no_sumable
       pais:
         significado: Pais del documento de identidad (`cifpai`).
       es_persona_fisica:
-        significado: Verdadero si Sigrid lo marca persona fisica (`perfis`) o su CIF tiene forma de NIF de persona.
+        significado: >-
+          Verdadero si Sigrid lo marca persona fisica (`perfis`) o su CIF tiene
+          forma de NIF de persona, tambien con prefijo de pais (`ES12345678Z`).
       cif_valido:
         significado: Verdadero si el CIF supera la letra o el digito de control (calculado antes de anularlo).
       cif_repetido:
@@ -754,7 +759,9 @@ objetos:
       construye el esquema.
     descripcion: >-
       Normaliza un CIF: mayusculas y sin espacios, puntos ni guiones; vacio,
-      NULL. Repite el literal de `etl_sigrid/domain/ventas.py`.
+      NULL; y quita un prefijo de pais de dos letras SOLO si lo que queda es un
+      NIF de persona (enmienda del humano, 2026-11-10). Repite los literales de
+      `etl_sigrid/domain/ventas.py`.
     grano: null
     clave_negocio: []
     paso_etl: build_ventas
@@ -772,7 +779,8 @@ objetos:
       construye el esquema.
     descripcion: >-
       Decide si un cliente es persona fisica: la marca `perfis` de Sigrid o
-      un CIF normalizado con forma de NIF de persona (DNI o NIE). Repite el
+      un CIF normalizado con forma de NIF de persona (DNI, NIE o K/L/M, tambien
+      con prefijo de pais, que quita `fn_cif_normalizado`). Repite el
       patron de `etl_sigrid/domain/ventas.py`.
     grano: null
     clave_negocio: []

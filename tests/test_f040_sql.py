@@ -234,6 +234,8 @@ def test_f040_r6_la_normalizacion_es_la_del_dominio() -> None:
     cuerpo = _cuerpo_funcion(_sql("00_setup.sql"), "ventas.fn_cif_normalizado")
     assert f"'{v.PATRON_SEPARADORES_CIF}'" in cuerpo
     assert "upper(" in cuerpo and "NULLIF(" in cuerpo
+    # R2-a: el prefijo de país, con el patrón del dominio y solo ante un NIF.
+    assert f"'{v.PATRON_NIF_CON_PREFIJO_PAIS}' THEN substr(n, 3) ELSE n END" in cuerpo
 
 
 def test_f040_r8_cif_valido_con_los_literales_del_dominio() -> None:

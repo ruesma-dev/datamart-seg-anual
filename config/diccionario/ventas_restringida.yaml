@@ -56,9 +56,9 @@ objetos:
       cif:
         significado: CIF o NIF integro, tal y como esta en Sigrid (dato personal si es persona fisica).
       cif_normalizado:
-        significado: CIF en mayusculas y sin espacios, puntos ni guiones.
+        significado: CIF en mayusculas y sin espacios, puntos ni guiones (ni prefijo de pais ante un NIF de persona).
       es_persona_fisica:
-        significado: Verdadero si el cliente es persona fisica (`perfis` o NIF de persona).
+        significado: Verdadero si el cliente es persona fisica (`perfis` o NIF de persona, tambien con prefijo de pais).
       direccion:
         significado: Direccion completa del cliente (dato personal si es persona fisica).
       direccion_linea1:

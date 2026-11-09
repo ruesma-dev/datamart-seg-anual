@@ -111,13 +111,23 @@ PREFIJOS_PROHIBIDOS_EN_VENTAS: Final[tuple[str, ...]] = (
 PATRON_SEPARADORES_CIF: Final[str] = r"[\s.-]"
 #: NIF de persona: DNI (8 cifras), NIE (X/Y/Z) o K/L/M, más 7 cifras y letra.
 PATRON_NIF_PERSONA: Final[str] = r"^[0-9KLMXYZ][0-9]{7}[A-Z]$"
+#: R2-a (enmienda del humano, 2026-11-10): el mismo NIF con un prefijo de país
+#: de dos letras delante (`ES12345678Z`). Un NIF nunca empieza por dos letras
+#: (tras la K/L/M/X/Y/Z va una cifra), así que el prefijo no es ambiguo; y una
+#: sociedad con prefijo (`ESB12345678`, `FR12345678901`) no casa y se queda igual.
+PATRON_NIF_CON_PREFIJO_PAIS: Final[str] = r"^[A-Z]{2}[0-9KLMXYZ][0-9]{7}[A-Z]$"
 
 
 def normalizar_cif(cif: str | None) -> str | None:
-    """Mayúsculas, sin espacios, guiones ni puntos; vacío -> None (R5)."""
+    """Mayúsculas, sin espacios, guiones ni puntos; vacío -> None (R5).
+
+    R2-a: un prefijo de país se quita SOLO si lo que queda es un NIF de persona.
+    """
     if cif is None:
         return None
     limpio = re.sub(PATRON_SEPARADORES_CIF, "", cif).upper()
+    if re.match(PATRON_NIF_CON_PREFIJO_PAIS, limpio):
+        return limpio[2:]
     return limpio or None
 
 
