@@ -568,12 +568,12 @@ def test_f040_r25_guarda_recuentos(publicada: str, origen: str) -> None:
 
 def test_f040_r25_guarda_base_y_reparto_de_recargos() -> None:
     guarda = _guarda()
-    assert "SUM(base) FROM ventas.facturas" in guarda
-    assert "SUM(COALESCE(totbas, 0)::NUMERIC(18, 2)) FROM raw.dvf" in guarda
+    assert "COALESCE(SUM(base), 0) FROM ventas.facturas" in guarda
+    assert "COALESCE(SUM(COALESCE(totbas, 0)::NUMERIC(18, 2)), 0) FROM raw.dvf" in guarda
     for tabla, padre in (("ventas.facturas", "raw.dvfrec"),
                          ("ventas.certificaciones", "raw.cerrec")):
         assert (f"SUM(importe_coeficientes + retencion_garantia + retencion_retesp "
-                f"+ retencion_otras) FROM {tabla}") in guarda, tabla
+                f"+ retencion_otras), 0) FROM {tabla}") in guarda, tabla
         assert f"FROM {padre} r" in guarda, padre
     assert guarda.count("RAISE EXCEPTION") >= 6
 
