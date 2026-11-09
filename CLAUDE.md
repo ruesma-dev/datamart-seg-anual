@@ -73,9 +73,9 @@ confirmación cubre el plan que se enseñó, no lo que apareció después.
 
 - `main.py` — CLI (click). Comandos: check-api, check-pg, bootstrap, ingest,
   stage, build-mart, publicar-diccionario, run-all, status. `run-all` construye
-  el datamart ENTERO desde F-047: dieciséis pasos (F-156; eran quince pasos),
-  con los nueve build de negocio —maestros, tesoreria, compras, retenciones,
-  personal, contabilidad, postventa, descompuestos (con su ingesta
+  el datamart ENTERO desde F-047: diecisiete pasos (F-040; eran dieciséis y, antes de F-156, quince pasos),
+  con los diez build de negocio —maestros, tesoreria, compras, retenciones,
+  ventas, personal, contabilidad, postventa, descompuestos (con su ingesta
   `ingest_descompuestos` delante) y cierre— dentro y en ese orden. `tesoreria` va delante de `compras` porque
   `compras.vencimientos` es una vista suya (F-037). `ingest-descompuestos` y `build-descompuestos` sueltos
   llevan `--sin-tope` para la primera carga, que es MANUAL.
@@ -99,13 +99,19 @@ confirmación cubre el plan que se enseñó, no lo que apareció después.
 - `etl_sigrid/infrastructure/postgres/` — cliente + `sql/` por capa:
   `raw` (implícito en ingesta), `stg/`, `mart/`, `cierre/`, `compras/`,
   `maestro/`, `retenciones/`, `personal/`, `contabilidad/`, `tesoreria/`,
-  `auxiliar/`, `descompuestos/`, `postventa/`. En `stg/`, **`plan_mensual_fase0`
+  `auxiliar/`, `descompuestos/`, `postventa/`, `ventas/`. En `stg/`, **`plan_mensual_fase0`
   (F-157)** es el presupuesto vivo de hoy (fase 0, coste 3 y venta 7) repartido
   en el tiempo con el `planif` del jefe de obra; no se suma con `plan_mensual`.
   **`postventa/` (F-156)** son unidades, incidencias, tareas, su histórico, sus adjuntos y el coste por obra
   de origen (solo facturas), sin personas y con el texto enmascarado; los datos
   personales, en `postventa_restringida`, que solo leen el perfil postventa
-  (el cuarto) y el total (`R-POSTVENTA-RESTRINGIDA`). **`tesoreria/` (F-037)** es la cartera de
+  (el cuarto) y el total (`R-POSTVENTA-RESTRINGIDA`). **`ventas/` (F-040)** es el
+  lado de ingresos: clientes (con su nombre), facturas de venta, certificaciones,
+  el enlace certificación -> factura (`cerprodes`, N:M) y el seguimiento hasta el
+  cobro (vistas sobre `tesoreria.efectos`); lo personal del cliente, en
+  `ventas_restringida` (solo perfil total, `R-VENTAS-RESTRINGIDA`), y certificado,
+  facturado y cobrado no se suman (`R-VENTAS-TRES-CIFRAS`). La garantía (clases 4 y
+  5) es provisional (D4): un solo punto, `ventas.fn_clase_recargo`. **`tesoreria/` (F-037)** es la cartera de
   cobros y pagos (un efecto de `raw.pag`/`raw.cob` por fila) en dos esquemas,
   como la contabilidad: `tesoreria` (la general) y `tesoreria_restringida` (con
   los pagos de nómina, embargo y cuota; solo el perfil total). BAJA no se suma
