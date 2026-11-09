@@ -173,13 +173,14 @@ def test_f148_r28_un_paso_omitido_no_llama_al_gancho() -> None:
 # Composición en main: `_permisos_tras_paso` y `run-all` (T10)
 # ---------------------------------------------------------------------------
 
-DIEZ_BUILD = (  # once desde F-156 (build_postventa); el nombre se queda
+DIEZ_BUILD = (  # once desde F-156 (build_postventa), doce desde F-040; el nombre se queda
     "build_stg",
     "build_mart",
     "build_maestros",
     "build_tesoreria",
     "build_compras",
     "build_retenciones",
+    "build_ventas",  # F-040
     "build_personal",
     "build_contabilidad",
     "build_postventa",  # F-156
@@ -438,6 +439,7 @@ def test_f148_r25_run_all_graba_una_fila_por_build(monkeypatch: pytest.MonkeyPat
             "build_tesoreria",
             "build_compras",
             "build_retenciones",
+            "build_ventas",  # F-040
             "build_personal",
             "build_contabilidad",
             "build_postventa",
