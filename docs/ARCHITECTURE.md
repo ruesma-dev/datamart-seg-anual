@@ -177,7 +177,8 @@ ingredientes SIEMPRE en el mismo orden y con el dato del contrato:
   publica aparte y no se cobra. IVA y retención del hueco, por el peso de cada
   contrato.
 - Ingesta: `iva` entera y `dvf` con la lista blanca `include_columns` (9 de sus
-  151 columnas): 80 tablas (93 desde F-156, postventa).
+  151 columnas): 80 tablas (93 desde F-156, postventa; 100 desde F-040, con
+  `dvf` a 35 columnas).
 - **Los albaranes netos por proveedor** (N11, 29-10): `09_albaranes_pendientes.sql`,
   el último sub-paso, publica `tesoreria.albaranes_pendientes_neto`: lo pendiente
   de facturar de las obras de la receta NETO por (obra, proveedor), con lo
@@ -663,9 +664,9 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
   Azure. Hoy **lee y valida, no carga** a `aux.*`: las tablas destino y el
   esquema de los libros no están definidos todavía.
 
-### Qué se copia de Sigrid: 93 tablas, y qué NO está ahí (F-066, F-074, F-080, F-102, F-107, F-095, F-085, F-090, F-138, F-140, F-150, F-156)
+### Qué se copia de Sigrid: 100 tablas, y qué NO está ahí (F-066, F-074, F-080, F-102, F-107, F-095, F-085, F-090, F-138, F-140, F-150, F-156, F-040)
 
-`config/tables_sigrid.yaml` declara **93 tablas**: eran 31, F-066 las dejó en 56
+`config/tables_sigrid.yaml` declara **100 tablas**: eran 31, F-066 las dejó en 56
 el 2026-09-06, F-074 sumó nueve más el 2026-09-09, F-080 otras tres el
 2026-09-11 —`auxnap`, `auxban` y `rpa`, el bloque de pago del efecto y las
 remesas—, F-102 una el 2026-09-23 —`auxemp`, las 38 empresas del grupo, que da
@@ -709,6 +710,14 @@ más dos recortes con lista blanca: `log` (solo los 659 cierres de la aplicació
 `postventa-incidencias`, sin `res` ni `err`) y `per` (solo `ide`, `nom`, `tel`,
 `tel2` y `ele` de las 362 personas que cita postventa: ni DNI ni credenciales).
 El `where` de `rcg` y `gra` pasa a traer también los gráficos de 707, 708 y 47.
+F-040 suma siete el 2026-11-09, las del **lado de ingresos** (~60.000 filas,
++10 a 20 s de lectura): `cli` (clientes, 20 columnas por lista blanca: 13 de
+negocio y 7 de contacto, sin cuentas bancarias, contraseñas ni correos de
+facturación), `cer` y `cerpro` (certificaciones y sus líneas, por lista
+blanca), `cerrec` y `dvfrec` (recargos, sin `tex`), `cerprodes` (el enlace
+certificación -> factura, entera) y `dvfpro` (líneas de factura de venta, por
+lista blanca); y `dvf` pasa de 9 a **35 columnas**, con el CIF, el nombre y las
+nueve direcciones de la cabecera, que solo publica `ventas_restringida`.
 Las 25 que entraron el primer día vienen en tres grupos, y ninguna se supuso: todo lo
 que sigue se midió contra Sigrid ese día por `sigrid-api` en solo lectura.
 

@@ -2,7 +2,7 @@
 #
 # Fichas del esquema `raw`: la copia de Sigrid, tabla a tabla.
 #
-# **A NIVEL DE OBJETO, NO DE COLUMNA** (DA-2 de la spec). Son 93 tablas con
+# **A NIVEL DE OBJETO, NO DE COLUMNA** (DA-2 de la spec). Son 100 tablas con
 # cientos de campos de cuatro letras cuyo diccionario completo —tipos, indices y
 # referencias— vive en `azure-apps/sigrid_tablas.md`. Cada ficha remite alli con
 # el `grep` de su bloque. Lo que SI se documenta aqui es lo que ese documento no
@@ -2372,16 +2372,142 @@ objetos:
     capa: origen
     consumo_recomendado: false
     motivo_no_consumo: >-
-      Solo la cabecera de las facturas de venta, para un calculo: lo facturado a origen de cada obra, ya sumado en `tesoreria.devengo_corte_obra.facturado_origen`. Las lineas, las certificaciones y su casado por mes no estan (F-040).
+      Facturas de venta en bruto, con el CIF, el nombre y las direcciones de la cabecera. La factura publicada esta en `ventas.facturas` (sin nada personal) y la cabecera personal, en `ventas_restringida.factura_cabecera` (solo perfil total). Lo facturado a origen de cada obra, en `tesoreria.devengo_corte_obra.facturado_origen`.
     descripcion: >-
-      **Facturas de venta, solo la CABECERA** (15.665 filas el 2026-10-27; F-150): una fila por factura emitida al cliente (`con` tipo 11). Se usa para el hueco de facturacion de H26: lo ejecutado a origen con coeficientes menos lo facturado (`totbas`), neto por obra, en `tesoreria.devengo_corte_obra`. La obra sale por el centro de coste (`cenide` = `obr.cenide`). `cla` 1024 son las RECTIFICATIVAS, en negativo: sumar `totbas` ya las neta. Sigrid no marca las anuladas.
+      **Facturas de venta, la CABECERA** (15.734 filas el 2026-11-07; F-150, ampliada por F-040): una fila por factura emitida al cliente (`con` tipo 11). La leen `tesoreria` (el hueco de facturacion de H26, por el centro de coste) y `ventas` (F-040). `cla` 1024 son las RECTIFICATIVAS, en negativo: sumar `totbas` ya las neta. Sigrid no marca las anuladas.
 
-      **Solo se traen 9** de sus 151 columnas, por lista blanca (`include_columns`): `ide`, `cla`, `entide` (el cliente), `cenide`, `ctride` (el contrato con el cliente, en 4.665 facturas), `fecdoc`, `totbas` (base), `totiva` (cuota) y `totdoc` (total sin retencion). Preguntar por otra aqui no devuelve nulo, devuelve "columna inexistente".
+      **Solo se traen 35** de sus 151 columnas, por lista blanca (`include_columns`). Las 9 de F-150: `ide`, `cla`, `entide` (el cliente), `cenide`, `ctride` (el contrato con el cliente), `fecdoc`, `totbas` (base), `totiva` (cuota) y `totdoc` (total sin retencion). Las 15 de negocio de F-040: `obride`, `fas`, `tot`, `totpag` (a cobrar), `impbru`, `impnet`, `impdes`, `imprec`, `ivaide`, `pagide`, `efeide`, `estfac`, `docoriide`, `expide` y `cueide`. Y **11 PERSONALES** (D6 del humano, 2026-11-07): `entcif` y `entres` (el CIF y el nombre de la cabecera, que en 3.635 facturas es el NIF de una persona) y las nueve direcciones `diremp1`, `dircon1`, `dirdir1`, `diremp2`, `dircon2`, `dirdir2`, `diremp3`, `dircon3` y `dirdir3` (`dircon*` vacias hoy). Lo personal solo se publica en `ventas_restringida`. NO entran la cuenta bancaria (`ban*`) ni `emptex`. Preguntar por otra aqui devuelve "columna inexistente".
 
       **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `dvf`, y se localiza con `grep -n "^| dvf " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
 
       **Como se carga.** El job nocturno arranca `run-all --full`, asi que cada noche la tabla se **recarga entera** desde Sigrid. No tiene columna de ultima modificacion.
     grano: Una factura de venta por fila, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  cli:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Clientes en bruto, con el CIF de las personas fisicas y su contacto. El cliente publicado esta en `ventas.clientes` (nombre publico; el CIF de la persona fisica a NULL) y el contacto, en `ventas_restringida.clientes_contacto` (solo perfil total).
+    descripcion: >-
+      **LOS CLIENTES** (1.210 filas el 2026-11-07; F-040): propiedades de `con` tipo 4, a donde apuntan `dvf.entide`, `cer.entide`, `obr.entide` y `cob.entide` (0 huerfanos). 572 son personas fisicas (`perfis` <> 0 o un CIF con forma de NIF de persona): arrendamientos de garajes, compraventa de viviendas. **DATOS PERSONALES.** Se traen 20 columnas por lista blanca: 13 de negocio (`ide`, `tipcif`, `cifpai`, `cif`, `raz` el nombre, `perfis`, `cenide`, `taride`, `secide`, `pagide`, `efeide`, `cueide`, `cueretide`) y 7 de contacto (`dir1`, `dir2`, `dircpo`, `dir`, `tel`, `tel2`, `ele`), que solo publica `ventas_restringida`. NO entran las cuentas bancarias, la fecha de nacimiento, la seguridad social, las contrasenas, el fax, la web ni los correos de facturacion (un test falla si entran). `taride` solo en 2 y `secide` en 0: Sigrid no clasifica al cliente.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `cli`, y se localiza con `grep -n "^| cli " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full`, asi que cada noche la tabla se **recarga entera** desde Sigrid. No tiene columna de ultima modificacion.
+    grano: Un cliente por fila, identificado por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  cer:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Certificaciones en bruto. La certificacion publicada, con su a cuenta, su a origen y el estado de su cobro, esta en `ventas.certificaciones` y `ventas.v_seguimiento_certificacion`.
+    descripcion: >-
+      **LAS CERTIFICACIONES DE OBRA** (6.308 filas el 2026-11-06; F-040): propiedades de `con` tipo 54, la certificacion que se emite al cliente; `obrcer` esta VACIA. Obra (`obride`) en el 100 % y contrato de venta (`ctride`) en el 99,5 %; `fas` es el numero y `docoriide` la certificacion ANTERIOR del mismo contrato. Se traen 27 de 135 columnas por lista blanca. `idefac` y `feccob` estan a 0 en todas: NO enlazan con la factura (el enlace es `cerprodes`). Sin datos personales.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `cer`, y se localiza con `grep -n "^| cer " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full`, asi que cada noche la tabla se **recarga entera** desde Sigrid. No tiene columna de ultima modificacion.
+    grano: Una certificacion por fila, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  cerpro:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Lineas de certificacion en bruto. Sus importes, sumados por certificacion, estan en `ventas.certificaciones` (`importe_a_cuenta`, `importe_a_origen`, `importe_anterior`).
+    descripcion: >-
+      **LAS LINEAS DE CERTIFICACION** (6.362 filas el 2026-11-06; F-040): `docide` es la certificacion (`cer`). `tot` es lo certificado en el periodo SIN recargos (a cuenta), `imporiori` el a origen y `imporiant` el anterior. 6.265 certificaciones tienen UNA linea. `paride` solo en 5 lineas: la certificacion no baja a partida. Se traen 18 de 86 columnas por lista blanca; `res` (la descripcion) entra en `raw` y no se publica.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `cerpro`, y se localiza con `grep -n "^| cerpro " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full`, asi que cada noche la tabla se **recarga entera** desde Sigrid. No tiene columna de ultima modificacion.
+    grano: Una linea de certificacion por fila, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  cerrec:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Recargos de certificacion en bruto. Publicados por linea en `ventas.certificacion_recargos` y repartidos en cuatro columnas en `ventas.certificaciones`.
+    descripcion: >-
+      **LOS RECARGOS DE LA CERTIFICACION** (7.396 filas el 2026-11-06; F-040): coeficientes (clase 0: `COEF_RECGG`, `COEF_RECBI`, `COEF_DESADJ`) y retenciones (clase 1 `RETESP`, clases 4 y 5 `RET5T`, `RET5`, `RET10`). `docide` es la certificacion, `recide` el recargo (su codigo y nombre, en `con`), `cuo` la cuota. Se traen todas menos `tex` (texto libre). Sin datos personales.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `cerrec`, y se localiza con `grep -n "^| cerrec " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full`, asi que cada noche la tabla se **recarga entera** desde Sigrid. No tiene columna de ultima modificacion.
+    grano: Un recargo de una certificacion por fila, identificado por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  cerprodes:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      El enlace en bruto. Publicado como pares certificacion-factura en `ventas.certificacion_factura`.
+    descripcion: >-
+      **LOS DESTINOS DE LAS LINEAS DE CERTIFICACION** (4.349 filas el 2026-11-06; F-040): a donde paso cada linea de `cerpro` (`docproide`). Con `docdestip` = 11 el destino es una factura de venta (`docdeside` = `dvf.ide`, `lindeside` = `dvfpro.ide`), el 100 % hoy. Es EL enlace certificacion -> factura, y es N:M. Siete columnas: entera. Sin datos personales.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `cerprodes`, y se localiza con `grep -n "^| cerprodes " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full`, asi que cada noche la tabla se **recarga entera** desde Sigrid. No tiene columna de ultima modificacion.
+    grano: Un destino de una linea de certificacion por fila, identificado por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  dvfpro:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Lineas de factura de venta en bruto, con la descripcion libre de las facturas de personas fisicas. Publicadas en `ventas.factura_lineas` (descripcion NULL si el cliente es persona fisica) y la descripcion integra de esas, en `ventas_restringida.factura_lineas_persona`.
+    descripcion: >-
+      **LAS LINEAS DE FACTURA DE VENTA** (29.273 filas el 2026-11-06; F-040): `docide` es la factura (`dvf`). Se traen 17 de 90 columnas por lista blanca; `res` (la descripcion) puede nombrar a la persona del arrendamiento o la compraventa y solo se publica integra en `ventas_restringida`. `linoriide` con `docoriide` apunta a la linea de certificacion de origen. Desde F-040 tambien la lee `retenciones.v_src_lineas_venta` (respaldo de obra; 0 efectos de cliente sin centro: no cambia ninguna cifra).
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `dvfpro`, y se localiza con `grep -n "^| dvfpro " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full`, asi que cada noche la tabla se **recarga entera** desde Sigrid. No tiene columna de ultima modificacion.
+    grano: Una linea de factura de venta por fila, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  dvfrec:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Recargos de factura de venta en bruto. Publicados por linea en `ventas.factura_recargos` y repartidos en cuatro columnas en `ventas.facturas`.
+    descripcion: >-
+      **LOS RECARGOS DE LA FACTURA DE VENTA** (6.145 filas el 2026-11-06; F-040): coeficientes (clase 0) y retenciones que nos practica el cliente (clase 1 `RETESP` 16,78 M EUR, clases 4 y 5 `RET5T`, `RET5`, `RET10`, clase 3 de alquiler). `docide` es la factura, `recide` el recargo, `cuo` la cuota. Se traen todas menos `tex`. Sin datos personales. La retencion de cliente por documento la cuadra F-104.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `dvfrec`, y se localiza con `grep -n "^| dvfrec " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full`, asi que cada noche la tabla se **recarga entera** desde Sigrid. No tiene columna de ultima modificacion.
+    grano: Un recargo de una factura de venta por fila, identificado por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
     refresco: nocturno

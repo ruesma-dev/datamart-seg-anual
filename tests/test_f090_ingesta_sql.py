@@ -159,9 +159,9 @@ def test_f090_r5_ninguna_familia_de_personal_en_los_filtros() -> None:
 
 
 def test_f090_r6_el_censo_pasa_a_76() -> None:
-    # +2 de F-138, +2 de F-140, +2 de F-150, +13 de F-156
-    assert len(_tablas()) == 93
-    assert len(_lista_tablas()) == 93, "tabla declarada dos veces"
+    # +2 de F-138, +2 de F-140, +2 de F-150, +13 de F-156, +7 de F-040
+    assert len(_tablas()) == 100
+    assert len(_lista_tablas()) == 100, "tabla declarada dos veces"
     assert {"rcg", "gra"} <= set(_tablas())
 
 
