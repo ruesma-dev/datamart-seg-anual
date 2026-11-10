@@ -23,6 +23,33 @@ Líder, 2026-11-10:
   - Hacer el push de `azure-apps`, con los commits `882abce`, `76e722c` y `0f5ae73`.
   - Medir la primera noche en Azure.
 - **Observaciones del reviewer (O1, O3, O4 y O5):** las decide el humano; no bloquean.
+- **Paso 0 del despliegue** (líder, 2026-11-10 10:28 UTC, solo lectura):
+  - **Antes del despliegue:** `main` = `be8a111`; imagen del job `r20261108-0945` (la vuelta atrás).
+  - **Esquemas en el job:** el job NO fija `PG_CONSUMPTION_SCHEMAS`, `PG_VETOED_SCHEMAS` ni `PG_RESTRICTED_SCHEMAS`, así que manda `config/settings.py`.
+  - **`retenciones.movimientos` CLIENTE**, la referencia de R34: VIVA 2.212 / 22.406.732,96; LIQUIDADA 42 / 322.851,50; total 2.254 / 22.729.584,46.
+  - **Esquemas de destino:** `ventas` y `ventas_restringida` aún no existen.
+- **Pasos 1 a 6 del despliegue, hechos el 2026-11-10** (comprobados por el líder con lecturas):
+  - **Paso 1, imagen:** job en `r20261110-1310`.
+  - **Paso 2, `02_roles.sql`:** `COMMIT`, logins sin cambios y permisos por perfil como se esperaba.
+  - **Paso 3, ingesta:** las 8 tablas, iguales que en Sigrid. El «NO CONFORME» de `check-raw-recuentos` es la deriva diurna de las tablas de la nocturna, no un corte.
+  - **Paso 4, build y permisos:** `build_ventas` SUCCESS en 15,2 s (28.764 filas). `apply_grants` SUCCESS, con las cuatro verificaciones ok.
+  - **Paso 5, permisos por login** (`has_table_privilege` sobre los logins reales):
+    - Estándar: lee `ventas` y no `ventas_restringida`.
+    - Total: lee las dos.
+    - Restringido y postventa: no leen ninguna.
+  - **Paso 6, cifras:**
+    - `ventas`: facturas 15.737, certificaciones 6.312, clientes 1.210 (572 personas físicas) y líneas 29.282.
+    - `ventas_restringida`: `factura_lineas_persona` 6.538.
+    - `cobertura_enlace`: `FACTURA_CLIENTE` 15.735 de 15.737.
+    - `retenciones.movimientos` CLIENTE, igual que en el paso 0 (R34 ok).
+- **Paso 7:** diccionario v75 publicado el 2026-11-10 a las 19:58 UTC (316 objetos, 2.654 columnas).
+  - `check-declarados`: 316 de 316.
+  - `check-unicidad`: 141 claves sin contradicción, 0 rotas y 1 sin comprobar por timeout de 300 s. Probablemente es `stg.plan_mensual`, como en cierres anteriores; falta confirmarlo.
+- **Paso 8 (T17):** el humano decide el 2026-11-10 meterlo «todo en f34» de `mcp-bbdd`.
+  - Pliego en `specs/F-040-ingresos/pliego_mcp_bbdd.md` (P4: lista blanca de `ventas` y `ventas_restringida`).
+  - Aviso enviado a la sesión `mcp`.
+  - No bloquea el `done` de F-040.
+- **Falta para el `done`:** la nocturna del 11-11 (`timings`, la ingesta nueva y `build_ventas`), el espejo `dev` y el push de `azure-apps`. Las dos últimas las hace el humano.
 
 ## 2026-11-10 · F-040 · implementer: ciclo 2 (H2 a y b del humano) hecho · rama `feature/F-040-ingresos`
 
