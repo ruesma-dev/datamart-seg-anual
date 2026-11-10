@@ -885,6 +885,13 @@ del puesto tiene que estar en el firewall del Postgres). Ninguno de estos pasos 
   paso repetido), 0 FAILED en `ingest_raw%`, todo SUCCESS; terminó a las 04:28. 4.846 páginas:
   `http_s` máx 3,5, `pg_connect_s` máx 0,056, `copy_s` máx 0,5, 0 reintentos, ningún hueco de más
   de 100 s. `conexiones_abiertas` = 385. **Racha: 2 de 7.**
+- **CERRADA el 2026-11-09 (líder), cumplida en sustancia.** Leído en Azure (`_meta.etl_runs` y
+  Log Analytics, solo lectura): 16 noches seguidas, del 25-10 al 09-11, con 0 FAILED en
+  `ingest_raw%`, ninguna ingesta repetida, `pg_connect_s` máx 0,081 y 0 huecos > 100 s de conexión o
+  `copy_s`; cuatro huecos de `http_s` (~134 s) atribuibles a `sigrid-api` (D6). Segunda réplica el
+  31-10 (`build_compras`, `oferta_id` duplicado en `comparativos`) y el 04, 05, 07 y 08-11
+  (`build_tesoreria` R50, corregido por F-159): fallos de build, no de conexión. Resumen en
+  `history.md`, sección de F-148.
 
 ## 2026-10-24 · F-148 · CERRADA (`done`, orden del humano) · R31 MANUAL pendiente: 7 noches desde la del 25-10
 
