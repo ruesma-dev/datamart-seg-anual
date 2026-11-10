@@ -83,6 +83,8 @@ def test_f006_r14_el_pipeline_nocturno_es_este_e_incluye_los_cinco() -> None:
         "build_tesoreria",
         "build_compras",
         "build_retenciones",
+        # F-040: el décimo, ventas. Nadie depende de el.
+        "build_ventas",
         "build_personal",
         "build_contabilidad",
         # F-156: el noveno, postventa. Nadie depende de el.
@@ -96,7 +98,7 @@ def test_f006_r14_el_pipeline_nocturno_es_este_e_incluye_los_cinco() -> None:
     )
     for paso in ("build_cierre", "build_maestros", "build_compras",
                  "build_retenciones", "build_personal", "build_contabilidad",
-                 "build_descompuestos", "build_tesoreria"):
+                 "build_descompuestos", "build_tesoreria", "build_ventas"):
         assert paso in PASOS_NOCTURNOS
 
 

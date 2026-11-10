@@ -48,7 +48,9 @@ from dataclasses import dataclass, replace
 #: (2026-10-14) añadió `compras_restringida`: las alarmas COMPLETAS de los
 #: documentos, con las de recursos y partes de trabajo, vetada al rol general.
 #: F-156 (2026-11-04) añadió `postventa` y `postventa_restringida` (los datos
-#: personales de postventa: solo perfiles postventa y total).
+#: personales de postventa: solo perfiles postventa y total). F-040
+#: (2026-11-09) añadió `ventas` (clientes, facturas de venta, certificaciones y
+#: cobro) y `ventas_restringida` (lo personal del cliente: solo perfil total).
 #:
 #: Ojo a la trampa de nombres: el esquema se llama `aux` pero su carpeta de SQL
 #: es `sql/auxiliar/`.
@@ -75,6 +77,8 @@ ESQUEMAS_DEL_DATAMART = (
     "stg",
     "tesoreria",
     "tesoreria_restringida",
+    "ventas",
+    "ventas_restringida",
 )
 
 #: Qué es el objeto para PostgreSQL.

@@ -1922,6 +1922,14 @@ delta 20/20, reverificadas en serie. Review: pasada 1 rechazada (R4 sin SQLSTATE
 `azure-apps` y despliegue MANUAL incompletos), pasada 2 APROBADO. Merge `8ed8cf5`; desplegada el
 24-10 (imagen `r20261024-1837`, v60, MCP reiniciado). Cerrada por orden del humano con R31 (7
 noches seguidas sin corte, desde la del 25-10) como verificación MANUAL pendiente.
+**R31 cerrada el 2026-11-09 (líder), cumplida en sustancia**: 16 noches seguidas (25-10 a 09-11)
+con 0 FAILED en `ingest_raw%`, ningún paso de ingesta repetido, `pg_connect_s` máx 0,081 s y 0
+huecos de más de 100 s en conexión o `copy_s`. Los cuatro huecos de `http_s` (~134 s: 25-10, 04-11,
+06-11 y 07-11) son de `sigrid-api` y no rompen la racha (D6). Al pie de la letra, R31 a (una
+réplica) se cumplió 6 noches seguidas (25 a 30-10): el 31-10, 04-11, 05-11, 07-11 y 08-11 hubo
+segunda réplica, siempre por un fallo de build posterior a la ingesta (`build_compras` el 31-10,
+`build_tesoreria` R50 los demás, ya corregido por F-159), y la reanudación de F-148 no repitió la
+ingesta. Ninguna noche se cortó la conexión.
 
 ## F-149 · El MCP no cita reglas que no se publican · 2026-10-25
 

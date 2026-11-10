@@ -68,8 +68,9 @@ def test_f141_r1_los_esquemas_son_el_consumo_menos_tesoreria_personal_y_contabil
     from config.settings import PostgresSettings
 
     pg = PostgresSettings(_env_file=None)
+    # F-040: `ventas` tampoco (R27 de F-040: el restringido no la lee).
     esperado = [s for s in pg.consumption_schema_list
-                if s not in ("tesoreria", "personal", "contabilidad")]
+                if s not in ("tesoreria", "personal", "contabilidad", "ventas")]
     assert pg.perfil_restringido_schema_list == esperado
 
 

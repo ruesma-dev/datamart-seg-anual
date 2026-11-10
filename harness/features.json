@@ -614,15 +614,16 @@
         "Publicado el DOCUMENTO de certificación a cliente por obra: número, mes, a origen / a cuenta y estado, con su ficha (petición de Juan Romero, 2026-10-27)",
         "Publicadas las facturas de venta, cabecera (`dvf`) y líneas (`dvfpro`), con su IVA y sus retenciones; `retenciones.v_src_lineas_venta` deja de estar vacía y la retención de garantía de venta sale informada",
         "Se puede seguir una certificación hasta su cobro: certificación -> factura de venta -> efecto de cobro (`tesoreria.efectos`), con la cobertura del enlace medida y declarada",
-        "Contraste por obra de la venta producida con coeficientes frente a lo certificado a origen (sugerencia de Juan Romero, 27-10: el ámbito certificación «no es referente para la fase 0, pero sí arroja datos buenos en la certificación fase n»), y los conceptos certificados FUERA del coeficiente (revisión de precios, contradictorios) identificados",
+        "Contraste por obra de la venta producida con coeficientes frente a lo certificado a origen para las 22 obras de la receta (sugerencia de Juan Romero, 27-10: el ámbito certificación «no es referente para la fase 0, pero sí arroja datos buenos en la certificación fase n»); el contraste de todas las obras y los conceptos certificados FUERA del coeficiente pasan a F-160 (D1 = A del humano, 2026-11-07)",
+        "Lo personal del cliente (NIF de persona física, direcciones, teléfono, correo, cabecera de la factura y descripción de las líneas de personas físicas) solo en el esquema nuevo `ventas_restringida`, que lee solo el perfil total; el nombre del cliente y el CIF de las personas jurídicas, públicos en `ventas` (D2 y D6 del humano, 2026-11-07)",
         "La spec estima el impacto en la ventana nocturna antes de comprometerse"
       ],
-      "status": "pending",
+      "status": "in_progress",
       "sdd": true,
       "rigor": "critico",
       "priority": 2,
       "branch": "feature/F-040-ingresos",
-      "notes": "2026-10-27: prioridad 46 -> 5 por orden del humano, tras el correo de Juan Romero; criterios de aceptación ampliados con sus tres peticiones. 2026-10-27: prioridad 5 -> 2 por orden del humano (tras F-150 van F-040 y F-104). 2026-10-27: añadido el contraste venta con coeficientes frente a certificado y los conceptos fuera de coeficiente (revisión de precios), que F-150 deja fuera y declara como aviso. Medido: el IVA del contrato (`obrctr.ivaide`) coincide con el de `cer` y `dvf` por `ctride` en todos los contratos."
+      "notes": "2026-11-09: spec APROBADA por el humano tras la PARADA 1 del líder («si»); in_progress, implementer lanzado. Diccionario: v74 -> v75 (main ya en v74 por F-159). 2026-11-07: PARADA 1 resuelta por el humano: D1, D3 y D5 = A (fase 2 en F-160); D4 = A provisional (garantía = clases 4 y 5, `RETESP` aparte; el líder pregunta a Juan Romero y el cambio es una constante del dominio); D6 modificada (entcif, entres y dir* de dvf, y el contacto de cli, se ingieren y van solo a `ventas_restringida`); D2 modificada (nombre público también para personas físicas; su NIF, direcciones, teléfono, correo y textos de línea, solo en `ventas_restringida`). Spec revisada por el spec-author. 2026-11-06: spec escrita (specs/F-040-ingresos/, mediciones en progress/spec_F-040.md); propone fase 1 aquí y fase 2 (contraste completo y conceptos fuera de coeficiente) como feature nueva (D1). 2026-10-27: prioridad 46 -> 5 por orden del humano, tras el correo de Juan Romero; criterios de aceptación ampliados con sus tres peticiones. 2026-10-27: prioridad 5 -> 2 por orden del humano (tras F-150 van F-040 y F-104). 2026-10-27: añadido el contraste venta con coeficientes frente a certificado y los conceptos fuera de coeficiente (revisión de precios), que F-150 deja fuera y declara como aviso. Medido: el IVA del contrato (`obrctr.ivaide`) coincide con el de `cer` y `dvf` por `ctride` en todos los contratos."
     },
     {
       "id": "F-041",
@@ -2553,6 +2554,22 @@
       "priority": 0,
       "branch": "feature/F-159-hotfix-devengo-negativo-2",
       "notes": "2026-11-08: APROBADA (`progress/review_F-159.md`), merge `main` 0ea9d38, desplegada (imagen r20261108-0945, `build-tesoreria` SUCCESS, 0 negativos en coste y venta), diccionario v74. Lo de antes (pendiente de la PARADA 1) queda superado. 2026-11-07: HOTFIX pedido por el líder; spec escrita por el spec-author en su worktree desde `main` (93fc38c), sin código. Diagnóstico y alternativas en `progress/spec_F-159.md`; pendiente de la PARADA 1."
+    },
+    {
+      "id": "F-160",
+      "title": "Ventas fase 2: contraste producido / certificado de todas las obras y los conceptos certificados fuera de coeficiente",
+      "description": "Nace de la D1 = A de F-040 (decisión del humano, 2026-11-07): F-040 publica certificaciones, facturas de venta, clientes y el enlace hasta el cobro, y deja el contraste de la venta producida con coeficientes frente a lo certificado SOLO para las 22 obras de la receta de caja (`ventas.v_contraste_certificado_obra`, que lee `tesoreria.devengo_corte_obra`). Esta fase lo extiende a TODAS las obras y separa los conceptos certificados FUERA del coeficiente (revisión de precios, contradictorios, órdenes de cambio). MEDIDO por F-040 el 2026-11-06 (`progress/spec_F-040.md` §§ 2-3): Sigrid NO los marca: `obrcer` (con `cerrev`) está VACÍA; `cerpro.paride` solo en 5 de 6.362 líneas, así que la certificación no baja a partida y el contraste solo puede ser por obra o contrato; los recargos `COEF_RECGG`/`COEF_RECBI`/`COEF_DESADJ` (clase 0) están en 1.286 de 6.308 certificaciones (en la mayoría de los CONTRATO PRINCIPAL el coeficiente va dentro del precio); 36 líneas dicen «revisión»/«contradictorio» (1,88 M€); los contratos lo insinúan por nombre («ORDENES DE CAMBIO», «PARTIDAS SIN COEFICIENTES», «MEDICIONES NO ACREDITADAS», «CONTRATO SIN PEM»). Hace falta el CRITERIO de Juan Romero (Control de Costes) antes de escribir la spec: cómo se reconoce un concepto fuera de coeficiente y contra qué producción se contrasta cada obra. Depende de F-040 en `done`. RELACIONADA con F-076 (los ámbitos de seguimiento 5 `VEN` «CERTIFICACION» y 13 `CER_PEC`, que llegan a `stg.presupuesto` y no al seguimiento): la spec debe decidir si el contraste lee esos ámbitos, los documentos `cer` de F-040 o los dos.",
+      "acceptance": [
+        "Definida en detalle por specs/F-160-*/ (sdd=true), con el criterio de Juan Romero por escrito",
+        "Contraste producido con coeficientes / certificado a origen / facturado para todas las obras con certificaciones, no solo las de la receta, con la cobertura medida",
+        "Los conceptos certificados fuera de coeficiente identificados según ese criterio, con su importe por obra y contrato y la parte que no se sabe clasificar declarada"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 4,
+      "branch": "feature/F-160-ventas-contraste-fase2",
+      "notes": "2026-11-07: creada por el spec-author de F-040 al recoger la D1 = A del humano. Id F-160 porque F-159 ya está reservado por la rama `feature/F-159-hotfix-devengo-negativo-2`. Prioridad 4 provisional (detrás de F-040 y F-104): la fija el humano."
     }
   ]
 }

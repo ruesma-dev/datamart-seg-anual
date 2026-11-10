@@ -28,7 +28,10 @@ FICHERO_TABLAS = RAIZ / "config" / "tables_sigrid.yaml"
 FICHERO_RAW = RAIZ / "config" / "diccionario" / "raw.yaml"
 
 #: La cabecera de `dvf` que necesita el hueco de H26 (`design.md` §5.1).
-COLUMNAS_DVF = ("ide", "cla", "entide", "cenide", "ctride", "fecdoc", "totbas", "totiva", "totdoc")
+COLUMNAS_DVF_F150 = ("ide", "cla", "entide", "cenide", "ctride", "fecdoc", "totbas", "totiva",
+                     "totdoc")
+#: F-040 (R3): `dvf` pasa a 35 columnas; las 9 de F-150 siguen delante y en su orden.
+from etl_sigrid.domain.ventas import COLUMNAS_DVF  # noqa: E402
 
 
 def _col(nombre: str) -> ColumnSpec:
@@ -184,13 +187,15 @@ def test_f150_r16_dvf_solo_la_cabecera_y_sin_tiemod() -> None:
     assert dvf["target_table"] == "dvf" and dvf["id_column"] == "ide"
     assert dvf["incremental_column"] is None, "medido en T1: `dvf` no tiene tiemod"
     assert tuple(dvf["include_columns"]) == COLUMNAS_DVF
+    assert tuple(dvf["include_columns"])[:9] == COLUMNAS_DVF_F150
     assert not dvf.get("exclude_columns"), "lista blanca o negra, nunca las dos (R17)"
     assert dvf.get("where") is None, "todas las facturas: rectificativas incluidas"
 
 
 def test_f150_r16_solo_dvf_usa_lista_blanca() -> None:
     con_lista = sorted(n for n, t in _ingesta().items() if t.get("include_columns"))
-    assert con_lista == ["dvf", "log", "per"]  # F-156: log y per (R2, R3)
+    # F-156: log y per (R2, R3); F-040: cer, cerpro, cli y dvfpro (R1, R2)
+    assert con_lista == ["cer", "cerpro", "cli", "dvf", "dvfpro", "log", "per"]
 
 
 @pytest.mark.parametrize("tabla", ["iva", "dvf"])
@@ -204,6 +209,7 @@ def test_f150_r16_cada_tabla_nueva_tiene_su_ficha_en_raw(tabla: str) -> None:
 def test_f150_r16_la_ficha_de_dvf_dice_que_solo_trae_la_cabecera() -> None:
     fichas = yaml.safe_load(FICHERO_RAW.read_text(encoding="utf-8"))["objetos"]
     texto = fichas["dvf"]["descripcion"]
-    assert "Solo se traen 9" in texto
+    # F-040 (R3): de 9 a 35 columnas; la ficha las nombra todas.
+    assert "Solo se traen 35" in texto
     for columna in COLUMNAS_DVF:
         assert f"`{columna}`" in texto, columna

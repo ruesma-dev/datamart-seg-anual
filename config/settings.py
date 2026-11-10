@@ -112,9 +112,16 @@ class SigridApiSettings(BaseSettings):
 # F-156 (2026-11-04) añade `postventa`: unidades, incidencias, tareas, su
 # histórico y sus adjuntos, SIN datos personales (los textos van enmascarados).
 # Los datos personales viven en `postventa_restringida`, vetada como las otras.
+#
+# F-040 (2026-11-09) añade `ventas`: clientes, facturas de venta,
+# certificaciones, su enlace y el seguimiento hasta el cobro, con el NOMBRE del
+# cliente y SIN lo personal (el NIF de la persona física, direcciones,
+# teléfonos, correos y la cabecera de la factura viven en `ventas_restringida`,
+# vetada como las otras; D2/D6 del humano). El perfil restringido y el de
+# postventa NO la leen: sus listas son explícitas.
 DEFAULT_CONSUMPTION_SCHEMAS = (
     "mart,cierre,compras,maestro,retenciones,personal,contabilidad,tesoreria,"
-    "descompuestos,postventa,stg,aux,_meta"
+    "descompuestos,postventa,ventas,stg,aux,_meta"
 )
 
 # Esquemas que el rol GENERAL de lectura (`PG_READONLY_ROLE`, el del MCP y
@@ -140,12 +147,18 @@ DEFAULT_CONSUMPTION_SCHEMAS = (
 #                             los textos íntegros (F-156, «d1 ok» del humano el
 #                             2026-11-03): para el rol autorizado y el perfil
 #                             postventa
+#   ventas_restringida        lo personal del cliente: el NIF de la persona
+#                             física, direcciones, teléfonos, correos, la
+#                             cabecera de la factura y la descripción de sus
+#                             líneas (F-040, D2/D6 del humano): solo para el
+#                             rol autorizado (y el total, por pertenencia)
 #   raw                       la copia literal de Sigrid, con todo lo anterior
 #                             y más (ver el comentario de arriba)
 #
 # Un esquema no puede estar a la vez aquí y en `DEFAULT_CONSUMPTION_SCHEMAS`.
 DEFAULT_VETOED_SCHEMAS = (
-    "contabilidad_restringida,tesoreria_restringida,compras_restringida,postventa_restringida,raw"
+    "contabilidad_restringida,tesoreria_restringida,compras_restringida,postventa_restringida,"
+    "ventas_restringida,raw"
 )
 
 # El rol AUTORIZADO (F-135): grupo NOLOGIN que lee la contabilidad completa. Lo
@@ -165,8 +178,10 @@ DEFAULT_VETOED_SCHEMAS = (
 DEFAULT_RESTRICTED_ROLE = "sigrid_dm_autorizado_ro"
 NOMBRE_AUTORIZADO_RETIRADO = "sigrid_dm_restringido_ro"
 # F-156: y los datos personales de postventa (`postventa_restringida`).
+# F-040: y lo personal del cliente (`ventas_restringida`).
 DEFAULT_RESTRICTED_SCHEMAS = (
-    "contabilidad_restringida,tesoreria_restringida,compras_restringida,postventa_restringida"
+    "contabilidad_restringida,tesoreria_restringida,compras_restringida,postventa_restringida,"
+    "ventas_restringida"
 )
 
 # El login de acceso TOTAL del MCP (F-136): lee lo mismo que el rol general más

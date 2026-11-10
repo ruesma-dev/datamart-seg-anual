@@ -1,0 +1,835 @@
+# config/diccionario/ventas.yaml
+#
+# Fichas del esquema `ventas` (F-040, fase 1, 2026-11-09): EL LADO DE INGRESOS.
+# Clientes, facturas de venta con sus lineas y recargos, certificaciones de
+# obra con los suyos, el enlace certificacion -> factura y el seguimiento hasta
+# el cobro (vistas sobre `tesoreria.efectos`).
+#
+# LO QUE NO ESTA AQUI (D2 y D6 del humano, 2026-11-07): el NOMBRE del cliente
+# es publico tambien si es persona fisica, pero su NIF, sus direcciones,
+# telefonos y correos, el nombre y el CIF de la cabecera de cada factura y la
+# descripcion de las lineas de las facturas a persona fisica viven en
+# `ventas_restringida`, que solo lee el perfil total (`R-VENTAS-RESTRINGIDA`).
+# Ninguna columna de este esquema empieza por `direccion`, `telefono`,
+# `correo`, `cif_cabecera` ni `nombre_cabecera`: la guarda del build lo tumba.
+#
+# TRES CIFRAS QUE NO SON LA MISMA (`R-VENTAS-TRES-CIFRAS`): lo certificado, lo
+# facturado y lo cobrado. La conciliacion de la retencion de cliente por
+# documento es de F-104; el contraste de todas las obras, de F-160.
+
+version: 1
+esquema: ventas
+
+objetos:
+
+  clientes:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **LOS CLIENTES DE SIGRID** (1.210 el 2026-11-07, `con` tipo 4), con su
+      nombre ACTUAL, su CIF y, por cliente, cuantas obras, facturas y
+      certificaciones tiene y lo facturado (base). 572 son persona fisica
+      (arrendatarios de garajes, compradores de vivienda): su NOMBRE es publico
+      (D2 del humano), pero su `cif` y `cif_normalizado` se publican a NULL. Un
+      `cif` NULL de persona fisica no es «sin CIF»: el CIF integro esta en
+      `ventas_restringida.clientes_contacto` (solo perfil total).
+      `cif_valido` y `cif_repetido` se calculan ANTES de anular: valen tambien
+      para la persona fisica. Sigrid no clasifica al cliente (`taride` en 2,
+      `secide` en 0): no hay tipo de cliente.
+    grano: >-
+      Una fila por cliente de Sigrid, identificado por `cliente_id`, clave
+      primaria declarada.
+    clave_negocio: [cliente_id]
+    paso_etl: build_ventas
+    refresco: nocturno
+    columnas:
+      cliente_id:
+        significado: Identificador del cliente en Sigrid (`cli.ide`).
+        agregacion: clave_sustituta
+      codigo_cliente:
+        significado: >-
+          Codigo del cliente, tal y como se ve en Sigrid (`con.cod`). NULL si el
+          cliente es persona fisica o si el codigo tiene forma de NIF de persona
+          (quien da de alta al cliente puede escribir su DNI como codigo): el
+          integro esta en `ventas_restringida.clientes_contacto`. No sirve para
+          cruzar: se cruza por `cliente_id`.
+      nombre:
+        significado: Razon social o nombre del cliente, el ACTUAL (publico tambien si es persona fisica).
+      cif:
+        significado: >-
+          CIF tal y como esta en Sigrid; NULL si el cliente es persona fisica
+          (su NIF solo esta en `ventas_restringida`), que se distingue con
+          `es_persona_fisica`.
+      cif_normalizado:
+        significado: >-
+          CIF en mayusculas y sin espacios, puntos ni guiones, y sin prefijo de
+          pais si lo que queda es un NIF de persona (enmienda del humano,
+          2026-11-10). NULL si es persona fisica.
+      tipo_documento:
+        significado: Tipo de documento de identidad que declara Sigrid (`tipcif`).
+        agregacion: no_sumable
+      pais:
+        significado: Pais del documento de identidad (`cifpai`).
+      es_persona_fisica:
+        significado: >-
+          Verdadero si Sigrid lo marca persona fisica (`perfis`) o su CIF tiene
+          forma de NIF de persona, tambien con prefijo de pais (`ES12345678Z`).
+      cif_valido:
+        significado: Verdadero si el CIF supera la letra o el digito de control (calculado antes de anularlo).
+      cif_repetido:
+        significado: Verdadero si otro cliente tiene el mismo CIF normalizado (fichas duplicadas).
+      num_obras:
+        significado: Numero de obras de Sigrid con este cliente.
+        agregacion: suma
+      num_facturas:
+        significado: Numero de facturas de venta del cliente, anuladas y rectificativas incluidas.
+        agregacion: suma
+      num_certificaciones:
+        significado: Numero de certificaciones del cliente, borradores incluidos.
+        agregacion: suma
+      facturado_base:
+        significado: Suma de la base de sus facturas de venta (las rectificativas restan), en EUR.
+        agregacion: suma
+      primera_factura:
+        significado: Fecha de su primera factura de venta.
+        agregacion: no_sumable
+      ultima_factura:
+        significado: Fecha de su ultima factura de venta.
+        agregacion: no_sumable
+    relaciones: []
+    ejemplos_preguntas:
+      - Cuales son los diez mayores clientes por lo facturado
+      - Que clientes tienen el CIF repetido o invalido
+
+  facturas:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **LAS FACTURAS DE VENTA** (15.734 el 2026-11-07, `con` tipo 11), todas:
+      las rectificativas (`clase` 1024) van en negativo y la suma ya las neta;
+      `anulada` marca las de baja. El cliente es el ACTUAL (`nombre_cliente`;
+      `cif_cliente` NULL si es persona fisica); el nombre y el CIF con que se
+      emitio, y las direcciones, solo en
+      `ventas_restringida.factura_cabecera`. La obra sale del centro de coste
+      y, solo sin centro, de la cabecera (`obra_via`). Los recargos se reparten
+      en cuatro columnas que no se solapan: coeficientes (clase 0), garantia
+      (clases 4 y 5, PROVISIONAL hasta la decision D4), el `RETESP` (clase 1,
+      16,78 M EUR, aparte) y otras. `a_cobrar` es lo que se espera cobrar tras
+      las retenciones; lo cobrado de verdad, en `ventas.v_factura_cobro`.
+    grano: >-
+      Una fila por factura de venta, identificada por `factura_id`, clave
+      primaria declarada.
+    clave_negocio: [factura_id]
+    paso_etl: build_ventas
+    refresco: nocturno
+    columnas:
+      factura_id:
+        significado: Identificador de la factura en Sigrid (`dvf.ide`).
+        agregacion: clave_sustituta
+      codigo_factura:
+        significado: Numero de la factura, tal y como se ve en Sigrid.
+      empresa_id:
+        significado: Empresa que emite la factura.
+        agregacion: no_sumable
+      fecha_factura:
+        significado: Fecha de la factura.
+        agregacion: no_sumable
+      clase:
+        significado: Clase de factura de Sigrid; 1024 es rectificativa, en negativo.
+        agregacion: no_sumable
+      estado_codigo:
+        significado: Codigo del estado de la factura en Sigrid (tipo 11).
+        agregacion: no_sumable
+      estado_sigrid:
+        significado: Nombre del estado (Pendiente de emision, Emitida, Comprobada, Contabilizada).
+      anulada:
+        significado: Verdadero si la factura esta de baja en Sigrid (`fecbaj`).
+      cliente_id:
+        significado: Cliente de la factura (el de `ventas.clientes`).
+        agregacion: no_sumable
+      nombre_cliente:
+        significado: Nombre ACTUAL del cliente (el de su ficha, no el de la cabecera).
+      cif_cliente:
+        significado: CIF del cliente; NULL si es persona fisica.
+      es_persona_fisica:
+        significado: >-
+          Verdadero si el cliente es persona fisica, y tambien si el cliente no
+          esta en `raw.cli` o falta (enmienda del humano, 2026-11-10): entonces
+          `cif_cliente` y las descripciones de sus lineas van a NULL.
+      obra_id:
+        significado: Obra de la factura (centro de coste o, sin centro, cabecera).
+        agregacion: no_sumable
+        nulo_significa: El centro de coste no es una obra, o la factura no tiene ninguno.
+      codigo_obra:
+        significado: Codigo de la obra, tal y como se ve en Sigrid.
+      obra_via:
+        significado: De donde sale la obra.
+        valores: [CENTRO, OBRA]
+        nulo_significa: Factura sin obra.
+      contrato_id:
+        significado: Contrato de venta con el cliente al que pertenece la factura.
+        agregacion: no_sumable
+      contrato_nombre:
+        significado: Nombre del contrato de venta.
+      base:
+        significado: Base imponible de la factura, SIN IVA, en EUR (rectificativas en negativo).
+        agregacion: suma
+      iva:
+        significado: Cuota de IVA de la factura, en EUR.
+        agregacion: suma
+      total_sin_retencion:
+        significado: Total con IVA antes de retenciones, en EUR (`totdoc`).
+        agregacion: suma
+      total:
+        significado: Total de la factura de Sigrid (`tot`), en EUR.
+        agregacion: suma
+      a_cobrar:
+        significado: Lo que se espera cobrar tras las retenciones (`totpag`), en EUR.
+        agregacion: suma
+      importe_coeficientes:
+        significado: Suma de los recargos de clase 0 (coeficientes), en EUR.
+        agregacion: suma
+      retencion_garantia:
+        significado: Retencion de garantia (clases 4 y 5, provisional D4), en EUR.
+        agregacion: suma
+      retencion_retesp:
+        significado: Retencion de clase 1 (`RETESP`), aparte de la garantia, en EUR.
+        agregacion: suma
+      retencion_otras:
+        significado: Los demas recargos (ni coeficientes, ni garantia, ni RETESP), en EUR.
+        agregacion: suma
+      num_lineas:
+        significado: Numero de lineas de la factura.
+        agregacion: suma
+    relaciones:
+      - de: cliente_id
+        a: ventas.clientes.cliente_id
+        cardinalidad: "N:1"
+        porque: Para el CIF, el tipo y los demas datos del cliente.
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: Para el nombre y el estado de la obra facturada.
+    ejemplos_preguntas:
+      - Cuanto se ha facturado por obra este ano, sin IVA
+      - Que retencion de garantia nos han practicado por cliente
+
+  factura_lineas:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **LAS LINEAS DE LAS FACTURAS DE VENTA**: cantidad, precio, importe sin
+      IVA, IVA, obra, partida y la linea de certificacion de origen. La
+      `descripcion` va a NULL en las lineas de un cliente persona fisica (puede
+      nombrar a la persona del arrendamiento o la compraventa) y en las de una
+      factura que no existe: integra, en
+      `ventas_restringida.factura_lineas_persona`.
+    grano: >-
+      Una fila por linea de factura de venta, identificada por `linea_id`,
+      clave primaria declarada.
+    clave_negocio: [linea_id]
+    paso_etl: build_ventas
+    refresco: nocturno
+    columnas:
+      linea_id:
+        significado: Identificador de la linea en Sigrid (`dvfpro.ide`).
+        agregacion: clave_sustituta
+      factura_id:
+        significado: Factura de la linea (la de `ventas.facturas`).
+        agregacion: no_sumable
+      posicion:
+        significado: Orden de la linea dentro de la factura.
+        agregacion: no_sumable
+      descripcion:
+        significado: Texto de la linea; NULL si el cliente es persona fisica, no esta en `raw.cli` o la factura no existe.
+      cantidad:
+        significado: Cantidad facturada en la linea, en su unidad.
+        agregacion: no_sumable
+      precio:
+        significado: Precio unitario de la linea, en EUR.
+        agregacion: no_sumable
+      importe:
+        significado: Importe de la linea, SIN IVA, en EUR.
+        agregacion: suma
+      iva_id:
+        significado: Tipo de IVA aplicado a la linea.
+        agregacion: no_sumable
+      iva_cuota:
+        significado: Cuota de IVA de la linea, en EUR.
+        agregacion: suma
+      obra_id:
+        significado: Obra de la linea, si la declara.
+        agregacion: no_sumable
+      partida_id:
+        significado: Partida de la obra de la linea, si la declara.
+        agregacion: no_sumable
+      unidad:
+        significado: Unidad de medida de la cantidad.
+      linea_certificacion_id:
+        significado: Linea de certificacion (`cerpro`) de la que viene la linea, si viene de una.
+        agregacion: no_sumable
+    relaciones:
+      - de: factura_id
+        a: ventas.facturas.factura_id
+        cardinalidad: "N:1"
+        porque: Para la fecha, el cliente y el estado de la factura.
+    ejemplos_preguntas:
+      - Que lineas tiene la factura de venta X y de que partida son
+
+  factura_recargos:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **LOS RECARGOS DE CADA FACTURA DE VENTA**, uno por fila: coeficientes y
+      retenciones que nos practica el cliente, con su clase de Sigrid y la
+      clase de recargo de F-040 (`clase_recargo`, la misma que reparte
+      `ventas.facturas` en cuatro columnas). La garantia (clases 4 y 5) es
+      PROVISIONAL hasta la decision D4; el `RETESP` (clase 1) va aparte.
+    grano: >-
+      Una fila por recargo de una factura, identificada por `recargo_linea_id`,
+      clave primaria declarada.
+    clave_negocio: [recargo_linea_id]
+    paso_etl: build_ventas
+    refresco: nocturno
+    columnas:
+      recargo_linea_id:
+        significado: Identificador de la linea de recargo en Sigrid (`dvfrec.ide`).
+        agregacion: clave_sustituta
+      factura_id:
+        significado: Factura del recargo (la de `ventas.facturas`).
+        agregacion: no_sumable
+      recargo_id:
+        significado: Recargo de Sigrid aplicado (su ficha en `con`).
+        agregacion: no_sumable
+      codigo_recargo:
+        significado: Codigo del recargo (`RETESP`, `RET5`, `COEF_RECGG`...).
+      nombre_recargo:
+        significado: Nombre del recargo, tal y como se ve en Sigrid.
+      clase:
+        significado: Clase del recargo en Sigrid (`reccla`), sin traducir.
+        agregacion: no_sumable
+      clase_recargo:
+        significado: Clase de recargo de F-040, la que decide su columna en la factura.
+        valores: [COEFICIENTES, GARANTIA, RETESP, OTRAS]
+      es_garantia:
+        significado: Verdadero si el recargo cuenta como retencion de garantia (D4, provisional).
+      base:
+        significado: Base sobre la que se calcula el recargo, en EUR.
+        agregacion: no_sumable
+      porcentaje:
+        significado: Porcentaje del recargo.
+        agregacion: no_sumable
+      importe:
+        significado: Cuota del recargo, en EUR.
+        agregacion: suma
+    relaciones:
+      - de: factura_id
+        a: ventas.facturas.factura_id
+        cardinalidad: "N:1"
+        porque: Para la fecha, el cliente y la obra de la factura.
+    ejemplos_preguntas:
+      - Que recargos y retenciones lleva la factura de venta X
+
+  certificaciones:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **LAS CERTIFICACIONES DE OBRA** que se emiten al cliente (6.308 el
+      2026-11-06, `con` tipo 54), borradores incluidos: solo `cuenta`
+      (estados 2, 3 y 4) son certificacion de verdad. Tres importes que NO son
+      el mismo: `importe_a_cuenta` es lo certificado a cuenta del periodo, SIN
+      recargos (las lineas); `base` es la cabecera, que en el 85 % lleva ya los coeficientes;
+      `base_origen_contrato`, la base acumulada de su contrato (solo las que
+      cuentan). No se mezclan, y lo certificado no es lo facturado ni lo
+      cobrado (`R-VENTAS-TRES-CIFRAS`). `obrcer` esta vacia en Sigrid: la
+      certificacion vive aqui.
+    grano: >-
+      Una fila por certificacion, identificada por `certificacion_id`, clave
+      primaria declarada.
+    clave_negocio: [certificacion_id]
+    paso_etl: build_ventas
+    refresco: nocturno
+    columnas:
+      certificacion_id:
+        significado: Identificador de la certificacion en Sigrid (`cer.ide`).
+        agregacion: clave_sustituta
+      codigo_certificacion:
+        significado: Codigo de la certificacion, tal y como se ve en Sigrid.
+      numero:
+        significado: Numero de la certificacion dentro de su contrato (`fas`).
+        agregacion: no_sumable
+      mes:
+        significado: Primer dia del mes de la certificacion.
+        agregacion: no_sumable
+      fecha_certificacion:
+        significado: Fecha de la certificacion.
+        agregacion: no_sumable
+      empresa_id:
+        significado: Empresa que certifica.
+        agregacion: no_sumable
+      obra_id:
+        significado: Obra certificada (cabecera y, si no, centro de coste).
+        agregacion: no_sumable
+      codigo_obra:
+        significado: Codigo de la obra, tal y como se ve en Sigrid.
+      contrato_id:
+        significado: Contrato de venta con el cliente que se certifica.
+        agregacion: no_sumable
+      contrato_nombre:
+        significado: Nombre del contrato de venta.
+      cliente_id:
+        significado: Cliente de la certificacion (el de `ventas.clientes`).
+        agregacion: no_sumable
+      nombre_cliente:
+        significado: Nombre ACTUAL del cliente.
+      estado_codigo:
+        significado: Codigo del estado de la certificacion en Sigrid (tipo 54).
+        agregacion: no_sumable
+      estado_sigrid:
+        significado: Nombre del estado (Pendiente de emision, Aprobada por gerencia, Emitida...).
+      cuenta:
+        significado: Verdadero en los estados 2, 3 y 4; falso en el borrador (estado 1).
+      facturada:
+        significado: Marca de Sigrid de certificacion facturada (`estfac`); el enlace real es `ventas.certificacion_factura`.
+      certificacion_anterior_id:
+        significado: Certificacion anterior del mismo contrato (`docoriide`).
+        agregacion: no_sumable
+      importe_a_cuenta:
+        significado: Lo certificado en el periodo SIN recargos (suma de las lineas), en EUR.
+        agregacion: suma
+      importe_a_origen:
+        significado: Lo certificado a origen que guardan las lineas, en EUR.
+        agregacion: no_sumable
+      importe_anterior:
+        significado: Lo certificado antes de este periodo que guardan las lineas, en EUR.
+        agregacion: no_sumable
+      base:
+        significado: Base de la cabecera, SIN IVA y con los coeficientes, en EUR.
+        agregacion: suma
+      iva:
+        significado: Cuota de IVA de la certificacion, en EUR.
+        agregacion: suma
+      total:
+        significado: Total de la certificacion con IVA, en EUR.
+        agregacion: suma
+      base_origen_contrato:
+        significado: Base acumulada de su contrato hasta esta certificacion, solo de las que cuentan, en EUR.
+        agregacion: ultimo_valor
+        nulo_significa: La certificacion no cuenta o no tiene contrato.
+      importe_coeficientes:
+        significado: Suma de los recargos de clase 0 (coeficientes), en EUR.
+        agregacion: suma
+      retencion_garantia:
+        significado: Retencion de garantia (clases 4 y 5, provisional D4), en EUR.
+        agregacion: suma
+      retencion_retesp:
+        significado: Retencion de clase 1 (`RETESP`), aparte de la garantia, en EUR.
+        agregacion: suma
+      retencion_otras:
+        significado: Los demas recargos de la certificacion, en EUR.
+        agregacion: suma
+      num_lineas:
+        significado: Numero de lineas de la certificacion.
+        agregacion: suma
+    relaciones:
+      - de: cliente_id
+        a: ventas.clientes.cliente_id
+        cardinalidad: "N:1"
+        porque: Para el CIF y los datos del cliente.
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: Para el nombre y el estado de la obra certificada.
+    ejemplos_preguntas:
+      - Cuanto se ha certificado por obra este ano
+      - Que certificaciones de la obra X estan emitidas y cuales en borrador
+
+  certificacion_recargos:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **LOS RECARGOS DE CADA CERTIFICACION**, uno por fila: coeficientes
+      (`COEF_RECGG`, `COEF_RECBI`, `COEF_DESADJ`) y retenciones, con su clase
+      de Sigrid y la clase de recargo de F-040 (`clase_recargo`, la que reparte
+      `ventas.certificaciones` en cuatro columnas). La garantia es PROVISIONAL
+      hasta la decision D4.
+    grano: >-
+      Una fila por recargo de una certificacion, identificada por
+      `recargo_linea_id`, clave primaria declarada.
+    clave_negocio: [recargo_linea_id]
+    paso_etl: build_ventas
+    refresco: nocturno
+    columnas:
+      recargo_linea_id:
+        significado: Identificador de la linea de recargo en Sigrid (`cerrec.ide`).
+        agregacion: clave_sustituta
+      certificacion_id:
+        significado: Certificacion del recargo (la de `ventas.certificaciones`).
+        agregacion: no_sumable
+      recargo_id:
+        significado: Recargo de Sigrid aplicado (su ficha en `con`).
+        agregacion: no_sumable
+      codigo_recargo:
+        significado: Codigo del recargo (`COEF_RECGG`, `RET5`, `RETESP`...).
+      nombre_recargo:
+        significado: Nombre del recargo, tal y como se ve en Sigrid.
+      clase:
+        significado: Clase del recargo en Sigrid (`reccla`), sin traducir.
+        agregacion: no_sumable
+      clase_recargo:
+        significado: Clase de recargo de F-040, la que decide su columna en la certificacion.
+        valores: [COEFICIENTES, GARANTIA, RETESP, OTRAS]
+      es_garantia:
+        significado: Verdadero si el recargo cuenta como retencion de garantia (D4, provisional).
+      base:
+        significado: Base sobre la que se calcula el recargo, en EUR.
+        agregacion: no_sumable
+      porcentaje:
+        significado: Porcentaje del recargo.
+        agregacion: no_sumable
+      importe:
+        significado: Cuota del recargo, en EUR.
+        agregacion: suma
+    relaciones:
+      - de: certificacion_id
+        a: ventas.certificaciones.certificacion_id
+        cardinalidad: "N:1"
+        porque: Para la obra, el contrato y el estado de la certificacion.
+    ejemplos_preguntas:
+      - Que coeficientes lleva la certificacion X
+
+  certificacion_factura:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **QUE CERTIFICACION PASO A QUE FACTURA**: una fila por par, sacada de los
+      destinos de las lineas de certificacion (`cerprodes` con destino factura
+      de venta, el 100 % de las 4.349 filas). `cer.idefac` y `cer.feccob`
+      estan a 0 en todas y NO enlazan. Es N:M (268 facturas son de dos
+      certificaciones y 71 certificaciones tienen dos facturas) y NO reparte
+      importes: sumar lo facturado o lo cobrado por certificacion cuenta dos
+      veces una factura compartida (`factura_compartida` en
+      `ventas.v_seguimiento_certificacion`).
+    grano: >-
+      Una fila por par certificacion y factura, identificada por
+      `certificacion_id` y `factura_id`, clave primaria declarada.
+    clave_negocio: [certificacion_id, factura_id]
+    paso_etl: build_ventas
+    refresco: nocturno
+    columnas:
+      certificacion_id:
+        significado: Certificacion de origen (la de `ventas.certificaciones`).
+        agregacion: no_sumable
+      factura_id:
+        significado: Factura de venta de destino (la de `ventas.facturas`).
+        agregacion: no_sumable
+      num_lineas:
+        significado: Numero de lineas de la certificacion que pasaron a esa factura.
+        agregacion: suma
+      cantidad:
+        significado: Cantidad de las lineas que paso a la factura, en su unidad.
+        agregacion: no_sumable
+    relaciones:
+      - de: certificacion_id
+        a: ventas.certificaciones.certificacion_id
+        cardinalidad: "N:1"
+        porque: Para la obra, el contrato y lo certificado.
+      - de: factura_id
+        a: ventas.facturas.factura_id
+        cardinalidad: "N:1"
+        porque: Para lo facturado y, por `ventas.v_factura_cobro`, lo cobrado.
+    ejemplos_preguntas:
+      - En que facturas se ha facturado la certificacion X
+
+  cobertura_enlace:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **CUANTO DEL CAMINO CERTIFICACION -> FACTURA -> COBRO ESTA ENLAZADO** la
+      ultima noche, por eslabon: certificaciones que cuentan con factura,
+      facturas con efecto de cobro y efectos de cobro que apuntan a una
+      factura (los agrupados `AGR` y las divisiones `DIV` no: lo explicara
+      F-104); y FACTURA_CLIENTE, facturas cuyo cliente esta en `raw.cli` (las
+      que no, `total - enlazados`, se publican como de persona fisica: enmienda
+      del humano, 2026-11-10). Es la medida de lo que NO se puede seguir hasta el cobro: citala
+      cuando una respuesta dependa del enlace.
+    grano: >-
+      Una fila por eslabon del enlace, identificada por `eslabon`, clave
+      primaria declarada.
+    clave_negocio: [eslabon]
+    paso_etl: build_ventas
+    refresco: nocturno
+    columnas:
+      eslabon:
+        significado: Que tramo del camino mide la fila.
+        valores: [CERTIFICACION_FACTURA, FACTURA_EFECTO, EFECTO_FACTURA, FACTURA_CLIENTE]
+      total:
+        significado: >-
+          Numero de documentos del tramo (los que cuentan). Los eslabones de
+          efectos leen `raw.cob` entero: cuentan tambien los efectos dados de
+          BAJA en tesoreria.
+        agregacion: no_sumable
+      enlazados:
+        significado: Cuantos de ellos tienen el siguiente eslabon.
+        agregacion: no_sumable
+      importe_total:
+        significado: Importe de todos los documentos del tramo (base, o importe del efecto), en EUR.
+        agregacion: no_sumable
+      importe_enlazado:
+        significado: Importe de los que tienen el siguiente eslabon, en EUR.
+        agregacion: no_sumable
+      calculado_en:
+        significado: Momento en que el build calculo la cobertura.
+        agregacion: ultimo_valor
+    relaciones: []
+    ejemplos_preguntas:
+      - Que parte de lo facturado tiene efecto de cobro enlazado
+
+  v_factura_cobro:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **LO EMITIDO, COBRADO Y PENDIENTE DE CADA FACTURA DE VENTA**, de sus
+      efectos de cobro de `tesoreria.efectos` que apuntan a la factura:
+      cobrado = REALIZADO, pendiente = PREVISTO y BAJA no suma nunca
+      (`R-TESORERIA-ESTADO`). Lo cobrado por un agrupado `AGR` (sin documento)
+      NO se atribuye a la factura: hasta F-104 sale como no cobrado. Es VISTA:
+      lee `tesoreria` al consultar y vale su frescura (`build_tesoreria`).
+    grano: >-
+      Una fila por factura de venta, identificada por `factura_id`.
+    clave_negocio: [factura_id]
+    paso_etl: build_ventas
+    refresco: nocturno
+    columnas:
+      factura_id:
+        significado: Factura de venta (la de `ventas.facturas`).
+        agregacion: no_sumable
+      emitido:
+        significado: Importe de sus efectos de cobro vivos (sin BAJA), en EUR.
+        agregacion: suma
+      cobrado:
+        significado: Importe de sus efectos de cobro REALIZADO, en EUR.
+        agregacion: suma
+      pendiente:
+        significado: Importe de sus efectos de cobro PREVISTO, en EUR.
+        agregacion: suma
+      num_efectos:
+        significado: Numero de efectos de cobro vivos de la factura.
+        agregacion: suma
+      ultima_fecha_cobro:
+        significado: Fecha real del ultimo efecto cobrado.
+        agregacion: no_sumable
+        nulo_significa: Nada cobrado todavia (o cobrado por un agrupado, no atribuido).
+    relaciones:
+      - de: factura_id
+        a: ventas.facturas.factura_id
+        cardinalidad: "1:1"
+        porque: Para el cliente, la obra y la base de la factura.
+    ejemplos_preguntas:
+      - Que facturas de venta estan pendientes de cobro y por cuanto
+
+  v_seguimiento_certificacion:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **EL ESTADO DE CADA CERTIFICACION HASTA EL COBRO**: cuantas facturas
+      tiene, lo facturado (base) y lo emitido, cobrado y pendiente de esas
+      facturas, y `estado_seguimiento` (BORRADOR, SIN_FACTURA,
+      FACTURADA_SIN_EFECTO, PENDIENTE_COBRO, COBRADA_PARCIAL o COBRADA, a menos
+      de 0,01 de lo emitido). `factura_compartida` dice que alguna de sus
+      facturas es tambien de otra certificacion: NO sumes lo cobrado entre
+      certificaciones, cuenta dos veces. Lee `tesoreria` al consultar.
+    grano: >-
+      Una fila por certificacion, identificada por `certificacion_id`.
+    clave_negocio: [certificacion_id]
+    paso_etl: build_ventas
+    refresco: nocturno
+    columnas:
+      certificacion_id:
+        significado: Certificacion (la de `ventas.certificaciones`).
+        agregacion: no_sumable
+      num_facturas:
+        significado: Numero de facturas en que se facturo la certificacion.
+        agregacion: no_sumable
+      facturado:
+        significado: Base de esas facturas, completa aunque sea compartida, en EUR.
+        agregacion: no_sumable
+      emitido:
+        significado: Efectos de cobro vivos de esas facturas, en EUR.
+        agregacion: no_sumable
+      cobrado:
+        significado: Lo cobrado (REALIZADO) de esas facturas, en EUR.
+        agregacion: no_sumable
+      pendiente:
+        significado: Lo pendiente (PREVISTO) de esas facturas, en EUR.
+        agregacion: no_sumable
+      factura_compartida:
+        significado: Verdadero si alguna de sus facturas es tambien de otra certificacion.
+      estado_seguimiento:
+        significado: Donde esta la certificacion en el camino hasta el cobro.
+        valores: [BORRADOR, SIN_FACTURA, FACTURADA_SIN_EFECTO, PENDIENTE_COBRO, COBRADA_PARCIAL, COBRADA]
+    relaciones:
+      - de: certificacion_id
+        a: ventas.certificaciones.certificacion_id
+        cardinalidad: "1:1"
+        porque: Para la obra, el contrato y lo certificado.
+    ejemplos_preguntas:
+      - Que certificaciones emitidas estan sin cobrar
+      - Cuanto tarda en cobrarse una certificacion de la obra X
+
+  v_contraste_certificado_obra:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **VENTA REAL, CERTIFICADO Y FACTURADO A ORIGEN POR OBRA**, solo para las
+      obras de la receta de la caja (`tesoreria.devengo_corte_obra`, concepto
+      VENTA), no para todas: el contraste completo es de F-160. Las dos
+      diferencias van CON SIGNO: `pendiente_certificar` = venta real con
+      coeficientes - certificado; `certificado_sin_facturar` = certificado -
+      facturado. Un negativo es real (se certifico o facturo de mas), no un
+      error. Lee `tesoreria` al consultar.
+    grano: >-
+      Una fila por obra de la receta de la caja, identificada por `obra_id`.
+    clave_negocio: [obra_id]
+    paso_etl: build_ventas
+    refresco: nocturno
+    columnas:
+      obra_id:
+        significado: Obra de la receta de la caja.
+        agregacion: no_sumable
+      codigo_obra:
+        significado: Codigo de la obra, tal y como se ve en Sigrid.
+      venta_real_origen_con_coeficientes:
+        significado: Venta real a origen con coeficientes de la receta de la caja, en EUR.
+        agregacion: suma
+      certificado_origen:
+        significado: Base certificada a origen, solo las certificaciones que cuentan, en EUR.
+        agregacion: suma
+      facturado_origen:
+        significado: >-
+          Base facturada a origen de la obra, en EUR, como la suma Sigrid:
+          incluye las facturas anuladas (`anulada`) y las rectificativas, con su
+          signo.
+        agregacion: suma
+      pendiente_certificar:
+        significado: Venta real menos lo certificado, con signo, en EUR.
+        agregacion: suma
+      certificado_sin_facturar:
+        significado: Lo certificado menos lo facturado, con signo, en EUR.
+        agregacion: suma
+    relaciones:
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: Para el nombre, el cliente y el estado de la obra.
+    ejemplos_preguntas:
+      - Cuanto queda por certificar de la venta real de la obra X
+
+  fn_fecha:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de ventas, usada solo dentro del SQL que
+      construye el esquema.
+    descripcion: >-
+      Convierte una fecha de Sigrid (un entero AAAAMMDD) en una fecha de
+      verdad, con el 0 como ausencia de fecha. Copia local de la de
+      `tesoreria`, como en los demas esquemas.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_ventas
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_cif_normalizado:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de ventas, usada solo dentro del SQL que
+      construye el esquema.
+    descripcion: >-
+      Normaliza un CIF: mayusculas y sin espacios, puntos ni guiones; vacio,
+      NULL; y quita un prefijo de pais de dos letras SOLO si lo que queda es un
+      NIF de persona (enmienda del humano, 2026-11-10). Repite los literales de
+      `etl_sigrid/domain/ventas.py`.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_ventas
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_es_persona_fisica:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de ventas, usada solo dentro del SQL que
+      construye el esquema.
+    descripcion: >-
+      Decide si un cliente es persona fisica: la marca `perfis` de Sigrid o
+      un CIF normalizado con forma de NIF de persona (DNI, NIE o K/L/M, tambien
+      con prefijo de pais, que quita `fn_cif_normalizado`). Repite el
+      patron de `etl_sigrid/domain/ventas.py`.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_ventas
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_cif_valido:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de ventas, usada solo dentro del SQL que
+      construye el esquema.
+    descripcion: >-
+      Comprueba la letra o el digito de control de un CIF normalizado (DNI,
+      NIE, NIF de las letras K, L y M y CIF de sociedad). Repite los patrones
+      de `etl_sigrid/domain/ventas.py`.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_ventas
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_clase_recargo:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de ventas, usada solo dentro del SQL que
+      construye el esquema.
+    descripcion: >-
+      Traduce la clase de recargo de Sigrid a COEFICIENTES (0), RETESP (1),
+      GARANTIA (hoy 4 y 5) u OTRAS. Es el UNICO punto de la decision D4 en el
+      SQL: cambiar las clases de garantia se hace aqui y en
+      `CLASES_GARANTIA` del dominio, y nada mas.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_ventas
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
