@@ -12,12 +12,7 @@ Sigrid: todo se verificó con tests y con un PostgreSQL 16 local desechable.
 | T1 | `0e12304` | Fase RED: `test_f040_dominio`, `_ingesta`, `_sql` |
 | T2 | `7c68c30` | `etl_sigrid/domain/ventas.py`: persona física, CIF válido, clase de recargo (`CLASES_GARANTIA`, el único punto de D4), reparto de recargos y estado del seguimiento |
 | T3 | `897922b` | `config/tables_sigrid.yaml`: `cli`, `cer`, `cerpro`, `cerrec`, `cerprodes`, `dvfpro` y `dvfrec` por lista blanca; `dvf` de 9 a 35 columnas; censo de 93 a 100 tablas; fichas de `raw` |
-| T4 | `adc9f14` | `sql/ventas/00_setup.sql` (los dos esquemas y las funciones) y `01_clientes.sql` |
-| T5 | `e80a6f2` | `02_facturas.sql`: facturas, líneas y recargos repartidos en cuatro columnas |
-| T6 | `43bd491` | `03_certificaciones.sql`: a cuenta, a origen, `base_origen_contrato` y recargos |
-| T7 | `19e45b5` | `04_enlace.sql` (`certificacion_factura`, `cobertura_enlace`) y `05_vistas.sql` (cobro, seguimiento y contraste) |
-| T8 | `76818d7` | `06_restringida.sql`: `clientes_contacto`, `factura_cabecera` y `factura_lineas_persona` |
-| T9 | `647cb01` | `07_guardas.sql`: recuentos, base y reparto contra `raw`, y ninguna columna personal en `ventas` |
+| T4-T9 | `adc9f14` `e80a6f2` `43bd491` `19e45b5` `76818d7` `647cb01` | `sql/ventas/`: `00_setup` (esquemas y funciones) y `01_clientes`; `02_facturas` (líneas y recargos en cuatro columnas); `03_certificaciones` (a cuenta, a origen, `base_origen_contrato`); `04_enlace` y `05_vistas` (cobro, seguimiento, contraste); `06_restringida`; `07_guardas` (cuadre con `raw` y nada personal en `ventas`) |
 | T10 | `ca289ea` | `build_ventas_step.py` (ocho sub-pasos); `main.py`: tras `build_retenciones`, diecisiete pasos, `PASOS_CON_PERMISOS`, comando `build-ventas` |
 | T11 | `f6889d9` | `settings.py` y `.env.example`: `ventas` en el consumo y `ventas_restringida` en vetados y restringidos; `ESQUEMAS_DEL_DATAMART` de 18 a 20; `00_global.yaml` |
 | T12 | `4515ab0` | `infra/sql/02_roles.sql` (esquemas, punto 5, veto del 5 ter, concesión al autorizado, comprobaciones finales) y runbook § 15 |
@@ -38,22 +33,14 @@ de otras features (§ 2.9). `sql/retenciones/` y `sql/tesoreria/` **no se tocan*
 3. **Tope de F-147 (presupuesto de contexto del MCP) a 37.042**. La causa son dos reglas duras
    nuevas y el ámbito ampliado de otras dos. Queda en un comentario del test, con el desglose
    (reglas 8.464, enrutado 18.516, bloques 10.062). Mismo precedente que F-156.
-4. **Fichas de `raw` ya en T3**: la puerta R25 de F-006 (`test_f006_r25_puerta...`) exige ficha
-   o pendiente en cuanto la tabla se declara. Sin ellas, T3 no pasaba la suite.
-5. **Una sandbox Postgres extra**: `tests/test_f040_sandbox.py` ejecuta el SQL real de
-   `sql/ventas/` sobre un PG16 local con los tipos reales de la ingesta (`double precision`, con
-   cast a `NUMERIC`). Sin `F040_SANDBOX_DSN`, salta. No estaba en tasks; es la defensa contra SQL que
-   solo se comprueba como literal.
+4. **Fichas de `raw` ya en T3**: la puerta R25 de F-006 exige ficha o pendiente al declarar la tabla.
+5. **Sandbox Postgres extra** (`tests/test_f040_sandbox.py`): el SQL real sobre un PG16 local con los
+   tipos de la ingesta; salta sin `F040_SANDBOX_DSN`. No estaba en tasks: defiende de lo solo literal.
 6. **Adiciones al dominio** que pide el SQL, para tener un oráculo único: `TIP_CLIENTE`,
    `repartir_recargos`, `ESLABONES_COBERTURA` y los patrones de CIF.
-7. **Persona física, tal como la define R6** (corregido en el ciclo 1, H2: aquí decía «fail-closed»
-   y era falso). Es persona física si `perfis` <> 0 o si el CIF normalizado casa con
-   `PATRON_NIF_PERSONA`. Estos casos **NO** se tratan como persona física y su dato se publica en
-   `ventas`: `perfis` NULL (cuenta como 0); un CIF con prefijo de país (`ES12345678Z` no casa); y
-   una factura cuyo cliente no está en `raw.cli`, que sale `es_persona_fisica = FALSE` y publica
-   la descripción de sus líneas (`cif_cliente` y `nombre_cliente` salen NULL por el `LEFT JOIN`).
-   Solo una LÍNEA sin factura en `raw.dvf` se anula por defecto (`COALESCE(..., TRUE)`).
-   Propuestas para el humano en § 7.
+7. **Persona física (R6, con la enmienda del ciclo 2)**: `perfis` <> 0 o CIF normalizado con forma de
+   NIF, también con prefijo de país; y la factura sin cliente en `raw.cli`. Solo `perfis` NULL cuenta
+   como 0 (el patrón de NIF lo cubre si el CIF es de persona). Ciclo 1 (H2) y § 8.
 8. **Obra de la factura**: sale de la cabecera solo cuando la línea no trae centro. Así lo describe
    design § 4.
 9. **Tests de otras features al día, solo listas y recuentos**: `f006_formato/_frescura/_publicacion`, `f024`,
@@ -173,25 +160,13 @@ E   AssertionError: assert 'PENDIENTE_COBRO' == 'COBRADA_PARCIAL'
 FAILED tests/test_f040_sandbox.py::test_f040_sandbox_r18_frontera_de_lo_cobrado[0.50-COBRADA_PARCIAL]
 7 failed, 20 passed, 2120 deselected in 5.62s
 ```
-**Verde tras el ciclo**: `pytest tests/test_f040_*.py` con la sandbox → **2319 passed** (21,04 s); la suite
-entera, en «base roja». `harness/init.sh` no se lanzó aquí (sin `.env`).
+**Verde**: F-040 con la sandbox, **2319 passed** (21,04 s). Propuestas de H2: (a) prefijo de país y (b)
+factura sin cliente, APROBADAS por el humano y aplicadas en el ciclo 2 (§ 8); (c) `perfis` NULL, sin cambio.
 
-**Propuestas para el humano (H2; NO aplicadas, cambian R6; sin medir: ni MCP ni `.env`)**: (a) quitar
-el prefijo de país (`ES`) antes del patrón de NIF (`normalizar_cif` y `fn_cif_normalizado`); (b)
-tratar como persona física la factura cuyo cliente no está en `raw.cli` (`COALESCE(..., TRUE)` en
-`02_facturas.sql`), como la línea huérfana; (c) `perfis` NULL, sin cambio (el patrón de NIF ya lo
-cubre). Se medirían en el paso MANUAL 6 con `<Q>`.
-
-**Supervivientes de `build_ventas_step.py`** (los cinco de la pasada RM4 del reviewer; para que el
-líder los traslade a `progress/mutacion_F-040.md`):
-- **L51 `slots=True`/`frozen=True` -> `False`** (dos): equivalentes. `_SubStep` solo se instancia
-  en `SUB_PASOS`, nadie le asigna ni añade atributos y `run` solo lee sus campos.
-- **L119 `exc_info=True` -> `False`**: solo quita la traza del log de error; `FAILED`,
-  `error_message` y el sub-paso (probados) no se mueven.
-- **L126 `rows = 0` -> `1`**: en los sub-pasos sin tabla destino (`setup`, `vistas`, `guardas`)
-  `rows` solo va al `logger.info` y no se suma a `total_rows`: `rows_processed` no cambia.
-- **L133 `round(…, 2)` -> `3`**: el `duration_s` del `logger.info`, solo log. Matarlos exigiría tests
-  del formato del log, deuda que el arnés pide no crear.
+**Supervivientes de `build_ventas_step.py`** (RM4 del reviewer, para `progress/mutacion_F-040.md`):
+L51 `slots`/`frozen` `True` -> `False`, equivalentes (`_SubStep` solo se instancia en `SUB_PASOS` y nadie
+le asigna nada); L119 `exc_info`, L126 `rows = 0 -> 1` (sin tabla destino `rows` solo va al log, no a
+`total_rows`) y L133 `round(…, 2 -> 3)`: solo cambian el log. Matarlos = testear el formato del log.
 
 ### Ciclo 1 · base roja (9 tests de otras features; el `-x` de `init.sh` y mi subconjunto los tapaban)
 
@@ -210,11 +185,36 @@ Los 112 son de ENTORNO, no 2: los CLI de 17 ficheros (`f006_comandos`, `f025_cli
 
 **PG de pruebas** (`scratchpad/pgdata`, 55440): seguía arrancado; usado y parado (`pg_ctl stop`: «servidor detenido»).
 
+## 8. Ciclo 2 (H2 a y b, aprobadas por el humano el 2026-11-10)
+
+| Cambio | Commit | Qué |
+|---|---|---|
+| R2-a | `9ea7e7e` | `normalizar_cif` y `ventas.fn_cif_normalizado` quitan un prefijo de país de 2 letras SOLO si queda un NIF (`PATRON_NIF_CON_PREFIJO_PAIS` = `^[A-Z]{2}` + el patrón de NIF; un NIF nunca abre con dos letras). Cubre `cif`, `cif_normalizado`, `cif_cliente`, `codigo_cliente`, líneas y la guarda R24 (todo pasa por la función). `ESB12345678`, `FR12345678901` o `ES1234567Z` no cambian (en dominio y sandbox, con prefijos en los 2.000 CIF aleatorios: SQL = dominio) |
+| R2-b | `118776a` | Factura sin cliente en `raw.cli`: `COALESCE(vc.es_persona_fisica, TRUE)` (oráculo `persona_fisica_de_factura`); descripción a NULL y entera en `factura_lineas_persona`. La cuenta el 4º eslabón `FACTURA_CLIENTE` de `cobertura_enlace` (`total - enlazados`), sin tumbar el paso. `azure-apps` `0f5ae73` |
+
+R6, R7, R20, R23 enmendados («*Enmienda del humano 2026-11-10*»), `design_detalle.md` y fichas al día; recuentos sin cambio.
+**RED** (trazas enteras en el scratchpad, `red_r2a.txt` y `red_r2b.txt`):
+```
+$ F040_SANDBOX_DSN=... .venv/Scripts/python.exe -m pytest tests/test_f040_dominio.py tests/test_f040_sql.py tests/test_f040_sandbox.py -q -p no:cacheprovider -rf --tb=line
+E   AssertionError: assert 'ES12345678Z' == '12345678Z'
+E   AttributeError: module 'etl_sigrid.domain.ventas' has no attribute 'PATRON_NIF_CON_PREFIJO_PAIS'
+E   Failed: DID NOT RAISE RaiseException
+10 failed, 2238 passed in 19.75s
+$ (lo mismo + tests/test_f040_diccionario.py, para R2-b)
+E   AttributeError: module 'etl_sigrid.domain.ventas' has no attribute 'persona_fisica_de_factura'
+E   assert 'COALESCE(vc.es_persona_fisica, TRUE) AS es_persona_fisica' in 'CREATE TABLE ventas.facturas AS ...
+E   assert {1005: (None,...(None, False)} == {1005: (None,... (None, True)}
+9 failed, 2287 passed in 28.68s
+```
+**Verde**: F-040 con la sandbox, **2352 passed** (31,49 s). Suite entera sin `-x` (`118776a`): `112 failed, 10965 passed, 2473 skipped in 2251.60s`. Los 112 son los mismos CLI de entorno (17 ficheros); con `SIGRID_API_*` ficticios, esos ficheros dan `679 passed, 1 skipped`.
+**Alcance de mutación** (`harness.alcance` + `generar_mutantes`, base `main`): 5 ficheros, 484 líneas, **61
+mutantes** (49 en `ventas.py`, 12 en `build_ventas_step.py`; eran 58). La campaña, del líder.
+
 ## Evidencias
 
 | Evidencia | Valor real |
 |---|---|
-| Tests ejecutados | Suite entera sin `-x` (ciclo 1, `9d148c8`): **10944 passed, 2461 skipped, 112 failed**, todos de entorno (CLI sin `.env`; con `SIGRID_API_*` ficticios, 705 passed). Ciclo 1: propios de F-040 **2319 passed**, 0 failed (21,04 s). Pasada 1: propios de F-040 **2300 passed**, 0 failed (246 sin base + 2054 en el PG16 local), 15,29 s. Subconjunto de la rama bajo cobertura: **3638 passed, 6 skipped, 1 failed** (el de entorno `test_f024_r19`). `init.sh`: 256 passed antes del corte por `-x` en `test_f006_t26` (entorno) |
+| Tests ejecutados | Suite entera sin `-x` (ciclo 2, `118776a`): **10965 passed, 2473 skipped, 112 failed**, todos de entorno. Ciclo 1 (`9d148c8`): **10944 passed, 2461 skipped, 112 failed**, todos de entorno (CLI sin `.env`; con `SIGRID_API_*` ficticios, 705 passed). Ciclo 1: propios de F-040 **2319 passed**, 0 failed (21,04 s). Pasada 1: propios de F-040 **2300 passed**, 0 failed (246 sin base + 2054 en el PG16 local), 15,29 s. Subconjunto de la rama bajo cobertura: **3638 passed, 6 skipped, 1 failed** (el de entorno `test_f024_r19`). `init.sh`: 256 passed antes del corte por `-x` en `test_f006_t26` (entorno) |
 | Cobertura de líneas cambiadas | **100,0 % (148/148)**, `PUERTA COBERTURA` de `harness.cobertura --base main` sobre el subconjunto. La de `init.sh` en este worktree, 52,0 %, es por el corte de `-x` |
 | Mutantes | **Sin veredicto: la campaña no corre en este worktree. Queda para el líder.** `python -m harness.mutacion --feature F-040 --base main` (árbol limpio): alcance de 5 ficheros y 450 líneas de producción, 4 workers, y **exit=3**: «LÍNEA BASE SIN TERMINAR [...] la suite SIN MUTAR agotó los 600 s que se le concedieron (el suelo 'mutacion.timeout_por_mutante_s' multiplicado por la holgura de 5), con 4 worker(s) compitiendo por la máquina». Además la línea base estaba roja: los de entorno y los 9 de § 7 «base roja», ya arreglados. No se evaluó ningún mutante: 0 generados y 0 supervivientes. No se cambió `rigor.json` ni se acotó la suite (no improvisar). El SQL de `sql/ventas/` no se muta; lo cubren la sandbox (2054 tests) y los literales contra el dominio |
 | Tiempo de la suite | Suite entera sin cobertura: **1157,15 s** (19 min 17 s). Subconjunto con cobertura: **554,63 s** (9 min 14 s). `init.sh` hasta el corte: 405,19 s. La suite entera no se completó aquí: con cobertura ronda las 4 h (F-156: 15.176 s) |

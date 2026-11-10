@@ -9,7 +9,14 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-11-09 · F-040 · `in_progress` · implementer: ciclo 1 del review hecho, pendiente re-review · rama `feature/F-040-ingresos`
+## 2026-11-10 · F-040 · `in_progress` · implementer: ciclo 2 (H2 a y b del humano) hecho, pendiente re-review y mutación · rama `feature/F-040-ingresos`
+
+Implementer, ciclo 2 (aprobado por el humano el 2026-11-10). R2-a `9ea7e7e`: el prefijo de país se quita solo si queda un
+NIF de persona (dominio y `ventas.fn_cif_normalizado`; cubre cif, código, líneas y guarda R24). R2-b `118776a`: la factura
+sin cliente en `raw.cli` es de persona física; cuarto eslabón `FACTURA_CLIENTE` en `cobertura_enlace`, que cuenta sin tumbar.
+Spec enmendada (R6, R7, R20, R23), `azure-apps` `0f5ae73` (local). Suite entera sin `-x`: 112 failed (los CLI de entorno),
+10965 passed. Alcance de mutación: 61 mutantes (eran 58). Diccionario sin cambio de recuentos. Informe § 8.
+
 
 Implementer, ciclo 1 (`progress/review_F-040.md`, CHANGES_REQUESTED). H1 `3ca7aea`: `codigo_cliente` a NULL
 en persona física o con forma de NIF; íntegro en `ventas_restringida.clientes_contacto` (columna
