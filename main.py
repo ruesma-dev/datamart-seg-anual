@@ -23,7 +23,8 @@ Operación del datamart en Azure (F-005, ver docs/runbook_postgres_azure.md):
                                         build-cierre, build-compras,
                                         build-maestros, build-retenciones,
                                         build-personal, build-contabilidad,
-                                        build-tesoreria, build-postventa o
+                                        build-tesoreria, build-postventa,
+                                        build-ventas o
                                         build-descompuestos sueltos: recrean
                                         tablas y vistas con
                                         DROP + CREATE y un DROP se lleva los
@@ -113,6 +114,7 @@ from etl_sigrid.application.steps.build_mart_step import BuildMartStep
 from etl_sigrid.application.steps.build_personal_step import BuildPersonalStep
 from etl_sigrid.application.steps.build_postventa_step import BuildPostventaStep
 from etl_sigrid.application.steps.build_retenciones_step import BuildRetencionesStep
+from etl_sigrid.application.steps.build_ventas_step import BuildVentasStep
 from etl_sigrid.application.steps.build_stg_step import (
     BuildStgStep,
     sello_vigente_del_repositorio,
@@ -203,7 +205,8 @@ CAP_DOCUMENTADO_SIGRID_API = 1_000
 #: de ella sale el sufijo del `batch_id` que les permite reanudar.
 VARIABLE_EJECUCION_JOB = "CONTAINER_APP_JOB_EXECUTION_NAME"
 
-#: F-148, R25. Los build que recrean vistas con DROP + CREATE (once desde F-156):
+#: F-148, R25. Los build que recrean vistas con DROP + CREATE (once desde F-156,
+#: doce desde F-040):
 #: tras cada uno, `run-all` devuelve los permisos completos sin esperar al
 #: `apply_grants` final, que sigue siendo el que decide.
 PASOS_CON_PERMISOS = (
@@ -213,6 +216,7 @@ PASOS_CON_PERMISOS = (
     "build_tesoreria",
     "build_compras",
     "build_retenciones",
+    "build_ventas",
     "build_personal",
     "build_contabilidad",
     "build_postventa",
@@ -630,7 +634,8 @@ def build_pipeline_steps(
     (`build_contabilidad`), F-097 el séptimo (`build_descompuestos`, con su
     propia ingesta `ingest_descompuestos` delante) y F-037 el octavo
     (`build_tesoreria`): ocho build de negocio, quince pasos. F-156 suma el
-    noveno (`build_postventa`): dieciséis pasos. El
+    noveno (`build_postventa`): dieciséis pasos. F-040 suma el décimo
+    (`build_ventas`, el lado de ingresos): diecisiete pasos. El
     orden dentro de la lista es legible, pero lo que lo GARANTIZA es el
     `depends_on` de cada paso, que es lo que obedece el orden topológico.
 
@@ -666,6 +671,13 @@ def build_pipeline_steps(
         BuildTesoreriaStep(settings),
         BuildComprasStep(settings),
         BuildRetencionesStep(settings),
+        # F-040: el lado de ingresos (clientes, facturas de venta,
+        # certificaciones, su enlace y el seguimiento hasta el cobro) y lo
+        # personal del cliente en `ventas_restringida`: el DECIMO build de
+        # negocio. Sus tablas solo leen `raw` (`depends_on` = `ingest_raw`); sus
+        # vistas leen `tesoreria` al consultar. Nadie depende de el: si falla,
+        # la noche continua y R-FRESCURA avisa.
+        BuildVentasStep(settings),
         # F-057: `personal` entra como QUINTO build de negocio. Lee `stg.obras`
         # para la marca `en_seguimiento`, y eso lo declara su `depends_on`; la
         # posición aquí es legibilidad. Nadie depende de él a propósito: si
@@ -955,7 +967,8 @@ def apply_grants() -> None:
     `run-all` ya lo ejecuta como último paso de la noche. A mano hace falta
     tras lanzar `build-cierre`, `build-compras`, `build-maestros`,
     `build-retenciones`, `build-personal`, `build-contabilidad`,
-    `build-tesoreria`, `build-postventa` o `build-descompuestos` SUELTOS: esos
+    `build-tesoreria`, `build-postventa`, `build-ventas` o
+    `build-descompuestos` SUELTOS: esos
     comandos recrean
     tablas y vistas con
     DROP + CREATE y un DROP se lleva los GRANT concedidos.
@@ -5509,6 +5522,45 @@ def build_postventa() -> None:
     pg = _get_pg()
     ejecucion = _arrancar_ejecucion(pg)
     _ejecutar_paso(BuildPostventaStep(settings), pg, ejecucion)
+
+
+# =============================================================================
+# MÓDULO VENTAS (F-040, fase 1): clientes, facturas, certificaciones y cobro
+# =============================================================================
+@cli.command("build-ventas")
+def build_ventas() -> None:
+    """
+    Construye los schemas ventas y ventas_restringida desde raw.*.
+
+    Ejecuta en orden los SQL de sql/ventas:
+      00_setup.sql            schemas y funciones (fecha, CIF, persona, recargo)
+      01_clientes.sql         clientes (el CIF de la persona física a NULL)
+      02_facturas.sql         facturas de venta, sus líneas y sus recargos
+      03_certificaciones.sql  certificaciones y sus recargos
+      04_enlace.sql           certificación -> factura y la cobertura del enlace
+      05_vistas.sql           cobro por factura, seguimiento y contraste por obra
+      06_restringida.sql      ventas_restringida: lo personal del cliente
+      07_guardas.sql          la guarda: recuentos, base, recargos y nada personal
+
+    Requiere haber ingerido cli, cer, cerpro, cerrec, cerprodes, dvfpro, dvfrec
+    y dvf con sus 35 columnas (F-040). Tras lanzarlo suelto, `apply-grants`.
+    No publica el diccionario.
+
+    LO QUE HAY QUE SABER ANTES DE CONSULTAR LO QUE ESTO CONSTRUYE:
+
+      * Certificado, facturado y cobrado son tres cifras que no se suman ni se
+        restan sin declararlo (R-VENTAS-TRES-CIFRAS).
+      * El enlace certificación -> factura es N:M: no sumar lo cobrado entre
+        certificaciones si `factura_compartida`.
+      * Lo personal del cliente (NIF de la persona física, direcciones,
+        teléfonos, correos, la cabecera de la factura) SOLO está en
+        `ventas_restringida`, que lee el perfil total (R-VENTAS-RESTRINGIDA).
+      * La garantía es provisional (D4): clases 4 y 5; el RETESP, aparte.
+    """
+    settings = get_settings()
+    pg = _get_pg()
+    ejecucion = _arrancar_ejecucion(pg)
+    _ejecutar_paso(BuildVentasStep(settings), pg, ejecucion)
 
 
 # =============================================================================

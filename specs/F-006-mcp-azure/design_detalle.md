@@ -286,6 +286,15 @@ infraestructura.
 > `stg.plan_mensual_fase0` (el presupuesto vivo de hoy repartido en el tiempo)
 > y `stg.v_plan_mensual_fase0_cobertura`, de consumo, y la funcion auxiliar
 > `stg.fn_explotar_planif`. Sin regla nueva. El inventario pasa a **290 objetos**.
+>
+> **Enmienda del 2026-11-09 (F-040, el lado de ingresos).** Entran las 7
+> tablas nuevas de `raw` (`cli`, `cer`, `cerpro`, `cerrec`, `cerprodes`,
+> `dvfpro`, `dvfrec`) y los esquemas `ventas` (clientes, facturas de venta,
+> sus lineas y recargos, certificaciones y sus recargos, el enlace
+> certificacion -> factura, su cobertura, tres vistas del cobro y cinco
+> funciones locales) y `ventas_restringida` (lo personal del cliente: tres
+> tablas, solo perfil total). Reglas duras nuevas `R-VENTAS-TRES-CIFRAS` y
+> `R-VENTAS-RESTRINGIDA`. El inventario pasa a **316 objetos**.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,

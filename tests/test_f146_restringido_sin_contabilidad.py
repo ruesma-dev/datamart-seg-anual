@@ -32,7 +32,7 @@ LOGIN = "mcp_sigrid_dm_restringido"
 DUENO = "sigrid_dm_etl"
 CONTABILIDAD = "contabilidad"
 #: lo que el perfil restringido no lee de la lista de consumo (F-141 y F-146)
-VETADOS_AL_PERFIL = ("personal", "contabilidad", "tesoreria")
+VETADOS_AL_PERFIL = ("personal", "contabilidad", "tesoreria", "ventas")  # + F-040 (R27)
 #: lo que hoy hay en `contabilidad` y una tabla que naciera mañana
 TABLAS_CONTABILIDAD = (
     "contabilidad.plan_cuentas", "contabilidad.mayor", "contabilidad.saldos_cuenta_mes",

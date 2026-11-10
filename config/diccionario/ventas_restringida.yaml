@@ -1,0 +1,183 @@
+# config/diccionario/ventas_restringida.yaml
+#
+# Fichas del esquema `ventas_restringida` (F-040, 2026-11-09): LO PERSONAL DEL
+# CLIENTE. El NIF de la persona fisica, las direcciones, los telefonos y el
+# correo de cada cliente; el nombre y el CIF de la CABECERA de cada factura de
+# venta, tal y como se emitio, con sus nueve direcciones; y la descripcion
+# integra de las lineas de las facturas a persona fisica.
+#
+# AUTORIZACION: decisiones D2 y D6 del humano, chat del 2026-11-07: el nombre
+# del cliente es publico en `ventas`; lo demas de la persona y toda direccion,
+# solo aqui. SOLO LA LEE el perfil TOTAL del MCP (por el grupo
+# `sigrid_dm_autorizado_ro`). El estandar, Power BI, el perfil restringido y el
+# de postventa la tienen VETADA: `apply_grants` se la revoca y lo comprueba
+# cada noche. Cada ficha EMPIEZA por el aviso porque el MCP no filtra el
+# diccionario por perfil. Reglas `R-VENTAS-RESTRINGIDA` y `R-PERFILES`.
+#
+# Se cruza con `ventas` por `cliente_id`, `factura_id` y `linea_id`. Ni un dato
+# personal en este fichero.
+
+version: 1
+esquema: ventas_restringida
+
+objetos:
+
+  clientes_contacto:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **ACCESO RESTRINGIDO: solo el perfil total del MCP** (D2 y D6 del humano,
+      chat del 2026-11-07). Si no lo tienes, la consulta devuelve «permission
+      denied»: usa `ventas.clientes`, sin reintentar ni buscar otro camino
+      (`R-VENTAS-RESTRINGIDA`).
+
+      **EL CONTACTO DE CADA CLIENTE**: el codigo y el CIF INTEGROS, tambien los
+      de la persona fisica (que `ventas.clientes` publica a NULL), la direccion completa y en
+      dos lineas, el codigo postal, dos telefonos y el correo. Una fila por
+      cliente, las mismas 1.210 que `ventas.clientes`.
+    grano: >-
+      Una fila por cliente de Sigrid, identificado por `cliente_id`, clave
+      primaria declarada.
+    clave_negocio: [cliente_id]
+    paso_etl: build_ventas
+    refresco: nocturno
+    columnas:
+      cliente_id:
+        significado: Identificador del cliente (el de `ventas.clientes`).
+        agregacion: clave_sustituta
+      codigo_cliente:
+        significado: >-
+          Codigo del cliente en Sigrid (`con.cod`), INTEGRO: puede ser el NIF de
+          la persona; `ventas.clientes` lo publica a NULL en persona fisica y
+          cuando tiene forma de NIF de persona.
+      nombre:
+        significado: Razon social o nombre del cliente, el actual.
+      cif:
+        significado: CIF o NIF integro, tal y como esta en Sigrid (dato personal si es persona fisica).
+      cif_normalizado:
+        significado: CIF en mayusculas y sin espacios, puntos ni guiones (ni prefijo de pais ante un NIF de persona).
+      es_persona_fisica:
+        significado: Verdadero si el cliente es persona fisica (`perfis` o NIF de persona, tambien con prefijo de pais).
+      direccion:
+        significado: Direccion completa del cliente (dato personal si es persona fisica).
+      direccion_linea1:
+        significado: Primera linea de la direccion del cliente.
+      direccion_linea2:
+        significado: Segunda linea de la direccion del cliente.
+      codigo_postal:
+        significado: Codigo postal de la direccion del cliente.
+      telefono:
+        significado: Telefono del cliente (dato personal si es persona fisica).
+      telefono2:
+        significado: Segundo telefono del cliente (dato personal si es persona fisica).
+      correo:
+        significado: Correo electronico del cliente (dato personal si es persona fisica).
+    relaciones:
+      - de: cliente_id
+        a: ventas.clientes.cliente_id
+        cardinalidad: "1:1"
+        porque: Para lo facturado y las obras del cliente.
+    ejemplos_preguntas:
+      - Cual es el telefono y la direccion del cliente X
+
+  factura_cabecera:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **ACCESO RESTRINGIDO: solo el perfil total del MCP** (D2 y D6 del humano,
+      chat del 2026-11-07). Si no lo tienes, la consulta devuelve «permission
+      denied»: usa `ventas.facturas`, sin reintentar ni buscar otro camino
+      (`R-VENTAS-RESTRINGIDA`).
+
+      **LA CABECERA DE CADA FACTURA DE VENTA, COMO SE EMITIO**: el nombre y el
+      CIF del destinatario escritos en la factura (en 571 facturas el nombre
+      difiere del actual del cliente por renombres; en 3.635 el CIF es el NIF
+      de una persona) y las nueve direcciones de la cabecera (empresa,
+      contacto y completa, 1 a 3; las de contacto, vacias hoy).
+    grano: >-
+      Una fila por factura de venta, identificada por `factura_id`, clave
+      primaria declarada.
+    clave_negocio: [factura_id]
+    paso_etl: build_ventas
+    refresco: nocturno
+    columnas:
+      factura_id:
+        significado: Factura de venta (la de `ventas.facturas`).
+        agregacion: clave_sustituta
+      cliente_id:
+        significado: Cliente de la factura (el de `ventas.clientes`).
+        agregacion: no_sumable
+      es_persona_fisica:
+        significado: Verdadero si el cliente de la factura es persona fisica.
+      nombre_cabecera:
+        significado: Nombre del destinatario escrito en la factura (`entres`).
+      cif_cabecera:
+        significado: CIF o NIF del destinatario escrito en la factura (`entcif`).
+      direccion_empresa_1:
+        significado: Primera direccion de la empresa en la cabecera (`diremp1`).
+      direccion_contacto_1:
+        significado: Primera direccion de contacto en la cabecera (`dircon1`).
+      direccion_completa_1:
+        significado: Primera direccion completa de la cabecera (`dirdir1`).
+      direccion_empresa_2:
+        significado: Segunda direccion de la empresa en la cabecera (`diremp2`).
+      direccion_contacto_2:
+        significado: Segunda direccion de contacto en la cabecera (`dircon2`).
+      direccion_completa_2:
+        significado: Segunda direccion completa de la cabecera (`dirdir2`).
+      direccion_empresa_3:
+        significado: Tercera direccion de la empresa en la cabecera (`diremp3`).
+      direccion_contacto_3:
+        significado: Tercera direccion de contacto en la cabecera (`dircon3`).
+      direccion_completa_3:
+        significado: Tercera direccion completa de la cabecera (`dirdir3`).
+    relaciones:
+      - de: factura_id
+        a: ventas.facturas.factura_id
+        cardinalidad: "1:1"
+        porque: Para la fecha, la obra y los importes de la factura.
+    ejemplos_preguntas:
+      - A que nombre y direccion se emitio la factura de venta X
+
+  factura_lineas_persona:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **ACCESO RESTRINGIDO: solo el perfil total del MCP** (D2 y D6 del humano,
+      chat del 2026-11-07). Si no lo tienes, la consulta devuelve «permission
+      denied»: usa `ventas.factura_lineas`, sin reintentar ni buscar otro
+      camino (`R-VENTAS-RESTRINGIDA`).
+
+      **LA DESCRIPCION INTEGRA DE LAS LINEAS QUE `ventas.factura_lineas`
+      PUBLICA SIN ELLA**: las de un cliente persona fisica (pueden nombrar a la
+      persona del arrendamiento o la compraventa), las de una factura cuyo
+      cliente no esta en `raw.cli` (enmienda del humano, 2026-11-10) y las de
+      una factura que no existe. Solo la descripcion: cantidades e importes, en la general.
+    grano: >-
+      Una fila por linea de factura de venta, identificada por `linea_id`,
+      clave primaria declarada.
+    clave_negocio: [linea_id]
+    paso_etl: build_ventas
+    refresco: nocturno
+    columnas:
+      linea_id:
+        significado: Linea de factura (la de `ventas.factura_lineas`).
+        agregacion: clave_sustituta
+      factura_id:
+        significado: Factura de la linea (la de `ventas.facturas`).
+        agregacion: no_sumable
+      cliente_id:
+        significado: Cliente de la factura (el de `ventas.clientes`).
+        agregacion: no_sumable
+      descripcion:
+        significado: Texto integro de la linea (puede llevar datos de la persona).
+    relaciones:
+      - de: linea_id
+        a: ventas.factura_lineas.linea_id
+        cardinalidad: "1:1"
+        porque: Para la cantidad, el importe y la partida de la linea.
+    ejemplos_preguntas:
+      - Que dice la linea de la factura de venta X a una persona fisica
