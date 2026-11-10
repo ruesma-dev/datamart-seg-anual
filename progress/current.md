@@ -9,7 +9,22 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-11-10 · F-040 · `in_progress` · implementer: ciclo 2 (H2 a y b del humano) hecho, pendiente re-review y mutación · rama `feature/F-040-ingresos`
+## 2026-11-10 · F-040 · `in_progress` · APPROVED y en `main`; pendiente de desplegar (T17 y T18, MANUALES) para pasarla a `done`
+
+Líder, 2026-11-10:
+- **Review, pasada 3:** APPROVED (`e10f465`).
+- **Puerta del líder con `.env` sobre `fcfd86f`:** `init.sh` exit 0, con 11077 passed y 2473 skipped.
+- **Sandbox de F-040 con DSN:** 2352 passed, y la `PUERTA COBERTURA` da el 100 % (160/160).
+- **Mutación sobre `fcfd86f`:** 61 mutantes, 58 muertos y 3 supervivientes de `build_ventas_step.py`, que el humano aceptó por escrito (`progress/mutacion_F-040.md`).
+- **Merge a `main`:** hecho.
+- **Para pasar a `done` falta lo siguiente:**
+  - Desplegar la imagen.
+  - Aplicar `02_roles.sql` y la lista blanca de `mcp-bbdd`.
+  - Hacer el push de `azure-apps`, con los commits `882abce`, `76e722c` y `0f5ae73`.
+  - Medir la primera noche en Azure.
+- **Observaciones del reviewer (O1, O3, O4 y O5):** las decide el humano; no bloquean.
+
+## 2026-11-10 · F-040 · implementer: ciclo 2 (H2 a y b del humano) hecho · rama `feature/F-040-ingresos`
 
 Implementer, ciclo 2 (aprobado por el humano el 2026-11-10). R2-a `9ea7e7e`: el prefijo de país se quita solo si queda un
 NIF de persona (dominio y `ventas.fn_cif_normalizado`; cubre cif, código, líneas y guarda R24). R2-b `118776a`: la factura
