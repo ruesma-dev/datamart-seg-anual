@@ -9,6 +9,15 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-11 · F-162 · `in_progress` · implementada (T1-T11), pendiente del review · rama `feature/F-162-obra-duplicada-ruesma`
+
+implementer, PARADA 1 confirmada («ok a d1 a d5»). Informe: `progress/impl_F-162.md`.
+- **Hecho:** `stg.obras` con una fila por ficha y `empresa_id`, `clave_obra` y `es_por_defecto`. El criterio es único (D1) y vive en `etl_sigrid/domain/ficha_obra.py` y en `03_obras.sql`. Lo llevan `maestro.obras`, `mart.v_pbi_dim_obra` (con `obra_label`, D3) y `cierre.v_pbi_cierre_cabecera`. Los seis `inspect-*` y `find-obra` aceptan clave o código y avisan cuando hay varias fichas.
+- **Diccionario v76:** 316 objetos, 2664 columnas y 153 de consumo. R-EMPRESA-POR-DEFECTO aplica D4.
+- **Guardas retiradas, con su motivo:** f102 r7/r18 y f073 r26. Fuera también las 4 excepciones de F-053 (`EXCEPCIONES_MAX` 19). F-053 se propone absorbida y F-106 queda enmendada, sin cambiar sus estados.
+- **Desviación:** `dudosas` usa `count(*) FILTER (empresa 1) <> 1` para que el SQL coincida con el oráculo cuando hay 0 o 2 fichas de Ruesma. Está justificada en el informe.
+- **MANUAL (líder o humano):** sandbox T12 con DSN, `EXPLAIN` de solo lectura en Azure, medición T13, despliegue T14, la campaña oficial de mutación, `check-cobertura` y el push de azure-apps (`f2cd5eb`).
+
 ## 2026-11-11 · F-162 · spec REHECHA (modelo por empresa), pendiente de la PARADA 1
 
 spec-author, rama `feature/F-162-obra-duplicada-ruesma` (desde `17b41ec`): `specs/F-162-obra-duplicada-ruesma/`. El humano rechazó «elegir una ficha por código»: el seguimiento lleva TODAS las fichas, cada una con su empresa, y la IA usa `es_por_defecto` cuando la pregunta no dice empresa. El primer planteamiento queda en el commit `b1345e8` como historia.
