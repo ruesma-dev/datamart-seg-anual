@@ -401,9 +401,16 @@ def test_f102_r7_stg_no_lee_la_vista_de_fichas() -> None:
 # ===========================================================================
 
 
+#: La que añade F-162 detrás de las seis de F-102: la ficha por defecto (R8 de
+#: F-162). El guarda sigue exigiendo la lista ENTERA y en orden.
+COLUMNAS_OBRAS_F162 = ("es_por_defecto",)
+
+
 def test_f102_r8_las_seis_columnas_van_al_final_y_en_orden() -> None:
     publicadas = _columnas_en_orden(RUTA_OBRAS, "maestro.obras")
-    assert publicadas == list(COLUMNAS_OBRAS_ANTES + COLUMNAS_OBRAS_NUEVAS), (
+    assert publicadas == list(
+        COLUMNAS_OBRAS_ANTES + COLUMNAS_OBRAS_NUEVAS + COLUMNAS_OBRAS_F162
+    ), (
         "las de antes en su orden, y las seis nuevas DETRAS: el replace solo "
         "admite columnas al final (R8)"
     )
