@@ -77,7 +77,12 @@ from etl_sigrid.infrastructure.postgres.cobertura_sql import (
 #: De las 13, **8 las cierra F-117** y **2 las cierra F-052**: el trinquete
 #: vuelve a bajar a 15 (23 - 8) en cuanto F-117 conteste si esas cuatro obras están
 #: ciegas en master por diseño o por otro agujero.
-EXCEPCIONES_MAX = 23
+#:
+#: **BAJA DE 23 A 19 EL 2026-11-11 (F-162).** Salen las cuatro excepciones de
+#: F-053 (0517, 0252, 0720 y 0606): `stg.obras` deja de desempatar y lleva todas
+#: las fichas de todas las empresas, así que ninguna se pierde. Que no salten en
+#: `check-cobertura` se mide en el despliegue (design §7, paso 7).
+EXCEPCIONES_MAX = 19
 
 
 def _fila(
@@ -248,14 +253,16 @@ def test_f052_r16_toda_excepcion_declara_motivo():
 
 
 def test_f052_r16_el_fichero_de_excepciones_declara_las_de_hoy():
-    """Los tres grupos del informe: las obras con partidas en ciclo, las
-    administrativas y las tres que dependen de F-053."""
+    """Los grupos del informe: las obras con partidas en ciclo y las
+    administrativas. El de F-053 (0517, 0252, 0720 y 0606) lo retiró F-162
+    (2026-11-11): con todas las fichas en `stg.obras` ninguna se pierde, y una
+    excepción que siguiera ahí taparía una obra invisible NUEVA de esos códigos."""
     excepciones = cargar_excepciones()
     codigos = {e.codigo_obra for e in excepciones if e.codigo_obra}
 
     assert {"0565", "0630", "0686"} <= codigos, "faltan las obras con ciclos"
-    assert {"0517", "0252", "0720"} <= codigos, "faltan las tres obras de F-053"
-    assert any(e.feature == "F-053" for e in excepciones)
+    assert not {"0517", "0252", "0720", "0606"} & codigos, "F-162 retiró las de F-053"
+    assert not any(e.feature == "F-053" for e in excepciones)
 
 
 def test_f052_r16_el_trinquete_de_excepciones_solo_baja():
