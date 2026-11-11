@@ -53,11 +53,8 @@ No corrí `init.sh` ni la suite entera (encargo: el worktree no tiene `.env`). �
 
 - **Retiradas:** `f102_r7` ×2, `f102_r18` ×2 y `f073_r26`, cada una con su motivo en un
   comentario que vigila `test_f162_r18`. Sigue en pie `f102_r7_stg_no_lee_la_vista_de_fichas`.
-- **Adaptadas, sin relajar:**
-  - `f102_r8` exige la lista entera más `es_por_defecto`.
-  - `f108` exige las claves nuevas.
-  - `f052_cobertura` exige que NO estén los 4 códigos de F-053.
-  - `f052_cierre_excepciones` saca la 0606 con su comentario.
+- **Adaptadas, sin relajar:** `f102_r8` (lista entera + `es_por_defecto`), `f108` (claves
+  nuevas), `f052_cobertura` (exige que NO estén los 4 de F-053), `f052_cierre_excepciones` (0606).
 - **`EXCEPCIONES_MAX`** baja de 23 a 19. Que no salten se mide en el despliegue (design §7, paso 7).
 
 ## Diccionario v76 (R13-R17), D3 y `azure-apps`
@@ -67,9 +64,8 @@ No corrí `init.sh` ni la suite entera (encargo: el worktree no tiene `.env`). �
   no sumar fichas sin decirlo. Conserva `empresa_id = 1`.
 - **`R-UNIVERSO-OBRA`** ya no deduplica: 634 fichas y 585 códigos.
 - **`R-CODIGO-POR-EMPRESA`** alcanza a las dos vistas.
-- **Preguntas.** P4, P6, P7, P10, P11 y P14 llevan la regla. P9 cuenta fichas por defecto.
-- **F-147.** `PRESUPUESTO_MAX` y los topes de `f147_contenido` en verde.
-- **D3.** El cambio de `obra_label` para Power BI está documentado en tres sitios: `mart.yaml`
+- **Preguntas:** P4, P6, P7, P10, P11 y P14 llevan la regla; P9 cuenta fichas por defecto.
+- **F-147:** `PRESUPUESTO_MAX` y topes en verde. **D3.** El cambio de `obra_label` para Power BI está documentado en tres sitios: `mart.yaml`
   (l. 758), la cabecera y el `COMMENT` de la vista, y `azure-apps`.
 - **`azure-apps` `f2cd5eb`.** Commit local sin push. Solo toca `datamart_seg_anual.md`, marcado
   «SIN DESPLEGAR», y avisa del cambio de texto de los segmentadores.
@@ -81,7 +77,6 @@ No corrí `init.sh` ni la suite entera (encargo: el worktree no tiene `.env`). �
   `23 == 19`).
 - **Sandbox en tres estados:** 9 failed por `UndefinedColumn`, después 8 failed (`KeyError:
   2759553`, se pierde la de Ruesma) y al final 9 passed.
-- **Los 6 que pasaban en RED** son guardas de lo que no cambia.
 
 ## Mutación
 
@@ -99,37 +94,21 @@ No corrí `init.sh` ni la suite entera (encargo: el worktree no tiene `.env`). �
 
 ## Checkpoints
 
-- **C1:** [x] condicionado a la puerta del líder; en el worktree solo falla el `.env`. [x] Están
-  los ficheros del arnés.
-- **C2:** [x] Una sola feature `in_progress`. [x] La rama es la de la feature. [x] `current.md`
-  está al día. [x] No hay `done` nuevas.
-- **C3:**
-  - [x] Hexagonal: `ficha_obra.py` es dominio puro, el SQL va en su capa y el CLI en `main.py`.
-  - [x] Cabecera con la ruta.
-  - [x] Sin `print`, TODO ni secretos.
-  - [x] Semántica de Sigrid respetada y `ARCHITECTURE.md` al día.
-- **C3 bis:** N/A, no entra ningún documento de fuera.
-- **C4:**
-  - [x] Cada requisito tiene test (tabla).
-  - [x] Sin red ni BBDD: la sandbox hace `skip` sin DSN y hay un PG falso para el CLI.
-  - [x] MANUAL en T12-T15.
-  - [x] El doble de cursor solo tiene `execute` y `fetchall`, con la firma real.
-- **C4 bis:**
-  - [x] Rigor declarado.
-  - [x] RED real.
-  - [x] Cobertura del 100 %, medida por mí.
-  - N/A justificado: no hay informe de la herramienta (la línea base no corre sin `.env`). Lo
-    sustituyen el recálculo y los 20 mutantes de la muestra, ejecutados por mí (20/20).
-  - N/A justificado: RM1, RM2, el tiempo y la cabecera «⚠ CAMPAÑA NO VÁLIDA», porque sin informe
-    no hay qué juzgar. El SHA verificado es 942b444 (HEAD).
-  - N/A: RM5, por ser `estandar`. [x] RM6.
-  - [x] Superviviente analizado.
-  - [x] «Evidencias» completas.
-- **C4 ter:** N/A, no hay `harness/rutas_sensibles.json`.
-- **C5:**
-  - [x] T1-T11 en `[x]`, con 16 commits `F-162`. T12-T15 son MANUAL o de la puerta: justificado.
-  - [x] Árbol limpio.
-  - [x] La feature sigue `in_progress`.
+- **C1** [x] condicionado a la puerta del líder (en el worktree solo falla el `.env`); arnés completo.
+- **C2** [x] una sola `in_progress`, rama correcta, `current.md` al día, sin `done` nuevas.
+- **C3** [x] hexagonal (`ficha_obra.py` dominio puro; SQL en su capa; CLI en `main.py`); cabecera
+  con ruta; sin `print`, TODO ni secretos; semántica Sigrid y `ARCHITECTURE.md` al día.
+- **C3 bis** N/A: no entra ningún documento de fuera.
+- **C4** [x] requisito → test (tabla); sin red ni BBDD (sandbox con `skip`, PG falso en el CLI);
+  MANUAL en T12-T15; el doble de cursor solo tiene `execute`/`fetchall` con la firma real.
+- **C4 bis** [x] rigor declarado; [x] RED real; [x] cobertura 100 % medida por mí. N/A justificado:
+  sin informe de la herramienta (línea base sin `.env`), lo sustituyen el recálculo y los 20
+  mutantes ejecutados por mí (20/20); por lo mismo no hay RM1, RM2, tiempo ni cabecera «⚠ CAMPAÑA
+  NO VÁLIDA» que juzgar (SHA verificado: 942b444). N/A RM5 (`estandar`). [x] RM6, superviviente
+  analizado, «Evidencias» completas.
+- **C4 ter** N/A: no hay `harness/rutas_sensibles.json`.
+- **C5** [x] T1-T11 en `[x]` con 16 commits `F-162`; T12-T15 MANUAL o puerta (justificado);
+  árbol limpio; la feature sigue `in_progress`.
 
 ## Cobertura requisito → test
 
@@ -157,7 +136,5 @@ No corrí `init.sh` ni la suite entera (encargo: el worktree no tiene `.env`). �
    Corregir la nota.
 4. **La enmienda de F-106** debería nombrar los cinco comandos de la desviación 4.
 
-## Automejora (propuesta, no aplicada)
-
-- **C5 de `CHECKPOINTS.md`:** una tarea que lleva dentro una verificación MANUAL no se marca `[x]`
+**Automejora (propuesta, no aplicada).** C5 de `CHECKPOINTS.md`:** una tarea que lleva dentro una verificación MANUAL no se marca `[x]`
   hasta hacerla; lo pendiente va a su propia tarea MANUAL (caso T4).
