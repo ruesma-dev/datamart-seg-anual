@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **148 features**, 72 abiertas (0 en curso, 1 con la spec lista, 0 bloqueadas y 71 en backlog) y 76 terminadas.
+Resumen: **150 features**, 74 abiertas (0 en curso, 1 con la spec lista, 0 bloqueadas y 73 en backlog) y 76 terminadas.
 
 ## En curso
 
@@ -23,6 +23,8 @@ _Ninguna feature bloqueada._
 
 | # | Feature | Prioridad | Rigor | Rama |
 |---|---|---|---|---|
+| F-162 | Hotfix: `stg.obras` elige la ficha vacía de PORSAN para la 0721 (desempate de fichas duplicadas sin marca de vigente) | 0 | estandar | `feature/F-162-obra-duplicada-ruesma` |
+| F-161 | Versiones del máster y coste sin planificación temporal: catálogo desde las cabeceras, coste por versión y partida y vigencia temporal frente a vigencia de importe | 1 | estandar | `feature/F-161-versiones-sin-reparto` |
 | F-104 | La retencion de CLIENTE no esta saneada: 22,16 M EUR «vivos» de los que 19,93 M tienen fecha de baja, y la contabilidad dice 13,81 M | 3 | estandar | `feature/F-104-retenciones-cliente` |
 | F-160 | Ventas fase 2: contraste producido / certificado de todas las obras y los conceptos certificados fuera de coeficiente | 4 | estandar | `feature/F-160-ventas-contraste-fase2` |
 | F-151 | La función de caja proyectada (fase 2): `tesoreria.fn_caja_proyectada(obra, hipótesis del usuario)` | 5 | critico | `feature/F-151-funcion-caja-proyectada` |
@@ -177,6 +179,18 @@ _Ninguna feature bloqueada._
 | F-142 | Que cualquier IA pueda leer los adjuntos: `abrir_adjunto` devuelve el contenido CONVERTIDO (texto por página, o imagen si es un escaneo) de PDF y ofimática, también Word 97 y Excel antiguos, y el original a petición | 74 | estandar |
 
 ## Detalle
+
+### F-162 · Hotfix: `stg.obras` elige la ficha vacía de PORSAN para la 0721 (desempate de fichas duplicadas sin marca de vigente)
+
+estado **pendiente** · prioridad 0 · rigor `estandar` · SDD sí · rama `feature/F-162-obra-duplicada-ruesma`
+
+Incidencia de Control de Costes (Elena y Juan, 2026-11-11): la 0721 no trae presupuesto ni versiones porque `stg/03_obras.sql` deja UNA ficha por código. Si ninguna tiene la marca de vigente (`conext` 15), elige la de `tiemod` más reciente, y en la 0721 esa es la ficha vacía de PORSAN (empresa 28, ide 2855829, alta del 19-10-2026), en lugar de la de Construcciones Ruesma (1-0721, ide 2759553, con 9.165 líneas y los dos masters). Diagnóstico en `progress/explore_0721_obra_duplicada.md`. CRITERIO DEL HUMANO (2026-11-11, «en caso de duda debe ir siempre por delante construcciones ruesma, salvo que se diga explicitamente lo contrario», matizado: Ruesma solo cuando los datos no deciden). Orden nuevo: 1) marca `conext` 15; 2) más presupuesto (líneas de `raw.obrparpre`); 3) Construcciones Ruesma (`con.emp` = 1); 4) `tiemod` DESC; 5) `ide` DESC. MEDIDO por el líder el 2026-11-11 sobre todos los códigos: cambian tres obras. La 0721 pasa de PORSAN a Ruesma; la 0252 y la 0517 (obras cerradas de 2009 y 2016) pasan de la ficha casi vacía de Ruesma a la de su UTE, que tiene los datos (28.511 y 158.737 líneas). La 0581, la 0606 y la 0671 no cambian. Además, `stg.obras` gana la columna `empresa_id` (`con.emp`) con su ficha, para que la skill del ABC y las consultas sepan de qué empresa es la ficha elegida.
+
+### F-161 · Versiones del máster y coste sin planificación temporal: catálogo desde las cabeceras, coste por versión y partida y vigencia temporal frente a vigencia de importe
+
+estado **pendiente** · prioridad 1 · rigor `estandar` · SDD sí · rama `feature/F-161-versiones-sin-reparto`
+
+Incidencia de Control de Costes (Juan, 2026-11-10): la v24 de coste de la 0698 (CIERRE SEPTIEMBRE-26, 776 líneas, 2.107.662,97 €) no aparece en `mart.v_master_versiones_tipadas`. Ninguna de sus líneas trae `obrparpre.planif`, el reparto temporal, y el catálogo (`mart/06_cp_tipologia.sql:117`, y su copia en `mart/02_build_fact.sql:55`) se deduce de `stg.plan_mensual`, que descarta las líneas sin `planif` (`stg/08_plan_mensual.sql:224`). Diagnóstico en `progress/explore_0698_v24_coste.md`: 49 versiones enteras sin reparto, y además 304 M€ de coste (en 1.716 versiones) y 195 M€ de venta sin mes dentro de versiones que sí tienen reparto. CRITERIO DEL HUMANO (2026-11-11): no siempre tiene que haber planificación temporal, y eso no quiere decir que no haya que coger y analizar el coste. «Una cosa es el último planificado temporal y otra el último planificado a nivel de importe total, y pueden divergir.» ALCANCE PROPUESTO: (1) el catálogo, desde las cabeceras (`obrfasamb` con líneas en `stg.presupuesto`), con `importe_total`, `importe_con_reparto`, `importe_sin_reparto` y `reparto` (COMPLETO, PARCIAL o NINGUNO); (2) una vista del coste por versión y partida que no dependa del reparto; (3) dos vigencias explícitas: la última versión de importe y la última con reparto temporal, y cómo se combinan en el seguimiento mensual (decisión de Negocio en la spec); (4) un solo catálogo para `fact_seguimiento_mensual` y `06_cp_tipologia`; (5) la ficha del diccionario corregida. Las cifras vigentes de hoy no cambian salvo por decisión explícita, y se comprueba con la huella de `master_vigente_anual`, `fact_cp_tipologia`, `fin_obra` y `devengo_*`.
 
 ### F-104 · La retencion de CLIENTE no esta saneada: 22,16 M EUR «vivos» de los que 19,93 M tienen fecha de baja, y la contabilidad dice 13,81 M
 

@@ -825,7 +825,7 @@
       "rigor": "documental",
       "priority": 6,
       "branch": "feature/F-054-conocimiento-de-negocio",
-      "notes": "2026-10-27: prioridad 4 -> 5 por orden del humano (tras F-150 van F-040 y F-104)."
+      "notes": "2026-10-27: prioridad 4 -> 5 por orden del humano (tras F-150 van F-040 y F-104). 2026-11-11: llega la primera definición de Negocio, «incurrido / coste incurrido», de Juan Romero, más el término derivado «almacén». Fuente literal en `docs/referencia/07_glosario_incurrido.md`. Antes de publicarla, contrastar cada trampa con lo que calcula el datamart."
     },
     {
       "id": "F-055",
@@ -2570,6 +2570,42 @@
       "priority": 4,
       "branch": "feature/F-160-ventas-contraste-fase2",
       "notes": "2026-11-07: creada por el spec-author de F-040 al recoger la D1 = A del humano. Id F-160 porque F-159 ya está reservado por la rama `feature/F-159-hotfix-devengo-negativo-2`. Prioridad 4 provisional (detrás de F-040 y F-104): la fija el humano."
+    },
+    {
+      "id": "F-161",
+      "title": "Versiones del máster y coste sin planificación temporal: catálogo desde las cabeceras, coste por versión y partida y vigencia temporal frente a vigencia de importe",
+      "description": "Incidencia de Control de Costes (Juan, 2026-11-10): la v24 de coste de la 0698 (CIERRE SEPTIEMBRE-26, 776 líneas, 2.107.662,97 €) no aparece en `mart.v_master_versiones_tipadas`. Ninguna de sus líneas trae `obrparpre.planif`, el reparto temporal, y el catálogo (`mart/06_cp_tipologia.sql:117`, y su copia en `mart/02_build_fact.sql:55`) se deduce de `stg.plan_mensual`, que descarta las líneas sin `planif` (`stg/08_plan_mensual.sql:224`). Diagnóstico en `progress/explore_0698_v24_coste.md`: 49 versiones enteras sin reparto, y además 304 M€ de coste (en 1.716 versiones) y 195 M€ de venta sin mes dentro de versiones que sí tienen reparto. CRITERIO DEL HUMANO (2026-11-11): no siempre tiene que haber planificación temporal, y eso no quiere decir que no haya que coger y analizar el coste. «Una cosa es el último planificado temporal y otra el último planificado a nivel de importe total, y pueden divergir.» ALCANCE PROPUESTO: (1) el catálogo, desde las cabeceras (`obrfasamb` con líneas en `stg.presupuesto`), con `importe_total`, `importe_con_reparto`, `importe_sin_reparto` y `reparto` (COMPLETO, PARCIAL o NINGUNO); (2) una vista del coste por versión y partida que no dependa del reparto; (3) dos vigencias explícitas: la última versión de importe y la última con reparto temporal, y cómo se combinan en el seguimiento mensual (decisión de Negocio en la spec); (4) un solo catálogo para `fact_seguimiento_mensual` y `06_cp_tipologia`; (5) la ficha del diccionario corregida. Las cifras vigentes de hoy no cambian salvo por decisión explícita, y se comprueba con la huella de `master_vigente_anual`, `fact_cp_tipologia`, `fin_obra` y `devengo_*`.",
+      "acceptance": [
+        "Spec SDD aprobada por el humano, con la decisión sobre las dos vigencias (importe y temporal)",
+        "La v24 de coste de la 0698 y las demás versiones sin reparto aparecen en el catálogo con su importe y `reparto` = NINGUNO",
+        "El coste de cualquier versión se consulta por partida tenga o no reparto",
+        "Huella antes/después de los consumidores del catálogo: idéntica salvo los cambios decididos y documentados",
+        "Fichas y reglas del diccionario al día; `bash harness/init.sh` en verde"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 1,
+      "branch": "feature/F-161-versiones-sin-reparto",
+      "notes": "2026-11-11: alta por el líder tras el sí del humano. Va detrás de F-162 y delante de F-104."
+    },
+    {
+      "id": "F-162",
+      "title": "Hotfix: `stg.obras` elige la ficha vacía de PORSAN para la 0721 (desempate de fichas duplicadas sin marca de vigente)",
+      "description": "Incidencia de Control de Costes (Elena y Juan, 2026-11-11): la 0721 no trae presupuesto ni versiones porque `stg/03_obras.sql` deja UNA ficha por código. Si ninguna tiene la marca de vigente (`conext` 15), elige la de `tiemod` más reciente, y en la 0721 esa es la ficha vacía de PORSAN (empresa 28, ide 2855829, alta del 19-10-2026), en lugar de la de Construcciones Ruesma (1-0721, ide 2759553, con 9.165 líneas y los dos masters). Diagnóstico en `progress/explore_0721_obra_duplicada.md`. CRITERIO DEL HUMANO (2026-11-11, «en caso de duda debe ir siempre por delante construcciones ruesma, salvo que se diga explicitamente lo contrario», matizado: Ruesma solo cuando los datos no deciden). Orden nuevo: 1) marca `conext` 15; 2) más presupuesto (líneas de `raw.obrparpre`); 3) Construcciones Ruesma (`con.emp` = 1); 4) `tiemod` DESC; 5) `ide` DESC. MEDIDO por el líder el 2026-11-11 sobre todos los códigos: cambian tres obras. La 0721 pasa de PORSAN a Ruesma; la 0252 y la 0517 (obras cerradas de 2009 y 2016) pasan de la ficha casi vacía de Ruesma a la de su UTE, que tiene los datos (28.511 y 158.737 líneas). La 0581, la 0606 y la 0671 no cambian. Además, `stg.obras` gana la columna `empresa_id` (`con.emp`) con su ficha, para que la skill del ABC y las consultas sepan de qué empresa es la ficha elegida.",
+      "acceptance": [
+        "Spec SDD aprobada por el humano (PARADA 1)",
+        "Test de regresión con el caso 0721 (dos fichas sin marca, la nueva vacía y de otra empresa) en RED antes y en verde después; y uno de empate en datos que gana Ruesma",
+        "Medida de antes y después en Azure: solo cambian de ficha la 0721, la 0252 y la 0517, y lo que arrastran (`stg.partidas`, `stg.presupuesto`, `plan_mensual`, `mart`) queda documentado",
+        "`stg.obras.empresa_id` con su ficha en el diccionario y la regla del desempate escrita en la ficha de `stg.obras`",
+        "`bash harness/init.sh` en verde y despliegue con sus pasos y su vuelta atrás"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 0,
+      "branch": "feature/F-162-obra-duplicada-ruesma",
+      "notes": "2026-11-11: alta por el líder tras el sí del humano; spec-author lanzado."
     }
   ]
 }
