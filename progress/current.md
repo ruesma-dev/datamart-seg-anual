@@ -9,6 +9,18 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-11 · F-162 · spec escrita, pendiente de la PARADA 1
+
+spec-author, rama `feature/F-162-obra-duplicada-ruesma` (desde `17b41ec`): `specs/F-162-obra-duplicada-ruesma/`.
+- **Medido en Azure** (solo lectura, 11:05-12:30 UTC): con el orden nuevo cambian solo 0721, 0252 y 0517, como midió el líder. Las tres fichas que salen tienen 0 filas en `stg.plan_mensual`, `mart` y `cierre`, así que no desaparece ninguna cifra publicada: solo entran obras. `stg.plan_mensual` no cambia (03 y 01 no están en el sello).
+- **Coste:** el recuento de `raw.obrparpre` añade unos 48 s por noche, porque no hay índice por `obride`.
+- **Guardas que caen a propósito:** el hash de `03_obras.sql` en `test_f102_r7` y las excepciones de cobertura de 0252 y 0517 (`EXCEPCIONES_MAX` pasa de 23 a 21).
+- **Decisiones abiertas para el humano** (design §7):
+  - **D3:** quitar también la excepción de la 0720, que ya elige la ficha de Ruesma.
+  - **D4:** reescribir F-053 para que quede solo la 0606.
+  - **D5:** F-162 lleva la 0252 y la 0517 a la ficha de su UTE, lo contrario de lo que plantea F-106 («solo empresa 1»). Hay que confirmar que F-162 manda hasta F-106.
+  - **D6 (aviso):** la 0721 entra en `mart` sin versiones master, porque no tiene `planif` (es F-161).
+
 ## 2026-11-11 · NADA EN CURSO · leer esto primero
 
 - **F-040, `done` el 2026-11-11:** primera nocturna sin fallos. El resumen está en `history.md`, y debajo quedan el registro del despliegue y del ciclo 2.
