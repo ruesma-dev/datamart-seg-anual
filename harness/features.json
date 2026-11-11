@@ -2602,12 +2602,12 @@
         "Excepciones de cobertura de F-053 retiradas (`EXCEPCIONES_MAX` 19); F-053 cerrada como absorbida y F-106 enmendada",
         "`bash harness/init.sh` en verde y despliegue con sus pasos y su vuelta atrás"
       ],
-      "status": "pending",
+      "status": "in_progress",
       "sdd": true,
       "rigor": "estandar",
       "priority": 0,
       "branch": "feature/F-162-obra-duplicada-ruesma",
-      "notes": "2026-11-11: alta por el líder tras el sí del humano; spec-author lanzado. Mismo día: el humano rechaza «elegir una ficha» y fija el modelo por empresa; spec rehecha."
+      "notes": "2026-11-11: alta por el líder tras el sí del humano; spec-author lanzado. Mismo día: el humano rechaza «elegir una ficha» y fija el modelo por empresa; spec rehecha. 2026-11-11, PARADA 1 CONFIRMADA por el humano («ok a d1 a d5»), con las recomendaciones de design §8: D1, `maestro.obras.es_por_defecto` con el MISMO criterio en todas las fichas; D2, `conext` 15 fuera del criterio; D3, Power BI sin filtro, con `obra_label` = `clave_obra · nombre` (cambia el texto de las 585 obras de hoy); D4, los agregados sin empresa en `mart`/`cierre` usan `empresa_id` = 1; D5, la empresa no va a los hechos: se cruza por `obra_id` con `maestro.obras`. Implementer lanzado."
     }
   ]
 }

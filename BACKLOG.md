@@ -3,11 +3,13 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **150 features**, 74 abiertas (0 en curso, 1 con la spec lista, 0 bloqueadas y 73 en backlog) y 76 terminadas.
+Resumen: **150 features**, 74 abiertas (1 en curso, 1 con la spec lista, 0 bloqueadas y 72 en backlog) y 76 terminadas.
 
 ## En curso
 
-_Ninguna feature en curso._
+| # | Feature | Prioridad | Rigor | Rama |
+|---|---|---|---|---|
+| F-162 | El seguimiento lleva TODAS las fichas de obra, cada una con su empresa, y marca la ficha por defecto de cada código (0721 en Ruesma y en PORSAN) | 0 | estandar | `feature/F-162-obra-duplicada-ruesma` |
 
 ## Spec lista
 
@@ -23,7 +25,6 @@ _Ninguna feature bloqueada._
 
 | # | Feature | Prioridad | Rigor | Rama |
 |---|---|---|---|---|
-| F-162 | Hotfix: `stg.obras` elige la ficha vacía de PORSAN para la 0721 (desempate de fichas duplicadas sin marca de vigente) | 0 | estandar | `feature/F-162-obra-duplicada-ruesma` |
 | F-161 | Versiones del máster y coste sin planificación temporal: catálogo desde las cabeceras, coste por versión y partida y vigencia temporal frente a vigencia de importe | 1 | estandar | `feature/F-161-versiones-sin-reparto` |
 | F-104 | La retencion de CLIENTE no esta saneada: 22,16 M EUR «vivos» de los que 19,93 M tienen fecha de baja, y la contabilidad dice 13,81 M | 3 | estandar | `feature/F-104-retenciones-cliente` |
 | F-160 | Ventas fase 2: contraste producido / certificado de todas las obras y los conceptos certificados fuera de coeficiente | 4 | estandar | `feature/F-160-ventas-contraste-fase2` |
@@ -180,11 +181,11 @@ _Ninguna feature bloqueada._
 
 ## Detalle
 
-### F-162 · Hotfix: `stg.obras` elige la ficha vacía de PORSAN para la 0721 (desempate de fichas duplicadas sin marca de vigente)
+### F-162 · El seguimiento lleva TODAS las fichas de obra, cada una con su empresa, y marca la ficha por defecto de cada código (0721 en Ruesma y en PORSAN)
 
-estado **pendiente** · prioridad 0 · rigor `estandar` · SDD sí · rama `feature/F-162-obra-duplicada-ruesma`
+estado **en curso** · prioridad 0 · rigor `estandar` · SDD sí · rama `feature/F-162-obra-duplicada-ruesma`
 
-Incidencia de Control de Costes (Elena y Juan, 2026-11-11): la 0721 no trae presupuesto ni versiones porque `stg/03_obras.sql` deja UNA ficha por código. Si ninguna tiene la marca de vigente (`conext` 15), elige la de `tiemod` más reciente, y en la 0721 esa es la ficha vacía de PORSAN (empresa 28, ide 2855829, alta del 19-10-2026), en lugar de la de Construcciones Ruesma (1-0721, ide 2759553, con 9.165 líneas y los dos masters). Diagnóstico en `progress/explore_0721_obra_duplicada.md`. CRITERIO DEL HUMANO (2026-11-11, «en caso de duda debe ir siempre por delante construcciones ruesma, salvo que se diga explicitamente lo contrario», matizado: Ruesma solo cuando los datos no deciden). Orden nuevo: 1) marca `conext` 15; 2) más presupuesto (líneas de `raw.obrparpre`); 3) Construcciones Ruesma (`con.emp` = 1); 4) `tiemod` DESC; 5) `ide` DESC. MEDIDO por el líder el 2026-11-11 sobre todos los códigos: cambian tres obras. La 0721 pasa de PORSAN a Ruesma; la 0252 y la 0517 (obras cerradas de 2009 y 2016) pasan de la ficha casi vacía de Ruesma a la de su UTE, que tiene los datos (28.511 y 158.737 líneas). La 0581, la 0606 y la 0671 no cambian. Además, `stg.obras` gana la columna `empresa_id` (`con.emp`) con su ficha, para que la skill del ABC y las consultas sepan de qué empresa es la ficha elegida.
+Incidencia de Control de Costes (Elena y Juan, 2026-11-11): la 0721 no trae presupuesto porque `stg/03_obras.sql` deja UNA ficha por código y elige la vacía de PORSAN (empresa 28, ide 2855829) en vez de la de Construcciones Ruesma (1-0721, ide 2759553, 9.165 líneas). Diagnóstico en `progress/explore_0721_obra_duplicada.md`. MODELO DEL HUMANO (2026-11-11, sustituye al primer planteamiento de «elegir una ficha»): «Debes leer los proyectos en ambas empresas. No tener que elegir: cada uno con su propia empresa, sin cruces entre empresas. Lo que pasa es que, al preguntar la IA, hay que decirle (quizás en el MCP) que puede ser el mismo proyecto en ambas empresas y que por defecto coja este. Ruesma debe tener la obra 0721 y PORSAN también.» Es el modelo de F-106 aplicado al SEGUIMIENTO. QUÉ HACE: (1) `stg.obras` deja de desempatar y lleva todas las fichas de obra real de todas las empresas (mismos filtros de códigos), con `empresa_id`, `clave_obra` y `es_por_defecto` al final; todo lo que cuelga (`mart`, `cierre`, `tesoreria`, `retenciones`, `personal`) va por `obra_id`, sin cruces ni consolidación. (2) `es_por_defecto` (también en `maestro.obras`): la ficha de la empresa 1 si existe; si solo hay una, esa; si hay varias sin la de Ruesma, la de más líneas de presupuesto, después `tiemod` y después `ide` (criterio del humano: «en caso de duda, Construcciones Ruesma por delante, salvo que se diga lo contrario; los datos deciden antes que la duda»); `conext` 15 no interviene. (3) La IA lo aprende por el diccionario (`R-EMPRESA-POR-DEFECTO`, `R-UNIVERSO-OBRA`, `R-CODIGO-POR-EMPRESA`); `mcp-bbdd` no cambia. (4) Absorbe F-053; F-106 se queda con recursos, partes y compras. MEDIDO por el spec-author el 2026-11-11: 585 -> 634 fichas (585 códigos); entran 49 fichas, 4 con plan (12-0252, 25-0517, 1-0606, 1-0721; +152.785 filas de plan, 0,47 %); ninguna ficha de hoy pierde una fila; 18.521 líneas de partes pasan a `en_seguimiento`.
 
 ### F-161 · Versiones del máster y coste sin planificación temporal: catálogo desde las cabeceras, coste por versión y partida y vigencia temporal frente a vigencia de importe
 
