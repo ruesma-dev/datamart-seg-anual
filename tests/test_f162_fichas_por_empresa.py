@@ -890,9 +890,9 @@ class _CursorCli(_CursorFalso):
             super().execute(sql, params)
         elif "FROM stg.obras" in sql:
             self._filas = [
-                (oid, cod, nom, int(clave.split("-")[0]), clave, defecto)
+                (oid, cod, nom, int(clave.split("-")[0]) if clave else None, clave, defecto)
                 for oid, cod, nom, clave, defecto in self.FICHAS
-            ]
+            ] + [(999, None, "N" * 90, None, None, False)]
         else:
             self._filas = []
 
@@ -928,8 +928,9 @@ class _PgCli:
 
 @pytest.fixture
 def cli_falsa(monkeypatch: pytest.MonkeyPatch):
-    import main
     from click.testing import CliRunner
+
+    import main
 
     monkeypatch.setenv("SIGRID_API_BASE_URL", "http://ficticio.invalid")
     monkeypatch.setenv("SIGRID_API_FUNCTION_KEY", "ficticia")
@@ -945,6 +946,52 @@ def test_f162_r12_find_obra_lista_las_fichas_con_empresa(cli_falsa) -> None:
     assert "1-0721" in resultado.output and "28-0721" in resultado.output
     assert "es_por_defecto" in resultado.output
     assert "empresa_id, clave_obra, es_por_defecto" in pg.cursor_.sql[0]
+    lineas = resultado.output.splitlines()
+    assert f"  {'obra_id':>12}  {'codigo':<10}  {'emp':>4}  {'clave_obra':<14}  nombre" in lineas
+    assert "  " + "-" * 110 in lineas
+    assert "       2759553  0721           1  1-0721       *  OBRA 0721" in lineas
+    assert "       2855829  0721          28  28-0721         OBRA 0721" in lineas
+    assert "           999                                    " + "N" * 80 in lineas, (
+        "sin código, empresa ni clave: huecos, y el nombre recortado a 80"
+    )
+
+
+def test_f162_r12_por_codigo_avisa_de_las_otras_fichas(capsys) -> None:
+    from main import _obra_de_stg
+
+    _obra_de_stg(_CursorFalso(), "0721")
+    error = capsys.readouterr().err
+    assert "1-0721" in error and "28-0721" in error, error
+    assert error.count("28-0721") == 1
+
+
+def test_f162_r12_por_clave_no_avisa(capsys) -> None:
+    from main import _obra_de_stg
+
+    _obra_de_stg(_CursorFalso(), "28-0721")
+    _obra_de_stg(_CursorFalso(), "1-0721")
+    assert capsys.readouterr().err == ""
+
+
+def test_f162_r12_un_codigo_con_una_sola_ficha_no_avisa(capsys) -> None:
+    from main import _obra_de_stg
+
+    cursor = _CursorFalso()
+    cursor.FICHAS = [(1, "0999", "UNICA", "1-0999", True)]
+    assert _obra_de_stg(cursor, "0999") == (1, "UNICA", "1-0999")
+    assert capsys.readouterr().err == ""
+
+
+def test_f162_r5_la_ficha_es_inmutable_y_ligera() -> None:
+    import dataclasses
+
+    from etl_sigrid.domain.ficha_obra import FichaObra
+
+    ficha = FichaObra(obra_id=1, codigo_obra="0721", empresa_id=1)
+    assert ficha.num_lineas == 0 and ficha.tiemod is None, "sin líneas ni tiemod por defecto"
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        ficha.obra_id = 2  # type: ignore[misc]
+    assert not hasattr(ficha, "__dict__"), "slots: miles de fichas sin diccionario por objeto"
 
 
 @pytest.mark.parametrize(
