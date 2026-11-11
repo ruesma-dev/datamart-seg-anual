@@ -15,6 +15,13 @@
 -- ===========================================================================
 -- DIMENSIÓN OBRA
 -- ===========================================================================
+-- F-162 (2026-11-11): una fila por FICHA de obra, de todas las empresas. El
+-- código ya no es único (la 0721 está en Ruesma y en PORSAN), así que
+-- `obra_label` lleva la clave de la ficha, `<empresa>-<codigo> · nombre`, y las
+-- tres columnas nuevas van AL FINAL: `empresa_id`, `clave_obra` y
+-- `es_por_defecto`. D3 del humano: sin filtro en Power BI (un filtro
+-- `es_por_defecto` dejaría sin datos la 0581, la 0606 y la 0671, que se ven por
+-- la ficha de su UTE).
 DROP VIEW IF EXISTS mart.v_pbi_dim_obra CASCADE;
 CREATE VIEW mart.v_pbi_dim_obra AS
 SELECT
@@ -22,11 +29,14 @@ SELECT
     codigo_obra,
     nombre_obra,
     -- Texto combinado para visualización compacta en segmentadores
-    codigo_obra || ' · ' || COALESCE(nombre_obra, '(sin nombre)') AS obra_label
+    COALESCE(clave_obra, codigo_obra) || ' · ' || COALESCE(nombre_obra, '(sin nombre)') AS obra_label,
+    empresa_id,
+    clave_obra,
+    es_por_defecto
 FROM stg.obras;
 
 COMMENT ON VIEW mart.v_pbi_dim_obra IS
-'Dimensión obra para Power BI. Clave: obra_id.';
+'Dimensión obra para Power BI. Clave: obra_id. Una fila por ficha de obra (F-162): el codigo no es unico entre empresas; obra_label = clave_obra · nombre; es_por_defecto marca la ficha por defecto de cada codigo.';
 
 
 -- ===========================================================================
