@@ -2587,7 +2587,7 @@
       "rigor": "estandar",
       "priority": 1,
       "branch": "feature/F-161-versiones-sin-reparto",
-      "notes": "2026-11-11: alta por el líder tras el sí del humano. Va detrás de F-162 y delante de F-104."
+      "notes": "2026-11-11: alta por el líder tras el sí del humano. Va detrás de F-162 y delante de F-104. 2026-11-11, DECISIÓN DEL HUMANO (D1): «los cierres mensuales son planificación de importe, como cierre; es el último. Así como el coste fase 0 (en ámbito coste) es el vivo. Lo que pasa es que hay cierres o masters que tienen planificación temporal (los cuatrimestrales y ABC principalmente) y otros que no, como los cierres intermedios». Hay TRES referencias: (1) el VIVO, el coste de la fase 0 (ya publicado: `stg.plan_mensual_fase0`, F-157); (2) el ÚLTIMO CIERRE, que es la última versión del máster de cualquier tipo y da el planificado de IMPORTE total; (3) el ÚLTIMO PLANIFICADO TEMPORAL, la última versión con planificación temporal, sobre todo cuatrimestrales y ABC, que da el reparto en el tiempo. Quedan abiertas para la spec: (a) si el planificado temporal se elige por TIPO (Planif inicial, ABC y Cuatrimestral, como hoy) o por TENER `planif`; la v21-v23 de la 0698 son cierres que sí traen `planif`, probablemente heredado de la cuatrimestral; (b) cómo enseña el seguimiento mensual la diferencia entre el importe del último cierre y el de la temporal: las dos por separado con su diferencia, que es lo que recomienda el líder, o reescalado."
     },
     {
       "id": "F-162",
