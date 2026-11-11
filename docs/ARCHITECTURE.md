@@ -418,10 +418,17 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
   empresa 1 → `conext` cod 15 → cierres → `tiemod` → `ide` DESC, nunca «`ide`
   menor») y la publica en `maestro.obras` como referencia
   (`obra_principal_id`), que no sirve para agregar hechos de otras empresas.
-  Regla dura `R-CODIGO-POR-EMPRESA`. **`stg.obras` NO la usa**: sigue eligiendo
-  una ficha por código como hasta hoy y difiere en 0581, 0606, 0671 y 0720;
-  pasar el seguimiento a la ficha de Ruesma y traer las demás empresas como
-  obras propias es **F-106**.
+  Regla dura `R-CODIGO-POR-EMPRESA`. **`stg.obras` NO la usa**: desde **F-162**
+  (2026-11-11) lleva una fila por ficha de TODAS las empresas, sin desempate
+  (634 fichas para 585 códigos), con `empresa_id`, `clave_obra` y
+  `es_por_defecto` al final. `es_por_defecto` marca una ficha por código, la que
+  se lee si la pregunta no dice empresa: la de la empresa 1 si existe; si no, la
+  de más líneas de presupuesto, después `tiemod` y después `ide`; `conext` 15 no
+  interviene (`etl_sigrid/domain/ficha_obra.py`, regla `R-EMPRESA-POR-DEFECTO`).
+  `mart`, `cierre`, `tesoreria`, `retenciones` y `personal` van por `obra_id`:
+  cada ficha con lo suyo, sin consolidar. `maestro.obras`, `mart.v_pbi_dim_obra`
+  y `cierre.v_pbi_cierre_cabecera` publican la marca. Recursos, partes y compras
+  de otras empresas siguen en **F-106**.
 - `obr.ide = con.ide` (obra hereda de concepto). El nombre legible está en
   `con.res`. `con.nom` NO existe.
 - En `raw.obrfas` el campo de fase se llama `fasnum`; en `raw.obrparpre` se
