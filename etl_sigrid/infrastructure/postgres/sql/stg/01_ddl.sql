@@ -7,14 +7,24 @@
 -- Nota: stg.ambitos NO está aquí: es una VISTA (ver 02_ambitos.sql).
 
 -- ---------------------------------------------------------------------------
--- stg.obras: una fila por obra con código y nombre legibles
+-- stg.obras: una fila por FICHA de obra (F-162), de todas las empresas, con
+-- código y nombre legibles.
+--
+-- Las tres columnas de F-162 van DETRÁS de `_built_at`, aquí y en la migración
+-- del bloque `DO` de abajo, para que la posición sea la misma en una base nueva
+-- y en la tabla que ya existe en Azure: `empresa_id` (`con.emp`), `clave_obra`
+-- ('<empresa>-<codigo>', como `maestro.v_obra_fichas`) y `es_por_defecto` (una
+-- por código; criterio en `etl_sigrid/domain/ficha_obra.py`).
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS stg.obras (
-    obra_id      BIGINT       PRIMARY KEY,
-    codigo_obra  VARCHAR(24),
-    nombre_obra  VARCHAR(255),
-    activa       BOOLEAN      NOT NULL DEFAULT TRUE,
-    _built_at    TIMESTAMP    NOT NULL DEFAULT NOW()
+    obra_id         BIGINT       PRIMARY KEY,
+    codigo_obra     VARCHAR(24),
+    nombre_obra     VARCHAR(255),
+    activa          BOOLEAN      NOT NULL DEFAULT TRUE,
+    _built_at       TIMESTAMP    NOT NULL DEFAULT NOW(),
+    empresa_id      INTEGER      NULL,
+    clave_obra      VARCHAR(40)  NULL,
+    es_por_defecto  BOOLEAN      NOT NULL DEFAULT FALSE
 );
 CREATE INDEX IF NOT EXISTS idx_obras_codigo ON stg.obras (codigo_obra);
 
@@ -297,7 +307,41 @@ BEGIN
         ALTER TABLE stg.plan_mensual ADD COLUMN es_deshacer BOOLEAN NULL;
         RAISE NOTICE 'Añadida columna stg.plan_mensual.es_deshacer';
     END IF;
+
+    -- F-162: la empresa, la clave legible y la ficha por defecto de stg.obras,
+    -- en este orden y detrás de `_built_at` (ver el CREATE TABLE de arriba).
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'stg' AND table_name = 'obras'
+          AND column_name = 'empresa_id'
+    ) THEN
+        ALTER TABLE stg.obras ADD COLUMN empresa_id INTEGER NULL;
+        RAISE NOTICE 'Añadida columna stg.obras.empresa_id';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'stg' AND table_name = 'obras'
+          AND column_name = 'clave_obra'
+    ) THEN
+        ALTER TABLE stg.obras ADD COLUMN clave_obra VARCHAR(40) NULL;
+        RAISE NOTICE 'Añadida columna stg.obras.clave_obra';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'stg' AND table_name = 'obras'
+          AND column_name = 'es_por_defecto'
+    ) THEN
+        ALTER TABLE stg.obras ADD COLUMN es_por_defecto BOOLEAN NOT NULL DEFAULT FALSE;
+        RAISE NOTICE 'Añadida columna stg.obras.es_por_defecto';
+    END IF;
 END $$;
+
+-- F-162: el código ya no es único en stg.obras (una fila por ficha); se busca
+-- por (empresa_id, codigo_obra). Después de la migración: en Azure la columna
+-- no existe hasta que el DO la añade.
+CREATE INDEX IF NOT EXISTS idx_obras_empresa_codigo ON stg.obras (empresa_id, codigo_obra);
 
 
 -- ---------------------------------------------------------------------------

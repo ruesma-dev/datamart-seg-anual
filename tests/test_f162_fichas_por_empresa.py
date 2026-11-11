@@ -207,21 +207,25 @@ def _insert_obras() -> str:
     return _sentencia_vista(RUTA_STG_OBRAS, "INSERT INTO stg.obras ")
 
 
+def _entre_parentesis(texto: str, inicio: int) -> str:
+    """Lo que hay desde `inicio` (justo detrás de un `(`) hasta su `)` pareja."""
+    profundidad = 1
+    i = inicio
+    while profundidad:
+        if texto[i] == "(":
+            profundidad += 1
+        elif texto[i] == ")":
+            profundidad -= 1
+        i += 1
+    return texto[inicio:i - 1].strip()
+
+
 def _cte(nombre: str) -> str:
     """El cuerpo de la CTE `nombre` (lo que va entre sus paréntesis)."""
     insert = _insert_obras()
     marca = re.search(rf"\b{nombre} AS \(", insert)
     assert marca, f"03_obras.sql no tiene la CTE «{nombre}»"
-    inicio = marca.end()
-    profundidad = 1
-    i = inicio
-    while profundidad:
-        if insert[i] == "(":
-            profundidad += 1
-        elif insert[i] == ")":
-            profundidad -= 1
-        i += 1
-    return insert[inicio:i - 1].strip()
+    return _entre_parentesis(insert, marca.end())
 
 
 def _select_final() -> str:
@@ -289,8 +293,7 @@ def _create_table_obras() -> list[tuple[str, str]]:
     compacto = _compacto(_leer(RUTA_DDL))
     marca = "CREATE TABLE IF NOT EXISTS stg.obras ("
     assert marca in compacto
-    cuerpo = compacto[compacto.index(marca) + len(marca):]
-    cuerpo = _troceado_en_profundidad_cero(cuerpo, ")")[0]
+    cuerpo = _entre_parentesis(compacto, compacto.index(marca) + len(marca))
     columnas = []
     for pieza in _troceado_en_profundidad_cero(cuerpo, ","):
         nombre, _, tipo = pieza.strip().partition(" ")
@@ -349,11 +352,10 @@ def test_f162_r3_indice_por_empresa_y_codigo_tras_la_migracion() -> None:
 def test_f162_r3_el_insert_nombra_sus_siete_columnas() -> None:
     insert = _insert_obras()
     assert insert.startswith(
-        "INSERT INTO stg.obras (obra_id, codigo_obra, nombre_obra, activa, "
-        "empresa_id, clave_obra, es_por_defecto) "
-    )
+        "(obra_id, codigo_obra, nombre_obra, activa, empresa_id, clave_obra, es_por_defecto) "
+    ), "INSERT INTO stg.obras con sus siete columnas nombradas (R3)"
     assert _columnas_select(_select_final()) == [
-        "obra_id", "codigo_obra", "nombre_obra", "TRUE", "empresa_id", "clave_obra",
+        "obra_id", "codigo_obra", "nombre_obra", "activa", "empresa_id", "clave_obra",
         "es_por_defecto",
     ]
 
