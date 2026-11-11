@@ -618,7 +618,7 @@
         "Lo personal del cliente (NIF de persona física, direcciones, teléfono, correo, cabecera de la factura y descripción de las líneas de personas físicas) solo en el esquema nuevo `ventas_restringida`, que lee solo el perfil total; el nombre del cliente y el CIF de las personas jurídicas, públicos en `ventas` (D2 y D6 del humano, 2026-11-07)",
         "La spec estima el impacto en la ventana nocturna antes de comprometerse"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "rigor": "critico",
       "priority": 2,

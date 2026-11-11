@@ -2104,3 +2104,41 @@ coste (pendiente 5,42 M) y entre 135.477,47 y 1.021.781,17 de venta (4,51 M).
 La reproducción previa en solo lectura (paso 0 bis) no se hizo: el propio
 `build-tesoreria` era la prueba, sin riesgo (un fallo deja `tesoreria` como
 estaba). Merge `main` 0ea9d38, `dev` 2a15b31.
+
+## F-040 — Ventas, fase 1: clientes, facturas, certificaciones y cobro · 2026-11-11
+
+Rama `feature/F-040-ingresos`. Spec en `specs/F-040-ingresos/` (R1-R34). Rigor `critico`.
+APROBADO en la pasada 3 (`progress/review_F-040.md`).
+- **Pasada 1:** CHANGES_REQUESTED por H1-H3.
+- **Pasada 2:** aprobada tras corregir H1-H3 y la base roja B1-B9, sin relajar ningún test.
+- **Ciclo 2:** H2 a y b, que el humano aprobó el 2026-11-10.
+
+**Qué publica.** `build_ventas` es el paso 17 de `run-all` y construye dos esquemas:
+- `ventas`, que leen el estándar y el total: clientes, facturas con sus líneas y recargos, certificaciones con los suyos, el enlace certificación → factura, `cobertura_enlace` (cuatro eslabones) y tres vistas de seguimiento hasta el cobro.
+- `ventas_restringida`, solo para el total: `clientes_contacto`, `factura_cabecera` y `factura_lineas_persona`.
+
+Además entran siete tablas de `raw` (`cli`, `cer`, `cerpro`, `cerrec`, `cerprodes`, `dvfpro`, `dvfrec`) y `dvf` pasa a 35 columnas.
+
+**Privacidad** (decisiones del humano):
+- El CIF de una persona jurídica es público.
+- El NIF de una persona física, el código de cliente con forma de NIF y el texto de sus líneas van solo a la restringida.
+- El prefijo de país de dos letras se quita solo si lo que queda es un NIF de persona.
+- Una factura cuyo cliente no está en `raw.cli` se trata como de persona física.
+
+**Verificado:**
+- Puerta del líder con `.env` sobre `fcfd86f`: `init.sh` exit 0, 11.077 passed.
+- Sandbox SQL: 2.352 passed. Cobertura de las líneas cambiadas: 100 % (160/160).
+- Mutación: 61 mutantes, 58 muertos y 3 supervivientes de log en `build_ventas_step.py`, aceptados por escrito por el humano (`progress/mutacion_F-040.md`).
+
+**Despliegue en Azure el 2026-11-10** (pasos 0-8 de design § 9, comprobados por el líder con lecturas):
+- Imagen `r20261110-1310`. La de vuelta atrás es `r20261108-0945`.
+- `02_roles.sql` y `apply-grants` con sus cuatro verificaciones ok. Permisos por login: el estándar lee `ventas` y no la restringida; el total lee las dos; el restringido y el de postventa no leen ninguna.
+- Cifras: 15.737 facturas, 6.312 certificaciones y 1.210 clientes (572 personas físicas). `retenciones.movimientos` CLIENTE queda idéntico al de la víspera (R34).
+- Diccionario v75.
+
+**Primera nocturna** (`20261111T000022Z-b97406`): 166 pasos sin fallos. `build_ventas` 5,8 s; las ocho tablas ingeridas, entre 0,4 y 2,3 s cada una.
+
+**Fuera, pendiente:**
+- `mcp-bbdd`: la lista blanca va en su F-034 (pliego `specs/F-040-ingresos/pliego_mcp_bbdd.md`; aviso enviado a la sesión `mcp`).
+- Observaciones O1, O3, O4 y O5 del reviewer, que decide el humano.
+- `CLASES_GARANTIA` sigue provisional (D4), a la espera de Control de Costes.

@@ -3,13 +3,11 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **148 features**, 73 abiertas (1 en curso, 1 con la spec lista, 0 bloqueadas y 71 en backlog) y 75 terminadas.
+Resumen: **148 features**, 72 abiertas (0 en curso, 1 con la spec lista, 0 bloqueadas y 71 en backlog) y 76 terminadas.
 
 ## En curso
 
-| # | Feature | Prioridad | Rigor | Rama |
-|---|---|---|---|---|
-| F-040 | El lado de ingresos: ventas, certificaciones y clientes | 2 | critico | `feature/F-040-ingresos` |
+_Ninguna feature en curso._
 
 ## Spec lista
 
@@ -132,6 +130,7 @@ _Ninguna feature bloqueada._
 | F-155 | Hotfix: ofertas compartidas entre comparativos rompen build_compras | 1 | estandar |
 | F-157 | La planificación en el tiempo de la fase 0 (Previsto) de coste y venta: el reparto mensual por partida que el jefe de obra mete en Sigrid no llega a `stg.plan_mensual` | 1 | estandar |
 | F-009 | Inventario del entorno Azure existente | 2 | documental |
+| F-040 | El lado de ingresos: ventas, certificaciones y clientes | 2 | critico |
 | F-042 | La clave de mart.fact_seguimiento_mensual esta rota: 8.778 combinaciones duplicadas | 2 | critico |
 | F-056 | El mayor y el plan de cuentas como arbol: stg y mart sobre la contabilidad (raw por F-066) | 2 | critico |
 | F-066 | Ingerir de Sigrid los raw que faltan: recursos, empleados y partes; la contabilidad; firmas, familias y actividades del proveedor | 2 | critico |
@@ -178,12 +177,6 @@ _Ninguna feature bloqueada._
 | F-142 | Que cualquier IA pueda leer los adjuntos: `abrir_adjunto` devuelve el contenido CONVERTIDO (texto por página, o imagen si es un escaneo) de PDF y ofimática, también Word 97 y Excel antiguos, y el original a petición | 74 | estandar |
 
 ## Detalle
-
-### F-040 · El lado de ingresos: ventas, certificaciones y clientes
-
-estado **en curso** · prioridad 2 · rigor `critico` · SDD sí · rama `feature/F-040-ingresos`
-
-Nacida el 2026-08-20 del analisis de dominio de F-006. Es el hueco caro y estructural del datamart: el lado del dinero que entra esta practicamente ausente, y sin el no hay flujo de caja completo ni analisis de cliente. Tres bloques. (1) VENTAS: dvf y dvfpro -facturas de venta y sus lineas, que llevan paride- no se ingieren; hay un config/tables_sigrid_venta_snippet.yaml preparado y sin integrar desde hace tiempo. Su ausencia deja ademas muerta la vista retenciones.v_src_lineas_venta, que existe vacia por diseno, y por eso las retenciones de cliente no tienen respaldo de atribucion a obra ni CIF. (2) CERTIFICACIONES a cliente: cer, cerpro -lineas con paride- y obrcer -con prorea, cerobr, cerrev, ceraac- son el eslabon que falta entre la produccion y el cobro; hoy tenemos la produccion como importe y el efecto de cobro, pero nada en medio. (3) CLIENTES: la tabla cli no se ingiere. Solo conocemos el nombre del cliente via con.res desde obr.entide, asi que no se puede responder ni quienes son nuestros diez mayores clientes ni nada que exija su CIF o su clasificacion. Depende de la capacidad del ETL: son tablas grandes y F-035 esta midiendo el tiempo de carga; la spec debe estimar el impacto en la ventana nocturna antes de comprometerse. ================ PEDIDA POR JUAN ROMERO (Dir. Admon y Control de Costes) por correo, recordado el 2026-10-27, y subida por el humano ese día de la prioridad 46 a la 5, justo detrás de F-054. Lo que pide, en sus palabras: (a) «Certificaciones a cliente: el documento de certificación (número, mes, a origen / a cuenta, estado)»; (b) «Facturas de venta: cabecera y líneas. La tabla de líneas de venta de Sigrid (dvfpro) no se está cargando, y por eso la retención de garantía de las facturas de venta sale siempre vacía»; (c) «Enlace certificación – factura – cobro, para poder seguir una certificación hasta que se cobra». La cuarta petición del mismo correo (forma de pago por defecto de la ficha del proveedor) va aparte, en F-152. MEDIDO EL 2026-10-27 en solo lectura (21 obras con devengo pendiente de F-140): `cer` y `dvf` se enlazan con la obra por `cenide` (= `obr.cenide`), llevan `totbas`/`totiva`/`fecdoc`, y su IVA efectivo coincide con el `obr.ivaide` de la ficha de la obra (21 % en 0690, 0697 y 0699; 0 % en las otras 16 con facturas, ninguna al 10 %); `obrcer` no tiene filas en esas 21 obras. Es la fuente de verdad del IVA de venta para la caja (H12 de `tesoreria.hipotesis_caja`), y `cer.feccob` («fecha de cobro, 0 pendiente») es un candidato al enlace con el cobro que la spec debe medir.
 
 ### F-104 · La retencion de CLIENTE no esta saneada: 22,16 M EUR «vivos» de los que 19,93 M tienen fecha de baja, y la contabilidad dice 13,81 M
 
@@ -802,6 +795,12 @@ Pedida por Juan Romero (Control de Costes) el 2026-11-05: «el datamart publica 
 estado **terminada** · prioridad 2 · rigor `documental` · SDD no · rama `feature/F-009-inventario-azure`
 
 Antes de añadir la base de datos del datamart, revisar qué hay ya montado en Azure y dejarlo documentado: suscripción y resource groups, redes virtuales y peerings, VPN gateway y su estado, Azure Firewall, storage accounts, Key Vaults, registros de contenedores, y qué contienen hoy rg-seguimiento-dev y rg-sigrid-dev-data-api. Sirve para no duplicar infraestructura ni contradecir el diseño de la landing zone de acens, y para cerrar decisiones abiertas del bloque Azure.
+
+### F-040 · El lado de ingresos: ventas, certificaciones y clientes
+
+estado **terminada** · prioridad 2 · rigor `critico` · SDD sí · rama `feature/F-040-ingresos`
+
+Nacida el 2026-08-20 del analisis de dominio de F-006. Es el hueco caro y estructural del datamart: el lado del dinero que entra esta practicamente ausente, y sin el no hay flujo de caja completo ni analisis de cliente. Tres bloques. (1) VENTAS: dvf y dvfpro -facturas de venta y sus lineas, que llevan paride- no se ingieren; hay un config/tables_sigrid_venta_snippet.yaml preparado y sin integrar desde hace tiempo. Su ausencia deja ademas muerta la vista retenciones.v_src_lineas_venta, que existe vacia por diseno, y por eso las retenciones de cliente no tienen respaldo de atribucion a obra ni CIF. (2) CERTIFICACIONES a cliente: cer, cerpro -lineas con paride- y obrcer -con prorea, cerobr, cerrev, ceraac- son el eslabon que falta entre la produccion y el cobro; hoy tenemos la produccion como importe y el efecto de cobro, pero nada en medio. (3) CLIENTES: la tabla cli no se ingiere. Solo conocemos el nombre del cliente via con.res desde obr.entide, asi que no se puede responder ni quienes son nuestros diez mayores clientes ni nada que exija su CIF o su clasificacion. Depende de la capacidad del ETL: son tablas grandes y F-035 esta midiendo el tiempo de carga; la spec debe estimar el impacto en la ventana nocturna antes de comprometerse. ================ PEDIDA POR JUAN ROMERO (Dir. Admon y Control de Costes) por correo, recordado el 2026-10-27, y subida por el humano ese día de la prioridad 46 a la 5, justo detrás de F-054. Lo que pide, en sus palabras: (a) «Certificaciones a cliente: el documento de certificación (número, mes, a origen / a cuenta, estado)»; (b) «Facturas de venta: cabecera y líneas. La tabla de líneas de venta de Sigrid (dvfpro) no se está cargando, y por eso la retención de garantía de las facturas de venta sale siempre vacía»; (c) «Enlace certificación – factura – cobro, para poder seguir una certificación hasta que se cobra». La cuarta petición del mismo correo (forma de pago por defecto de la ficha del proveedor) va aparte, en F-152. MEDIDO EL 2026-10-27 en solo lectura (21 obras con devengo pendiente de F-140): `cer` y `dvf` se enlazan con la obra por `cenide` (= `obr.cenide`), llevan `totbas`/`totiva`/`fecdoc`, y su IVA efectivo coincide con el `obr.ivaide` de la ficha de la obra (21 % en 0690, 0697 y 0699; 0 % en las otras 16 con facturas, ninguna al 10 %); `obrcer` no tiene filas en esas 21 obras. Es la fuente de verdad del IVA de venta para la caja (H12 de `tesoreria.hipotesis_caja`), y `cer.feccob` («fecha de cobro, 0 pendiente») es un candidato al enlace con el cobro que la spec debe medir.
 
 ### F-042 · La clave de mart.fact_seguimiento_mensual esta rota: 8.778 combinaciones duplicadas
 
