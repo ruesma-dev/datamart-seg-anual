@@ -868,3 +868,97 @@ def test_f162_r21_f106_enmendada_sin_cambiar_de_estado() -> None:
     assert "lleva desde F-162 todas las fichas de todas las empresas" in texto
     assert "F-106 queda para RECURSOS, PARTES y COMPRAS" in texto
     assert f106["status"] == "pending"
+
+
+# ---------------------------------------------------------------------------
+# R12 · los comandos de verdad, por la CLI y con un PostgreSQL falso
+# ---------------------------------------------------------------------------
+
+
+class _CursorCli(_CursorFalso):
+    """Como `_CursorFalso`, y además sirve `find-obra` y deja vacío lo demás:
+    lo que se comprueba es con qué `obra_id` sigue cada comando."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.parametros: list = []
+
+    def execute(self, sql: str, params=None) -> None:
+        self.sql.append(sql)
+        self.parametros.append(params)
+        if "FROM stg.obras WHERE clave_obra" in sql:
+            super().execute(sql, params)
+        elif "FROM stg.obras" in sql:
+            self._filas = [
+                (oid, cod, nom, int(clave.split("-")[0]), clave, defecto)
+                for oid, cod, nom, clave, defecto in self.FICHAS
+            ]
+        else:
+            self._filas = []
+
+    def fetchone(self):
+        return None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        return False
+
+
+class _PgCli:
+    def __init__(self) -> None:
+        self.cursor_ = _CursorCli()
+
+    def connection(self):
+        pg = self
+
+        class _Conexion:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                return False
+
+            def cursor(self):
+                return pg.cursor_
+
+        return _Conexion()
+
+
+@pytest.fixture
+def cli_falsa(monkeypatch: pytest.MonkeyPatch):
+    import main
+    from click.testing import CliRunner
+
+    monkeypatch.setenv("SIGRID_API_BASE_URL", "http://ficticio.invalid")
+    monkeypatch.setenv("SIGRID_API_FUNCTION_KEY", "ficticia")
+    pg = _PgCli()
+    monkeypatch.setattr(main, "_get_pg", lambda: pg)
+    return main, CliRunner(), pg
+
+
+def test_f162_r12_find_obra_lista_las_fichas_con_empresa(cli_falsa) -> None:
+    main, runner, pg = cli_falsa
+    resultado = runner.invoke(main.cli, ["find-obra", "--codigo", "0721"])
+    assert resultado.exit_code == 0, resultado.output
+    assert "1-0721" in resultado.output and "28-0721" in resultado.output
+    assert "es_por_defecto" in resultado.output
+    assert "empresa_id, clave_obra, es_por_defecto" in pg.cursor_.sql[0]
+
+
+@pytest.mark.parametrize(
+    "comando",
+    ["list-master-cierre", "inspect-cierre", "inspect-indirectos-detalle",
+     "inspect-generales-detalle", "inspect-cabecera", "inspect-planif-vs-real"],
+)
+@pytest.mark.parametrize(("valor", "obra_id"), [("28-0721", 2855829), ("0721", 2759553)])
+def test_f162_r12_cada_comando_sigue_con_la_ficha_resuelta(cli_falsa, comando, valor, obra_id) -> None:
+    main, runner, pg = cli_falsa
+    resultado = runner.invoke(main.cli, [comando, "--codigo", valor])
+    assert "FROM stg.obras WHERE clave_obra" in pg.cursor_.sql[0], resultado.output
+    siguientes = [p for p in pg.cursor_.parametros[1:] if p]
+    assert siguientes, f"{comando} no siguió tras resolver la obra: {resultado.output}"
+    primero = siguientes[0]
+    valores = list(primero.values()) if isinstance(primero, dict) else list(primero)
+    assert obra_id in valores, (comando, primero)
