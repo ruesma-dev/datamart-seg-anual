@@ -9,7 +9,16 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-11-10 · F-040 · `in_progress` · APPROVED y en `main`; pendiente de desplegar (T17 y T18, MANUALES) para pasarla a `done`
+## 2026-11-11 · NADA EN CURSO · leer esto primero
+
+- **F-040, `done` el 2026-11-11:** primera nocturna sin fallos. El resumen está en `history.md`, y debajo quedan el registro del despliegue y del ciclo 2.
+- **Incidencias de Control de Costes del 10-11 y el 11-11:** propuesta pendiente de la PARADA 1 del humano.
+  - **0698:** versiones sin reparto temporal (`planif`) que se caen del catálogo. Ver `progress/explore_0698_v24_coste.md`.
+  - **0721:** `stg.obras` elige la ficha vacía de PORSAN (empresa 28) en vez de la de Ruesma. Ver `progress/explore_0721_obra_duplicada.md`.
+- **F-054 (glosario):** ha llegado la definición de «incurrido» de Juan, que aún no está guardada.
+- **Siguiente:** F-104, salvo que el humano ordene otra cosa.
+
+## 2026-11-10 · F-040 · APPROVED, en `main` y desplegada (ya `done`)
 
 Líder, 2026-11-10:
 - **Review, pasada 3:** APPROVED (`e10f465`).
