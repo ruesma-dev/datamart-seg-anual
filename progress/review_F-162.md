@@ -136,5 +136,5 @@ No corrí `init.sh` ni la suite entera (encargo: el worktree no tiene `.env`). �
    Corregir la nota.
 4. **La enmienda de F-106** debería nombrar los cinco comandos de la desviación 4.
 
-**Automejora (propuesta, no aplicada).** C5 de `CHECKPOINTS.md`:** una tarea que lleva dentro una verificación MANUAL no se marca `[x]`
-  hasta hacerla; lo pendiente va a su propia tarea MANUAL (caso T4).
+**Automejora (propuesta, no aplicada).** En C5 de `CHECKPOINTS.md`, una tarea que lleva dentro una verificación MANUAL no se marca `[x]`
+hasta hacerla; lo pendiente va a su propia tarea MANUAL (caso T4).
