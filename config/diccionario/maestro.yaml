@@ -14,7 +14,8 @@
 #    Y desde F-102, **una fila por FICHA, no por codigo**: la obra es de UNA
 #    empresa y el mismo codigo existe una vez por empresa (922 fichas, 846
 #    codigos el 2026-09-23). Por codigo se cruza SIEMPRE con `empresa_id`, o por
-#    `clave_obra`; `es_ficha_principal` marca la ficha de Ruesma de cada codigo.
+#    `clave_obra`; `es_ficha_principal` marca la ficha de Ruesma de cada codigo
+#    y `es_por_defecto` (F-162) la que se lee si la pregunta no dice empresa.
 # 2. **`importe_contratado` lleva IVA.** Es la suma del total del documento,
 #    mientras que todos los importes de `compras` son sin IVA. La diferencia
 #    entre las dos cifras no es sobrecoste ni ahorro: es el impuesto.
@@ -65,8 +66,10 @@ objetos:
       empresas. Las **103 fichas de la empresa 28** (Porsan) **no traen ni
       direccion ni cliente**, ni presupuesto ni cierres: 57 son obras propias de
       Porsan (unica ficha de su codigo) y el resto, copias de una obra de
-      Ruesma. Traer al seguimiento las demas empresas como obras propias es
-      F-106.
+      Ruesma. **El codigo no es unico**: desde F-162 el seguimiento (`stg.obras`)
+      lleva tambien todas las fichas, y `es_por_defecto` marca la ficha por
+      defecto de cada codigo, la que se lee si la pregunta no dice empresa.
+      Recursos, partes y compras de otras empresas siguen en F-106.
 
       **LA DIRECCION SE MIDE SOBRE LA FICHA DE RUESMA**, no sobre las 922: las
       copias de otras empresas no la traen y hundian la cifra. Medido el
@@ -83,10 +86,11 @@ objetos:
       Una fila por FICHA de obra (`obra_id`), y son TODAS las de Sigrid: 922 el
       2026-09-23, de todas las empresas. `codigo_obra` NO es unico --se repite
       una vez por empresa--; `clave_obra` si. Es superconjunto de `stg.obras`,
-      que excluye las administrativas y los codigos de cinco o mas digitos y se
-      queda con una ficha por codigo: contar aqui da mas obras que contar alli,
-      y esa diferencia es deliberada. Para contar obras por codigo, filtrar
-      `es_ficha_principal` y decirlo.
+      que excluye las administrativas y los codigos de cinco o mas digitos
+      (desde F-162 lleva todas las fichas de los demas codigos): contar aqui da
+      mas obras que contar alli, y esa diferencia es deliberada. Para contar
+      obras por codigo, filtrar `es_por_defecto` (o `es_ficha_principal`, que
+      hoy coincide) y decirlo.
     clave_negocio: [obra_id]
     claves_alternativas: [[clave_obra]]
     paso_etl: build_maestros
@@ -354,9 +358,9 @@ objetos:
           desempate. Si el codigo no tiene ficha de la empresa 1 --las obras
           propias de Porsan, 0001-0005--, decide el resto del ranking: 64
           principales son de otra empresa. **Filtrar por ella da una fila por
-          codigo** y es como se cuenta "obras" en este maestro. OJO: `stg.obras`
-          NO usa esta marca y elige otra ficha en 0581, 0606, 0671 y 0720, que
-          es F-106.
+          codigo** y es como se cuenta "obras" en este maestro. `stg.obras` no
+          la usa: desde F-162 lleva todas las fichas y marca la suya en
+          `es_por_defecto`, que hoy coincide con esta en todas las fichas.
         agregacion: no_sumable
       obra_principal_id:
         significado: >-
@@ -372,6 +376,18 @@ objetos:
           empresa son su propio centro de gastos, no la misma cosa que la ficha
           de Ruesma a la que apuntan.
         agregacion: no_sumable
+      es_por_defecto:
+        significado: >-
+          Cierto en la **ficha por defecto** de cada codigo, una por codigo: la
+          que se lee si la pregunta no dice empresa (`R-EMPRESA-POR-DEFECTO`,
+          F-162). En el seguimiento es la de `stg.obras.es_por_defecto` (la de
+          la empresa 1 si existe; si no, la de mas lineas de presupuesto,
+          despues `tiemod` y despues `ide`; sin `conext`); fuera de el --codigos
+          administrativos y de cinco o mas digitos--, la de
+          `es_ficha_principal` (D1). Hoy coincide con `es_ficha_principal` en
+          las 925 fichas: solo difieren si un codigo con varias fichas no tiene
+          la de Ruesma.
+        agregacion: no_sumable
     relaciones:
       - de: obra_id
         a: stg.obras.obra_id
@@ -379,9 +395,8 @@ objetos:
         porque: >-
           Es el universo del seguimiento, que es un SUBCONJUNTO de este. Unir
           por aqui equivale a filtrar a las obras reales; no unir deja dentro
-          las administrativas. `stg.obras` se queda con UNA ficha por codigo, y
-          en 0581, 0606, 0671 y 0720 no es la ficha de Ruesma
-          (`es_ficha_principal`): lo resuelve F-106.
+          las administrativas. Desde F-162 `stg.obras` tiene una fila por ficha,
+          como este maestro, y su `es_por_defecto` es la columna de aqui.
       - de: obra_id
         a: maestro.v_obra_fichas.obra_id
         cardinalidad: "1:1"
@@ -425,8 +440,8 @@ objetos:
       `obra_id` menor**: falla en la 0680, donde la copia de Porsan tiene el
       menor. Lee SOLO `raw`, se crea en `sql/maestro/00_setup.sql` y no se
       dropea nunca, asi que `compras` la lee sin depender de `stg`. `stg.obras`
-      NO la usa: el seguimiento sigue eligiendo como hasta hoy, y difiere de
-      esta marca en 0581, 0606, 0671 y 0720 (F-106).
+      NO la usa: desde F-162 lleva todas las fichas y marca la suya en
+      `es_por_defecto`, sin `conext` (hoy coincide con esta marca).
     grano: >-
       Una fila por ficha de obra (`obra_id`): 922 el 2026-09-23, con 922
       `clave_obra` distintas y 846 principales, una por codigo.

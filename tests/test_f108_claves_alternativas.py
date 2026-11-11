@@ -71,7 +71,10 @@ DECLARADAS = {
     "maestro.v_obra_fichas": (("clave_obra",),),
     "maestro.cuentas_analiticas": (("empresa_id", "codigo_cuenta"),),
     "maestro.centros_coste": (("empresa", "codigo_centro"),),
-    "stg.obras": (("codigo_obra",),),
+    # F-162 (2026-11-11): `stg.obras` deja de tener una ficha por codigo y pasa a
+    # una por ficha de todas las empresas; su alternativa ya no es el codigo
+    # solo, sino la clave legible y el par (empresa, codigo).
+    "stg.obras": (("clave_obra",), ("empresa_id", "codigo_obra")),
     # F-056 (2026-09-26): el plan de cuentas, por las dos vias de R7: el par
     # (empresa, codigo) y la clave legible.
     "contabilidad.plan_cuentas": (("empresa_id", "codigo_cuenta"), ("clave_cuenta",)),
