@@ -24,6 +24,7 @@ import re
 import unicodedata
 from functools import cache
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 import yaml
@@ -565,7 +566,7 @@ def test_f162_r11_cabecera_publica_las_tres_al_final() -> None:
     assert columnas[:3] == ["obra_id", "codigo_obra", "nombre_obra"]
     for columna in COLUMNAS_NUEVAS:
         assert f"o.{columna}" in sentencia, f"{columna} sale de stg.obras o"
-    assert "presupuesto_vigente_venta_con_coeficientes" == columnas[-4]
+    assert columnas[-4] == "presupuesto_vigente_venta_con_coeficientes"
 
 
 # ===========================================================================
@@ -577,7 +578,7 @@ class _CursorFalso:
     """Simula `stg.obras` con unas pocas fichas: devuelve las que casan por
     código o por clave, como haría la consulta del ayudante."""
 
-    FICHAS = [
+    FICHAS: ClassVar[list[tuple]] = [
         # obra_id, codigo, nombre, clave, es_por_defecto
         (2759553, "0721", "OBRA 0721", "1-0721", True),
         (2855829, "0721", "OBRA 0721", "28-0721", False),

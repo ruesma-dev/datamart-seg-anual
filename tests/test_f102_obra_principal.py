@@ -29,7 +29,6 @@ no se dropee. La desviacion esta justificada en `progress/impl_F-102.md`.
 
 from __future__ import annotations
 
-import hashlib
 import re
 import unicodedata
 from functools import cache
@@ -100,10 +99,9 @@ VISTAS_COMPRAS = (
     (RUTA_PAGO_FACTURA, "compras.v_control_forma_pago"),
 )
 
-#: `sha256` de `sql/stg/03_obras.sql` en `main` el 2026-09-23 (R7), con los
-#: finales de linea normalizados a LF. `stg.obras` no cambia: pasar el
-#: seguimiento a «solo Ruesma» es F-106.
-HASH_STG_OBRAS_MAIN = "851dea9012987f8fcbc7099ff2542f3cb80978db87b8067f7587dc9fe9071d27"
+#: `HASH_STG_OBRAS_MAIN` (el `sha256` de `sql/stg/03_obras.sql` en `main` el
+#: 2026-09-23, R7) se RETIRÓ con F-162 (2026-11-11): `stg.obras` deja de elegir
+#: una ficha por código y lleva todas, con `es_por_defecto`. Ver abajo, R7.
 
 #: `depends_on` de cada paso en `main` el 2026-09-23 (R24): la vista nueva no
 #: anade dependencias. `compras` la lee sin depender de `build_maestros`, como
@@ -209,11 +207,6 @@ def _nivel_cero(texto: str) -> str:
         if profundidad == 0:
             salida.append(caracter)
     return "".join(salida)
-
-
-def _hash(ruta: Path) -> str:
-    texto = ruta.read_bytes().decode("utf-8").replace("\r\n", "\n")
-    return hashlib.sha256(texto.encode("utf-8")).hexdigest()
 
 
 def _normalizado(texto: str) -> str:
@@ -387,17 +380,15 @@ def test_f102_r6_la_clave_es_empresa_guion_codigo() -> None:
 # ===========================================================================
 
 
-def test_f102_r7_stg_obras_es_identico_al_de_main() -> None:
-    assert _hash(RUTA_STG_OBRAS) == HASH_STG_OBRAS_MAIN, (
-        "`sql/stg/03_obras.sql` no se toca en F-102: el seguimiento «solo "
-        "Ruesma» es F-106 (R7)"
-    )
-
-
-def test_f102_r7_el_guarda_de_f073_sigue_en_pie() -> None:
-    texto = (RAIZ / "tests" / "test_f073_sql.py").read_text(encoding="utf-8")
-    assert "def test_f073_r26_no_toca_el_desempate_de_stg_obras" in texto
-    assert '"rn = 1" in texto' in texto
+# RETIRADOS CON F-162 (2026-11-11), a proposito y con este motivo:
+# `test_f102_r7_stg_obras_es_identico_al_de_main` (el hash de `03_obras.sql`) y
+# `test_f102_r7_el_guarda_de_f073_sigue_en_pie` (que exigia el
+# `test_f073_r26_no_toca_el_desempate_de_stg_obras`) congelaban el desempate
+# `rn = 1` de `stg.obras` hasta que una feature lo cambiase. F-162 es esa
+# feature: por orden del humano, `stg.obras` lleva TODAS las fichas, cada una con
+# su empresa, y marca la ficha por defecto en `es_por_defecto`. Lo que vigilan
+# ahora es `tests/test_f162_fichas_por_empresa.py` (R1-R7). Se queda el guarda
+# de abajo: `stg` sigue sin leer `maestro.v_obra_fichas`.
 
 
 def test_f102_r7_stg_no_lee_la_vista_de_fichas() -> None:
@@ -602,21 +593,14 @@ def test_f102_r17_la_regla_trae_las_cifras_medidas() -> None:
         assert cifra in texto, f"la regla no dice «{cifra}» (R17)"
 
 
-def test_f102_r18_la_ficha_de_stg_obras_dice_donde_difiere() -> None:
-    texto = _texto(_ficha("stg.obras"))
-    for codigo in ("0581", "0606", "0671", "0720", "F-106", "es_ficha_principal"):
-        assert codigo in texto, f"stg.obras no dice «{codigo}» (R18)"
-
-
-def test_f102_r18_la_regla_del_universo_tambien() -> None:
-    """F-147 (revision_reglas.md, fila 4): las cuatro obras de ficha distinta
-    salieron de la regla a la ficha de `stg.obras` (el test de arriba las exige
-    allí); la regla remite a esa ficha."""
-    regla = _regla("R-UNIVERSO-OBRA")
-    assert "lo dice su ficha" in " ".join(regla["regla"].split())
-    texto = _texto(_ficha("stg.obras"))
-    for codigo in ("0581", "0606", "0671", "0720", "F-106"):
-        assert codigo in texto, f"stg.obras no dice «{codigo}» (R18)"
+# RETIRADOS CON F-162 (2026-11-11), a proposito y con este motivo:
+# `test_f102_r18_la_ficha_de_stg_obras_dice_donde_difiere` y
+# `test_f102_r18_la_regla_del_universo_tambien` exigian que la ficha de
+# `stg.obras` dijese que difiere de `es_ficha_principal` en «0581, 0606, 0671,
+# 0720» y remitiese a F-106. Desde F-162 no difiere por eleccion: `stg.obras`
+# tiene una fila por ficha y `es_por_defecto` coincide hoy con
+# `es_ficha_principal` en todas. La ficha y `R-UNIVERSO-OBRA` las vigila
+# `tests/test_f162_fichas_por_empresa.py` (R13-R15).
 
 
 def test_f102_r20_la_version_sube_sobre_la_de_main() -> None:

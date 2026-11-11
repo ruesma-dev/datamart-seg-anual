@@ -13,7 +13,7 @@
 -- Las tres columnas de F-162 van DETRÁS de `_built_at`, aquí y en la migración
 -- del bloque `DO` de abajo, para que la posición sea la misma en una base nueva
 -- y en la tabla que ya existe en Azure: `empresa_id` (`con.emp`), `clave_obra`
--- ('<empresa>-<codigo>', como `maestro.v_obra_fichas`) y `es_por_defecto` (una
+-- ('<empresa>-<codigo>', la forma de `maestro.obras`) y `es_por_defecto` (una
 -- por código; criterio en `etl_sigrid/domain/ficha_obra.py`).
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS stg.obras (
