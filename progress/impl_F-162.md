@@ -123,7 +123,7 @@ Los tres KO vienen del `.env`. Sin él, `SigridApiSettings` no carga y la puerta
 ## MANUAL pendiente (líder o humano)
 
 1. **T12 · sandbox con DSN** en la copia con `.env`: `F162_SANDBOX_DSN=<dsn local> .venv/Scripts/python.exe -m pytest tests/test_f162_sandbox.py`. Aquí se pasó en un cluster desechable (9 passed); falta en el Postgres local del puesto, sin `skip`.
-2. **`EXPLAIN (ANALYZE, BUFFERS)` en solo lectura en Azure** del `SELECT` de `03_obras.sql`, desde `WITH fichas AS` hasta el final. Está preparado en `C:\Users\pgris\AppData\Local\Temp\claude\8c090c429e3d52a1\c07baa90-9816-490e-8fd8-5246a1377627\scratchpad\explain_f162.sql`. Envuelto en `BEGIN READ ONLY; ... ROLLBACK;`. Se espera un coste de +0 s a +48 s (design §6).
+2. **`EXPLAIN (ANALYZE, BUFFERS)` en solo lectura en Azure** del `SELECT` de `03_obras.sql`, desde `WITH fichas AS` hasta el final. Está preparado en `<scratchpad del líder>/explain_f162.sql`. Envuelto en `BEGIN READ ONLY; ... ROLLBACK;`. Se espera un coste de +0 s a +48 s (design §6).
 3. **T13 · medición ANTES** (design §7, paso 0): cuatro CSV `antes_*` y el recuento por ficha.
 4. **T14 · despliegue** (design §7, pasos 1-10) y su vuelta atrás. Lo que se espera: 634 fichas, 585 por defecto y las huellas de las 585 de hoy sin cambio.
 5. **Campaña oficial de mutación:** `python -m harness.mutacion --feature F-162 --base main` → `progress/mutacion_F-162.md`. Aquí no se pudo: con workers > 1 crea worktrees de git (prohibido en este encargo), y en serie la línea base pasa del timeout de 600 s, como en F-040.
