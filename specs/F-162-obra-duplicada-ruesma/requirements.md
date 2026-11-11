@@ -1,108 +1,120 @@
 <!-- specs/F-162-obra-duplicada-ruesma/requirements.md -->
-# F-162 · Requisitos · Hotfix: la ficha de obra que gana el desempate de `stg.obras`
+# F-162 · Requisitos · El seguimiento lleva TODAS las fichas de obra, cada una con su empresa
 
-Diagnóstico: `progress/explore_0721_obra_duplicada.md`. En Sigrid hay dos fichas 0721, la
-2759553 (Construcciones Ruesma, `con.emp` = 1, 9.165 líneas de `raw.obrparpre`) y la 2855829
-(PORSAN, empresa 28, vacía, alta del 19-10-2026). Ninguna tiene `conext` 15, así que
-`stg/03_obras.sql` elige por `tiemod` la de PORSAN, y la 0721 sale del seguimiento.
+Diagnóstico de partida: `progress/explore_0721_obra_duplicada.md`. Hay dos fichas 0721, la
+2759553 de Construcciones Ruesma (`con.emp` = 1, 9.165 líneas) y la 2855829 de PORSAN (empresa 28,
+vacía). `stg/03_obras.sql` se queda con UNA ficha por código y elige la de PORSAN.
 
-**Criterio del humano (2026-11-11), no se discute:** «en caso de duda debe ir siempre por
-delante Construcciones Ruesma, salvo que se diga explícitamente lo contrario». La «duda» es
-SOLO cuando los datos no deciden.
+**Modelo del humano (2026-11-11), no se discute** (sustituye al primer planteamiento de esta spec,
+«elegir una ficha»): «Debes leer los proyectos en ambas empresas. No tener que elegir: cada uno con
+su propia empresa, sin cruces entre empresas. Lo que pasa es que, al preguntar la IA, hay que
+decirle que puede ser el mismo proyecto en ambas empresas y que por defecto coja este. Ruesma debe
+tener la obra 0721 y PORSAN también.» Y el criterio del proyecto por defecto: «en caso de duda,
+Construcciones Ruesma por delante, salvo que se diga lo contrario; los datos deciden antes que la
+duda». Es el modelo de F-106 (`harness/features.json`) aplicado al SEGUIMIENTO.
 
-**Medido** (spec-author, 2026-11-11 11:05 UTC, solo lectura, Azure): con el orden nuevo
-cambian **tres** códigos y ninguno más. Detalle y arrastre en `design.md` §5.
+**Medido** (spec-author, Azure, solo lectura, 2026-11-11 16:30-16:45 UTC): el universo pasa de 585
+a **634 fichas** (585 códigos); entran 49 fichas, **4 con filas de plan**: 12-0252, 25-0517,
+1-0606 y 1-0721. Ninguna ficha de hoy sale. Detalle en `design.md` §5.
 
-| Código | Hoy (`obra_id`, empresa, líneas) | Con F-162 |
-|---|---|---|
-| 0721 | 2855829, 28, 0 | 2759553, 1, 9.165 |
-| 0252 | 587639, 1, 22 | 650280, 12 (UTE CP Primo de Rivera), 28.511 |
-| 0517 | 1060846, 1, 207 | 1088657, 25 (UTE Colegio Seseña), 158.737 |
+Fuera: recursos, partes y compras de otras empresas (se quedan en F-106); F-161 (versiones sin
+`planif`, que afecta a la 0721); el modelo de Power BI, que es del humano (D3).
 
-Alcance: el desempate de `stg.obras`, su columna nueva `empresa_id`, las fichas y textos que
-describen esa elección, y las dos excepciones de cobertura que el cambio deja sin objeto.
-NO entran F-106 (seguimiento por empresa), F-161 (versiones sin `planif`), la 0606 ni la 0720.
+## Requisitos · el universo (`stg.obras`)
 
-## Requisitos · el desempate
+R1. `stg.obras` debe tener UNA fila por FICHA de obra real (`raw.obr JOIN raw.con`) de TODAS las
+empresas, sin desempate: los mismos filtros de hoy (lista cerrada de códigos administrativos,
+`con.cod !~ '[0-9]{5,}'`, código nulo o vacío) y ninguno más.
 
-R1. El sistema debe dejar en `stg.obras` UNA ficha por `codigo_obra`, la primera según este
-orden y solo este: (1) marcada en `raw.conext` con `cod = '15'`; (2) MÁS líneas de presupuesto
-(filas de `raw.obrparpre` con ese `obride`, todos los ámbitos y fases); (3) Construcciones
-Ruesma (`con.emp = 1`) antes que cualquier otra empresa; (4) `con.tiemod` DESC NULLS LAST;
-(5) `obr.ide` DESC.
+R2. CUANDO un código tenga fichas en varias empresas, ENTONCES `stg.obras` debe tener una fila por
+cada una (la 0721: 2759553 de la empresa 1 y 2855829 de la 28).
 
-R2. CUANDO un código tenga dos fichas sin marca 15, una con líneas de presupuesto y otra sin
-ellas, más reciente y de otra empresa (el caso 0721), ENTONCES el sistema debe elegir la que
-tiene líneas. Test de regresión con los datos de la 0721, en RED con el `03_obras.sql` de `main`
-(`17b41ec`) y en verde con el nuevo.
+R3. `stg.obras` debe publicar, AL FINAL y en este orden, `empresa_id INTEGER NULL` (`con.emp`),
+`clave_obra VARCHAR` (`<empresa>-<codigo>`, como `maestro.v_obra_fichas`) y `es_por_defecto
+BOOLEAN NOT NULL`, en el `CREATE TABLE` y en la migración de la tabla de Azure. Ninguna columna de
+hoy cambia de nombre, tipo ni posición; el `INSERT` nombra sus columnas.
 
-R3. CUANDO dos fichas empaten en (1) y (2) y solo una sea de la empresa 1, ENTONCES el sistema
-debe elegir la de la empresa 1 aunque la otra tenga `tiemod` más reciente e `ide` mayor.
+R4. `clave_negocio` sigue siendo `obra_id`; la clave alternativa pasa de `codigo_obra` a
+`clave_obra` y a (`empresa_id`, `codigo_obra`), y `check-unicidad` la vigila.
 
-R4. El sistema debe aplicar cada criterio solo cuando empatan todos los anteriores: (1) manda
-sobre (2) aunque la marcada esté vacía; (2) sobre (3) aunque la de más líneas sea de una UTE;
-(3) sobre (4); (4) sobre (5). Test parametrizado, un par de fichas por frontera.
+## Requisitos · el proyecto por defecto
 
-R5. SI una ficha no tiene ninguna línea en `raw.obrparpre`, ENTONCES el sistema debe contarla
-con 0 líneas (no NULL) y no debe perderla ni duplicarla: el recuento se agrega por `obride`
-ANTES de unirlo, y la marca 15 es un `EXISTS` (dos filas cod 15 no multiplican la ficha).
+R5. `es_por_defecto` debe ser TRUE en exactamente UNA ficha por código: (1) la de la empresa 1 si
+existe; (2) si solo hay una ficha, esa; (3) si hay varias y ninguna es de la empresa 1, la de MÁS
+líneas de presupuesto (`raw.obrparpre` por `obride`, contadas antes de unir), después `tiemod`
+DESC NULLS LAST y después `ide` DESC.
 
-R6. El sistema NO debe cambiar los filtros de código de `03_obras.sql`: la lista cerrada de
-códigos administrativos, `con.cod !~ '[0-9]{5,}'`, el código nulo o vacío y `activa = TRUE`.
+R6. La marca de vigente `conext` 15 NO debe intervenir en `es_por_defecto` (razonado en design §3.2).
 
-R7. El dominio debe tener la función pura del orden (`etl_sigrid/domain/ficha_obra.py`) y el
-`ORDER BY` del `ROW_NUMBER` de `03_obras.sql` debe seguirla criterio a criterio, en el mismo
-orden (test sobre el texto del SQL, como F-158 R7).
+R7. El dominio debe tener la función pura del criterio (`etl_sigrid/domain/ficha_obra.py`) y el
+SQL debe seguirla criterio a criterio (test sobre el texto).
 
-## Requisitos · la columna `empresa_id`
+R8. `maestro.obras` debe publicar `es_por_defecto` como última columna: la de `stg.obras` para las
+fichas del seguimiento y, fuera de él (códigos administrativos y de 5+ dígitos), la de
+`es_ficha_principal` (D1).
 
-R8. `stg.obras` debe publicar `empresa_id INTEGER NULL`, la `con.emp` de la ficha elegida, como
-ÚLTIMA columna (detrás de `_built_at`), tanto en el `CREATE TABLE` como en la migración de la
-tabla que ya existe en Azure (`ALTER TABLE ... ADD COLUMN`), de modo que su posición sea la
-misma en una base nueva y en Azure.
+## Requisitos · lo que cuelga de `stg.obras`
 
-R9. El `INSERT` de `03_obras.sql` debe nombrar sus columnas (ya lo hace) e incluir `empresa_id`;
-ninguna otra columna cambia de nombre, tipo ni posición.
+R9. `stg.partidas`, `stg.presupuesto`, `stg.plan_mensual`, `stg.plan_mensual_fase0` y `stg.fases`
+no deben cambiar ni una fila (ya se construyen para todas las fichas).
 
-R10. CUANDO se construya `stg.obras`, ENTONCES `empresa_id` debe ser la empresa de la ficha
-elegida: 1 en la 0721, 12 en la 0252 y 25 en la 0517 con los datos de hoy (sandbox, R18).
+R10. `mart`, `cierre` y lo que los lee (`tesoreria`, `retenciones`, `personal.en_seguimiento`)
+deben ir por `obra_id`: cada ficha con lo suyo, sin cruces ni consolidación entre empresas. Ningún
+SQL del repositorio agrega ni cruza por `codigo_obra` sin `obra_id` (medido, design §4).
 
-## Requisitos · documentación
+R11. `mart.v_pbi_dim_obra` y `cierre.v_pbi_cierre_cabecera` deben publicar al final `empresa_id`,
+`clave_obra` y `es_por_defecto`, y `obra_label` debe distinguir las fichas de un mismo código (D3).
 
-R11. La cabecera de `03_obras.sql` debe explicar el orden de R1, el criterio del humano con su
-fecha, por qué las líneas van antes que la empresa (0252 y 0517) y por qué la empresa va antes
-que `tiemod` (0721); y retirar los porcentajes «Caso 1/2/3» que ya no describen el orden.
+R12. Los comandos de inspección de `main.py` que buscan en `stg.obras` por código con `fetchone`
+(`list-master-cierre`, `inspect-cierre`, `inspect-indirectos-detalle`, `inspect-generales-detalle`,
+`inspect-cabecera`, `inspect-planif-vs-real`) deben aceptar el código (ficha por defecto) o la
+`clave_obra` (`28-0721`) por un solo ayudante, y `find-obra` debe mostrar la empresa.
 
-R12. La ficha de `stg.obras` (`config/diccionario/stg.yaml`) debe describir la regla de R1, la
-columna `empresa_id` (con su relación a `maestro.obras`) y la lista actualizada de códigos en
-que `stg.obras` y `maestro.obras.es_ficha_principal` eligen distinto (design §5.4).
+## Requisitos · la IA (diccionario; `mcp-bbdd` no cambia)
 
-R13. Los textos que hoy dicen «`stg.obras` no cambia» o citan la lista vieja «0581, 0606, 0671
-y 0720» deben decir la nueva: fichas de `maestro.yaml`, comentarios de `sql/maestro/00_setup.sql`
-y `01_obras.sql`, `docs/ARCHITECTURE.md` y `azure-apps/datamart_seg_anual.md` (design §2).
+R13. `R-EMPRESA-POR-DEFECTO` debe decir que el mismo código puede ser la misma obra en varias
+empresas; que, sin empresa en la pregunta, una obra se lee en su ficha `es_por_defecto` y se dice;
+que nunca se suman fichas de empresas distintas sin decirlo; que si la ficha por defecto no tiene
+datos y otra del mismo código sí, se avisa; y su `ambito` debe alcanzar a `stg`, `mart` y `cierre`.
 
-R14. El diccionario debe subir de versión en `00_global.yaml`, con su nota de cambio.
+R14. `R-UNIVERSO-OBRA` debe dejar de decir «deduplica por `conext` 15»: `stg.obras` tiene una fila
+por ficha y difiere de `maestro.obras` solo en los filtros de código. `R-CODIGO-POR-EMPRESA` debe
+alcanzar a `stg.obras`, `mart.v_pbi_dim_obra` y `cierre.v_pbi_cierre_cabecera`.
 
-## Requisitos · guardas y cobertura
+R15. Las fichas de `stg.obras`, `maestro.obras`, `mart.v_pbi_dim_obra`, `cierre.v_pbi_cierre_cabecera`
+y la columna `codigo_obra` de `mart.fact_seguimiento_mensual` y `cierre.fact_cierre_mensual` deben
+decir que el código no es único entre empresas y cómo se llega a la ficha por defecto.
 
-R15. La guarda `test_f102_r7_stg_obras_es_identico_al_de_main` (hash de `03_obras.sql`) debe
-retirarse con su motivo escrito en el propio test: F-162 cambia el fichero a propósito y sus
-tests fijan ahora el desempate. Las otras guardas de F-102 R7 y la de F-073 R26 siguen.
+R16. Las preguntas de aceptación de «la obra X» sobre `stg`, `mart` y `cierre` (P4, P6, P7, P10,
+P11, P14) deben llevar `R-EMPRESA-POR-DEFECTO` en `reglas_implicadas`, y P9 debe contar fichas
+por defecto.
 
-R16. CUANDO la 0252 y la 0517 publiquen su ficha con datos, ENTONCES sus dos excepciones de
-`config/cobertura_excepciones.yaml` (las de F-053) deben salir y `EXCEPCIONES_MAX` bajar de 23
-a 21 en `tests/test_f052_cobertura.py` (trinquete: solo baja).
+R17. Lo servido debe respetar `PRESUPUESTO_MAX` de `tests/test_f147_presupuesto_contexto.py` y los
+topes de `test_f147_contenido.py`; el diccionario sube de versión con su nota.
+
+## Requisitos · guardas, cobertura y features vecinas
+
+R18. Caen a propósito, con su motivo escrito en el propio test: `test_f102_r7_stg_obras_es_identico_al_de_main`,
+`test_f073_r26_no_toca_el_desempate_de_stg_obras`, `test_f102_r7_el_guarda_de_f073_sigue_en_pie` y
+los dos `test_f102_r18_*`, que exigen la lista «0581, 0606, 0671, 0720» en la ficha.
+
+R19. Las cuatro excepciones de cobertura de F-053 (0517, 0252, 0720 y 0606) deben salir y
+`EXCEPCIONES_MAX` bajar de 23 a 19, una vez medido en el despliegue que no saltan.
+
+R20. Los textos que dicen «`stg.obras` no cambia» o «elige una ficha por código» deben decir lo
+nuevo: `maestro.yaml`, comentarios de `sql/maestro/00_setup.sql` y `01_obras.sql`,
+`docs/ARCHITECTURE.md`, `CLAUDE.md` si lo dice y `azure-apps/datamart_seg_anual.md`.
+
+R21. F-053 se propone cerrar como absorbida y F-106 se enmienda con el texto de design §8.
 
 ## Requisitos · medición y despliegue (MANUAL del humano)
 
-R17. Antes y después del despliegue, sobre el MISMO `raw` (job puntual sin ingesta), el sistema
-debe medir: las fichas elegidas por código (solo cambian 0252, 0517 y 0721), las huellas
-`mart`, `cierre`, `dimension` y `plan_obra` y el recuento por objeto de design §5. Fuera de esos
-tres códigos, diferencia CERO; `plan_obra` idéntica entera.
+R22. Antes y después, sobre el MISMO `raw` (job puntual sin ingesta): fichas por código, las
+huellas `mart`, `cierre`, `dimension` y `plan_obra` y el recuento de design §5. Lo de hoy no
+cambia; solo GANAN datos 1-0721, 12-0252, 25-0517 y 1-0606; en `dimension` y `plan_obra` solo
+cambia la etiqueta `codigo_obra` de las fichas nuevas.
 
-R18. Test de sandbox (`F162_SANDBOX_DSN`, `skip` sin él): el `03_obras.sql` real contra un `raw`
-mínimo con los casos de R2-R5 y R10. Es la prueba de comportamiento del SQL; los tests sin base
-son el oráculo y el texto.
+R23. Test de sandbox (`F162_SANDBOX_DSN`, `skip` sin él): `01_ddl.sql` y `03_obras.sql` reales
+contra un `raw` mínimo con los casos de R2, R5 y R6.
 
-R19. El despliegue es MANUAL del humano (Azure: solo él escribe), con los pasos y la vuelta
-atrás de `design.md` §6, fuera de 00:00-05:00 UTC.
+R24. El despliegue y la vuelta atrás son MANUALES del humano (design §7), fuera de 00:00-05:00 UTC.

@@ -9,17 +9,22 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-11-11 · F-162 · spec escrita, pendiente de la PARADA 1
+## 2026-11-11 · F-162 · spec REHECHA (modelo por empresa), pendiente de la PARADA 1
 
-spec-author, rama `feature/F-162-obra-duplicada-ruesma` (desde `17b41ec`): `specs/F-162-obra-duplicada-ruesma/`.
-- **Medido en Azure** (solo lectura, 11:05-12:30 UTC): con el orden nuevo cambian solo 0721, 0252 y 0517, como midió el líder. Las tres fichas que salen tienen 0 filas en `stg.plan_mensual`, `mart` y `cierre`, así que no desaparece ninguna cifra publicada: solo entran obras. `stg.plan_mensual` no cambia (03 y 01 no están en el sello).
-- **Coste:** el recuento de `raw.obrparpre` añade unos 48 s por noche, porque no hay índice por `obride`.
-- **Guardas que caen a propósito:** el hash de `03_obras.sql` en `test_f102_r7` y las excepciones de cobertura de 0252 y 0517 (`EXCEPCIONES_MAX` pasa de 23 a 21).
-- **Decisiones abiertas para el humano** (design §7):
-  - **D3:** quitar también la excepción de la 0720, que ya elige la ficha de Ruesma.
-  - **D4:** reescribir F-053 para que quede solo la 0606.
-  - **D5:** F-162 lleva la 0252 y la 0517 a la ficha de su UTE, lo contrario de lo que plantea F-106 («solo empresa 1»). Hay que confirmar que F-162 manda hasta F-106.
-  - **D6 (aviso):** la 0721 entra en `mart` sin versiones master, porque no tiene `planif` (es F-161).
+spec-author, rama `feature/F-162-obra-duplicada-ruesma` (desde `17b41ec`): `specs/F-162-obra-duplicada-ruesma/`. El humano rechazó «elegir una ficha por código»: el seguimiento lleva TODAS las fichas, cada una con su empresa, y la IA usa `es_por_defecto` cuando la pregunta no dice empresa. El primer planteamiento queda en el commit `b1345e8` como historia.
+- **Medido en Azure** (solo lectura, 16:30-16:45 UTC): `stg.obras` pasa de 585 a 634 fichas (585 códigos). Entran 49 fichas, de las que 4 tienen plan: 12-0252, 25-0517, 1-0606 y 1-0721 (+152.785 filas, el 0,47 %). Ninguna ficha de hoy pierde filas.
+- **Las demás:** 18.521 líneas de partes pasan a `en_seguimiento`. Los 49 códigos con varias fichas tienen todos la de Ruesma, así que hoy `es_por_defecto` coincide con `es_ficha_principal`.
+- **Barrido:** ningún SQL agrupa ni cruza por `codigo_obra` sin `obra_id`. Solo saldrían duplicados en seis comandos `inspect-*` de `main.py`, en Power BI y en la IA (design §4).
+- **Caen a propósito:** las guardas `test_f102_r7` y `test_f102_r18`, la `test_f073_r26` y las 4 excepciones de cobertura de F-053 (`EXCEPCIONES_MAX` pasa de 23 a 19).
+- **Coste:** de +0 s a +48 s en `03_obras.sql`, según el plan, y unos +40 s en `mart` y `cierre`.
+- **Decisiones para la PARADA 1** (design §8):
+  - **D1:** qué vale `maestro.obras.es_por_defecto` fuera del seguimiento: `es_ficha_principal` o NULL.
+  - **D2:** `conext` 15 queda fuera del criterio, razonado.
+  - **D3:** el filtro por defecto de Power BI. Recomendado: sin filtro y con `obra_label` por `clave_obra`. Un filtro `es_por_defecto` dejaría sin datos la 0581, la 0606 y la 0671, que hoy se ven por la ficha de su UTE.
+  - **D4:** en `mart`/`cierre`, una pregunta agregada sin empresa usa `empresa_id = 1` o `es_por_defecto`.
+  - **D5:** se propone no llevar la empresa a las tablas de hechos.
+- **Se proponen:** cerrar F-053 como absorbida y enmendar F-106 con el texto de design §8.
+- **Aviso:** la 0721 seguirá sin master hasta F-161, porque no tiene `planif`.
 
 ## 2026-11-11 · NADA EN CURSO · leer esto primero
 

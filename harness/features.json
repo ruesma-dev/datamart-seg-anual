@@ -2591,13 +2591,15 @@
     },
     {
       "id": "F-162",
-      "title": "Hotfix: `stg.obras` elige la ficha vacía de PORSAN para la 0721 (desempate de fichas duplicadas sin marca de vigente)",
-      "description": "Incidencia de Control de Costes (Elena y Juan, 2026-11-11): la 0721 no trae presupuesto ni versiones porque `stg/03_obras.sql` deja UNA ficha por código. Si ninguna tiene la marca de vigente (`conext` 15), elige la de `tiemod` más reciente, y en la 0721 esa es la ficha vacía de PORSAN (empresa 28, ide 2855829, alta del 19-10-2026), en lugar de la de Construcciones Ruesma (1-0721, ide 2759553, con 9.165 líneas y los dos masters). Diagnóstico en `progress/explore_0721_obra_duplicada.md`. CRITERIO DEL HUMANO (2026-11-11, «en caso de duda debe ir siempre por delante construcciones ruesma, salvo que se diga explicitamente lo contrario», matizado: Ruesma solo cuando los datos no deciden). Orden nuevo: 1) marca `conext` 15; 2) más presupuesto (líneas de `raw.obrparpre`); 3) Construcciones Ruesma (`con.emp` = 1); 4) `tiemod` DESC; 5) `ide` DESC. MEDIDO por el líder el 2026-11-11 sobre todos los códigos: cambian tres obras. La 0721 pasa de PORSAN a Ruesma; la 0252 y la 0517 (obras cerradas de 2009 y 2016) pasan de la ficha casi vacía de Ruesma a la de su UTE, que tiene los datos (28.511 y 158.737 líneas). La 0581, la 0606 y la 0671 no cambian. Además, `stg.obras` gana la columna `empresa_id` (`con.emp`) con su ficha, para que la skill del ABC y las consultas sepan de qué empresa es la ficha elegida.",
+      "title": "El seguimiento lleva TODAS las fichas de obra, cada una con su empresa, y marca la ficha por defecto de cada código (0721 en Ruesma y en PORSAN)",
+      "description": "Incidencia de Control de Costes (Elena y Juan, 2026-11-11): la 0721 no trae presupuesto porque `stg/03_obras.sql` deja UNA ficha por código y elige la vacía de PORSAN (empresa 28, ide 2855829) en vez de la de Construcciones Ruesma (1-0721, ide 2759553, 9.165 líneas). Diagnóstico en `progress/explore_0721_obra_duplicada.md`. MODELO DEL HUMANO (2026-11-11, sustituye al primer planteamiento de «elegir una ficha»): «Debes leer los proyectos en ambas empresas. No tener que elegir: cada uno con su propia empresa, sin cruces entre empresas. Lo que pasa es que, al preguntar la IA, hay que decirle (quizás en el MCP) que puede ser el mismo proyecto en ambas empresas y que por defecto coja este. Ruesma debe tener la obra 0721 y PORSAN también.» Es el modelo de F-106 aplicado al SEGUIMIENTO. QUÉ HACE: (1) `stg.obras` deja de desempatar y lleva todas las fichas de obra real de todas las empresas (mismos filtros de códigos), con `empresa_id`, `clave_obra` y `es_por_defecto` al final; todo lo que cuelga (`mart`, `cierre`, `tesoreria`, `retenciones`, `personal`) va por `obra_id`, sin cruces ni consolidación. (2) `es_por_defecto` (también en `maestro.obras`): la ficha de la empresa 1 si existe; si solo hay una, esa; si hay varias sin la de Ruesma, la de más líneas de presupuesto, después `tiemod` y después `ide` (criterio del humano: «en caso de duda, Construcciones Ruesma por delante, salvo que se diga lo contrario; los datos deciden antes que la duda»); `conext` 15 no interviene. (3) La IA lo aprende por el diccionario (`R-EMPRESA-POR-DEFECTO`, `R-UNIVERSO-OBRA`, `R-CODIGO-POR-EMPRESA`); `mcp-bbdd` no cambia. (4) Absorbe F-053; F-106 se queda con recursos, partes y compras. MEDIDO por el spec-author el 2026-11-11: 585 -> 634 fichas (585 códigos); entran 49 fichas, 4 con plan (12-0252, 25-0517, 1-0606, 1-0721; +152.785 filas de plan, 0,47 %); ninguna ficha de hoy pierde una fila; 18.521 líneas de partes pasan a `en_seguimiento`.",
       "acceptance": [
-        "Spec SDD aprobada por el humano (PARADA 1)",
-        "Test de regresión con el caso 0721 (dos fichas sin marca, la nueva vacía y de otra empresa) en RED antes y en verde después; y uno de empate en datos que gana Ruesma",
-        "Medida de antes y después en Azure: solo cambian de ficha la 0721, la 0252 y la 0517, y lo que arrastran (`stg.partidas`, `stg.presupuesto`, `plan_mensual`, `mart`) queda documentado",
-        "`stg.obras.empresa_id` con su ficha en el diccionario y la regla del desempate escrita en la ficha de `stg.obras`",
+        "Spec SDD aprobada por el humano (PARADA 1), con las decisiones D1-D5 de `design.md` §8 resueltas",
+        "`stg.obras` con una fila por ficha (634 el 2026-11-11), `empresa_id`, `clave_obra` y `es_por_defecto` (uno por código), con test de la 0721 en dos empresas en RED antes y en verde después, y el criterio por defecto fijado por un oráculo puro y un sandbox",
+        "Huella antes y después sobre el mismo raw: lo de hoy no cambia y solo ganan datos 1-0721, 12-0252, 25-0517 y 1-0606",
+        "Ningún SQL ni comando agrega ni cruza por `codigo_obra` sin `obra_id`; las vistas de Power BI y `maestro.obras` distinguen las fichas de un código",
+        "`R-EMPRESA-POR-DEFECTO`, `R-UNIVERSO-OBRA`, `R-CODIGO-POR-EMPRESA`, fichas y preguntas de aceptación enmendadas, dentro del presupuesto de F-147",
+        "Excepciones de cobertura de F-053 retiradas (`EXCEPCIONES_MAX` 19); F-053 cerrada como absorbida y F-106 enmendada",
         "`bash harness/init.sh` en verde y despliegue con sus pasos y su vuelta atrás"
       ],
       "status": "pending",
@@ -2605,7 +2607,7 @@
       "rigor": "estandar",
       "priority": 0,
       "branch": "feature/F-162-obra-duplicada-ruesma",
-      "notes": "2026-11-11: alta por el líder tras el sí del humano; spec-author lanzado."
+      "notes": "2026-11-11: alta por el líder tras el sí del humano; spec-author lanzado. Mismo día: el humano rechaza «elegir una ficha» y fija el modelo por empresa; spec rehecha."
     }
   ]
 }
