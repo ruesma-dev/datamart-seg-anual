@@ -20,7 +20,10 @@
   - Tesorería de control: 0. `check-unicidad`: 0 claves rotas.
   - Diccionario v76 publicado a las 14:41 UTC y MCP reiniciado.
 - **El despliegue destapó la 0517.** `check-cobertura` daba KO porque su master (versiones 15 y 16) no tiene `tex`. Vuelve a las excepciones solo para los ámbitos 8 y 11, con F-117 y decisión del humano (`2c02911`, delta APROBADO). La 0726 da KO desde antes de F-162 y queda apuntada en F-117, sin excepción.
-- **Pendiente:** imagen nueva con `2c02911`, para que la nocturna lleve el YAML. `done` tras la primera nocturna buena.
+- **Imagen `r20261112-1745` en el job desde el 2026-11-12 (17:45)**, con `2c02911`. La vuelta atrás es `r20261112-0941`. `main` y `dev` están subidos.
+- **Al empezar la próxima sesión,** mirar la nocturna del 2026-11-13. La ejecución tiene que llevar la imagen `r20261112-1745`; `build_stg`, `build_mart`, `build_maestros` y `build_cierre` tienen que acabar en SUCCESS; y `check-cobertura` solo puede dar KO por la 0726.
+  - Si sale así: F-162 a `done` (con su entrada en `history.md`), F-053 cerrada como absorbida y adelante con F-161.
+  - Pendiente del humano: Power BI (D3).
 
 ### 2026-11-11 · implementada (T1-T11), pendiente del review · rama `feature/F-162-obra-duplicada-ruesma`
 
