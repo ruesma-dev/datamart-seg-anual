@@ -2142,3 +2142,33 @@ Además entran siete tablas de `raw` (`cli`, `cer`, `cerpro`, `cerrec`, `cerprod
 - `mcp-bbdd`: la lista blanca va en su F-034 (pliego `specs/F-040-ingresos/pliego_mcp_bbdd.md`; aviso enviado a la sesión `mcp`).
 - Observaciones O1, O3, O4 y O5 del reviewer, que decide el humano.
 - `CLASES_GARANTIA` sigue provisional (D4), a la espera de Control de Costes.
+
+## F-162 — Todas las fichas de obra, cada una con su empresa, y la ficha por defecto · `done` (2026-11-12)
+
+Rama `feature/F-162-obra-duplicada-ruesma`. Spec en `specs/F-162-obra-duplicada-ruesma/`. Rigor `estandar`.
+Detonante: la 0721 salía con la ficha vacía de PORSAN (empresa 28) en lugar de la de Ruesma (`progress/explore_0721_obra_duplicada.md`).
+
+**Qué cambia.** `stg.obras` deja de elegir una ficha por código: lleva TODAS (de 585 a 635), con `empresa_id`, `clave_obra` y `es_por_defecto`.
+- Criterio de `es_por_defecto`: Ruesma primero; si no, deciden los datos (líneas de `obrparpre`, `tiemod`, `ide`), sin `conext` 15. Vive en `etl_sigrid/domain/ficha_obra.py` y en `03_obras.sql`.
+- Lo publican `maestro.obras`, `mart.v_pbi_dim_obra` (con `obra_label` = `clave_obra · nombre`) y `cierre.v_pbi_cierre_cabecera`. Los seis `inspect-*` y `find-obra` aceptan la clave o el código.
+- Decisiones del humano (PARADA 1, «ok a d1 a d5»):
+  - D1: un solo criterio en todas las fichas.
+  - D2: `conext` 15 queda fuera.
+  - D3: Power BI sin filtro.
+  - D4: los agregados sin empresa usan `empresa_id = 1`.
+  - D5: la empresa no va a los hechos.
+- Diccionario v76 (R-EMPRESA-POR-DEFECTO).
+
+**Verificado:**
+- Review APPROVED (`progress/review_F-162.md`), y también el delta `2c02911`.
+- Puerta en verde: 11.179 passed sobre `fd4439d`; 11.209 passed sobre `911657c`.
+- Mutación: 20/20 muertos (`progress/mutacion_F-162.md`). El `EXPLAIN` da 9 ms (+0 s).
+
+**Despliegue (2026-11-12):**
+- Job puntual `t3ux7xk` con la imagen `r20261112-0941`. Huellas: `cierre` OK y `mart` cambia solo en 0252, 0517, 0606 y 0721. Tesorería de control 0 y `check-unicidad` 0.
+- Destapó la 0517 sin `tex` en su master, que vuelve a las excepciones de cobertura solo para 8 y 11 (F-117).
+- Imagen final `r20261112-1745`; la de vuelta atrás es `r20261112-0941`.
+
+**Cierre:** decisión del humano el 2026-11-12, sin esperar a la nocturna del 13. Esa nocturna queda como vigilancia en `current.md`. **F-053** se cierra con ella, absorbida.
+
+**Fuera, pendiente:** Power BI (D3), del humano. La 0721 sigue sin master hasta F-161 porque no tiene `planif`.
