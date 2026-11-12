@@ -108,8 +108,10 @@ encaja: `docs/ARCHITECTURE.md`.
   recuerda con ese comando al cerrar. **Ninguna feature nace de `dev`**:
   una rama que naciera de ella pondría en rojo la puerta de cobertura.
 - Commits: `F-XXX Tn: descripción` (tareas) o `F-XXX: descripción` (ajustes).
-- Los agentes solo hacen commit local en ramas feature. Push, merge a main y
-  PRs: siempre el humano.
+- Los agentes hacen commit local en ramas feature, nunca directos en `dev` ni
+  en `main`. Merges: a `dev` y a la rama espejo, el líder sin preguntar tras el
+  OK del humano al resumen final; a `main`, el líder preguntando antes. Push:
+  siempre el humano. PRs: solo con petición explícita.
 - Los originales en PDF u ofimática no se versionan (ver `.gitignore`).
 
 <!-- ==================== INICIO · ENTORNO DE RUESMA ==================== -->
