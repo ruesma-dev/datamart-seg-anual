@@ -1,23 +1,48 @@
 {
-  "$doc": "EJEMPLO, no activo. Copialo a harness/servicios.json SOLO si este repositorio es un monorepo con varios servicios. Sin harness/servicios.json el arnes es mono-proyecto: no hay nada que configurar y todo funciona como siempre. Campos: 'nombre' (unico), 'ruta' (relativa a la raiz, sin solaparse con la de otro servicio), 'lenguaje' ('python' u 'otro'), 'venv' (opcional: ruta del entorno virtual del servicio; si se declara y no existe, el arnes falla en vez de probar con el interprete equivocado) y 'comando_tests' (opcional: suite de un servicio que no es Python). Ningun campo puede contener el caracter '|'.",
+  "$doc": "EJEMPLO, no activo. Copialo a harness/servicios.json SOLO si este repositorio es un monorepo con varios servicios. Sin harness/servicios.json el arnes es mono-proyecto: no hay nada que configurar y todo funciona como siempre. Campos: 'nombre' (unico), 'ruta' (relativa a la raiz, sin solaparse con la de otro servicio), 'lenguaje' ('python' u 'otro'), 'venv' (opcional: ruta del entorno virtual del servicio; si se declara y no existe, el arnes falla en vez de probar con el interprete equivocado) y 'comando_tests' (opcional: suite de un servicio que no es Python). Ningun campo puede contener el caracter '|'. Campos de la cache de suites (opcionales; sin ellos, la clave es solo el arbol del servicio en HEAD mas el interprete y los .env): 'depende_de' (lista de rutas del repositorio, fichero o carpeta, que la suite usa fuera de su ruta, p. ej. una libreria comun: un commit en cualquiera invalida la cache; tienen que existir y estar versionadas), 'importa' (solo en servicios python: lista de modulos cuya ruta real se comprueba con el interprete del servicio, sin importarlos; si resuelven fuera de este repositorio -un worktree que importa la libreria del arbol principal- o fuera de la ruta y de depende_de, el portero lo avisa y no cachea) y 'entradas_no_versionadas' (lista de ficheros locales sin versionar cuya huella -nombre, tamano y fecha, nunca el contenido- entra en la clave; .env de la raiz y el del servicio entran siempre). Limitacion: la sonda usa importlib.util.find_spec desde la carpeta del servicio y NO ve un conftest.py que toque sys.path para llegar a otro paquete; declara esa ruta en depende_de. Para depender del repositorio entero, depende_de: [\".\"] (su hash es el arbol raiz en HEAD): cualquier cambio en cualquier ruta, commiteado o no, anula la cache, asi que en la practica casi nunca se sirve. Mas barato para un test que barre todo el repositorio (progress/, docs/, specs/: p. ej. un barrido de secretos) es 'ejecutar_siempre' (solo en servicios python: lista de ficheros o carpetas de tests, relativas a la ruta del servicio, que tienen que existir; una clave que se le parezca mal escrita tumba la declaracion): con la cache valida, init.sh las ejecuta igualmente con pytest y da [KO] si fallan; no entran en la clave. Un init.sh anterior a F-028 no las ejecuta. Sin cache que servir, init.sh ejecuta la suite completa y NO anade estas rutas: solo corren si pytest las colecta por defecto (dentro de sus testpaths y con nombre test_*.py). ARNES_SIN_CACHE=1 bash harness/init.sh ejecuta todas las suites aunque haya cache (y la refresca). Campo del alcance (opcional): 'alcance_incluye' (lista; hoy solo admite 'harness'): el alcance automatico de la puerta de cobertura y de la campana de mutacion excluye 'harness' a cualquier profundidad, porque en un proyecto normal es utillaje; un servicio que declara [\"harness\"] hace que el harness/ que cae bajo SU ruta si se mida. Es para el repositorio que fabrica el arnes, donde '<payload>/harness/' es el producto; no lo declares en un proyecto normal. Un valor distinto de 'harness', repetido, o una clave que parezca 'alcance_incluye' mal escrita tumban la declaracion. Capa e2e (opcional, F-059): 'e2e' es un objeto que activa la capa de tests de navegador (Playwright) del servicio, que ejecuta 'python -m harness.e2e --feature F-XXX' y nunca init.sh. Claves: 'url_base' (obligatoria, http:// o https://: donde escucha la aplicacion en local), 'rutas_ui' (obligatoria, lista no vacia de globs relativos a la ruta del servicio: si el diff de la feature toca alguno, la feature 'toca UI'), 'runner' ('pytest-playwright' por defecto, solo en servicios python, o 'playwright-test'), 'comando' (opcional: pisa el del runner), 'arranque' (opcional: comando que levanta la aplicacion; se espera a que url_base responda y se para con su arbol de procesos al terminar), 'ruta_tests' (por defecto 'tests_e2e'), 'espera_arranque_s' (60) y 'timeout_s' (900), enteros positivos, y 'hosts_prohibidos' (lista de globs de host productivos: si url_base o --url-base casa con uno, la declaracion falla y la capa nunca se ejecuta contra el). El host se compara como NOMBRE, sin resolverlo: se normaliza (minusculas, %xx decodificado, sin punto final). La IPv4 solo en forma canonica de cuatro decimales; la IPv6 sin IPv4 embebida: las formas alternativas de una IP (10.5, 0x0a000005, 012.0.0.5, 167772165, ::ffff:10.0.0.5), que el navegador lee como otra IP, se rechazan. Una url_base o --url-base con barra invertida, blancos o caracteres de control se rechaza: el navegador lee la barra invertida como '/' y quita los controles, asi que veria otro host. El host va en ASCII: un IDN se declara en forma xn-- (p. ej. xn--pp-8cd.dominio); un host con caracteres no ASCII (punto ideografico o de ancho completo, guion blando, espacio de ancho cero) se rechaza, porque el navegador los mapea por IDNA y veria otro host. Solo se aceptan nombres DNS ASCII ([a-z0-9-] por etiqueta), IPv4 canonica e IPv6 entre corchetes sin IPv4 embebida. Es semantica glob: '*.dominio' no casa con 'dominio' a secas, declara los dos. Una clave desconocida DENTRO del bloque tumba la declaracion. Playwright lo instala el proyecto, no el arnes; las plantillas se copian con 'python -m harness.e2e --plantilla --servicio NOMBRE'.",
   "servicios": [
+    {
+      "nombre": "comun",
+      "ruta": "services/comun",
+      "lenguaje": "python",
+      "venv": "services/comun/.venv"
+    },
     {
       "nombre": "email",
       "ruta": "services/email",
       "lenguaje": "python",
-      "venv": "services/email/.venv"
+      "venv": "services/email/.venv",
+      "depende_de": [
+        "services/comun"
+      ],
+      "importa": [
+        "comun"
+      ],
+      "entradas_no_versionadas": [
+        "services/email/config.local.ini"
+      ]
     },
     {
       "nombre": "api",
       "ruta": "services/api",
       "lenguaje": "python",
-      "venv": "services/api/.venv"
+      "venv": "services/api/.venv",
+      "ejecutar_siempre": [
+        "tests/test_sin_secretos_en_el_repositorio.py"
+      ]
     },
     {
       "nombre": "web",
       "ruta": "services/web",
       "lenguaje": "otro",
-      "comando_tests": "npm test --silent"
+      "comando_tests": "npm test --silent",
+      "e2e": {
+        "runner": "playwright-test",
+        "url_base": "http://localhost:5173",
+        "arranque": "npm run dev",
+        "rutas_ui": ["src/**", "public/**"],
+        "hosts_prohibidos": ["*.ejemplo-produccion.invalid"]
+      }
     },
     {
       "nombre": "infra",

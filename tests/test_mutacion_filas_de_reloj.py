@@ -128,7 +128,8 @@ def test_todo_prefijo_declarado_sigue_apareciendo_en_el_informe(
     test anterior se vuelve flaky otra vez. Esto lo caza en el acto.
     """
     ruta = tmp_path / "informe.md"
-    escribir_informe(_informe(), ruta)
+    # F-019: las filas de la selección solo salen en un informe que la declara.
+    escribir_informe(_informe(seleccion="activa"), ruta)
     lineas = ruta.read_text(encoding="utf-8").splitlines()
 
     for prefijo in FILAS_DE_RELOJ:
