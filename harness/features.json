@@ -618,7 +618,7 @@
         "Lo personal del cliente (NIF de persona física, direcciones, teléfono, correo, cabecera de la factura y descripción de las líneas de personas físicas) solo en el esquema nuevo `ventas_restringida`, que lee solo el perfil total; el nombre del cliente y el CIF de las personas jurídicas, públicos en `ventas` (D2 y D6 del humano, 2026-11-07)",
         "La spec estima el impacto en la ventana nocturna antes de comprometerse"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "rigor": "critico",
       "priority": 2,
@@ -805,7 +805,8 @@
       "sdd": true,
       "rigor": "critico",
       "priority": 53,
-      "branch": "feature/F-053-desempate-obras-duplicadas"
+      "branch": "feature/F-053-desempate-obras-duplicadas",
+      "notes": "2026-11-11: absorbida por F-162 (PARADA 1 del humano, «ok a d1 a d5», design §8). F-162 no elige ficha: `stg.obras` lleva TODAS las fichas de todas las empresas, cada una con lo suyo, y marca `es_por_defecto` (Ruesma por delante; si no, deciden los datos). La 0517, la 0252, la 0720 y la 0606 publican cada ficha con sus datos y la eleccion de negocio de la 0606 deja de hacer falta. Las cuatro excepciones de cobertura salen (`EXCEPCIONES_MAX` 19). Propuesta: cerrarla como absorbida cuando F-162 este APPROVED y desplegada; el estado lo cambia el lider, no el implementer."
     },
     {
       "id": "F-054",
@@ -825,7 +826,7 @@
       "rigor": "documental",
       "priority": 6,
       "branch": "feature/F-054-conocimiento-de-negocio",
-      "notes": "2026-10-27: prioridad 4 -> 5 por orden del humano (tras F-150 van F-040 y F-104)."
+      "notes": "2026-10-27: prioridad 4 -> 5 por orden del humano (tras F-150 van F-040 y F-104). 2026-11-11: llega la primera definición de Negocio, «incurrido / coste incurrido», de Juan Romero, más el término derivado «almacén». Fuente literal en `docs/referencia/07_glosario_incurrido.md`. Antes de publicarla, contrastar cada trampa con lo que calcula el datamart. 2026-11-11: el humano confirma el sinónimo: «a la planificación temporal la llamamos también VALORADA»."
     },
     {
       "id": "F-055",
@@ -1662,9 +1663,9 @@
     {
       "id": "F-106",
       "title": "Traer al seguimiento las demas empresas (UTE, Porsan...): cada obra desde la perspectiva de SU empresa, sin consolidar",
-      "description": "Decidido por el humano el 2026-09-23, prioridad 3, detras del hotfix F-102. MODELO DE NEGOCIO, en palabras del humano: «las obras son por empresa. La UTE es una cosa y Ruesma otra. En la UTE hay una info y en Ruesma unos suplidos (a la UTE), no estamos consolidando. El codigo igual representa que es la misma obra, pero desde la perspectiva de diferentes empresas. Lo mismo con Porsan. Ahora mismo estamos trayendo cosas de Ruesma, no de las demas empresas; despues traeremos las demas». HOY: `stg.obras` elige UNA ficha por codigo con un ranking (conext 15 -> tiemod, F-053) que mezcla empresas: para 0581 y 0606 elige la ficha de la UTE (27 y 31), para 0720 la copia vacia de Porsan (28), y 0252 y 0517 pierden sus datos de UTE (7.564 y 72.737 filas de plan). Medido por el spec-author de F-102 el 2026-09-23. F-102 publica los identificadores (`empresa_id`, `nombre_empresa`, `clave_obra` = '<empresa>-<codigo>', `clave_recurso`, `es_ficha_principal` = empresa 1) pero NO toca la eleccion de `stg.obras`, para no perder datos. QUE HACER: (1) el seguimiento de Ruesma (`stg`, `mart`, `cierre`) pasa a leer SOLO la ficha de la empresa 1, con la clave `obra_id`/`clave_obra`; (2) las demas empresas (UTE, Porsan, 12, 14, 18, 25, 27, 31...) se traen como obras PROPIAS, cada una con su perspectiva, SIN CONSOLIDAR y sin mezclarse con Ruesma; decidir con el humano donde viven (mismo `mart` con dimension empresa, o esquema aparte) y como las ve Power BI; (3) lo mismo para RECURSOS y partes (correo de Juan Romero del 23-09: el codigo de recurso es unico por empresa; 26.426 lineas de parte y 3,23 M EUR imputadas a recursos de otras empresas) y para compras (83.375 lineas y 31,17 M EUR de las 8 fichas UTE). RIESGO: cambia el `obra_id` de obras visibles en Power BI (0581, 0606, 0671, 0720) y el universo de `R-UNIVERSO-OBRA`; hay que contrastar la huella con `huella-obras --propuesta` como en F-042.",
+      "description": "Decidido por el humano el 2026-09-23, prioridad 3, detras del hotfix F-102. MODELO DE NEGOCIO, en palabras del humano: «las obras son por empresa. La UTE es una cosa y Ruesma otra. En la UTE hay una info y en Ruesma unos suplidos (a la UTE), no estamos consolidando. El codigo igual representa que es la misma obra, pero desde la perspectiva de diferentes empresas. Lo mismo con Porsan. Ahora mismo estamos trayendo cosas de Ruesma, no de las demas empresas; despues traeremos las demas». HOY: `stg.obras` elige UNA ficha por codigo con un ranking (conext 15 -> tiemod, F-053) que mezcla empresas: para 0581 y 0606 elige la ficha de la UTE (27 y 31), para 0720 la copia vacia de Porsan (28), y 0252 y 0517 pierden sus datos de UTE (7.564 y 72.737 filas de plan). Medido por el spec-author de F-102 el 2026-09-23. F-102 publica los identificadores (`empresa_id`, `nombre_empresa`, `clave_obra` = '<empresa>-<codigo>', `clave_recurso`, `es_ficha_principal` = empresa 1) pero NO toca la eleccion de `stg.obras`, para no perder datos. QUE HACER: (1) ENMENDADO POR F-162 (2026-11-11): «El seguimiento (`stg`, `mart`, `cierre`) lleva desde F-162 todas las fichas de todas las empresas, cada una por su `obra_id`, con `empresa_id`, `clave_obra` y `es_por_defecto`. F-106 queda para RECURSOS, PARTES y COMPRAS de otras empresas: atribuirlos a la obra de SU empresa sin consolidar, y decidir con el humano como los ve Power BI.» (2) las demas empresas (UTE, Porsan, 12, 14, 18, 25, 27, 31...) se traen como obras PROPIAS, cada una con su perspectiva, SIN CONSOLIDAR y sin mezclarse con Ruesma; decidir con el humano donde viven (mismo `mart` con dimension empresa, o esquema aparte) y como las ve Power BI; (3) lo mismo para RECURSOS y partes (correo de Juan Romero del 23-09: el codigo de recurso es unico por empresa; 26.426 lineas de parte y 3,23 M EUR imputadas a recursos de otras empresas) y para compras (83.375 lineas y 31,17 M EUR de las 8 fichas UTE). RIESGO (ya NO aplica desde F-162: ningun `obra_id` publicado cambia): cambia el `obra_id` de obras visibles en Power BI (0581, 0606, 0671, 0720) y el universo de `R-UNIVERSO-OBRA`; hay que contrastar la huella con `huella-obras --propuesta` como en F-042.",
       "acceptance": [
-        "El seguimiento de Ruesma lee solo fichas de la empresa 1 y lo que cambia frente a hoy (obras, filas e importes) esta medido y aceptado por el humano",
+        "ENMENDADO POR F-162: el seguimiento (`stg`, `mart`, `cierre`) ya lleva todas las fichas de todas las empresas por su `obra_id`, con `empresa_id`, `clave_obra` y `es_por_defecto`; F-106 no lo rehace (criterio original: «El seguimiento de Ruesma lee solo fichas de la empresa 1 y lo que cambia frente a hoy (obras, filas e importes) esta medido y aceptado por el humano»)",
         "Las obras de las demas empresas se publican como obras propias, identificadas por `obra_id`/`clave_obra`, sin consolidar con Ruesma, en el sitio que decida el humano",
         "Recursos, partes y compras de otras empresas quedan atribuidos a la obra de SU empresa",
         "Diccionario, reglas duras y `azure-apps/datamart_seg_anual.md` explican el modelo por empresa en el mismo trabajo"
@@ -1673,7 +1674,8 @@
       "sdd": true,
       "rigor": "estandar",
       "priority": 21,
-      "branch": "feature/F-106-obras-por-empresa"
+      "branch": "feature/F-106-obras-por-empresa",
+      "notes": "2026-11-11: enmendada por F-162 (design §8, PARADA 1 del humano): su punto (1) lo entrega F-162; F-106 queda para recursos, partes y compras de otras empresas, incluidos los cinco comandos de main.py que aún filtran por codigo_obra sobre vistas de compras y retenciones (inspect-contrato-consumo, proveedores-obra, albaranes-sin-facturar, retenciones y retenciones-vencidas). Estado sin cambiar."
     },
     {
       "id": "F-107",
@@ -2570,6 +2572,44 @@
       "priority": 4,
       "branch": "feature/F-160-ventas-contraste-fase2",
       "notes": "2026-11-07: creada por el spec-author de F-040 al recoger la D1 = A del humano. Id F-160 porque F-159 ya está reservado por la rama `feature/F-159-hotfix-devengo-negativo-2`. Prioridad 4 provisional (detrás de F-040 y F-104): la fija el humano."
+    },
+    {
+      "id": "F-161",
+      "title": "Versiones del máster y coste sin planificación temporal: catálogo desde las cabeceras, coste por versión y partida y vigencia temporal frente a vigencia de importe",
+      "description": "Incidencia de Control de Costes (Juan, 2026-11-10): la v24 de coste de la 0698 (CIERRE SEPTIEMBRE-26, 776 líneas, 2.107.662,97 €) no aparece en `mart.v_master_versiones_tipadas`. Ninguna de sus líneas trae `obrparpre.planif`, el reparto temporal, y el catálogo (`mart/06_cp_tipologia.sql:117`, y su copia en `mart/02_build_fact.sql:55`) se deduce de `stg.plan_mensual`, que descarta las líneas sin `planif` (`stg/08_plan_mensual.sql:224`). Diagnóstico en `progress/explore_0698_v24_coste.md`: 49 versiones enteras sin reparto, y además 304 M€ de coste (en 1.716 versiones) y 195 M€ de venta sin mes dentro de versiones que sí tienen reparto. CRITERIO DEL HUMANO (2026-11-11): no siempre tiene que haber planificación temporal, y eso no quiere decir que no haya que coger y analizar el coste. «Una cosa es el último planificado temporal y otra el último planificado a nivel de importe total, y pueden divergir.» ALCANCE PROPUESTO: (1) el catálogo, desde las cabeceras (`obrfasamb` con líneas en `stg.presupuesto`), con `importe_total`, `importe_con_reparto`, `importe_sin_reparto` y `reparto` (COMPLETO, PARCIAL o NINGUNO); (2) una vista del coste por versión y partida que no dependa del reparto; (3) dos vigencias explícitas: la última versión de importe y la última con reparto temporal, y cómo se combinan en el seguimiento mensual (decisión de Negocio en la spec); (4) un solo catálogo para `fact_seguimiento_mensual` y `06_cp_tipologia`; (5) la ficha del diccionario corregida. Las cifras vigentes de hoy no cambian salvo por decisión explícita, y se comprueba con la huella de `master_vigente_anual`, `fact_cp_tipologia`, `fin_obra` y `devengo_*`.",
+      "acceptance": [
+        "Spec SDD aprobada por el humano, con la decisión sobre las dos vigencias (importe y temporal)",
+        "La v24 de coste de la 0698 y las demás versiones sin reparto aparecen en el catálogo con su importe y `reparto` = NINGUNO",
+        "El coste de cualquier versión se consulta por partida tenga o no reparto",
+        "Huella antes/después de los consumidores del catálogo: idéntica salvo los cambios decididos y documentados",
+        "Fichas y reglas del diccionario al día; `bash harness/init.sh` en verde"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 1,
+      "branch": "feature/F-161-versiones-sin-reparto",
+      "notes": "2026-11-11: alta por el líder tras el sí del humano. Va detrás de F-162 y delante de F-104. 2026-11-11, DECISIÓN DEL HUMANO (D1): «los cierres mensuales son planificación de importe, como cierre; es el último. Así como el coste fase 0 (en ámbito coste) es el vivo. Lo que pasa es que hay cierres o masters que tienen planificación temporal (los cuatrimestrales y ABC principalmente) y otros que no, como los cierres intermedios». Hay TRES referencias: (1) el VIVO, el coste de la fase 0 (ya publicado: `stg.plan_mensual_fase0`, F-157); (2) el ÚLTIMO CIERRE, que es la última versión del máster de cualquier tipo y da el planificado de IMPORTE total; (3) el ÚLTIMO PLANIFICADO TEMPORAL, la última versión con planificación temporal, sobre todo cuatrimestrales y ABC, que da el reparto en el tiempo. Quedan abiertas para la spec: (a) si el planificado temporal se elige por TIPO (Planif inicial, ABC y Cuatrimestral, como hoy) o por TENER `planif`; la v21-v23 de la 0698 son cierres que sí traen `planif`, probablemente heredado de la cuatrimestral; (b) cómo enseña el seguimiento mensual la diferencia entre el importe del último cierre y el de la temporal: las dos por separado con su diferencia, que es lo que recomienda el líder, o reescalado. 2026-11-11, DECISIONES DEL HUMANO D2 y D3. D2: la última versión TEMPORAL es la última que traiga reparto en los meses (por tener `planif`, NO por tipo): «en principio se hereda de la cuatrimestral, pero por si acaso, la última temporal es la última con reparto». Ya en `stg` hay que saber qué líneas y qué versiones traen reparto y cuáles no, con una marca por línea y un resumen por versión. En la 0698 hoy, la temporal es la v23 (cierre de agosto) y la de importe es la v24. D3: el seguimiento mensual enseña las dos POR SEPARADO, el mensual con el reparto de la temporal y, al lado, el total del último cierre y la diferencia, sin reescalar. VOCABULARIO: a la planificación temporal en Ruesma la llaman también «VALORADA» (va al glosario de F-054). Abierta para la spec: con D2, la vigencia temporal deja de elegirse por tipo (Planif inicial, ABC y Cuatrimestral), y hay que medir cuántas obras cambian de versión temporal vigente, con la huella antes/después de `master_vigente_anual`, `fact_seguimiento_mensual`, `fact_cp_tipologia`, `fin_obra` y `devengo_*`. 2026-11-11, D2 REVOCADA POR EL HUMANO: «la parte temporal no quiero que cambie. Solo que te traigas también el coste sin planificación de máster coste cuando no haya temporal». La vigencia temporal, el seguimiento mensual y todo lo que cuelga de ellos (`master_vigente_anual`, `fact_seguimiento_mensual`, `fact_cp_tipologia`, `fin_obra` y `devengo_*`) se quedan EXACTAMENTE como hoy: huella idéntica antes y después, como criterio de aceptación. El ALCANCE queda en ADITIVO: (1) el catálogo completo, con las versiones sin reparto y sus importes con y sin reparto; (2) el coste de cada versión del máster por partida, tenga o no planificación temporal; (3) el planificado de IMPORTE, que es el último cierre (D1), publicado aparte y al lado de lo temporal, con su diferencia (D3). Se mantiene la marca de reparto por línea y versión en `stg`, porque solo informa. Vale como D4."
+    },
+    {
+      "id": "F-162",
+      "title": "El seguimiento lleva TODAS las fichas de obra, cada una con su empresa, y marca la ficha por defecto de cada código (0721 en Ruesma y en PORSAN)",
+      "description": "Incidencia de Control de Costes (Elena y Juan, 2026-11-11): la 0721 no trae presupuesto porque `stg/03_obras.sql` deja UNA ficha por código y elige la vacía de PORSAN (empresa 28, ide 2855829) en vez de la de Construcciones Ruesma (1-0721, ide 2759553, 9.165 líneas). Diagnóstico en `progress/explore_0721_obra_duplicada.md`. MODELO DEL HUMANO (2026-11-11, sustituye al primer planteamiento de «elegir una ficha»): «Debes leer los proyectos en ambas empresas. No tener que elegir: cada uno con su propia empresa, sin cruces entre empresas. Lo que pasa es que, al preguntar la IA, hay que decirle (quizás en el MCP) que puede ser el mismo proyecto en ambas empresas y que por defecto coja este. Ruesma debe tener la obra 0721 y PORSAN también.» Es el modelo de F-106 aplicado al SEGUIMIENTO. QUÉ HACE: (1) `stg.obras` deja de desempatar y lleva todas las fichas de obra real de todas las empresas (mismos filtros de códigos), con `empresa_id`, `clave_obra` y `es_por_defecto` al final; todo lo que cuelga (`mart`, `cierre`, `tesoreria`, `retenciones`, `personal`) va por `obra_id`, sin cruces ni consolidación. (2) `es_por_defecto` (también en `maestro.obras`): la ficha de la empresa 1 si existe; si solo hay una, esa; si hay varias sin la de Ruesma, la de más líneas de presupuesto, después `tiemod` y después `ide` (criterio del humano: «en caso de duda, Construcciones Ruesma por delante, salvo que se diga lo contrario; los datos deciden antes que la duda»); `conext` 15 no interviene. (3) La IA lo aprende por el diccionario (`R-EMPRESA-POR-DEFECTO`, `R-UNIVERSO-OBRA`, `R-CODIGO-POR-EMPRESA`); `mcp-bbdd` no cambia. (4) Absorbe F-053; F-106 se queda con recursos, partes y compras. MEDIDO por el spec-author el 2026-11-11: 585 -> 634 fichas (585 códigos); entran 49 fichas, 4 con plan (12-0252, 25-0517, 1-0606, 1-0721; +152.785 filas de plan, 0,47 %); ninguna ficha de hoy pierde una fila; 18.521 líneas de partes pasan a `en_seguimiento`.",
+      "acceptance": [
+        "Spec SDD aprobada por el humano (PARADA 1), con las decisiones D1-D5 de `design.md` §8 resueltas",
+        "`stg.obras` con una fila por ficha (634 el 2026-11-11), `empresa_id`, `clave_obra` y `es_por_defecto` (uno por código), con test de la 0721 en dos empresas en RED antes y en verde después, y el criterio por defecto fijado por un oráculo puro y un sandbox",
+        "Huella antes y después sobre el mismo raw: lo de hoy no cambia y solo ganan datos 1-0721, 12-0252, 25-0517 y 1-0606",
+        "Ningún SQL ni comando agrega ni cruza por `codigo_obra` sin `obra_id`; las vistas de Power BI y `maestro.obras` distinguen las fichas de un código",
+        "`R-EMPRESA-POR-DEFECTO`, `R-UNIVERSO-OBRA`, `R-CODIGO-POR-EMPRESA`, fichas y preguntas de aceptación enmendadas, dentro del presupuesto de F-147",
+        "Excepciones de cobertura de F-053 retiradas (`EXCEPCIONES_MAX` 19); F-053 cerrada como absorbida y F-106 enmendada",
+        "`bash harness/init.sh` en verde y despliegue con sus pasos y su vuelta atrás"
+      ],
+      "status": "in_progress",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 0,
+      "branch": "feature/F-162-obra-duplicada-ruesma",
+      "notes": "2026-11-11: alta por el líder tras el sí del humano; spec-author lanzado. Mismo día: el humano rechaza «elegir una ficha» y fija el modelo por empresa; spec rehecha. 2026-11-11, PARADA 1 CONFIRMADA por el humano («ok a d1 a d5»), con las recomendaciones de design §8: D1, `maestro.obras.es_por_defecto` con el MISMO criterio en todas las fichas; D2, `conext` 15 fuera del criterio; D3, Power BI sin filtro, con `obra_label` = `clave_obra · nombre` (cambia el texto de las 585 obras de hoy); D4, los agregados sin empresa en `mart`/`cierre` usan `empresa_id` = 1; D5, la empresa no va a los hechos: se cruza por `obra_id` con `maestro.obras`. Implementer lanzado."
     }
   ]
 }

@@ -960,10 +960,10 @@ objetos:
     consumo_recomendado: true
     descripcion: >-
       El universo del SEGUIMIENTO: las obras reales, sin las administrativas.
-      Excluye una lista cerrada de codigos de gestion, excluye los codigos con
-      cinco o mas digitos seguidos —el numero de obra de Ruesma es de cuatro— y
-      deduplica los codigos repetidos por el mecanismo de Sigrid que marca cual
-      es la ficha vigente.
+      Excluye una lista cerrada de codigos de gestion y los codigos con cinco o
+      mas digitos seguidos —el numero de obra de Ruesma es de cuatro—, y lleva
+      UNA FILA POR FICHA de obra de TODAS las empresas, cada una con su
+      `empresa_id`, su `clave_obra` y la marca `es_por_defecto` (F-162).
 
       **ADVERTENCIA DE CORRECCION: su columna `activa` no significa nada.** La
       escribe el SQL como una constante `TRUE`, asi que vale TRUE tambien en las
@@ -974,28 +974,35 @@ objetos:
       El universo completo, con estado y cliente, esta en `maestro.obras`; el
       del seguimiento con etiquetas listas, en `mart.v_pbi_dim_obra`.
 
-      **UNA FICHA POR CODIGO, Y NO SIEMPRE LA DE RUESMA (F-102).** En Sigrid la
-      obra es POR EMPRESA: el mismo codigo existe una vez por empresa --Ruesma,
-      Porsan, cada UTE-- y es la misma obra vista desde cada una, sin
-      consolidar. Esta tabla sigue eligiendo UNA ficha por codigo como hasta hoy
-      --marca de `raw.conext` con `cod = '15'`, despues la modificada mas
-      recientemente y despues el `ide` mayor--, sin mirar la empresa. F-102 NO
-      la cambia: publica en `maestro.obras` la marca `es_ficha_principal` (la
-      ficha de la empresa 1), y las dos eligen distinto en **cuatro codigos**,
-      medido el 2026-09-23: **0581** (aqui la ficha de la UTE 27, con 20 cierres
-      y todo el seguimiento; la de Ruesma no tiene cierres), **0606** (aqui la de
-      la UTE 31, con 24 cierres; la de Ruesma tiene 15), **0671** (aqui la de la
-      UTE 34) y **0720** (aqui la copia vacia de Porsan, 28, sin cierres ni plan;
-      la de Ruesma tiene 2 cierres y 142 filas de plan). Aplicar la marca aqui
-      sacaria la 0581 del `mart` y del `cierre` y reduciria la 0606, asi que se
-      deja como esta: pasar el seguimiento a la ficha de Ruesma y traer las
-      demas empresas como obras propias es **F-106**. Hasta entonces, el
-      `obra_id` de estas cuatro no es el de `es_ficha_principal`.
+      **EL CODIGO NO ES UNICO: UNA FILA POR FICHA, CADA UNA CON SU EMPRESA
+      (F-162, 2026-11-11).** En Sigrid la obra es POR EMPRESA: el mismo codigo
+      existe una vez por empresa --Ruesma (1), Porsan (28), cada UTE-- y es la
+      misma obra vista desde cada una, SIN CONSOLIDAR. Esta tabla las lleva
+      todas: 634 fichas para 585 codigos el 2026-11-11, 49 codigos con varias
+      (la 0721 esta en Ruesma, `1-0721`, y en Porsan, `28-0721`). Lo que cuelga
+      de aqui (`mart`, `cierre`, `tesoreria`, `retenciones`, `personal`) va por
+      `obra_id`: cada ficha con lo suyo. **Por codigo se busca con
+      `empresa_id` o por `clave_obra`** (`R-CODIGO-POR-EMPRESA`).
+
+      **`es_por_defecto`** marca UNA ficha por codigo, la que se lee si la
+      pregunta no dice empresa (`R-EMPRESA-POR-DEFECTO`): la de la empresa 1 si
+      existe; si no, la de mas lineas de presupuesto, despues la modificada mas
+      recientemente y despues el `ide` mayor. La marca de `raw.conext` no
+      interviene. Hoy coincide con `maestro.obras.es_ficha_principal` en todas
+      las fichas. Hasta F-162 esta tabla se quedaba con UNA ficha por codigo y
+      elegia otra que `es_ficha_principal` en 0581, 0606, 0671 y 0720 (la 0721
+      salia por la copia vacia de Porsan). **Ojo**: en 0581 y 0671 los datos
+      del seguimiento estan en la ficha de la UTE, no en la por defecto, y en
+      0606 hay datos en las dos; si la ficha por defecto no tiene datos y otra
+      del codigo si, se avisa.
     grano: >-
-      Una fila por `obra_id`, ya deduplicada. Es SUBCONJUNTO de `maestro.obras`,
-      y esa diferencia es deliberada: contar aqui da menos obras.
+      Una fila por ficha de obra (`obra_id`), de todas las empresas: 634 el
+      2026-11-11 para 585 codigos. `codigo_obra` NO es unico; `clave_obra` si, y
+      `es_por_defecto` es cierto en una fila por codigo (contar obras por codigo
+      es contar `es_por_defecto`, y decirlo). Es SUBCONJUNTO de `maestro.obras`:
+      difiere solo en los filtros de codigo, y esa diferencia es deliberada.
     clave_negocio: [obra_id]
-    claves_alternativas: [[codigo_obra]]
+    claves_alternativas: [[clave_obra], [empresa_id, codigo_obra]]
     paso_etl: build_stg
     refresco: nocturno
     columnas:
@@ -1006,10 +1013,11 @@ objetos:
         significado: >-
           Codigo de obra tal y como se teclea en Sigrid. **Nunca es NULL**: sale
           de `con.cod` en crudo y ademas el build excluye las obras sin codigo.
-          Aqui es unico porque la tabla se queda con una ficha por codigo; en
-          `maestro.obras` NO lo es (una ficha por empresa, F-102).
-          Es la clave alternativa de la ficha (584 para 584 el 2026-09-24): la
-          vigila `check-unicidad` contra la base (F-108).
+          **No es unico desde F-162**: se repite una vez por empresa (585 codigos
+          para 634 fichas el 2026-11-11). La clave alternativa es
+          (`empresa_id`, `codigo_obra`), o `clave_obra`; la vigila
+          `check-unicidad` contra la base (F-108). Sin empresa en la pregunta,
+          la ficha del codigo es la de `es_por_defecto`.
         nulo_significa: null
       nombre_obra:
         significado: >-
@@ -1027,13 +1035,37 @@ objetos:
       _built_at:
         significado: Instante de construccion de la fila. Instrumentacion, no negocio.
         agregacion: no_sumable
+      empresa_id:
+        significado: >-
+          La empresa de la ficha (`con.emp`): 1 es Construcciones Ruesma, 28
+          Porsan, y cada UTE la suya; el nombre esta en
+          `maestro.obras.nombre_empresa`. Nunca NULL en Sigrid (0 de 925 fichas
+          el 2026-11-11), aunque la columna lo admite. F-162.
+        agregacion: no_sumable
+      clave_obra:
+        significado: >-
+          Clave legible y UNICA de la ficha: `<empresa>-<codigo>` (`1-0721`,
+          `28-0721`), la misma que `maestro.obras.clave_obra`. Es la forma de
+          pedir una ficha concreta cuando el codigo esta en varias empresas, y
+          la clave alternativa de la ficha (634 para 634 el 2026-11-11): la
+          vigila `check-unicidad` contra la base (F-108). F-162.
+        agregacion: no_sumable
+      es_por_defecto:
+        significado: >-
+          Cierto en UNA ficha por codigo: la que se lee si la pregunta no dice
+          empresa. Criterio del humano (2026-11-11), en este orden: (1) la de la
+          empresa 1; (2) mas lineas de presupuesto; (3) `tiemod` mas reciente;
+          (4) `ide` mayor. La marca de `raw.conext` no interviene. Filtrar por
+          ella da una fila por codigo. F-162.
+        agregacion: no_sumable
     relaciones:
       - de: obra_id
         a: maestro.obras.obra_id
         cardinalidad: "1:1"
         porque: >-
-          Para el estado real, el cliente y las fechas. El maestro es
-          SUPERCONJUNTO de esta tabla: tiene ademas las obras administrativas.
+          Para el estado real, el cliente, el nombre de la empresa y las fechas.
+          El maestro es SUPERCONJUNTO de esta tabla: tiene ademas las obras
+          administrativas.
     ejemplos_preguntas:
       - Que obras entran en el seguimiento y cuales quedan fuera
 

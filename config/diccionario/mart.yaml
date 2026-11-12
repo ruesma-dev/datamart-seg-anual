@@ -115,7 +115,11 @@ objetos:
         agregacion: no_sumable
       codigo_obra: >-
         Codigo de obra tal y como se teclea en Sigrid: cuatro digitos, con
-        posible sufijo alfabetico ('0675', '0675B').
+        posible sufijo alfabetico ('0675', '0675B'). **No es unico entre
+        empresas** (F-162): el mismo codigo puede ser la obra de Ruesma y la de
+        una UTE o de Porsan, cada una con su `obra_id`. Se agrega y se filtra
+        por `obra_id`; sin empresa en la pregunta, la del codigo con
+        `es_por_defecto` en `stg.obras` (cruzando por `obra_id`).
       nombre_obra: >-
         Nombre legible de la obra. Viene de `con.res`; en Sigrid no existe
         ninguna columna `nom`.
@@ -729,8 +733,17 @@ objetos:
       universo del SEGUIMIENTO: no estan las obras administrativas ni los codigos
       con cinco o mas digitos. Para el universo completo, con cliente y estado,
       se va a `maestro.obras`.
+
+      **Una fila por FICHA, de todas las empresas (F-162): el codigo no es
+      unico.** La 0721 sale dos veces, `1-0721` (Ruesma) y `28-0721` (Porsan);
+      por eso `obra_label` lleva la `clave_obra` y no el codigo. Sin empresa en
+      la pregunta, la ficha del codigo es la de `es_por_defecto`
+      (`R-EMPRESA-POR-DEFECTO`). Power BI va sin filtro (D3 del humano): un
+      filtro `es_por_defecto` dejaria sin datos la 0581 y la 0671, que se ven
+      por la ficha de su UTE.
     grano: >-
-      Una fila por `obra_id`, del universo de seguimiento.
+      Una fila por `obra_id` (por ficha), del universo de seguimiento: 634 el
+      2026-11-11 para 585 codigos.
     clave_negocio: [obra_id]
     paso_etl: build_mart
     refresco: nocturno
@@ -738,11 +751,26 @@ objetos:
       obra_id:
         significado: Identificador de la obra en Sigrid (`con.ide`). Clave de la dimension.
         agregacion: no_sumable
-      codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
+      codigo_obra: >-
+        Codigo de obra tal y como se teclea en Sigrid. No es unico entre
+        empresas: se busca con `empresa_id` o por `clave_obra`.
       nombre_obra: Nombre legible de la obra, de `con.res`.
       obra_label: >-
-        Codigo y nombre juntos, para segmentadores ("0704 · REFORMA..."). Es
-        presentacion, no un dato.
+        Clave de la ficha y nombre juntos, para segmentadores ("1-0704 ·
+        REFORMA..."). Desde F-162 lleva la `clave_obra` y no el codigo, para que
+        las fichas de un mismo codigo se distingan (D3). Es presentacion, no un
+        dato.
+      empresa_id:
+        significado: La empresa de la ficha (`con.emp`; 1 = Construcciones Ruesma). F-162.
+        agregacion: no_sumable
+      clave_obra:
+        significado: Clave legible y unica de la ficha, `<empresa>-<codigo>` (`28-0721`). F-162.
+        agregacion: no_sumable
+      es_por_defecto:
+        significado: >-
+          Cierto en una ficha por codigo: la que se lee si la pregunta no dice
+          empresa (la de Ruesma si existe). La de `stg.obras`. F-162.
+        agregacion: no_sumable
     relaciones:
       - de: obra_id
         a: maestro.obras.obra_id
