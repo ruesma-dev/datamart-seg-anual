@@ -13,6 +13,6 @@
 - [x] T10: Cobertura: fuera la sección 3 de `config/cobertura_excepciones.yaml` y `EXCEPCIONES_MAX = 19` (R19)  |  Verificación: `pytest tests/test_f052_cobertura.py tests/test_f052_cierre_excepciones.py` en verde
 - [x] T11: Textos de R20 (`docs/ARCHITECTURE.md` y `azure-apps/datamart_seg_anual.md`, este con commit local en `azure-apps`)  |  Verificación: `pytest tests/test_f162_fichas_por_empresa.py -k r20` en verde y `git -C C:/Users/pgris/PycharmProjects/azure-apps log -1`
 - [x] T12: Sandbox con DSN (líder, en la copia con `.env`)  |  Verificación: MANUAL (líder): `F162_SANDBOX_DSN=<dsn local> .venv/Scripts/python.exe -m pytest tests/test_f162_sandbox.py` en verde, sin `skip`
-- [ ] T13: Medición ANTES en Azure, mismo `raw` (design §7, paso 0)  |  Verificación: MANUAL (humano o líder, solo lectura): cuatro CSV `antes_*` y el recuento por ficha en `progress/impl_F-162.md`
+- [x] T13: Medición ANTES en Azure, mismo `raw` (design §7, paso 0)  |  Verificación: MANUAL (humano o líder, solo lectura): cuatro CSV `antes_*` y el recuento por ficha en `progress/impl_F-162.md`
 - [ ] T14: Despliegue (design §7, pasos 1-10) con su vuelta atrás  |  Verificación: MANUAL (humano): pasos 4-7 como dice el design (634 fichas, 585 por defecto, huellas y cobertura)
 - [x] T15: Ejecutar `bash harness/init.sh` en verde  |  Verificación: `bash harness/init.sh` exit 0

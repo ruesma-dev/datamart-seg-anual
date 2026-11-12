@@ -148,3 +148,21 @@ Los tres KO vienen del `.env`. Sin él, `SigridApiSettings` no carga y la puerta
 | Mutación | Campaña oficial **pendiente del líder** (MANUAL 5). Alcance: 2 ficheros, 140 líneas, 42 mutantes (12 en `ficha_obra.py` y 30 en `main.py`). Pre-análisis no oficial con los tests de f162 y f102: 41 de 42 muertos |
 | Superviviente del pre-análisis | `ficha_obra.py:57`, `else 1` → `else 2`. **Equivalente**: solo importa que Ruesma (0) vaya antes que el resto, y 1 o 2 ordenan igual |
 | Tiempo de la suite | 2935 s (48 min 55 s), en serie y con cobertura; `pytest-xdist` no está instalado |
+
+## T13 · Medición ANTES en Azure (líder, 2026-11-12, solo lectura, tras la nocturna del día)
+
+- **Job:** imagen `r20261110-1310` (la vuelta atrás). La nocturna `29907360` (00:00-05:00 UTC) terminó con `Succeeded`.
+- **Huellas:** `huella-obras --desde cierre|dimension|plan_obra|mart`, en cuatro CSV `f162_antes_*.csv` del scratchpad del líder (27.233, 740, 951 y 35.217 líneas).
+- **Recuentos de hoy:**
+  - `stg.obras` 586 (586 códigos), `maestro.obras` 926, `mart.v_pbi_dim_obra` 586 y `cierre.v_pbi_cierre_cabecera` 586.
+  - `tesoreria.devengo_pendiente_obra_mes` de las 4 fichas de control: 0.
+  - `personal.partes_lineas` con `en_seguimiento`: 306.037.
+  - La 0721 está hoy en `stg.obras` por la ficha 2855829, que es la de PORSAN.
+- **El design esperaba 585/634.** Hay un código más desde que se escribió, así que las cifras suben a 586/635.
+- **`EXPLAIN (ANALYZE, BUFFERS)` del `SELECT` vigente de `03_obras.sql`, montado del propio fichero:**
+  - 9,4 ms de ejecución.
+  - `raw.obrparpre` se corta en la primera fila, porque `dudosas` está vacía. El coste es +0 s, el mejor caso de design §5.4.
+- **Esperado DESPUÉS, del mismo `SELECT`:**
+  - 635 fichas y 586 códigos.
+  - 586 `es_por_defecto`, 0 sin empresa y 0 códigos sin una sola ficha por defecto.
+  - La 0721 queda con `1-0721:2759553` (por defecto) y `28-0721:2855829`.

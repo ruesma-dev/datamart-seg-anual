@@ -9,7 +9,13 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-11-11 · F-162 · `in_progress` · implementada (T1-T11), pendiente del review · rama `feature/F-162-obra-duplicada-ruesma`
+## 2026-11-12 · F-162 · `in_progress` · APROBADA y fusionada en `main` (`01d877b`), DESPLEGANDO
+
+- Reviewer APROBADO (`progress/review_F-162.md`). Puerta en verde sobre `fd4439d`: 11.179 passed. Mutación oficial: 20/20 muertos (`progress/mutacion_F-162.md`).
+- T12, T13 y T15 hechas. Lo medido ANTES y el `EXPLAIN` (9 ms, +0 s) están en `progress/impl_F-162.md` §T13.
+- Falta T14, el despliegue que lanza el humano (design §7, pasos 1-10). `done` tras la primera nocturna buena.
+
+### 2026-11-11 · implementada (T1-T11), pendiente del review · rama `feature/F-162-obra-duplicada-ruesma`
 
 implementer, PARADA 1 confirmada («ok a d1 a d5»). Informe: `progress/impl_F-162.md`.
 - **Hecho:** `stg.obras` con una fila por ficha y `empresa_id`, `clave_obra` y `es_por_defecto`. El criterio de `es_por_defecto` en el seguimiento vive en `etl_sigrid/domain/ficha_obra.py` y en `03_obras.sql` (Ruesma, luego líneas de `obrparpre`, `tiemod` e `ide`, sin `conext` 15). Fuera del seguimiento, `maestro.obras.es_por_defecto` vale `es_ficha_principal`, que sí usa `conext` 15; hoy coinciden en las 925 fichas. Lo llevan `maestro.obras`, `mart.v_pbi_dim_obra` (con `obra_label`, D3) y `cierre.v_pbi_cierre_cabecera`. Los seis `inspect-*` y `find-obra` aceptan clave o código y avisan cuando hay varias fichas.
