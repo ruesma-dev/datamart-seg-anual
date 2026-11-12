@@ -801,12 +801,12 @@
         "check-cobertura (F-052) deja de declarar estas obras como excepcion aceptada: o pasa a exigirlas, o la excepcion queda documentada como definitiva con su motivo",
         "Si la causa de fondo es dato mal metido en Sigrid, llevada a quien lo administra: no se toca desde aqui"
       ],
-      "status": "pending",
+      "status": "done",
       "sdd": true,
       "rigor": "critico",
       "priority": 53,
       "branch": "feature/F-053-desempate-obras-duplicadas",
-      "notes": "2026-11-11: absorbida por F-162 (PARADA 1 del humano, «ok a d1 a d5», design §8). F-162 no elige ficha: `stg.obras` lleva TODAS las fichas de todas las empresas, cada una con lo suyo, y marca `es_por_defecto` (Ruesma por delante; si no, deciden los datos). La 0517, la 0252, la 0720 y la 0606 publican cada ficha con sus datos y la eleccion de negocio de la 0606 deja de hacer falta. Las cuatro excepciones de cobertura salen (`EXCEPCIONES_MAX` 19). Propuesta: cerrarla como absorbida cuando F-162 este APPROVED y desplegada; el estado lo cambia el lider, no el implementer."
+      "notes": "2026-11-11: absorbida por F-162 (PARADA 1 del humano, «ok a d1 a d5», design §8). F-162 no elige ficha: `stg.obras` lleva TODAS las fichas de todas las empresas, cada una con lo suyo, y marca `es_por_defecto` (Ruesma por delante; si no, deciden los datos). La 0517, la 0252, la 0720 y la 0606 publican cada ficha con sus datos y la eleccion de negocio de la 0606 deja de hacer falta. Las cuatro excepciones de cobertura salen (`EXCEPCIONES_MAX` 19). Propuesta: cerrarla como absorbida cuando F-162 este APPROVED y desplegada; el estado lo cambia el lider, no el implementer. 2026-11-12: CERRADA como absorbida por F-162 (done, desplegada). No tiene entrega propia."
     },
     {
       "id": "F-054",
@@ -2605,12 +2605,12 @@
         "Excepciones de cobertura de F-053 retiradas (`EXCEPCIONES_MAX` 19); F-053 cerrada como absorbida y F-106 enmendada",
         "`bash harness/init.sh` en verde y despliegue con sus pasos y su vuelta atrás"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "rigor": "estandar",
       "priority": 0,
       "branch": "feature/F-162-obra-duplicada-ruesma",
-      "notes": "2026-11-11: alta por el líder tras el sí del humano; spec-author lanzado. Mismo día: el humano rechaza «elegir una ficha» y fija el modelo por empresa; spec rehecha. 2026-11-11, PARADA 1 CONFIRMADA por el humano («ok a d1 a d5»), con las recomendaciones de design §8: D1, `maestro.obras.es_por_defecto` con el MISMO criterio en todas las fichas; D2, `conext` 15 fuera del criterio; D3, Power BI sin filtro, con `obra_label` = `clave_obra · nombre` (cambia el texto de las 585 obras de hoy); D4, los agregados sin empresa en `mart`/`cierre` usan `empresa_id` = 1; D5, la empresa no va a los hechos: se cruza por `obra_id` con `maestro.obras`. Implementer lanzado."
+      "notes": "2026-11-11: alta por el líder tras el sí del humano; spec-author lanzado. Mismo día: el humano rechaza «elegir una ficha» y fija el modelo por empresa; spec rehecha. 2026-11-11, PARADA 1 CONFIRMADA por el humano («ok a d1 a d5»), con las recomendaciones de design §8: D1, `maestro.obras.es_por_defecto` con el MISMO criterio en todas las fichas; D2, `conext` 15 fuera del criterio; D3, Power BI sin filtro, con `obra_label` = `clave_obra · nombre` (cambia el texto de las 585 obras de hoy); D4, los agregados sin empresa en `mart`/`cierre` usan `empresa_id` = 1; D5, la empresa no va a los hechos: se cruza por `obra_id` con `maestro.obras`. Implementer lanzado. 2026-11-12: CERRADA (done) por decisión del humano («si f162 está desplegada ciérrala»): reviewer APPROVED (y delta 2c02911 APPROVED), mutación 20/20, desplegada con la imagen r20261112-1745. La comprobación de la nocturna del 2026-11-13 queda como vigilancia en progress/current.md, no como condición de cierre."
     }
   ]
 }
