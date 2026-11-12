@@ -1815,9 +1815,10 @@
         "Si es por diseno: queda documentado en el diccionario que una obra sin version master vigente no publica en los ambitos master, para que la proxima vez no haya que investigarlo otra vez",
         "Si es un agujero: arreglado, y verificado con las cuatro huellas antes/despues de F-052 con `--obras-esperadas` acotado a estas obras",
         "Medido cuantas obras MAS estan en la misma situacion: las cuatro salieron de un veredicto de un dia concreto, no de un censo",
-        "Retiradas de `config/cobertura_excepciones.yaml` las ocho excepciones marcadas `feature: F-117` y bajado EXCEPCIONES_MAX de 23 a 15 en tests/test_f052_cobertura.py. El trinquete SOLO BAJA",
+        "Retiradas de `config/cobertura_excepciones.yaml` las excepciones marcadas `feature: F-117` (diez desde el 2026-11-12, con las dos de la 0517) y bajado EXCEPCIONES_MAX en esa misma cantidad en tests/test_f052_cobertura.py (de 21 a 11 hoy). El trinquete SOLO BAJA",
         "`python main.py check-cobertura --timeout 900` sigue saliendo en codigo 0"
       ],
+      "notes": "2026-11-12: dos casos nuevos de la misma pregunta, medidos tras el despliegue de F-162. (1) 0517, ficha 25-0517 (1088657): publica sus reales desde F-162 pero no su master, porque sus versiones 15 y 16 tienen `tex` vacío (\"Sin clasificar\", sin master vigente). Vuelve a cobertura_excepciones.yaml acotada a los ámbitos 8 y 11, con F-117 (EXCEPCIONES_MAX 19 -> 21, decisión del humano). (2) 0726, ficha 2817778: su master es \"INICIAL JO\", con INICIAL y sin VALORADA, así que tampoco se clasifica. Daba KO en check-cobertura ya antes de F-162 y queda sin excepción, a propósito, para que siga sonando.",
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",

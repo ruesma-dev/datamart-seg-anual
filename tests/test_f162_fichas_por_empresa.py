@@ -783,16 +783,22 @@ def test_f162_r18_los_guardas_viejos_se_retiran_con_motivo(fichero: str, test: s
 
 
 def test_f162_r19_el_trinquete_baja_a_19() -> None:
+    """F-162 lo bajó de 23 a 19. El 2026-11-12, tras el despliegue, volvió a 21
+    con decisión del humano: dos entradas de la 0517, solo para master (F-117)."""
     from tests.test_f052_cobertura import EXCEPCIONES_MAX
 
-    assert EXCEPCIONES_MAX == 19
+    assert EXCEPCIONES_MAX == 21
 
 
 def test_f162_r19_las_cuatro_de_f053_salen() -> None:
     datos = yaml.safe_load(_leer(RUTA_EXCEPCIONES))
     codigos = {e.get("codigo_obra") for e in datos["excepciones"]}
-    assert not codigos & {"0517", "0252", "0720", "0606"}
+    assert not codigos & {"0252", "0720", "0606"}
     assert all(e.get("feature") != "F-053" for e in datos["excepciones"])
+    # La 0517 vuelve solo en los ámbitos master y como pregunta de F-117, nunca entera.
+    de_0517 = [e for e in datos["excepciones"] if e.get("codigo_obra") == "0517"]
+    assert sorted(e.get("ambito_id") for e in de_0517) == [8, 11]
+    assert all(e.get("tipo") == "obra_invisible" and e.get("feature") == "F-117" for e in de_0517)
 
 
 # ===========================================================================
