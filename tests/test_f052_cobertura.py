@@ -82,7 +82,13 @@ from etl_sigrid.infrastructure.postgres.cobertura_sql import (
 #: F-053 (0517, 0252, 0720 y 0606): `stg.obras` deja de desempatar y lleva todas
 #: las fichas de todas las empresas, así que ninguna se pierde. Que no salten en
 #: `check-cobertura` se mide en el despliegue (design §7, paso 7).
-EXCEPCIONES_MAX = 19
+#:
+#: **SUBE DE 19 A 21 EL 2026-11-12, con decisión del humano** («sigue con la
+#: propuesta»). Medido tras el despliegue de F-162: la 0517 ya publica sus reales,
+#: pero no su master. Sus versiones 15 y 16 tienen `tex` vacío y no son master
+#: vigente. Vuelve con dos entradas acotadas a los ámbitos 8 y 11, que cierra F-117,
+#: en lugar de la «ambas» de F-053. Queda por debajo de las 23 de antes de F-162.
+EXCEPCIONES_MAX = 21
 
 
 def _fila(
@@ -261,8 +267,12 @@ def test_f052_r16_el_fichero_de_excepciones_declara_las_de_hoy():
     codigos = {e.codigo_obra for e in excepciones if e.codigo_obra}
 
     assert {"0565", "0630", "0686"} <= codigos, "faltan las obras con ciclos"
-    assert not {"0517", "0252", "0720", "0606"} & codigos, "F-162 retiró las de F-053"
+    assert not {"0252", "0720", "0606"} & codigos, "F-162 retiró las de F-053"
     assert not any(e.feature == "F-053" for e in excepciones)
+    # La 0517 vuelve SOLO para el master (2026-11-12): nunca para sus reales.
+    de_0517 = [e for e in excepciones if e.codigo_obra == "0517"]
+    assert sorted(e.ambito_id for e in de_0517) == [8, 11]
+    assert all(e.tipo == "obra_invisible" and e.feature == "F-117" for e in de_0517)
 
 
 def test_f052_r16_el_trinquete_de_excepciones_solo_baja():

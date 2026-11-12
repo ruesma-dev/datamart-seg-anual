@@ -1,4 +1,4 @@
-Revisión completa (pasada 1), diff cd81ea6..942b444 (spec en b614db7, PARADA 1 en cd81ea6; merge-base con `main` 17b41ec)
+Revisión completa (pasada 1), diff cd81ea6..942b444; delta incremental desde 85c109d hasta 2c02911 al final (2026-11-12)
 
 <!-- progress/review_F-162.md -->
 # F-162 · Review · el seguimiento lleva todas las fichas de obra, con `es_por_defecto`
@@ -41,11 +41,9 @@ No corrí `init.sh` ni la suite entera (encargo: el worktree no tiene `.env`). �
 - **Barrido propio de `sql/`** (`GROUP BY`, `PARTITION BY`, `ON`, `USING`): todos llevan `obra_id`.
   Solo el ranking de `maestro/00_setup` y el criterio de `03_obras` no, y son intencionados.
   `postventa/08` va por `empresa_id`.
-- **Toda lectura de `stg.obras`** (mart, cierre, maestro, personal, cobertura, huellas, mes-fase)
-  une por `obra_id`. Las dos `v_pbi_*` no agrupan.
-- **`main.py`.** La única consulta por código es `_obra_de_stg`, que usan los seis comandos de
-  R12. Con un código da la ficha por defecto y avisa de las demás; con la clave da esa ficha; si
-  no encuentra nada sale con 2. `find-obra` muestra `emp`, `clave_obra` y `*`.
+- **Toda lectura de `stg.obras`** une por `obra_id`; las `v_pbi_*` no agrupan. En `main.py` la
+  única consulta por código es `_obra_de_stg` (seis comandos de R12): ficha por defecto con aviso,
+  clave exacta o salida 2. `find-obra` muestra `emp`, `clave_obra` y `*`.
 - **Fuera de alcance (desviación 4):** cinco comandos de compras y retenciones. Leen vistas sobre
   `raw`, que ya traían todas las fichas antes de F-162: no es regresión, es F-106.
 
@@ -59,24 +57,17 @@ No corrí `init.sh` ni la suite entera (encargo: el worktree no tiene `.env`). �
 
 ## Diccionario v76 (R13-R17), D3 y `azure-apps`
 
-- **`R-EMPRESA-POR-DEFECTO`.** Su ámbito llega a `stg`, `mart` y `cierre`. Cubre R13 entero:
-  mismo código en varias empresas, la ficha por defecto, el aviso si esa ficha no tiene datos y
-  no sumar fichas sin decirlo. Conserva `empresa_id = 1`.
-- **`R-UNIVERSO-OBRA`** ya no deduplica: 634 fichas y 585 códigos.
-- **`R-CODIGO-POR-EMPRESA`** alcanza a las dos vistas.
-- **Preguntas:** P4, P6, P7, P10, P11 y P14 llevan la regla; P9 cuenta fichas por defecto.
-- **F-147:** `PRESUPUESTO_MAX` y topes en verde. **D3.** El cambio de `obra_label` para Power BI está documentado en tres sitios: `mart.yaml`
-  (l. 758), la cabecera y el `COMMENT` de la vista, y `azure-apps`.
-- **`azure-apps` `f2cd5eb`.** Commit local sin push. Solo toca `datamart_seg_anual.md`, marcado
-  «SIN DESPLEGAR», y avisa del cambio de texto de los segmentadores.
+- **`R-EMPRESA-POR-DEFECTO`** (stg, mart, cierre) cubre R13 entero y conserva `empresa_id = 1`;
+  `R-UNIVERSO-OBRA` ya no deduplica (634 fichas, 585 códigos); `R-CODIGO-POR-EMPRESA` alcanza a
+  las dos vistas. P4, P6, P7, P10, P11 y P14 llevan la regla; P9 cuenta fichas por defecto.
+- **F-147** en verde. **D3:** `obra_label` documentado en `mart.yaml` (l. 758), cabecera y
+  `COMMENT` de la vista y `azure-apps` `f2cd5eb` (local, sin push, «SIN DESPLEGAR»).
 
 ## Fase RED
 
-- **El commit T1 (`0ee7c93`) solo trae tests.** El informe trae la salida real: 83 failed y 6
-  passed en cd81ea6, con los motivos (`ModuleNotFoundError`, `ImportError _obra_de_stg`,
-  `23 == 19`).
-- **Sandbox en tres estados:** 9 failed por `UndefinedColumn`, después 8 failed (`KeyError:
-  2759553`, se pierde la de Ruesma) y al final 9 passed.
+- **T1 (`0ee7c93`) solo trae tests**; salida real: 83 failed, 6 passed en cd81ea6
+  (`ModuleNotFoundError`, `ImportError _obra_de_stg`, `23 == 19`). Sandbox: 9 failed
+  (`UndefinedColumn`), 8 failed (`KeyError: 2759553`) y 9 passed.
 
 ## Mutación
 
@@ -138,3 +129,10 @@ No corrí `init.sh` ni la suite entera (encargo: el worktree no tiene `.env`). �
 
 **Automejora (propuesta, no aplicada).** En C5 de `CHECKPOINTS.md`, una tarea que lleva dentro una verificación MANUAL no se marca `[x]`
 hasta hacerla; lo pendiente va a su propia tarea MANUAL (caso T4).
+
+## Delta 2c02911 (2026-11-12) · Revisión incremental desde 85c109d · **APPROVED**
+
+- **Hace eso y nada más:** 4 ficheros. Dos `obra_invisible` de la 0517 (ámbitos 8 y 11, F-117), `EXCEPCIONES_MAX` 19 → 21 (21 entradas, `r16 ==` en verde), nota y aceptación de F-117 (10 entradas F-117: «de 21 a 11» cuadra). La 0726 sin excepción, a propósito.
+- **Guardas sin relajar de más:** r16 y r19 siguen vetando 0252, 0720, 0606 y `F-053`, y exigen que la 0517 venga SOLO en `[8, 11]`, `obra_invisible` y F-117: una `ambas` o un ámbito real las tumba.
+- **Verificado:** f052 + f162: 148 passed, 5 failed (r13/r17/r18, lanzan `main.py` sin `.env`, como avisó el líder); `features.json` válido; `backlog.py` sin diff. Puerta completa: la del líder sobre 2c02911 (exit 0, 11.179 passed). Sin código ni SQL tocado: C3/C4 bis sin cambios (sin campaña nueva).
+- **Obs. (no bloquean):** el título de F-117 aún dice «Cuatro obras…»; y su aceptación «check-cobertura sale en 0» no se cumple hoy por la 0726: que lo recoja la spec de F-117.

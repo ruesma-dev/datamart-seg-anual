@@ -13,7 +13,14 @@
 
 - Reviewer APROBADO (`progress/review_F-162.md`). Puerta en verde sobre `fd4439d`: 11.179 passed. Mutación oficial: 20/20 muertos (`progress/mutacion_F-162.md`).
 - T12, T13 y T15 hechas. Lo medido ANTES y el `EXPLAIN` (9 ms, +0 s) están en `progress/impl_F-162.md` §T13.
-- Falta T14, el despliegue que lanza el humano (design §7, pasos 1-10). `done` tras la primera nocturna buena.
+- **T14, desplegado el 2026-11-12.**
+  - Imagen `r20261112-0941` y job puntual `t3ux7xk` (09:28 a 13:00 UTC, Succeeded).
+  - `stg.obras`: 635 fichas, 586 por defecto y 0721 = `1-0721`* y `28-0721`.
+  - Huellas: `cierre` OK; `mart` solo en 0252, 0517, 0606 y 0721 (8 y 11 solo la 0606); `dimension` y `plan_obra` solo con la etiqueta de las fichas nuevas (también la `28-0680`).
+  - Tesorería de control: 0. `check-unicidad`: 0 claves rotas.
+  - Diccionario v76 publicado a las 14:41 UTC y MCP reiniciado.
+- **El despliegue destapó la 0517.** `check-cobertura` daba KO porque su master (versiones 15 y 16) no tiene `tex`. Vuelve a las excepciones solo para los ámbitos 8 y 11, con F-117 y decisión del humano (`2c02911`, delta APROBADO). La 0726 da KO desde antes de F-162 y queda apuntada en F-117, sin excepción.
+- **Pendiente:** imagen nueva con `2c02911`, para que la nocturna lleve el YAML. `done` tras la primera nocturna buena.
 
 ### 2026-11-11 · implementada (T1-T11), pendiente del review · rama `feature/F-162-obra-duplicada-ruesma`
 

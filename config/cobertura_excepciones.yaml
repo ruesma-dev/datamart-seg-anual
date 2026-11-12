@@ -235,6 +235,27 @@ excepciones:
       CENTRO PRIMERA ACOGIDA DE MENORES LA CANTUENA. Lo mismo en master venta.
     feature: F-117
 
+  # La 0517 vuelve el 2026-11-12, ACOTADA a master. F-162 retiró su excepción de
+  # F-053 («ambas») y la ficha de la UTE 25 (1088657) ya publica sus reales 3 y 7.
+  # Lo que no publica es el master: sus versiones 15 y 16 tienen `tex` vacío, así
+  # que el fact las da por «Sin clasificar» y no son master vigente (medido tras
+  # el despliegue de F-162). Es la misma pregunta que F-117 hace de las de arriba.
+  - codigo_obra: "0517"
+    tipo: obra_invisible
+    ambito_id: 8
+    motivo: >-
+      COLEGIO EN SESENA (FASE II), ficha 25-0517. Cero filas en el fact para el
+      ambito master de coste, medido el 2026-11-12: versiones 15 y 16 sin tex,
+      sin master vigente. Publica en los ambitos reales desde F-162.
+    feature: F-117
+
+  - codigo_obra: "0517"
+    tipo: obra_invisible
+    ambito_id: 11
+    motivo: >-
+      COLEGIO EN SESENA (FASE II), ficha 25-0517. Lo mismo en master venta.
+    feature: F-117
+
   # -------------------------------------------------------------------------
   # 6. Las tres papeleras de codigo de SEIS DIGITOS
   # -------------------------------------------------------------------------
