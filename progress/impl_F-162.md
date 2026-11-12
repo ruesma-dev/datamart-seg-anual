@@ -127,7 +127,7 @@ Los tres KO vienen del `.env`. Sin él, `SigridApiSettings` no carga y la puerta
 3. **T13 · medición ANTES** (design §7, paso 0): cuatro CSV `antes_*` y el recuento por ficha.
 4. **T14 · despliegue** (design §7, pasos 1-10) y su vuelta atrás. Lo que se espera: 634 fichas, 585 por defecto y las huellas de las 585 de hoy sin cambio.
 5. **Campaña oficial de mutación:** `python -m harness.mutacion --feature F-162 --base main` → `progress/mutacion_F-162.md`. Aquí no se pudo: con workers > 1 crea worktrees de git (prohibido en este encargo), y en serie la línea base pasa del timeout de 600 s, como en F-040.
-6. **`check-cobertura`** tras el despliegue: confirmar que las 4 excepciones retiradas (0581, 0606, 0671, 0720) no disparan.
+6. **`check-cobertura`** tras el despliegue: confirmar que las 4 excepciones retiradas (0517, 0252, 0720, 0606) no disparan.
 7. **Push de `azure-apps`** (`f2cd5eb`) cuando el humano lo autorice.
 8. **Republicar el diccionario v76** solo con la imagen nueva del job: la nocturna republica el de su imagen.
 

@@ -12,7 +12,7 @@
 ## 2026-11-11 · F-162 · `in_progress` · implementada (T1-T11), pendiente del review · rama `feature/F-162-obra-duplicada-ruesma`
 
 implementer, PARADA 1 confirmada («ok a d1 a d5»). Informe: `progress/impl_F-162.md`.
-- **Hecho:** `stg.obras` con una fila por ficha y `empresa_id`, `clave_obra` y `es_por_defecto`. El criterio es único (D1) y vive en `etl_sigrid/domain/ficha_obra.py` y en `03_obras.sql`. Lo llevan `maestro.obras`, `mart.v_pbi_dim_obra` (con `obra_label`, D3) y `cierre.v_pbi_cierre_cabecera`. Los seis `inspect-*` y `find-obra` aceptan clave o código y avisan cuando hay varias fichas.
+- **Hecho:** `stg.obras` con una fila por ficha y `empresa_id`, `clave_obra` y `es_por_defecto`. El criterio de `es_por_defecto` en el seguimiento vive en `etl_sigrid/domain/ficha_obra.py` y en `03_obras.sql` (Ruesma, luego líneas de `obrparpre`, `tiemod` e `ide`, sin `conext` 15). Fuera del seguimiento, `maestro.obras.es_por_defecto` vale `es_ficha_principal`, que sí usa `conext` 15; hoy coinciden en las 925 fichas. Lo llevan `maestro.obras`, `mart.v_pbi_dim_obra` (con `obra_label`, D3) y `cierre.v_pbi_cierre_cabecera`. Los seis `inspect-*` y `find-obra` aceptan clave o código y avisan cuando hay varias fichas.
 - **Diccionario v76:** 316 objetos, 2664 columnas y 153 de consumo. R-EMPRESA-POR-DEFECTO aplica D4.
 - **Guardas retiradas, con su motivo:** f102 r7/r18 y f073 r26. Fuera también las 4 excepciones de F-053 (`EXCEPCIONES_MAX` 19). F-053 se propone absorbida y F-106 queda enmendada, sin cambiar sus estados.
 - **Desviación:** `dudosas` usa `count(*) FILTER (empresa 1) <> 1` para que el SQL coincida con el oráculo cuando hay 0 o 2 fichas de Ruesma. Está justificada en el informe.

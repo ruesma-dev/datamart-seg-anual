@@ -1675,7 +1675,7 @@
       "rigor": "estandar",
       "priority": 21,
       "branch": "feature/F-106-obras-por-empresa",
-      "notes": "2026-11-11: enmendada por F-162 (design §8, PARADA 1 del humano): su punto (1) lo entrega F-162; F-106 queda para recursos, partes y compras de otras empresas. Estado sin cambiar."
+      "notes": "2026-11-11: enmendada por F-162 (design §8, PARADA 1 del humano): su punto (1) lo entrega F-162; F-106 queda para recursos, partes y compras de otras empresas, incluidos los cinco comandos de main.py que aún filtran por codigo_obra sobre vistas de compras y retenciones (inspect-contrato-consumo, proveedores-obra, albaranes-sin-facturar, retenciones y retenciones-vencidas). Estado sin cambiar."
     },
     {
       "id": "F-107",
