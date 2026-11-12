@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+from harness import alcance as alcance_mod
 from harness import mutacion, rigor
 from harness.alcance import Alcance
 from harness.mutacion import (
@@ -168,11 +169,26 @@ def cli(monkeypatch: pytest.MonkeyPatch) -> list[dict]:
         return informe
 
     monkeypatch.setattr("harness.mutacion.alcance_de_feature", lambda *_a, **_k: alcance)
+    # F-074 (R6): la base se fija aquí. Sin esto, `main` la lee del init.sh del
+    # repositorio anfitrión y la cabecera lleva `--base main` donde RAMA_BASE=main.
+    monkeypatch.setattr("harness.mutacion.rama_base_configurada", lambda *_a, **_k: "dev")
     monkeypatch.setattr("harness.mutacion.ejecutar_campania", _campania)
     monkeypatch.setattr("harness.mutacion_paralela.ejecutar_campania_paralela", _campania)
     return llamadas
 
 
+def _anfitrion_con_base(tmp_path: Path, base: str) -> Path:
+    """Un repositorio anfitrión simulado cuyo `harness/init.sh` declara `RAMA_BASE`."""
+    raiz = tmp_path / "anfitrion"
+    (raiz / "harness").mkdir(parents=True)
+    (raiz / "harness" / "init.sh").write_text(f"RAMA_BASE={base}\n", encoding="utf-8")
+    return raiz
+
+
+# F-074 (R6 de la 1.10.1): el test no puede depender del `RAMA_BASE` del
+# repositorio que lo acoge. Se corre desde un anfitrión simulado con `dev` y con
+# `main`; la cabecera tiene que salir igual en los dos.
+@pytest.mark.parametrize("base_del_anfitrion", ["dev", "main"])
 @pytest.mark.parametrize("workers", ["1", "2"])
 @pytest.mark.parametrize(
     ("configurada", "opcion", "esperada", "cola"),
@@ -186,8 +202,12 @@ def cli(monkeypatch: pytest.MonkeyPatch) -> list[dict]:
 def test_f019_r19_el_cli_resuelve_y_pasa_la_seleccion(
     cli: list[dict], monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
     capsys: pytest.CaptureFixture[str], workers: str, configurada: bool,
-    opcion: list[str], esperada: bool, cola: str,
+    opcion: list[str], esperada: bool, cola: str, base_del_anfitrion: str,
 ) -> None:
+    anfitrion = _anfitrion_con_base(tmp_path, base_del_anfitrion)
+    # La simulación muerde: leído de verdad, el anfitrión declara esa base.
+    assert alcance_mod.rama_base_configurada(str(anfitrion)) == base_del_anfitrion
+    monkeypatch.chdir(anfitrion)
     monkeypatch.setattr(mutacion, "_seleccion_configurada", lambda: configurada)
 
     mutacion.main(["--feature", "F-019", "--workers", workers, *opcion,

@@ -9,7 +9,7 @@ pasarlo por `escalar_timeout`.
 
 from __future__ import annotations
 
-import re
+import ast
 from pathlib import Path
 
 import pytest
@@ -63,26 +63,124 @@ def test_f019_r21_lee_un_entorno_explicito() -> None:
 
 # --- R22 ---------------------------------------------------------------------
 
-#: `timeout=` seguido de un número literal (no de `escalar_timeout(...)`).
-_TIMEOUT_LITERAL = re.compile(r"\btimeout\s*=\s*\d")
-#: Constante de módulo de timeout con valor literal.
-_CONSTANTE_LITERAL = re.compile(r"^TIMEOUT_S\s*=\s*\d", re.MULTILINE)
+# F-074 (R7 de la 1.10.1): el barrido era textual (`timeout\s*=\s*\d`) y
+# daba falsos positivos con los valores por defecto de un `def` y con los
+# argumentos de los dobles. Ahora es sobre el AST: solo cuenta un `timeout=` con
+# literal numérico en una llamada que lanza o espera un subproceso de verdad.
+
+#: Funciones de `subprocess` que lanzan un proceso (también importadas sueltas).
+_FUNCIONES_SUBPROCESO = frozenset({"run", "Popen", "check_output", "check_call", "call"})
+#: Métodos de un proceso ya lanzado que aceptan `timeout`.
+_METODOS_DE_PROCESO = frozenset({"communicate", "wait"})
+#: Constante de módulo que fija un timeout.
+_CONSTANTE = "TIMEOUT_S"
+
+
+def _es_literal_numerico(nodo: ast.expr | None) -> bool:
+    return (
+        isinstance(nodo, ast.Constant)
+        and isinstance(nodo.value, (int, float))
+        and not isinstance(nodo.value, bool)
+    )
+
+
+def _nombres_de_subprocess(arbol: ast.Module) -> tuple[set[str], set[str]]:
+    """Los alias del módulo `subprocess` y las funciones suyas importadas sueltas."""
+    modulos: set[str] = set()
+    sueltas: set[str] = set()
+    for nodo in ast.walk(arbol):
+        if isinstance(nodo, ast.Import):
+            modulos.update(a.asname or a.name for a in nodo.names if a.name == "subprocess")
+        elif isinstance(nodo, ast.ImportFrom) and nodo.module == "subprocess":
+            sueltas.update(
+                a.asname or a.name for a in nodo.names if a.name in _FUNCIONES_SUBPROCESO
+            )
+    return modulos, sueltas
+
+
+def _es_llamada_de_subproceso(llamada: ast.Call, modulos: set[str], sueltas: set[str]) -> bool:
+    funcion = llamada.func
+    if isinstance(funcion, ast.Name):
+        return funcion.id in sueltas
+    if isinstance(funcion, ast.Attribute):
+        if funcion.attr in _METODOS_DE_PROCESO:
+            return True
+        return (
+            funcion.attr in _FUNCIONES_SUBPROCESO
+            and isinstance(funcion.value, ast.Name)
+            and funcion.value.id in modulos
+        )
+    return False
 
 
 def _ofensas(texto: str) -> list[str]:
-    return [
-        coincidencia.group(0)
-        for patron in (_TIMEOUT_LITERAL, _CONSTANTE_LITERAL)
-        for coincidencia in patron.finditer(texto)
+    arbol = ast.parse(texto)
+    modulos, sueltas = _nombres_de_subprocess(arbol)
+    ofensas = [
+        f"línea {nodo.lineno}: {ast.unparse(nodo.func)}(timeout={clave.value.value})"
+        for nodo in ast.walk(arbol)
+        if isinstance(nodo, ast.Call) and _es_llamada_de_subproceso(nodo, modulos, sueltas)
+        for clave in nodo.keywords
+        if clave.arg == "timeout" and _es_literal_numerico(clave.value)
     ]
+    for nodo in arbol.body:  # solo el nivel de módulo
+        if isinstance(nodo, ast.Assign):
+            objetivos, valor = nodo.targets, nodo.value
+        elif isinstance(nodo, ast.AnnAssign):
+            objetivos, valor = [nodo.target], nodo.value
+        else:
+            continue
+        if _es_literal_numerico(valor) and any(
+            isinstance(o, ast.Name) and o.id == _CONSTANTE for o in objetivos
+        ):
+            ofensas.append(f"línea {nodo.lineno}: {_CONSTANTE} = {valor.value}")
+    return ofensas
 
 
-def test_f019_r22_el_barrido_detecta_un_literal() -> None:
+@pytest.mark.parametrize(
+    "codigo",
+    [
+        "import subprocess\nsubprocess.run(x, timeout=60, check=False)\n",
+        "import subprocess\nsubprocess.check_output(x, timeout=1.5)\n",
+        "import subprocess\nsubprocess.check_call(x, timeout=5)\n",
+        "import subprocess\nsubprocess.call(x, timeout=5)\n",
+        "import subprocess as sp\nsp.Popen(x, timeout=5)\n",
+        "from subprocess import run\nrun(x, timeout=60)\n",
+        "from subprocess import check_output as co\nco(x, timeout=60)\n",
+        "proceso.communicate(timeout=30)\n",
+        "proceso.wait(timeout=30)\n",
+        "TIMEOUT_S = 240\n",
+        "TIMEOUT_S: int = 240\n",
+    ],
+)
+def test_f019_r22_el_barrido_detecta_un_literal(codigo: str) -> None:
     """Control del barrido: sin esto, un patrón roto daría un verde vacío."""
-    assert _ofensas("subprocess.run(x, timeout=60, check=False)")
-    assert _ofensas("TIMEOUT_S = 240\n")
-    assert not _ofensas("subprocess.run(x, timeout=escalar_timeout(60))")
-    assert not _ofensas("TIMEOUT_S = escalar_timeout(240)\n")
+    assert _ofensas(codigo), codigo
+
+
+@pytest.mark.parametrize(
+    "codigo",
+    [
+        "import subprocess\nsubprocess.run(x, timeout=escalar_timeout(60))\n",
+        "TIMEOUT_S = escalar_timeout(240)\n",
+        # Valor por defecto de una función: lo que comprueban sus propios asserts.
+        "def _comprobar(x, timeout=30):\n    return x\n",
+        "def _comprobar(x, *, timeout: int = 30) -> int:\n    return x\n",
+        # Argumentos a dobles o a funciones que no son de subprocess.
+        "doble(timeout=30)\n",
+        "doble.ejecutar(x, timeout=30)\n",
+        "requests.get(url, timeout=10)\n",
+        # `run` sin importar de subprocess es otra función.
+        "run(x, timeout=60)\n",
+        "otro.run(x, timeout=60)\n",
+        # La constante dentro de una función no es de módulo.
+        "def f():\n    TIMEOUT_S = 240\n",
+        "import subprocess\nsubprocess.run(x, timeout=None)\n",
+    ],
+)
+def test_f019_r22_el_barrido_no_marca_lo_que_no_es_un_subproceso(codigo: str) -> None:
+    """Control negativo (F-074): los falsos positivos que vio datamart, en verde."""
+    assert not _ofensas(codigo), (codigo, _ofensas(codigo))
 
 
 def test_f019_r22_ningun_test_lanza_subprocesos_con_timeout_literal() -> None:
