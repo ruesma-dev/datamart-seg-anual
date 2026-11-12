@@ -45,7 +45,9 @@ PROHIBIDOS = (
     "azure",
     "blob",
     "albaranes",
-    "partes",
+    # `partes` salió de la lista con el arnés 1.10.0: su `mutacion.py` llama
+    # `partes` a los trozos de una línea de `git diff --numstat`, castellano
+    # llano y no la aplicación del ecosistema. Mismo caso que `cierre`, abajo.
     "portal",
     "remesas",
     "ruesma",
@@ -56,7 +58,11 @@ PATRON = re.compile(r"\b(" + "|".join(PROHIBIDOS) + r")\b", re.IGNORECASE)
 #: `cierre` sale de la lista de arriba y entra aquí cualificado: el arnés usa la
 #: palabra en castellano llano («la línea base de cierre EXPIRÓ») y el esquema de
 #: este repositorio se cita `cierre.algo`. Mismo criterio que R19.
-PATRON_CUALIFICADO = re.compile(r"cierre\.\w", re.IGNORECASE)
+#: Desde el arnés 1.10.0, `backlog.py` tiene una variable `cierre` (la fecha de
+#: cierre de una feature) y llama a sus métodos de fecha: no son el esquema.
+PATRON_CUALIFICADO = re.compile(
+    r"cierre\.(?!(?:toordinal|isoformat|year|month|day)\b)\w", re.IGNORECASE
+)
 
 
 def menciones(texto: str) -> list[str]:
