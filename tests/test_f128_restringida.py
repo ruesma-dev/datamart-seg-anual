@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import re
 import subprocess
+from harness.tiempos import escalar_timeout
 from pathlib import Path
 
 import pytest
@@ -293,7 +294,7 @@ def test_f128_r22_las_guardas_del_perfil_restringido_la_cubren():
 
 def _git(*args: str) -> str | None:
     try:
-        r = subprocess.run(["git", *args], cwd=RAIZ, capture_output=True, text=True, timeout=30)
+        r = subprocess.run(["git", *args], cwd=RAIZ, capture_output=True, text=True, timeout=escalar_timeout(30))
     except (OSError, subprocess.SubprocessError):
         return None
     return r.stdout if r.returncode == 0 else None
