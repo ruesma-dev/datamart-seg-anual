@@ -7,7 +7,7 @@
 # POR QUE EXISTE. Sin excepciones el guardian sale en rojo todas las noches por
 # cosas que ya sabemos y que no dependen de esta feature -las 12 partidas en
 # ciclo de raw.obrparpar, las obras administrativas que stg/03_obras.sql excluye
-# a proposito y las tres que dependen de F-053-, y un guardian que siempre esta
+# a proposito y, hasta F-162, las que dependian de F-053-, y un guardian que siempre esta
 # rojo no lo mira nadie. Mismo criterio y mismo patron que `pendientes` en
 # `config/objetos_pendientes.yaml`: DESCARTE CORRECTO O EXCEPCION DECLARADA.
 #
@@ -121,49 +121,15 @@ excepciones:
       2026-09-02: sin ficha en stg.obras es obra invisible ademas de huerfana.
 
   # -------------------------------------------------------------------------
-  # 3. Las obras que dependen de F-053 (R24, DA-7)
+  # 3. Las obras que dependian de F-053: RETIRADAS por F-162 (2026-11-11)
   # -------------------------------------------------------------------------
-  # OTRA CAUSA, otro fichero: el desempate `WHERE rn = 1` de
-  # stg/03_obras.sql:125 se queda con un ide y descarta el otro, y en estas
-  # obras gana la ficha vacia. Aqui solo se nombra y se declara; arreglarlo -o
-  # concluir que el comportamiento actual es correcto, que es un resultado
-  # valido- es F-053, ya fichada con prioridad 2.
-
-  - codigo_obra: "0517"
-    tipo: ambas
-    motivo: >-
-      COLEGIO SESENA II. El desempate rn=1 elige el ide 1060846 (207 filas de
-      presupuesto) y descarta el 1088657 (158.737). Cero filas en
-      mart.fact_seguimiento_mensual; 6.105.401,62 EUR de coste y 6.814.253,09 de
-      venta invisibles.
-    feature: F-053
-
-  - codigo_obra: "0252"
-    tipo: ambas
-    motivo: >-
-      C.P. PRIMO DE RIVERA. El desempate rn=1 elige el ide 587639 (22 filas) y
-      descarta el 650280 (28.511). Cero filas en el fact; 4.547.711,35 EUR de
-      coste y 4.129.990,44 de venta invisibles.
-    feature: F-053
-
-  - codigo_obra: "0720"
-    tipo: ambas
-    motivo: >-
-      PROMIRIS, obra VIVA. El desempate rn=1 elige el ide 2824201 (0 filas) y
-      descarta el 2759241 (7.317). Cero filas en el fact.
-    feature: F-053
-
-  - codigo_obra: "0606"
-    tipo: ambas
-    motivo: >-
-      PUY DU FOU. Caso APARTE, no confundir con los tres de arriba: aqui el ide
-      ganador SI publica y el perdido arrastra 1.811.434,92 / 1.890.560,92 EUR.
-      Elegir cual es el bueno es una decision de negocio, y va en F-053. TIPO
-      `ambas` DESDE EL 2026-09-02: el ide PERDIDO no esta en stg.obras, asi que
-      se manifiesta como OBRA INVISIBLE en los cuatro ambitos ademas de traer
-      huerfanas. Declarada solo `filas_huerfanas` tapaba unicamente la mitad
-      que nadie veia, y la 0606 salia en rojo en los cuatro ambitos.
-    feature: F-053
+  # Aqui iban 0517, 0252, 0720 y 0606, las obras que el desempate `WHERE rn = 1`
+  # de stg/03_obras.sql dejaba sin datos o con una ficha perdida. F-162 absorbe
+  # F-053: `stg.obras` lleva TODAS las fichas de todas las empresas, cada una con
+  # lo suyo, y ninguna ficha se pierde. Las cuatro excepciones salen y el
+  # trinquete EXCEPCIONES_MAX baja de 23 a 19. Que no salten en
+  # `check-cobertura` se mide en el despliegue (paso 7 de
+  # specs/F-162-obra-duplicada-ruesma/design.md, seccion 7).
 
   # -------------------------------------------------------------------------
   # 4. El residuo de la propia F-052, medido y CERRADO por ella (2026-09-02)

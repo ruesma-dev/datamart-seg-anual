@@ -9,6 +9,32 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-11 · F-162 · `in_progress` · implementada (T1-T11), pendiente del review · rama `feature/F-162-obra-duplicada-ruesma`
+
+implementer, PARADA 1 confirmada («ok a d1 a d5»). Informe: `progress/impl_F-162.md`.
+- **Hecho:** `stg.obras` con una fila por ficha y `empresa_id`, `clave_obra` y `es_por_defecto`. El criterio de `es_por_defecto` en el seguimiento vive en `etl_sigrid/domain/ficha_obra.py` y en `03_obras.sql` (Ruesma, luego líneas de `obrparpre`, `tiemod` e `ide`, sin `conext` 15). Fuera del seguimiento, `maestro.obras.es_por_defecto` vale `es_ficha_principal`, que sí usa `conext` 15; hoy coinciden en las 925 fichas. Lo llevan `maestro.obras`, `mart.v_pbi_dim_obra` (con `obra_label`, D3) y `cierre.v_pbi_cierre_cabecera`. Los seis `inspect-*` y `find-obra` aceptan clave o código y avisan cuando hay varias fichas.
+- **Diccionario v76:** 316 objetos, 2664 columnas y 153 de consumo. R-EMPRESA-POR-DEFECTO aplica D4.
+- **Guardas retiradas, con su motivo:** f102 r7/r18 y f073 r26. Fuera también las 4 excepciones de F-053 (`EXCEPCIONES_MAX` 19). F-053 se propone absorbida y F-106 queda enmendada, sin cambiar sus estados.
+- **Desviación:** `dudosas` usa `count(*) FILTER (empresa 1) <> 1` para que el SQL coincida con el oráculo cuando hay 0 o 2 fichas de Ruesma. Está justificada en el informe.
+- **MANUAL (líder o humano):** sandbox T12 con DSN, `EXPLAIN` de solo lectura en Azure, medición T13, despliegue T14, la campaña oficial de mutación, `check-cobertura` y el push de azure-apps (`f2cd5eb`).
+
+## 2026-11-11 · F-162 · spec REHECHA (modelo por empresa), pendiente de la PARADA 1
+
+spec-author, rama `feature/F-162-obra-duplicada-ruesma` (desde `17b41ec`): `specs/F-162-obra-duplicada-ruesma/`. El humano rechazó «elegir una ficha por código»: el seguimiento lleva TODAS las fichas, cada una con su empresa, y la IA usa `es_por_defecto` cuando la pregunta no dice empresa. El primer planteamiento queda en el commit `b1345e8` como historia.
+- **Medido en Azure** (solo lectura, 16:30-16:45 UTC): `stg.obras` pasa de 585 a 634 fichas (585 códigos). Entran 49 fichas, de las que 4 tienen plan: 12-0252, 25-0517, 1-0606 y 1-0721 (+152.785 filas, el 0,47 %). Ninguna ficha de hoy pierde filas.
+- **Las demás:** 18.521 líneas de partes pasan a `en_seguimiento`. Los 49 códigos con varias fichas tienen todos la de Ruesma, así que hoy `es_por_defecto` coincide con `es_ficha_principal`.
+- **Barrido:** ningún SQL agrupa ni cruza por `codigo_obra` sin `obra_id`. Solo saldrían duplicados en seis comandos `inspect-*` de `main.py`, en Power BI y en la IA (design §4).
+- **Caen a propósito:** las guardas `test_f102_r7` y `test_f102_r18`, la `test_f073_r26` y las 4 excepciones de cobertura de F-053 (`EXCEPCIONES_MAX` pasa de 23 a 19).
+- **Coste:** de +0 s a +48 s en `03_obras.sql`, según el plan, y unos +40 s en `mart` y `cierre`.
+- **Decisiones para la PARADA 1** (design §8):
+  - **D1:** qué vale `maestro.obras.es_por_defecto` fuera del seguimiento: `es_ficha_principal` o NULL.
+  - **D2:** `conext` 15 queda fuera del criterio, razonado.
+  - **D3:** el filtro por defecto de Power BI. Recomendado: sin filtro y con `obra_label` por `clave_obra`. Un filtro `es_por_defecto` dejaría sin datos la 0581, la 0606 y la 0671, que hoy se ven por la ficha de su UTE.
+  - **D4:** en `mart`/`cierre`, una pregunta agregada sin empresa usa `empresa_id = 1` o `es_por_defecto`.
+  - **D5:** se propone no llevar la empresa a las tablas de hechos.
+- **Se proponen:** cerrar F-053 como absorbida y enmendar F-106 con el texto de design §8.
+- **Aviso:** la 0721 seguirá sin master hasta F-161, porque no tiene `planif`.
+
 ## 2026-11-11 · NADA EN CURSO · leer esto primero
 
 - **F-040, `done` el 2026-11-11:** primera nocturna sin fallos. El resumen está en `history.md`, y debajo quedan el registro del despliegue y del ciclo 2.

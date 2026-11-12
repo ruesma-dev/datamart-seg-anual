@@ -813,7 +813,17 @@
 # esquemas y `R-FRESCURA` el paso `build_ventas`. Siete tablas nuevas en `raw`
 # (`cli`, `cer`, `cerpro`, `cerrec`, `cerprodes`, `dvfpro`, `dvfrec`) y `dvf` a
 # 35 columnas.
-version: 75
+#
+# version 76 (F-162, 2026-11-11): EL SEGUIMIENTO LLEVA TODAS LAS FICHAS, CADA
+# UNA CON SU EMPRESA. `stg.obras` deja de elegir una ficha por codigo (la 0721
+# salia por la copia vacia de Porsan): una fila por ficha de todas las empresas
+# (634 fichas, 585 codigos) con `empresa_id`, `clave_obra` y `es_por_defecto`
+# (la de Ruesma si existe; si no, deciden los datos). `maestro.obras`,
+# `mart.v_pbi_dim_obra` y `cierre.v_pbi_cierre_cabecera` publican la marca.
+# `R-EMPRESA-POR-DEFECTO` alcanza a `stg`, `mart` y `cierre` y dice como leer una
+# obra sin empresa; `R-UNIVERSO-OBRA` ya no deduplica; `R-CODIGO-POR-EMPRESA`
+# alcanza a las dos vistas. Las preguntas de «la obra X» llevan la regla.
+version: 76
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -979,13 +989,16 @@ reglas:
     regla: >-
       `stg.obras` es el universo del SEGUIMIENTO: excluye codigos
       administrativos (0001-0005, CM, CP, GG, VAR, POSTV*, BD*, GGD, GINT, OT),
-      excluye codigos con cinco o mas digitos seguidos y deduplica por el
-      mecanismo de Sigrid `conext.cod = '15'`. `maestro.obras` NO filtra nada:
-      es superconjunto, con una fila por FICHA (una por empresa y codigo, F-102).
+      excluye codigos con cinco o mas digitos seguidos y, desde F-162, tiene
+      una fila por ficha de todas las empresas (634 fichas, 585 codigos el
+      2026-11-11): difiere de `maestro.obras` solo en esos filtros de codigo.
+      `maestro.obras` NO filtra nada: es superconjunto, con una fila por FICHA
+      (una por empresa y codigo, F-102). Contar obras por codigo es contar
+      `es_por_defecto`, y decirlo.
       Toda respuesta que cuente obras debe decir cual usa. `compras` y
       `retenciones` tampoco filtran por `stg.obras` y pueden traer obras
-      administrativas que el seguimiento excluye. Que ficha elige `stg.obras`
-      cuando un codigo tiene varias lo dice su ficha.
+      administrativas que el seguimiento excluye. Cual es la ficha por defecto
+      de un codigo con varias lo dice su ficha.
     motivo: >-
       Los filtros estan en `sql/stg/03_obras.sql`; `sql/maestro/01_obras.sql` no
       tiene ninguno. Contar en una o en otra da cifras distintas a proposito, y
@@ -998,6 +1011,8 @@ reglas:
       - maestro.obras
       - maestro.v_obra_fichas
       - stg.obras
+      - mart.v_pbi_dim_obra
+      - cierre.v_pbi_cierre_cabecera
       - personal.partes_lineas
       - personal.partes
       - personal.recursos
@@ -1049,28 +1064,28 @@ reglas:
   - codigo: R-EMPRESA-POR-DEFECTO
     titulo: Sin empresa en la pregunta, es Construcciones Ruesma (empresa_id = 1), y se dice
     severidad: bloqueante
-    ambito: [maestro, compras, compras_restringida, retenciones, personal, contabilidad, contabilidad_restringida, tesoreria, tesoreria_restringida]
+    ambito: [maestro, compras, compras_restringida, retenciones, personal, contabilidad, contabilidad_restringida, tesoreria, tesoreria_restringida, stg, mart, cierre]
     resumen: >-
-      Sin empresa en la pregunta, filtra `empresa_id = 1` (Construcciones
-      Ruesma) y dilo. Sin columna de empresa, llega por `obra_id` →
-      `maestro.obras`; si tampoco hay obra, avisa de que la cifra mezcla todas.
-      Nunca sumes empresas sin decirlo.
+      Sin empresa en la pregunta: una obra, en su ficha `es_por_defecto` (la de
+      Ruesma si existe); lo demas, `empresa_id = 1`. Dilo. El mismo codigo puede
+      ser la obra en varias empresas: nunca sumes sus fichas sin decirlo.
     regla: >-
-      Es un CRITERIO GENERAL: si la pregunta no indica empresa, se entiende
-      Construcciones Ruesma, `empresa_id = 1`, y la respuesta lo dice («he
-      supuesto Construcciones Ruesma, `empresa_id = 1`, porque la pregunta no
-      indica empresa»). NO se aplica si la pregunta pide otra empresa (Porsan es
-      la 28), varias, el grupo o una UTE: entonces se filtra por las que pide y,
-      si son varias, se dice si van por separado o sumadas. Nunca se suman
-      empresas sin decirlo. Donde filtrar se decide OBJETO A OBJETO, y cada
-      ficha dice su caso: con columna de empresa (`empresa_id`, o
-      `maestro.centros_coste.empresa`), por ella; con solo `obra_id`, cruzando
-      con `maestro.obras` (su `empresa_id`, o `clave_obra` que empieza por `1-`:
-      `R-CODIGO-POR-EMPRESA`), y las filas sin obra quedan fuera y se cuentan; sin empresa ni
-      obra, el objeto mezcla las 38 empresas: la respuesta lo dice y NO dice
-      «he supuesto Construcciones Ruesma» (si la ficha da un camino comprobado
-      para filtrarlo, se usa ese). `stg`, `mart`, `cierre` y `descompuestos` no
-      tienen empresa: manda `R-UNIVERSO-OBRA`.
+      Es un CRITERIO GENERAL: sin empresa en la pregunta se entiende
+      Construcciones Ruesma, `empresa_id = 1`, y la respuesta lo dice («he supuesto
+      Construcciones Ruesma, `empresa_id = 1`»). NO se aplica si pide otra empresa,
+      varias, el grupo o una UTE: se filtra por las que pide. Nunca se suman empresas
+      sin decirlo. Donde filtrar se decide OBJETO A OBJETO y cada ficha dice su caso:
+      con columna de empresa (`empresa_id`, `maestro.centros_coste.empresa`), por
+      ella; con solo `obra_id`, cruzando con `maestro.obras` (`empresa_id`, o
+      `clave_obra` que empieza por `1-`: `R-CODIGO-POR-EMPRESA`), y las filas sin obra
+      quedan fuera y se cuentan; sin empresa ni obra, mezcla las 38 empresas: la
+      respuesta lo dice y NO dice «he supuesto Construcciones Ruesma» (salvo camino
+      comprobado en su ficha). UNA OBRA puede estar en varias empresas con el mismo
+      codigo: `stg`, `mart` y `cierre` tienen una fila por ficha, con su empresa y
+      `es_por_defecto` por `obra_id` → `stg.obras` (`R-UNIVERSO-OBRA`). Sin empresa,
+      la obra es su ficha `es_por_defecto`; si esa ficha esta sin datos y otra del
+      codigo los tiene, se avisa. Agregados sin obra: `empresa_id = 1`. Nunca se
+      suman fichas de empresas distintas sin decirlo.
     motivo: >-
       Orden del humano del 2026-10-18, pedida primero en la sesion de
       `mcp-bbdd` («si no se dice nada es construcciones ruesma») y confirmada
@@ -1081,7 +1096,12 @@ reglas:
       sin decirlo. Que la IA lo diga es sugerencia de `mcp-bbdd`: el usuario ve
       el supuesto y lo corrige. `empresa_id = 1` es 'CONSTRUCCIONES RUESMA' en
       `maestro.obras.nombre_empresa` (Azure, 2026-10-18). El inventario de que
-      objeto tiene empresa, obra o ninguna vive en cada ficha desde F-147.
+      objeto tiene empresa, obra o ninguna vive en cada ficha desde F-147. La
+      ficha por defecto es orden del humano del 2026-11-11 (F-162): «al
+      preguntar la IA, hay que decirle que puede ser el mismo proyecto en ambas
+      empresas y que por defecto coja este»; «en caso de duda, Construcciones
+      Ruesma por delante, salvo que se diga lo contrario; los datos deciden
+      antes que la duda».
 
   - codigo: R-SALDO-CONTABLE
     titulo: El saldo contable no se suma con los cierres ni las aperturas
@@ -2291,6 +2311,7 @@ preguntas_aceptacion:
       "El datamart no tiene tesoreria." No hay ni un objeto de cobros o pagos en
       los diez esquemas. Cualquier numero es incorrecto, incluida la tentacion
       de dar el facturado como si fuera caja.
+    reglas_implicadas: [R-EMPRESA-POR-DEFECTO]
     estado: bloqueada
     bloqueada_por: F-037
 
@@ -2321,7 +2342,7 @@ preguntas_aceptacion:
       Va a `mart`, NO a `stg.plan_mensual`, donde conviven todas las versiones.
       Usa `importe_mes` y no suma `importe_origen` a lo largo del tiempo.
       Menciona que las versiones de tipo 'Cierre mensual' no reemplazan al plan.
-    reglas_implicadas: [R-VERSION-MASTER, R-IMPORTE-MES]
+    reglas_implicadas: [R-VERSION-MASTER, R-IMPORTE-MES, R-EMPRESA-POR-DEFECTO]
     estado: respondible
 
   - id: P7
@@ -2334,7 +2355,7 @@ preguntas_aceptacion:
       pero su paso puede haber fallado sin tumbar el resto de la carga. Los
       porcentajes van contra la VENTA de esa misma columna y ese mismo mes, no
       contra el presupuesto global.
-    reglas_implicadas: [R-FRESCURA]
+    reglas_implicadas: [R-FRESCURA, R-EMPRESA-POR-DEFECTO]
     estado: respondible
 
   - id: P8
@@ -2356,7 +2377,9 @@ preguntas_aceptacion:
       - stg.obras
     respuesta_correcta: >-
       DECLARA QUE UNIVERSO USA: `maestro.obras` no filtra nada y `stg.obras`
-      excluye administrativas y códigos de cinco o mas digitos. Y usa
+      excluye administrativas y códigos de cinco o mas digitos. Las dos tienen
+      una fila por FICHA (una por empresa y codigo): para contar obras cuenta
+      las fichas `es_por_defecto`, una por codigo, y lo dice. Y usa
       `maestro.obras.es_activa`, NO `stg.obras.activa`, que esta cableada a TRUE
       y vale TRUE para todas.
     reglas_implicadas: [R-UNIVERSO-OBRA, R-OBRA-ACTIVA]
@@ -2374,7 +2397,7 @@ preguntas_aceptacion:
       `importe_oficial` es la venta CON los coeficientes del contrato, lo que se
       factura; darla solo si se pide eso, y decirlo, sin mezclarla con la otra.
       Filtra la fase correcta.
-    reglas_implicadas: [R-FAS-AMBIGUO, R-VERSION-MASTER, R-VENTA-COEFICIENTES]
+    reglas_implicadas: [R-FAS-AMBIGUO, R-VERSION-MASTER, R-VENTA-COEFICIENTES, R-EMPRESA-POR-DEFECTO]
     estado: respondible
     es_trampa: true
 
@@ -2386,7 +2409,7 @@ preguntas_aceptacion:
       Usa `importe_mes`. Si suma `importe_origen` a lo largo de los meses, la
       respuesta es INCORRECTA aunque el numero parezca razonable: multiplica por
       unas nueve veces.
-    reglas_implicadas: [R-IMPORTE-MES]
+    reglas_implicadas: [R-IMPORTE-MES, R-EMPRESA-POR-DEFECTO]
     estado: respondible
     es_trampa: true
 
@@ -2424,7 +2447,7 @@ preguntas_aceptacion:
       administrativas que el seguimiento excluye. Y dice que el puente entre el
       coste planificado de la partida y el incurrido documental **no existe
       todavia** como objeto, aunque `partida_id` los une.
-    reglas_implicadas: [R-UNIVERSO-OBRA]
+    reglas_implicadas: [R-UNIVERSO-OBRA, R-EMPRESA-POR-DEFECTO]
     estado: parcial
     bloqueada_por: F-039
 

@@ -22,7 +22,7 @@ quedar fuera de `stg.obras` —lista negra de códigos y regla de los cinco díg
 seguidos—, porque lo que hay que probar es que **cada patrón del YAML tapa las
 dos manifestaciones**, no repetir quince veces el mismo caso. Las que sí van
 enteras, obra a obra, son las que llevan nombre y apellidos en el review: 0613,
-0618, 0578, 0585, 0670, 0687 y 0606.
+0618, 0578, 0585, 0670, 0687 y, hasta F-162, 0606.
 
 ## Qué prueba y qué no
 
@@ -64,10 +64,11 @@ LINEA_BASE_2026_09_02 = (
     (1314512, "0585", "REF. Y AMPLIACIÓN COLEGIO MAYOR ALCOR (MADRID)", (8, 11), True, False),
     (2153966, "0670", "CAMPO FUTBOL COLEGIO SANTILLANA (MADRID)", (8, 11), True, False),
     (2318773, "0687", 'CENTRO PRIMERA ACOGIDA DE MENORES "LA CANTUEÑA"', (8, 11), True, False),
-    # --- 0606: el ide PERDIDO por el desempate `rn = 1` de stg/03_obras.sql.
-    # No está en `stg.obras`, así que es invisible en los cuatro ámbitos Y todas
-    # sus filas son huérfanas. Es F-053 quien decide cuál de los dos ide manda.
-    (1581377, "0606", "PARQUE TEMÁTICO PUY DU FOU - LOTE 7 (TOLEDO)", (3, 7, 8, 11), True, True),
+    # --- 0606 (el ide PERDIDO por el desempate `rn = 1` de stg/03_obras.sql)
+    # iba aquí: invisible en los cuatro ámbitos y con todas sus filas huérfanas.
+    # RETIRADA CON F-162 (2026-11-11): `stg.obras` lleva todas las fichas, así
+    # que ese ide ya no se pierde, y su excepción salió del YAML. Si volviera a
+    # salir así, el guardián tiene que gritar.
     # --- Las administrativas que `stg/03_obras.sql` excluye a propósito: por la
     # lista negra de códigos o por la regla `con.cod !~ '[0-9]{5,}'`. Al no tener
     # ficha en `stg.obras` son las DOS cosas a la vez, y ahí es donde el `tipo`
@@ -125,7 +126,7 @@ def test_f052_cierre_la_linea_base_medida_queda_toda_declarada():
 @pytest.mark.parametrize(
     ("codigo", "nombre"),
     [
-        ("0606", "PARQUE TEMÁTICO PUY DU FOU - LOTE 7 (TOLEDO)"),
+        # La 0606 iba aquí hasta F-162, que retiró su excepción (ver arriba).
         ("171104", "OBRA PRUEBA 4"),
         ("POSTV", "POSTVENTA"),
         ("VAR", "VARIOS"),
@@ -136,7 +137,7 @@ def test_f052_cierre_las_administrativas_estan_declaradas_como_invisibles(
 ) -> None:
     """El defecto exacto que el reviewer encontró, aislado.
 
-    Las cuatro se manifiestan como **obra invisible**, y estaban declaradas
+    Todas se manifiestan como **obra invisible**, y estaban declaradas
     `filas_huerfanas`. Una excepción que apunta al hallazgo equivocado es peor
     que no tenerla: ocupa sitio en el trinquete y no tapa nada.
     """

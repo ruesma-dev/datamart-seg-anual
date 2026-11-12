@@ -1,0 +1,18 @@
+<!-- specs/F-162-obra-duplicada-ruesma/tasks.md -->
+# F-162 · Tareas
+
+- [x] T1: Tests `tests/test_f162_fichas_por_empresa.py` (R1-R19) y `tests/test_f162_sandbox.py` (R23); RED sobre `17b41ec` anotado en `progress/impl_F-162.md`  |  Verificación: `.venv/Scripts/python.exe -m pytest tests/test_f162_fichas_por_empresa.py` falla en R1, R3, R5, R7, R8, R11-R17 y R19
+- [x] T2: `etl_sigrid/domain/ficha_obra.py`: `FichaObra`, `clave_por_defecto`, `ficha_por_defecto` (design §3.2)  |  Verificación: `pytest tests/test_f162_fichas_por_empresa.py -k r5` en verde
+- [x] T3: `stg/01_ddl.sql`: `empresa_id`, `clave_obra`, `es_por_defecto` tras `_built_at`, migración en el `DO` e índice (R3)  |  Verificación: `pytest tests/test_f162_fichas_por_empresa.py -k r3` en verde
+- [x] T4: `stg/03_obras.sql`: todas las fichas, CTE `dudosas`/`lineas`, `es_por_defecto` y cabecera nueva (design §3.1); `EXPLAIN (ANALYZE)` en solo lectura del `SELECT` en Azure, anotado  |  Verificación: `pytest tests/test_f162_fichas_por_empresa.py -k "r1 or r2 or r6 or r7"` en verde
+- [x] T5: Retirar las guardas de R18 (`test_f102_obra_principal.py`, `test_f073_sql.py`) con su motivo  |  Verificación: `pytest tests/test_f102_obra_principal.py tests/test_f073_sql.py` en verde
+- [x] T6: `maestro/01_obras.sql`: `es_por_defecto` última columna con el `COALESCE` (R8, D1), comentarios de `00_setup.sql`  |  Verificación: `pytest tests/test_f162_fichas_por_empresa.py -k r8 tests/test_f073_sql.py tests/test_f102_obra_principal.py` en verde
+- [x] T7: `mart/05_views_powerbi.sql` y `cierre/05_views_cabecera.sql`: tres columnas al final y `obra_label` según D3 (R11)  |  Verificación: `pytest tests/test_f162_fichas_por_empresa.py -k r11` y los tests de esas vistas en verde
+- [x] T8: `main.py`: ayudante `_obra_de_stg` en los seis comandos y `find-obra` con empresa (R12)  |  Verificación: `pytest tests/test_f162_fichas_por_empresa.py -k r12` en verde
+- [x] T9: Diccionario: fichas (`stg`, `maestro`, `mart`, `cierre`, `personal`), reglas `R-EMPRESA-POR-DEFECTO`, `R-UNIVERSO-OBRA`, `R-CODIGO-POR-EMPRESA`, preguntas P4/P6/P7/P9/P10/P11/P14 y `version` siguiente (R4, R13-R17)  |  Verificación: `pytest tests/test_f162_fichas_por_empresa.py -k "r4 or r13 or r14 or r15 or r16 or r17" tests/test_f144_empresa_por_defecto.py tests/test_f147_contenido.py tests/test_f147_presupuesto_contexto.py tests/test_f006_fichas.py tests/test_f108_claves_alternativas.py` en verde
+- [x] T10: Cobertura: fuera la sección 3 de `config/cobertura_excepciones.yaml` y `EXCEPCIONES_MAX = 19` (R19)  |  Verificación: `pytest tests/test_f052_cobertura.py tests/test_f052_cierre_excepciones.py` en verde
+- [x] T11: Textos de R20 (`docs/ARCHITECTURE.md` y `azure-apps/datamart_seg_anual.md`, este con commit local en `azure-apps`)  |  Verificación: `pytest tests/test_f162_fichas_por_empresa.py -k r20` en verde y `git -C C:/Users/pgris/PycharmProjects/azure-apps log -1`
+- [ ] T12: Sandbox con DSN (líder, en la copia con `.env`)  |  Verificación: MANUAL (líder): `F162_SANDBOX_DSN=<dsn local> .venv/Scripts/python.exe -m pytest tests/test_f162_sandbox.py` en verde, sin `skip`
+- [ ] T13: Medición ANTES en Azure, mismo `raw` (design §7, paso 0)  |  Verificación: MANUAL (humano o líder, solo lectura): cuatro CSV `antes_*` y el recuento por ficha en `progress/impl_F-162.md`
+- [ ] T14: Despliegue (design §7, pasos 1-10) con su vuelta atrás  |  Verificación: MANUAL (humano): pasos 4-7 como dice el design (634 fichas, 585 por defecto, huellas y cobertura)
+- [ ] T15: Ejecutar `bash harness/init.sh` en verde  |  Verificación: `bash harness/init.sh` exit 0

@@ -1,7 +1,8 @@
 -- etl_sigrid/infrastructure/postgres/sql/stg/03_obras.sql
 --
--- Materializa stg.obras combinando raw.obr con raw.con, deduplicando por
--- el mecanismo de Sigrid `conext.cod='15'` y filtrando códigos no válidos.
+-- Materializa stg.obras combinando raw.obr con raw.con: UNA FILA POR FICHA de
+-- obra de todas las empresas (F-162), filtrando códigos no válidos y marcando
+-- en `es_por_defecto` la ficha por defecto de cada código.
 --
 -- ===========================================================================
 -- Modelo Sigrid
@@ -46,62 +47,52 @@
 --      '12345-9'   → FUERA (5 dígitos)
 --
 -- ===========================================================================
--- DEDUPLICACIÓN POR conext.cod='15'
+-- TODAS LAS FICHAS, CADA UNA CON SU EMPRESA (F-162, 2026-11-11)
 -- ===========================================================================
--- En Sigrid puede haber múltiples ide para el mismo cod de obra (53 códigos
--- duplicados detectados en Ruesma). El mecanismo de Sigrid para marcar cuál
--- es la vigente es la tabla raw.conext con cod='15' (igual mecanismo que
--- para versiones master en 07_version_master_vigente.sql).
+-- En Sigrid la obra es POR EMPRESA: el mismo código existe una vez por empresa
+-- (Ruesma 1, Porsan 28, cada UTE) y es la misma obra vista desde cada una, SIN
+-- CONSOLIDAR. Modelo del humano: «Debes leer los proyectos en ambas empresas.
+-- No tener que elegir: cada uno con su propia empresa, sin cruces entre
+-- empresas.» Por eso esta tabla lleva UNA FILA POR FICHA (`obra_id`) y ya no
+-- desempata: hasta F-162 se quedaba con una ficha por código (`WHERE rn = 1`
+-- sobre la marca `conext` 15, `tiemod` e `ide`) y en la 0721 elegía la copia
+-- vacía de PORSAN en vez de la de Ruesma, con 9.165 líneas de presupuesto.
+-- Medido el 2026-11-11: 585 -> 634 fichas para 585 códigos.
 --
--- Hallazgo empírico: en el Caso 1 (66% de duplicados) el ide vigente según
--- conext es siempre el MÁS ANTIGUO (ide más bajo). Esto es opuesto al patrón
--- de tablas detalle de Sigrid donde una edición añade una línea nueva.
+-- Todo lo que cuelga (`mart`, `cierre`, `tesoreria`, `retenciones`,
+-- `personal`) va por `obra_id`: cada ficha con lo suyo. El código NO es único
+-- aquí; se busca por `clave_obra` o por (`empresa_id`, `codigo_obra`).
 --
--- Tres casos detectados al analizar Ruesma:
+-- `es_por_defecto` marca UNA ficha por código: la que se lee cuando la pregunta
+-- no dice empresa. Criterio del humano («en caso de duda, Construcciones Ruesma
+-- por delante, salvo que se diga lo contrario; los datos deciden antes que la
+-- duda»), el mismo que `etl_sigrid/domain/ficha_obra.py`, criterio a criterio:
+--   1º la ficha de la empresa 1, si el código la tiene;
+--   2º más líneas de presupuesto (`raw.obrparpre`);
+--   3º `tiemod` más reciente (sin `tiemod`, pierde);
+--   4º `ide` mayor, solo como desempate final.
+-- La marca de vigente `conext` 15 NO interviene (D2): dice cuál de las fichas
+-- duplicadas es «la vigente», que es justo la elección que este modelo deja.
 --
---   Caso 1 (66%, 35 obras): conext marca un único ide como vigente.
---     → ese es el bueno (lo elige automáticamente el ranking).
---
---   Caso 2 (32%, 17 obras): ningún ide marcado en conext. Dos subcasos:
---     2A: códigos administrativos → ya excluidos por el WHERE de arriba.
---     2B: obras antiguas legítimas pre-conext. Fallback automático:
---         MAX(tiemod), el registro modificado más recientemente.
---
---   Caso 3 (2%, solo 0606 = PUY DU FOU): múltiples ides marcados como
---     vigentes en conext. Desempate automático por tiemod DESC, ide DESC.
---     Si en algún momento negocio decide cuál es el correcto, marcar en
---     Sigrid (quitar el cx15 del incorrecto) y rebuild.
---
--- Ranking aplicado:
---   1º vigente en conext (0) vs no vigente (1) → vigentes primero
---   2º tiemod DESC                              → entre iguales, el más reciente
---   3º obr.ide DESC                             → desempate final
+-- LAS LÍNEAS SE CUENTAN SOLO DONDE DECIDEN, y antes de unir: `raw.obrparpre`
+-- tiene 13,7 M de filas y contarla entera cuesta 48 s. Solo hacen falta en los
+-- códigos con varias fichas en los que la empresa 1 no decide sola (ninguna o
+-- más de una ficha de Ruesma: `dudosas`). Hoy no hay ninguno.
 -- ===========================================================================
 
 TRUNCATE TABLE stg.obras;
 
-INSERT INTO stg.obras (obra_id, codigo_obra, nombre_obra, activa)
-WITH ranked AS (
+INSERT INTO stg.obras (obra_id, codigo_obra, nombre_obra, activa, empresa_id, clave_obra, es_por_defecto)
+WITH fichas AS (
     SELECT
         obr.ide                              AS obra_id,
         con.cod                              AS codigo_obra,
         con.res                              AS nombre_obra,
-        con.tiemod                           AS con_tiemod,
-        ROW_NUMBER() OVER (
-            PARTITION BY con.cod
-            ORDER BY
-                -- 1º vigentes en conext primero
-                CASE WHEN cx15.conide IS NOT NULL THEN 0 ELSE 1 END,
-                -- 2º más recientes primero (fallback Caso 2B)
-                con.tiemod DESC NULLS LAST,
-                -- 3º desempate final por ide DESC
-                obr.ide DESC
-        ) AS rn
+        con.emp                              AS empresa_id,
+        con.emp::text || '-' || con.cod      AS clave_obra,
+        con.tiemod                           AS tiemod
     FROM raw.obr obr
     JOIN raw.con con ON con.ide = obr.ide
-    LEFT JOIN raw.conext cx15
-           ON cx15.conide = obr.ide
-          AND cx15.cod = '15'
     -- Excluir códigos administrativos (papeleras, no obras reales)
     WHERE con.cod NOT IN (
         '0001','0002','0003','0004','0005',
@@ -115,11 +106,38 @@ WITH ranked AS (
     -- Excluir códigos NULL o vacíos por sanidad
     AND con.cod IS NOT NULL
     AND length(trim(con.cod)) > 0
+),
+-- Las fichas de los códigos donde la empresa 1 no decide sola.
+dudosas AS (
+    SELECT f.obra_id
+    FROM fichas f
+    WHERE f.codigo_obra IN (
+        SELECT codigo_obra FROM fichas
+        GROUP BY codigo_obra HAVING count(*) > 1
+           AND count(*) FILTER (WHERE empresa_id = 1) <> 1
+    )
+),
+-- Sus líneas de presupuesto, agregadas ANTES de unir.
+lineas AS (
+    SELECT p.obride, count(*) AS num_lineas
+    FROM raw.obrparpre p
+    WHERE p.obride IN (SELECT obra_id FROM dudosas)
+    GROUP BY p.obride
 )
 SELECT
-    obra_id,
-    codigo_obra,
-    nombre_obra,
-    TRUE AS activa
-FROM ranked
-WHERE rn = 1;
+    f.obra_id,
+    f.codigo_obra,
+    f.nombre_obra,
+    TRUE AS activa,
+    f.empresa_id,
+    f.clave_obra,
+    ROW_NUMBER() OVER (
+        PARTITION BY f.codigo_obra
+        ORDER BY
+            CASE WHEN f.empresa_id = 1 THEN 0 ELSE 1 END,
+            COALESCE(l.num_lineas, 0) DESC,
+            f.tiemod DESC NULLS LAST,
+            f.obra_id DESC
+    ) = 1 AS es_por_defecto
+FROM fichas f
+LEFT JOIN lineas l ON l.obride = f.obra_id;
