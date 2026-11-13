@@ -31,7 +31,7 @@
 -- negocio de más abajo viajó verbatim desde las vistas, y `tests/test_f078_sql.py`
 -- la fija cadena a cadena para que un refactor no se la lleve por delante.
 --
--- LAS TRES VISTAS SE QUEDAN, con el mismo nombre y las mismas columnas, ahora
+-- LAS VISTAS SE QUEDAN, con el mismo nombre y las mismas columnas, ahora
 -- como envoltorio de su tabla: así el `.pbix` del humano no cambia ni una
 -- línea, y tampoco el MCP ni `main.py inspect-cp-tipologia`.
 --
@@ -96,58 +96,20 @@
 --    Todo el fichero se ejecuta en UNA transacción (`execute_sql_file` manda
 --    el texto entero en una sola llamada), así que o se rehace entero o no se
 --    toca nada: no hay ventana en la que Power BI encuentre la vista ausente.
+--
+--    El catálogo `mart.master_versiones_tipadas` y su vista ya NO son de este
+--    fichero: desde F-161 los construye `01b_master_versiones.sql`, antes de
+--    `02_build_fact.sql`, y aquí solo se leen (D11).
 -- ===========================================================================
 DROP VIEW  IF EXISTS mart.v_pbi_cp_tipologia         CASCADE;
 DROP VIEW  IF EXISTS mart.v_master_vigente_anual     CASCADE;
-DROP VIEW  IF EXISTS mart.v_master_versiones_tipadas CASCADE;
 
 DROP TABLE IF EXISTS mart.fact_cp_tipologia          CASCADE;
 DROP TABLE IF EXISTS mart.master_vigente_anual       CASCADE;
-DROP TABLE IF EXISTS mart.master_versiones_tipadas   CASCADE;
 
 
 -- ===========================================================================
--- 1) Tabla helper: catálogo de versiones master tipadas.
---    Reusable para otras agregaciones que necesiten "versión vigente" en
---    distintos cortes temporales.
---
---    Es el ÚNICO objeto de este fichero que baja a `stg.plan_mensual` a por
---    las versiones: los otros dos se apoyan en él.
--- ===========================================================================
-CREATE TABLE mart.master_versiones_tipadas AS
-SELECT DISTINCT
-    obra_id,
-    ambito_id,
-    version,
-    version_fec_creacion,
-    version_fec_efectiva,
-    version_descripcion,
-    version_tex,
-    CASE
-        WHEN version_tex IS NULL OR length(trim(version_tex)) = 0
-            THEN 'Sin clasificar'
-        WHEN UPPER(version_tex) LIKE '%ABC%'
-            THEN 'ABC'
-        WHEN UPPER(version_tex) LIKE '%INICIAL%'
-         AND UPPER(version_tex) LIKE '%VALORADA%'
-            THEN 'Planif Inicial'
-        WHEN UPPER(version_tex) LIKE '%CUATRIM%'
-          OR UPPER(version_tex) LIKE '%VALORADA%'
-            THEN 'Cuatrimestral'
-        WHEN UPPER(version_tex) LIKE '%CIERRE%'
-            THEN 'Cierre mensual'
-        ELSE 'Sin clasificar'
-    END AS tipo_master
-FROM stg.plan_mensual
-WHERE ambito_id IN (8, 11)
-  AND version_fec_efectiva IS NOT NULL;
-
-COMMENT ON TABLE mart.master_versiones_tipadas IS
-'Catálogo de versiones master con tipo derivado del tex (Planif Inicial / ABC / Cuatrimestral / Cierre mensual / Sin clasificar). Helper reusable para selección de versión vigente. Materializada en F-078.';
-
-
--- ===========================================================================
--- 2) Tabla helper: versión vigente al cierre anual.
+-- 1) Tabla helper: versión vigente al cierre anual.
 --    Para cada (obra, año, ámbito) elige la última versión CUAT/ABC con
 --    fec_efectiva ≤ corte.
 --    - corte = 31/12 si el año es pasado.
@@ -200,7 +162,7 @@ COMMENT ON TABLE mart.master_vigente_anual IS
 
 
 -- ===========================================================================
--- 3) Tabla de hecho: detalle anual de CP por tipología.
+-- 2) Tabla de hecho: detalle anual de CP por tipología.
 --    Una fila por (obra, año, tipología) con cp_real, cp_planificado y su
 --    desviación. Decenas de miles de filas, frente a los 29,8 M que había que
 --    recorrer cinco veces para obtenerlas.
@@ -212,7 +174,7 @@ WITH params AS (
 ),
 
 -- --------------------------------------------------------------------------
--- 3a) Último mes con coste real cargado (ambito_id=3) por (obra, año).
+-- 2a) Último mes con coste real cargado (ambito_id=3) por (obra, año).
 --     Define el extremo superior de la ventana cerrada para el año en curso.
 -- --------------------------------------------------------------------------
 ultimo_real AS (
@@ -226,7 +188,7 @@ ultimo_real AS (
 ),
 
 -- --------------------------------------------------------------------------
--- 3b) Corte temporal COMÚN a Plan y Real, por (obra, año).
+-- 2b) Corte temporal COMÚN a Plan y Real, por (obra, año).
 --     Construido sobre el universo (obra, año) de plan_mensual para cubrir
 --     también obras con Plan pero sin Real todavía.
 --       * año pasado   → 12
@@ -254,7 +216,7 @@ corte AS (
 ),
 
 -- --------------------------------------------------------------------------
--- 3c) REAL anual.
+-- 2c) REAL anual.
 --     Suma importes mensuales de coste real (ambito_id=3) sobre la ventana
 --     [enero .. mes_corte] de cada (obra, año).
 -- --------------------------------------------------------------------------
@@ -279,7 +241,7 @@ real_anual AS (
 ),
 
 -- --------------------------------------------------------------------------
--- 3d) PLAN anual.
+-- 2d) PLAN anual.
 --     Suma importes mensuales de coste planificado (ambito_id=8) restringido
 --     a la versión vigente anual de mart.master_vigente_anual.
 --     MISMA ventana [enero .. mes_corte] que real_anual.
@@ -310,7 +272,7 @@ plan_anual AS (
 ),
 
 -- --------------------------------------------------------------------------
--- 3e) Outer join entre real y plan para preservar partidas con solo uno
+-- 2e) Outer join entre real y plan para preservar partidas con solo uno
 --     de los dos lados.
 -- --------------------------------------------------------------------------
 detalle_partida AS (
@@ -331,7 +293,7 @@ detalle_partida AS (
 ),
 
 -- --------------------------------------------------------------------------
--- 3f) Mapping a tipología.
+-- 2f) Mapping a tipología.
 --
 -- Lógica en cascada:
 --   1) Si el subcapítulo es DEFINITORIO (CP.1..CP.4, CP.6, CP.9, CP.12),
@@ -413,7 +375,7 @@ COMMENT ON TABLE mart.fact_cp_tipologia IS
 
 
 -- ===========================================================================
--- 4) Las tres vistas, con EL MISMO NOMBRE Y LAS MISMAS COLUMNAS de siempre.
+-- 3) Las dos vistas, con EL MISMO NOMBRE Y LAS MISMAS COLUMNAS de siempre.
 --
 --    Existen para que nada de lo que ya consume estos datos tenga que
 --    cambiar: el `.pbix` del humano (Origen + Navegación a
@@ -421,22 +383,6 @@ COMMENT ON TABLE mart.fact_cp_tipologia IS
 --    Son un `SELECT` de columnas desnudas sobre su tabla: no queda ni un
 --    cálculo en tiempo de consulta.
 -- ===========================================================================
-CREATE OR REPLACE VIEW mart.v_master_versiones_tipadas AS
-SELECT
-    obra_id,
-    ambito_id,
-    version,
-    version_fec_creacion,
-    version_fec_efectiva,
-    version_descripcion,
-    version_tex,
-    tipo_master
-FROM mart.master_versiones_tipadas;
-
-COMMENT ON VIEW mart.v_master_versiones_tipadas IS
-'Catálogo de versiones master con tipo derivado del tex (Planif Inicial / ABC / Cuatrimestral / Cierre mensual / Sin clasificar). Desde F-078 es el envoltorio de mart.master_versiones_tipadas.';
-
-
 CREATE OR REPLACE VIEW mart.v_master_vigente_anual AS
 SELECT
     obra_id,

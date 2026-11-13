@@ -6,6 +6,9 @@ Flujo:
     1. Asegura schema mart (idempotente, vía PostgresClient auto-bootstrap).
     2. Ejecuta en orden los archivos SQL de sql/mart/:
         01_ddl.sql                       - DROP + CREATE mart.fact_seguimiento_mensual
+        01b_master_versiones.sql         - El ÚNICO catálogo de versiones master
+                                           (F-161) y lo que cuelga de él: el coste
+                                           por partida y el planificado de importe
         02_build_fact.sql                - TRUNCATE + INSERT con la lógica de comparativa
         03_agg_categoria.sql             - Pre-agregado CD/CI/CP por obra × mes × escenario
         04_view_periodificado.sql        - Tabla aux.periodificacion_partida + vista
@@ -13,9 +16,9 @@ Flujo:
         05_views_powerbi.sql             - Vistas v_pbi_* consumidas por Power BI
         05b_view_dim_partida_niveles.sql - Vista mart.v_pbi_dim_partida_niveles
                                            (DimPartida + nivel_1..6 para el visual árbol)
-        06_cp_tipologia.sql              - Detalle anual CP por tipología: las
-                                           TRES TABLAS (F-078) y las tres vistas
-                                           que las envuelven
+        06_cp_tipologia.sql              - Detalle anual CP por tipología: dos
+                                           tablas (F-078; el catálogo pasó a 01b
+                                           con F-161) y las vistas que las envuelven
 
 Cada sub-step se registra en logs con tiempo y filas procesadas.
 
@@ -60,7 +63,7 @@ class _SubStep:
     target_table: str | None = None
 
 
-#: Los siete ficheros SQL de `mart`, EN ORDEN, y de qué tabla se cuentan filas.
+#: Los ocho ficheros SQL de `mart`, EN ORDEN, y de qué tabla se cuentan filas.
 #:
 #: Vive fuera de `run()` a propósito, igual que en `build_compras_step`: es
 #: DATO, no lógica. Así se puede leer —y comprobar— sin abrir una conexión, que
@@ -68,6 +71,15 @@ class _SubStep:
 #: sub-paso nuevo cuenta sus filas.
 SUB_PASOS: tuple[_SubStep, ...] = (
     _SubStep(name="ddl", sql_file="01_ddl.sql"),
+    # F-161 (R7). ANTES de `build_fact`: `02_build_fact.sql` lee de aquí el
+    # catálogo de versiones (D11). Cuenta el catálogo: sin versiones no hay
+    # planificado en el hecho.
+    _SubStep(
+        name="master_versiones",
+        sql_file="01b_master_versiones.sql",
+        target_schema="mart",
+        target_table="master_versiones_tipadas",
+    ),
     _SubStep(
         name="build_fact",
         sql_file="02_build_fact.sql",
@@ -95,9 +107,10 @@ SUB_PASOS: tuple[_SubStep, ...] = (
         sql_file="05b_view_dim_partida_niveles.sql",
         # Vista (DimPartida + nivel_1..6 para el visual árbol), no cuenta filas
     ),
-    # F-078: deja de ser un fichero de solo vistas. Construye TRES TABLAS
-    # —`master_versiones_tipadas`, `master_vigente_anual` y `fact_cp_tipologia`—
-    # y las tres vistas que las envuelven con el nombre de siempre.
+    # F-078: deja de ser un fichero de solo vistas. Construye las tablas
+    # `master_vigente_anual` y `fact_cp_tipologia` y las vistas que las
+    # envuelven con el nombre de siempre. El catálogo `master_versiones_tipadas`,
+    # su tercera tabla hasta F-161, se construye ahora en `01b`.
     #
     # Cuenta el HECHO y no los dos helpers, por el mismo motivo por el que el
     # sub-paso `texto` de `compras` cuenta los comentarios y no el memo: sin
