@@ -9,8 +9,9 @@ El fixture crea una BASE NUEVA y la borra al terminar, como
 reales, un `raw` mínimo con los tipos de la ingesta (ids y fechas `integer`,
 cantidades `double precision`, texto `character varying`) y ejecuta los
 ficheros REALES: `stg/08_plan_mensual.sql` (compuesto como lo compone el step),
-`stg/10_master_versiones.sql`, `mart/01_ddl.sql`, `mart/01b_master_versiones.sql`
-y `mart/02_build_fact.sql`.
+`stg/10_master_versiones.sql`, `mart/01_ddl.sql`, `mart/01b_master_versiones.sql`,
+`mart/02_build_fact.sql`, `mart/06_cp_tipologia.sql` y `retenciones/05_fin_obra.sql`
+(este con un `raw.obr`/`raw.con`/`raw.obrctr` y un `cierre` mínimos).
 
 La obra A (100) tiene, en coste (ámbito 8):
 - v0 sin reparto (fuera, D6);
@@ -19,10 +20,15 @@ La obra A (100) tiene, en coste (ámbito 8):
 - v3 «CIERRE SEPTIEMBRE-26» con ancla y sin ningún `planif` (NINGUNO, la 0698 v24);
 - v4 con líneas y SIN cabecera (D5);
 - v5 con la cabecera DUPLICADA y sin ancla (D13);
+- v6 «PLANIFICACION CUATRIMESTRAL MAR-26» SIN reparto y posterior a la v2: es la
+  que ganaría en todo lo temporal si se quitara el filtro `tiene_reparto` (D4,
+  review pasada 1). Es la población real que el filtro protege;
 y en venta (ámbito 11) la v1 con reparto y la v3 sin él, las dos con el texto
 vacío (lo pone el de coste, como en `08`).
 
 La obra B (200) es la 0721: solo una v1 «CIERRE INICIAL_OBRA» sin reparto.
+La partida 4 de la obra A es de categoría CP, para que `fact_cp_tipologia` tenga
+planificado que perder si la vigencia anual eligiera la v6.
 """
 
 from __future__ import annotations
@@ -63,6 +69,14 @@ CREATE TABLE raw.obrparpre (ide integer, obride integer, paride integer, amb int
                             fas integer, can double precision, pre double precision,
                             planif varchar, totinc double precision,
                             impcoe double precision);
+CREATE SCHEMA retenciones; CREATE SCHEMA cierre;
+CREATE TABLE raw.obr (ide integer, garfecini integer, fecfinrea integer, fecfinpre integer);
+CREATE TABLE raw.con (ide integer, emp integer, cod varchar, res varchar, est integer);
+CREATE TABLE raw.obrctr (obride integer, fecinigar integer, fecreafin integer,
+                         fecprorec integer, fecprefin integer, plaret integer,
+                         plagar integer);
+CREATE TABLE cierre.fact_cierre_mensual (obra_id integer, anio_mes date,
+                                         ejecutado_mes numeric);
 """
 
 #: (ide, obra, ámbito, versión, plafec, fec, res, tex)
@@ -73,6 +87,7 @@ CABECERAS = [
     (4, OBRA_A, 8, 3, 20260901, 20260905, "", "CIERRE SEPTIEMBRE-26"),
     (5, OBRA_A, 8, 5, 0, 20261001, "Vieja", "CIERRE VIEJO"),
     (6, OBRA_A, 8, 5, 0, 20261002, "Nueva", "CIERRE OCTUBRE-26"),
+    (10, OBRA_A, 8, 6, 0, 20260315, "Version 6", "PLANIFICACION CUATRIMESTRAL MAR-26"),
     (7, OBRA_A, 11, 1, 20250201, 20250110, "Venta 1", ""),
     (8, OBRA_A, 11, 3, 20260901, 20260905, "Venta 3", ""),
     (9, OBRA_B, 8, 1, 0, 20250301, "Version 1", "CIERRE INICIAL_OBRA"),
@@ -85,10 +100,12 @@ LINEAS = [
     (OBRA_A, 2, 8, 1, 0.0, 10.0, None),
     (OBRA_A, 1, 8, 2, 2.0, 110.0, "0.2|0.6|1"),
     (OBRA_A, 2, 8, 2, 3.0, 10.0, None),
+    (OBRA_A, 4, 8, 2, 1.0, 80.0, "0.5|1"),
     (OBRA_A, 1, 8, 3, 2.0, 120.0, None),
     (OBRA_A, 2, 8, 3, 3.0, 10.0, None),
     (OBRA_A, 1, 8, 4, 1.0, 130.0, "1"),
     (OBRA_A, 1, 8, 5, 1.0, 140.0, None),
+    (OBRA_A, 1, 8, 6, 1.0, 150.0, None),
     (OBRA_A, 1, 11, 1, 2.0, 150.0, "0.5|1"),
     (OBRA_A, 1, 11, 3, 2.0, 160.0, None),
     (OBRA_B, 3, 8, 1, 10.0, 1000.0, None),
@@ -157,13 +174,26 @@ def _cargar(c) -> None:
         "INSERT INTO stg.partidas (partida_id, obra_id, codigo_partida, descripcion_corta, "
         "categoria, ruta_capitulos) VALUES "
         "(1, 100, 'P1', 'PARTIDA 1', 'CD', 'C1 > P1'), (2, 100, 'P2', 'PARTIDA 2', 'CD', 'C1 > P2'),"
-        "(3, 200, 'P3', 'PARTIDA 3', 'CI', 'C2 > P3')"
+        "(3, 200, 'P3', 'PARTIDA 3', 'CI', 'C2 > P3'), (4, 100, 'P4', 'PARTIDA 4', 'CP', 'C1 > P4')"
     )
+    c.execute("INSERT INTO raw.obr VALUES (100, 0, 0, 0), (200, 0, 0, 0)")
+    c.execute("INSERT INTO raw.con VALUES (100, 1, '0698', 'OBRA A', 1), (200, 1, '0721', 'OBRA B', 1)")
     c.execute(componer_sql_tramo(_stg("08_plan_mensual.sql"), [OBRA_A, OBRA_B]))
     c.execute(_stg("10_master_versiones.sql"))
     for nombre in ("01_ddl.sql", "01b_master_versiones.sql", "02_build_fact.sql",
                    "06_cp_tipologia.sql"):
         c.execute(_mart(nombre))
+    c.execute(_funcion_fecha_de_retenciones())
+    c.execute((DIRECTORIO_SQL_STG.parent / "retenciones" / "05_fin_obra.sql").read_text(
+        encoding="utf-8"))
+
+
+def _funcion_fecha_de_retenciones() -> str:
+    """`retenciones.fn_sigrid_date` tal cual está en `00_setup.sql` (solo esa función)."""
+    texto = (DIRECTORIO_SQL_STG.parent / "retenciones" / "00_setup.sql").read_text(
+        encoding="utf-8")
+    inicio = texto.index("CREATE OR REPLACE FUNCTION retenciones.fn_sigrid_date")
+    return texto[inicio:texto.index("END $$;", inicio) + len("END $$;")]
 
 
 def _catalogo(c) -> dict[tuple[int, int, int], dict]:
@@ -179,9 +209,9 @@ def test_f161_r1_el_universo_y_la_v0_fuera(conexion) -> None:
     claves = set(_catalogo(conexion))
     assert claves == {
         (OBRA_A, 8, 1), (OBRA_A, 8, 2), (OBRA_A, 8, 3), (OBRA_A, 8, 4), (OBRA_A, 8, 5),
-        (OBRA_A, 11, 1), (OBRA_A, 11, 3), (OBRA_B, 8, 1),
+        (OBRA_A, 8, 6), (OBRA_A, 11, 1), (OBRA_A, 11, 3), (OBRA_B, 8, 1),
     }
-    assert conexion.execute("SELECT count(*) FROM stg.master_versiones").fetchone() == (8,)
+    assert conexion.execute("SELECT count(*) FROM stg.master_versiones").fetchone() == (9,)
 
 
 # --- R2 · la marca por línea ---------------------------------------------------
@@ -199,7 +229,7 @@ def test_f161_r2_la_marca_por_linea_es_dejar_filas(conexion) -> None:
         "WHERE tiene_reparto ORDER BY 1, 2, 3, 4"
     ).fetchall()
     # La v4 tiene `planif` pero no cabecera: `08` no la reparte.
-    assert con == [(OBRA_A, 8, 1, 1), (OBRA_A, 8, 2, 1), (OBRA_A, 11, 1, 1)]
+    assert con == [(OBRA_A, 8, 1, 1), (OBRA_A, 8, 2, 1), (OBRA_A, 8, 2, 4), (OBRA_A, 11, 1, 1)]
     assert conexion.execute(
         "SELECT count(*) FROM stg.v_master_lineas WHERE version = 0"
     ).fetchone() == (0,)
@@ -423,3 +453,63 @@ def test_f161_r10_master_vigente_anual_solo_con_reparto(conexion) -> None:
     ).fetchall()
     assert fuera == []
     assert conexion.execute("SELECT count(*) FROM mart.master_vigente_anual").fetchone()[0] > 0
+
+
+# --- R10 · D4: una Cuatrimestral SIN reparto no rige nada temporal ---------------
+#
+# Review pasada 1: sin esta versión la sandbox seguía en verde quitando el filtro
+# `tiene_reparto` de 02, 06 y 01b, porque todas las versiones sin reparto eran
+# cierres y caían antes por `tipo_master`. La v6 es Cuatrimestral, sin `planif`
+# y posterior a la v2: sin el filtro, ganaría en los cuatro sitios.
+
+
+def test_f161_r10_la_v6_es_cuatrimestral_sin_reparto(conexion) -> None:
+    v6 = _catalogo(conexion)[(OBRA_A, 8, 6)]
+    assert (v6["tipo_master"], v6["tiene_reparto"], v6["reparto"]) == (
+        "Cuatrimestral", False, "NINGUNO",
+    )
+    assert v6["version_fec_efectiva"] == date(2026, 3, 15)
+
+
+def test_f161_r10_d4_el_mensual_no_usa_la_cuatrimestral_sin_reparto(conexion) -> None:
+    filas = conexion.execute(
+        "SELECT DISTINCT anio_mes, version_master FROM mart.fact_seguimiento_mensual "
+        "WHERE obra_id = %s AND ambito_id = 8 AND tipo_dato = 'PLANIFICADO' ORDER BY 1",
+        (OBRA_A,),
+    ).fetchall()
+    assert filas == [
+        (date(2025, 2, 1), 1), (date(2025, 3, 1), 1),
+        (date(2026, 2, 1), 2), (date(2026, 3, 1), 2), (date(2026, 4, 1), 2),
+    ]
+
+
+def test_f161_r10_d4_la_vigencia_anual_y_cp_tipologia_siguen_en_la_v2(conexion) -> None:
+    assert conexion.execute(
+        "SELECT version FROM mart.master_vigente_anual "
+        "WHERE obra_id = %s AND anio = 2026 AND ambito_id = 8",
+        (OBRA_A,),
+    ).fetchall() == [(2,)]
+    plan = conexion.execute(
+        "SELECT sum(cp_planificado) FROM mart.fact_cp_tipologia WHERE obra_id = %s AND anio = 2026",
+        (OBRA_A,),
+    ).fetchone()[0]
+    assert plan == Decimal("80.00"), "el CP planificado de 2026 es el de la v2"
+
+
+def test_f161_r10_d4_el_fin_de_obra_sigue_en_la_v2(conexion) -> None:
+    fila = conexion.execute(
+        "SELECT version_cuatrimestral, ultimo_mes_planificado, fuente_fin_obra "
+        "FROM retenciones.fin_obra WHERE obra_id = %s",
+        (OBRA_A,),
+    ).fetchone()
+    assert fila == (2, date(2026, 4, 1), "ULTIMO_CUATRIMESTRAL_MAS_1_MES")
+
+
+def test_f161_r14_d4_en_marzo_el_importe_es_la_v6_y_la_temporal_la_v2(conexion) -> None:
+    fila = conexion.execute(
+        "SELECT version_importe, tipo_master_importe, version_temporal, tipo_master_temporal "
+        "FROM mart.master_importe_mensual WHERE obra_id = %s AND ambito_id = 8 "
+        "AND anio_mes = DATE '2026-03-01'",
+        (OBRA_A,),
+    ).fetchone()
+    assert fila == (6, "Cuatrimestral", 2, "Cuatrimestral")
