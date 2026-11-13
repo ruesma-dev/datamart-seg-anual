@@ -256,17 +256,20 @@ def preparar(
 
 def test_f015_r1_campania_cuenta_muertos_y_supervivientes(tmp_path: Path) -> None:
     _, alcance = preparar(tmp_path)
-    ejecutor = EjecutorFalso([MUERTO, SUPERVIVIENTE, MUERTO])
+    # Orden de generación: negacion y comparacion (línea 2), True y False.
+    ejecutor = EjecutorFalso([MUERTO, MUERTO, SUPERVIVIENTE, MUERTO])
     progreso: list[str] = []
 
     informe = ejecutar_campania(
         alcance, ejecutor, timeout_s=5, raiz=str(tmp_path), eco=progreso.append
     )
 
-    assert informe.generados == 3  # `a > b`, `True` y `False`
-    assert informe.evaluados == 3
-    assert ejecutor.llamadas == 3
-    assert informe.muertos == 2
+    # Desde el arnés 1.9.0 (F-026 del taller) el `if a > b:` da también el
+    # mutante `negacion` (`if not (a > b):`): FUENTE genera 4 mutantes, no 3.
+    assert informe.generados == 4  # negacion y `a > b`, `True` y `False`
+    assert informe.evaluados == 4
+    assert ejecutor.llamadas == 4
+    assert informe.muertos == 3
     assert len(informe.supervivientes) == 1
     assert informe.supervivientes[0].mutado == "return False"
     assert informe.timeouts == []
@@ -278,9 +281,9 @@ def test_f015_r1_campania_cuenta_muertos_y_supervivientes(tmp_path: Path) -> Non
     assert progreso[0].startswith(MARCA_LINEA_BASE)
     # Y el avance, ya sin las líneas de base, se numera desde el primero.
     avance = [linea for linea in progreso if not linea.startswith(MARCA_LINEA_BASE)]
-    assert len(avance) == 3
-    assert avance[0].startswith("[1/3]")
-    assert avance[-1].startswith("[3/3]")
+    assert len(avance) == 4
+    assert avance[0].startswith("[1/4]")
+    assert avance[-1].startswith("[4/4]")
 
 
 def test_f015_r1_no_genera_mutantes_fuera_del_alcance(tmp_path: Path) -> None:
@@ -289,9 +292,14 @@ def test_f015_r1_no_genera_mutantes_fuera_del_alcance(tmp_path: Path) -> None:
 
     informe = ejecutar_campania(alcance, ejecutor, timeout_s=5, raiz=str(tmp_path))
 
-    assert informe.generados == 1
-    assert informe.mutantes_evaluados[0].linea == 2
-    assert informe.mutantes_evaluados[0].mutado == "if a >= b:"
+    # Desde el arnés 1.9.0 (F-026 del taller) el `if a > b:` da también el
+    # mutante `negacion` (`if not (a > b):`): la línea 2 da 2 mutantes, no 1.
+    assert informe.generados == 2
+    assert {m.linea for m in informe.mutantes_evaluados} == {2}
+    assert {m.mutado for m in informe.mutantes_evaluados} == {
+        "if not (a > b):",
+        "if a >= b:",
+    }
 
 
 def test_f015_r1_exit_code_0_sin_supervivientes_y_1_con_ellos(
@@ -387,7 +395,9 @@ def test_f015_r1_muestreo_reproducible_con_semilla(tmp_path: Path) -> None:
         semilla=20260809,
     )
 
-    assert uno.generados == 3
+    # Desde el arnés 1.9.0 (F-026 del taller) el `if a > b:` da también el
+    # mutante `negacion` (`if not (a > b):`): FUENTE genera 4 mutantes, no 3.
+    assert uno.generados == 4
     assert uno.evaluados == 2
     assert uno.muestreado is True
     assert [m.descripcion() for m in uno.mutantes_evaluados] == [
@@ -403,11 +413,13 @@ def test_f015_r1_un_tope_que_no_recorta_no_es_muestreo(tmp_path: Path) -> None:
         EjecutorFalso([MUERTO]),
         timeout_s=5,
         raiz=str(tmp_path),
-        max_mutantes=3,  # justo los que hay: no se descarta ninguno
+        max_mutantes=4,  # justo los que hay: no se descarta ninguno
     )
 
-    assert informe.generados == 3
-    assert informe.evaluados == 3
+    # Desde el arnés 1.9.0 (F-026 del taller) el `if a > b:` da también el
+    # mutante `negacion` (`if not (a > b):`): FUENTE genera 4 mutantes, no 3.
+    assert informe.generados == 4
+    assert informe.evaluados == 4
     assert informe.muestreado is False
 
 
@@ -487,7 +499,9 @@ def test_f015_r3_cada_superviviente_lleva_seccion_de_analisis(tmp_path: Path) ->
     escribir_informe(informe, destino)
     texto = destino.read_text(encoding="utf-8")
 
-    assert len(informe.supervivientes) == 3
+    # Desde el arnés 1.9.0 (F-026 del taller) el `if a > b:` da también el
+    # mutante `negacion` (`if not (a > b):`): FUENTE genera 4 mutantes, no 3.
+    assert len(informe.supervivientes) == 4
     assert texto.count("Análisis") == len(informe.supervivientes)
     assert texto.count("PENDIENTE") >= len(informe.supervivientes)
 
@@ -527,10 +541,12 @@ def test_f015_r7_timeout_no_cuelga_la_campania(tmp_path: Path) -> None:
 
     informe = ejecutar_campania(alcance, ejecutor, timeout_s=1, raiz=str(tmp_path))
 
-    assert ejecutor.llamadas == 3, "la campaña siguió con los mutantes restantes"
+    # Desde el arnés 1.9.0 (F-026 del taller) el `if a > b:` da también el
+    # mutante `negacion` (`if not (a > b):`): FUENTE genera 4 mutantes, no 3.
+    assert ejecutor.llamadas == 4, "la campaña siguió con los mutantes restantes"
     assert len(informe.timeouts) == 1
     assert informe.supervivientes == [], "un timeout no es un superviviente"
-    assert informe.muertos == 2
+    assert informe.muertos == 3
 
 
 class Proceso:
@@ -587,7 +603,10 @@ def test_f015_r7_el_ejecutor_no_deja_que_pytest_tumbe_la_campania(
     assert "pytest" in registro["orden"]
 
 
-def test_f015_r7_mutante_que_no_compila_cuenta_como_muerto(tmp_path: Path) -> None:
+def test_f015_r7_mutante_que_no_compila_es_indeterminado(tmp_path: Path) -> None:
+    # Antes `test_f015_r7_mutante_que_no_compila_cuenta_como_muerto`. Desde el
+    # arnés 1.9.0 (F-023 del taller) el único criterio de muerte es el código 1:
+    # lo que no compila no lo ha cazado ningún test, así que es INDETERMINADO.
     fichero, alcance = preparar(tmp_path, fuente="x = 1 + 1\n")
     roto = Mutante(
         fichero="modulo_x.py",
@@ -605,7 +624,8 @@ def test_f015_r7_mutante_que_no_compila_cuenta_como_muerto(tmp_path: Path) -> No
         alcance, ejecutor, timeout_s=5, raiz=str(tmp_path), mutantes=[roto]
     )
 
-    assert ejecutor.llamadas == 0, "un mutante que no compila ya está muerto"
-    assert informe.muertos == 1
+    assert ejecutor.llamadas == 0, "un mutante que no compila no se juzga"
+    assert informe.muertos == 0
+    assert [m.mutado for m in informe.indeterminados] == ["x = 1 +"]
     assert informe.supervivientes == []
     assert fichero.read_text(encoding="utf-8") == "x = 1 + 1\n"

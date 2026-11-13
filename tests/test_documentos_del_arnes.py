@@ -167,3 +167,18 @@ def test_ninguna_regla_de_campania_es_puerta_automatica() -> None:
 
     for regla in ("RM1", "RM2", "RM3", "RM4", "RM5", "RM6"):
         assert regla not in portero, f"{regla} no puede ser puerta automática"
+
+
+# --- F-055 R1: el implementer no cierra la feature ---------------------------
+
+
+def test_f055_r1_el_implementer_no_cierra_y_done_llega_con_el_ok_del_humano() -> None:
+    """Coherente con `leader.md` de F-042: `human_review` y luego el OK."""
+    texto = " ".join(_texto(IMPLEMENTER).split())
+
+    assert "eso ocurre tras el APPROVED del reviewer" not in texto, (
+        "frase de antes de F-042: el APPROVED lleva a `human_review`, no a `done`"
+    )
+    assert "Nunca cierras la feature" in texto
+    assert "`human_review`" in texto
+    assert "solo con el OK del humano" in texto

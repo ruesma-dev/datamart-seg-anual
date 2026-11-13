@@ -31,7 +31,14 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from harness.rigor import RUTA_FEATURES, RUTA_RIGOR, cargar_rigor, topes_tamano
+from harness.rigor import (
+    RUTA_FEATURES,
+    RUTA_RIGOR,
+    cargar_features,
+    cargar_rigor,
+    nivel_de_feature,
+    topes_tamano,
+)
 
 ETIQUETA = "PUERTA TAMAÑO"
 
@@ -56,6 +63,16 @@ class Exceso:
 
     def descripcion(self) -> str:
         return f"{self.ruta}: {self.lineas} líneas > tope {self.tope}"
+
+
+def nivel_de(feature: str, rigor: dict, raiz: str = ".") -> str | None:
+    """Nivel de `feature`; `None` si no tiene ficha: mandan los topes globales."""
+    try:
+        fichas = cargar_features(Path(raiz) / RUTA_FEATURES)
+    except (ValueError, AttributeError):
+        return None  # lo denuncia la sección 3 de init.sh, no esta puerta
+    ficha = next((f for f in fichas if f.get("id") == feature), None)
+    return None if ficha is None else nivel_de_feature(ficha, rigor)
 
 
 def contar_lineas(ruta: Path) -> int:
@@ -165,7 +182,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{ETIQUETA}: N/A ({error})")
         return 2
 
-    topes = topes_tamano(rigor)
+    nivel = nivel_de(opciones.feature, rigor, raiz=opciones.raiz)
+    topes = topes_tamano(rigor, nivel)
     if not topes:
         print(
             f"{ETIQUETA}: N/A (harness/rigor.json no declara el bloque 'tamano': "
@@ -176,7 +194,11 @@ def main(argv: list[str] | None = None) -> int:
     slug = slug_de_feature(opciones.feature, raiz=opciones.raiz)
     excesos = medir(opciones.feature, slug, topes, raiz=opciones.raiz)
     if excesos:
-        print(f"{ETIQUETA}: {opciones.feature} se pasa de los topes:", file=sys.stderr)
+        print(
+            f"{ETIQUETA}: {opciones.feature} (nivel {nivel or 'sin ficha'}) se pasa "
+            "de los topes:",
+            file=sys.stderr,
+        )
         for exceso in excesos:
             print(f"    {exceso.descripcion()}", file=sys.stderr)
         print(

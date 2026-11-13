@@ -14,7 +14,17 @@ el paralelismo se monta por fuera.
    va en subprocesos, así que el GIL no pinta nada.
 4. Fusiona los parciales en un informe idéntico al de la campaña en serie
    salvo la fecha y la fila «Tiempo total».
-5. `finally`: retira los worktrees pase lo que pase.
+5. Repasa EN SERIE, sobre uno solo de los worktrees, los mutantes que quedaron
+   en `timeout`, y sustituye ese no-veredicto por el de verdad.
+6. `finally`: retira los worktrees pase lo que pase.
+
+Sobre el paso 5, que es contraintuitivo hasta que se mide: con N suites
+compitiendo, el reloj de un mutante mide la carga de la máquina, no al mutante.
+Medido el 2026-09-02 sobre una suite de 38,7 s, con 16 workers cada pase subía a
+131,6 s contra un tope de 120 s; tres campañas de la misma feature y el mismo
+commit dieron 15, 27 y 0 timeouts, sobre mutantes distintos cada vez, y algún
+mutante «muerto» en una salía `timeout` en la siguiente. Un `timeout` de una
+campaña concurrente no es un veredicto: es un reintento pendiente.
 
 El árbol principal no se muta NUNCA en modo paralelo, y por eso se exige que
 esté limpio: los worktrees se crean desde `HEAD` y con cambios sin commitear
@@ -38,7 +48,8 @@ publicar un cero de supervivientes que nadie ha medido.
   ningún worktree y los workers las heredan (ver `volcar_variables`). El
   fichero NO se copia a ninguna parte. Cualquier OTRO fichero no versionado
   que la suite necesite —datos locales, certificados, un fixture generado—
-  sigue sin existir en el worktree, y ahí solo hay detección.
+  se copia a cada worktree si se declara en `mutacion.ficheros_no_versionados`
+  (F-023, ver `copiar_no_versionados`); sin declararlo, solo hay detección.
 - **Detached HEAD**: el worktree no está en ninguna rama, así que un test que
   lea `git branch --show-current` recibe cadena vacía. DETECTADO, no resuelto.
 
@@ -61,13 +72,16 @@ import tempfile
 import threading
 import time
 from collections.abc import Callable, Iterator
+from dataclasses import replace
 from pathlib import Path
 from types import TracebackType
 
 from harness.alcance import Alcance
 from harness.mutacion import (
     MARCA_LINEA_BASE,
+    SELECCION_DEGRADADA,
     TIMEOUT_POR_DEFECTO,
+    BaseRota,
     Centinela,
     EjecutorPytest,
     InformeMutacion,
@@ -75,8 +89,12 @@ from harness.mutacion import (
     ejecutar_campania,
     ejecutor_para,
     generar_mutantes,
+    medir_mapas,
+    mutantes_por_fichero,
     restauracion_ante_senales,
     restaurar_desde_centinela,
+    seleccionar,
+    timeout_de_linea_base,
 )
 from harness.mutacion import (
     # privado de `harness.mutacion` a sabiendas: la campaña paralela tiene que
@@ -84,6 +102,7 @@ from harness.mutacion import (
     # saltos de línea) o los mutantes generados no serían los mismos.
     _leer as _leer_fuente,
 )
+from harness.rigor import ReglaMuestreo
 from harness.servicios import Servicio, interprete, servicio_de_ruta
 
 #: Fábrica de ejecutores: `(fichero, raíz del worker) -> ejecutor`.
@@ -123,8 +142,12 @@ def fusionar(
     max_mutantes: int | None = None,
     semilla: int | None = None,
     workers: int | None = None,
+    por_fichero: dict[str, int] | None = None,
 ) -> InformeMutacion:
     """Funde los informes de los workers en el informe único de la campaña.
+
+    `por_fichero` (F-026) es el del coordinador, que es quien generó: el de
+    cada worker solo cuenta su partición.
 
     Los totales se suman y las listas se reordenan por la clave estable, de
     forma que el resultado no delata en qué worker cayó cada mutante. Los
@@ -144,12 +167,21 @@ def fusionar(
         muestreado=muestreado,
         max_mutantes=max_mutantes,
         semilla=semilla,
+        por_fichero=None if por_fichero is None else dict(por_fichero),
     )
-    for atributo in ("supervivientes", "timeouts", "mutantes_evaluados", "base_rota"):
+    for atributo in (
+        "supervivientes", "timeouts", "mutantes_evaluados", "base_rota", "indeterminados"
+    ):
         juntos: list[Mutante] = []
         for parcial in parciales:
             juntos.extend(getattr(parcial, atributo))
         setattr(informe, atributo, sorted(juntos, key=clave_estable))
+    # F-023 (R13): los códigos de salida se unen (cada mutante cae en un solo
+    # worker, así que no hay claves que se pisen) y los restos de bytecode se
+    # suman en el orden de los workers.
+    for parcial in parciales:
+        informe.codigos.update(parcial.codigos)
+        informe.pyc_no_borrados.extend(parcial.pyc_no_borrados)
     # Todos los workers nacen del MISMO `HEAD`, así que el primero que lo sepa
     # habla por todos; y cada uno midió su propia línea base, en su worktree,
     # así que sus tiempos se juntan en vez de pisarse (R10–R12). Sin parciales
@@ -176,7 +208,105 @@ def fusionar(
     avisos = [parcial.aviso_base for parcial in parciales if parcial.aviso_base]
     if avisos:
         informe.aviso_base = avisos[0]
+    _fusionar_seleccion(informe, parciales)
     return informe
+
+
+def _fusionar_seleccion(informe: InformeMutacion, parciales: list[InformeMutacion]) -> None:
+    """Lo de la selección de tests (F-019, R29): podados y contadores, sumados.
+
+    `degradada` en cuanto UN worker degradó (otro HEAD, por ejemplo): sus
+    mutantes se juzgaron con la suite entera y el informe tiene que decirlo.
+    """
+    informe.podados = sorted(
+        (m for parcial in parciales for m in parcial.podados), key=clave_estable
+    )
+    modos = [parcial.seleccion for parcial in parciales if parcial.seleccion is not None]
+    if SELECCION_DEGRADADA in modos:
+        informe.seleccion = SELECCION_DEGRADADA
+    elif modos:
+        informe.seleccion = modos[0]
+    for parcial in parciales:
+        informe.motivos_degradado.update(parcial.motivos_degradado)
+        informe.segundos_mapa.update(parcial.segundos_mapa)
+        informe.tests_en_suite.update(parcial.tests_en_suite)
+        informe.sha_mapa = informe.sha_mapa or parcial.sha_mapa
+        informe.tamanos_subconjunto.extend(parcial.tamanos_subconjunto)
+        informe.revalidados += parcial.revalidados
+        informe.muertos_al_revalidar += parcial.muertos_al_revalidar
+        informe.subconjuntos_descartados += parcial.subconjuntos_descartados
+        informe.segundos_suite_entera += parcial.segundos_suite_entera
+        informe.juzgados_suite_entera += parcial.juzgados_suite_entera
+
+
+def reemplazar_timeouts(
+    informe: InformeMutacion, reintento: InformeMutacion
+) -> InformeMutacion:
+    """Reparte los mutantes repasados en serie según su veredicto de verdad.
+
+    `informe` es el de la campaña paralela; `reintento`, el que devuelve volver a
+    evaluar SIN concurrencia los mutantes que quedaron en `timeout`. Se cambia
+    únicamente **cómo se reparten**: `generados` y `mutantes_evaluados` no se
+    tocan —nadie se ha evaluado dos veces ni ha desaparecido nadie— y las listas
+    se reordenan con `clave_estable`, igual que hace `fusionar`, para que el
+    informe no delate en qué orden se repasó.
+
+    Los segundos se suman: el repaso cuesta minutos reales y esconderlos falsea
+    la media por mutante, que es justo la señal con la que `CHECKPOINTS.md`
+    detecta una campaña que no midió lo que dice.
+
+    Función pura: no toca disco, ni git, ni el reloj.
+    """
+    if not informe.timeouts:
+        return informe
+
+    # El código del repaso pisa al «timeout» de la campaña; el que muere en el
+    # repaso deja de tener código, como cualquier muerto (F-023, R13).
+    repasados = {clave_estable(m) for m in informe.timeouts}
+    codigos = {
+        clave: codigo for clave, codigo in informe.codigos.items() if clave not in repasados
+    }
+    codigos.update(reintento.codigos)
+    corregido = replace(
+        informe,
+        muertos=informe.muertos + reintento.muertos,
+        supervivientes=sorted(
+            [*informe.supervivientes, *reintento.supervivientes], key=clave_estable
+        ),
+        timeouts=sorted(reintento.timeouts, key=clave_estable),
+        # Hasta F-023 la base rota del repaso se perdía: el mutante no salía
+        # en ninguna lista y la campaña seguía pareciendo fiable.
+        base_rota=sorted([*informe.base_rota, *reintento.base_rota], key=clave_estable),
+        indeterminados=sorted(
+            [*informe.indeterminados, *reintento.indeterminados], key=clave_estable
+        ),
+        codigos=codigos,
+        pyc_no_borrados=[*informe.pyc_no_borrados, *reintento.pyc_no_borrados],
+        mutantes_evaluados=list(informe.mutantes_evaluados),
+        segundos=informe.segundos + reintento.segundos,
+        timeouts_repasados=len(informe.timeouts),
+        # F-019 (R29): el repaso juzga con el mismo mapa; lo suyo se suma. Un
+        # timeout nunca es podado, pero se conserva lo que traiga, por si acaso.
+        podados=sorted([*informe.podados, *reintento.podados], key=clave_estable),
+        tamanos_subconjunto=[*informe.tamanos_subconjunto, *reintento.tamanos_subconjunto],
+        revalidados=informe.revalidados + reintento.revalidados,
+        muertos_al_revalidar=informe.muertos_al_revalidar + reintento.muertos_al_revalidar,
+        subconjuntos_descartados=(
+            informe.subconjuntos_descartados + reintento.subconjuntos_descartados
+        ),
+        segundos_suite_entera=informe.segundos_suite_entera + reintento.segundos_suite_entera,
+        juzgados_suite_entera=informe.juzgados_suite_entera + reintento.juzgados_suite_entera,
+        motivos_degradado={**informe.motivos_degradado, **reintento.motivos_degradado},
+    )
+    if reintento.seleccion == SELECCION_DEGRADADA:
+        corregido.seleccion = SELECCION_DEGRADADA
+    if reintento.base_rota and corregido.aviso_base is None:
+        corregido.aviso_base = reintento.aviso_base or (
+            f"{len(reintento.base_rota)} mutante(s) del repaso se juzgaron con la "
+            "suite rota por causas ajenas a la mutación: no cuentan ni como "
+            "muertos ni como supervivientes."
+        )
+    return corregido
 
 
 # --- Worktrees desechables ---------------------------------------------------
@@ -372,6 +502,27 @@ def volcar_variables(raiz: str = ".", fichero: str = FICHERO_ENTORNO) -> list[st
     return anadidas
 
 
+def copiar_no_versionados(raiz: str, rutas_worktree: list[str], ficheros: list[str]) -> None:
+    """Copia lo no versionado que se declaró a cada worktree (R16 de F-023).
+
+    Misma ruta relativa; un fichero con `copy2` y una carpeta con `copytree`.
+    El `.env` se salta SIEMPRE (R18): sus variables ya llegan por
+    `volcar_variables`, y copiarlo dejaría credenciales en el temp. La copia
+    vive dentro del worktree y se retira con él.
+    """
+    for relativa in ficheros:
+        if Path(relativa).name == FICHERO_ENTORNO:
+            continue
+        origen = Path(raiz) / relativa
+        for worktree in rutas_worktree:
+            destino = Path(worktree) / relativa
+            if origen.is_dir():
+                shutil.copytree(origen, destino, dirs_exist_ok=True)
+            else:
+                destino.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(origen, destino)
+
+
 # --- Piezas del coordinador --------------------------------------------------
 
 
@@ -410,20 +561,8 @@ def resolver_interpretes(
     return resueltos
 
 
-def generar_y_muestrear(
-    alcance: Alcance,
-    raiz: str = ".",
-    max_mutantes: int | None = None,
-    semilla: int | None = None,
-) -> tuple[list[Mutante], int, bool]:
-    """Genera los mutantes del alcance y aplica el muestreo UNA sola vez.
-
-    Devuelve `(mutantes a evaluar, generados, muestreado)`. Reproduce paso por
-    paso lo que hace `ejecutar_campania` en serie —mismo orden de ficheros,
-    misma lectura sin traducir saltos de línea, mismo `random.Random(semilla)`
-    sobre la misma lista— porque de esa igualdad depende que el muestreo elija
-    exactamente los mismos mutantes que la campaña en serie.
-    """
+def generar_del_alcance(alcance: Alcance, raiz: str = ".") -> list[Mutante]:
+    """Todos los mutantes del alcance, leídos y ordenados como en serie."""
     base = Path(raiz)
     mutantes: list[Mutante] = []
     for fichero in alcance.ficheros():
@@ -432,7 +571,44 @@ def generar_y_muestrear(
             mutantes.extend(
                 generar_mutantes(_leer_fuente(ruta), alcance.lineas[fichero], fichero)
             )
+    return mutantes
 
+
+def generar_y_seleccionar(
+    alcance: Alcance, raiz: str, regla: ReglaMuestreo, semilla: int | None
+) -> tuple[list[Mutante], int, int, int | None]:
+    """`(elegidos, generados, candidatos, tope)` con la regla de F-058 (R8).
+
+    Llama a la misma `seleccionar` que la campaña en serie sobre la misma lista:
+    de esa igualdad depende que las dos elijan los mismos mutantes.
+    """
+    mutantes = generar_del_alcance(alcance, raiz)
+    elegidos, candidatos, limite = seleccionar(mutantes, regla, semilla)
+    return (elegidos, len(mutantes), candidatos, limite)
+
+
+def generar_y_muestrear(
+    alcance: Alcance,
+    raiz: str = ".",
+    max_mutantes: int | None = None,
+    semilla: int | None = None,
+    regla: ReglaMuestreo | None = None,
+) -> tuple[list[Mutante], int, bool]:
+    """Genera los mutantes del alcance y aplica el muestreo UNA sola vez.
+
+    Devuelve `(mutantes a evaluar, generados, muestreado)`. Reproduce paso por
+    paso lo que hace `ejecutar_campania` en serie —mismo orden de ficheros,
+    misma lectura sin traducir saltos de línea, mismo `random.Random(semilla)`
+    sobre la misma lista— porque de esa igualdad depende que el muestreo elija
+    exactamente los mismos mutantes que la campaña en serie. Con `regla`
+    (F-058) elige `seleccionar` y `max_mutantes` no pinta nada.
+    """
+    if regla is not None:
+        elegidos, generados, candidatos, _ = generar_y_seleccionar(
+            alcance, raiz, regla, semilla
+        )
+        return (elegidos, generados, len(elegidos) < candidatos)
+    mutantes = generar_del_alcance(alcance, raiz)
     generados = len(mutantes)
     if max_mutantes is not None and generados > max_mutantes:
         sorteo = random.Random(semilla)
@@ -453,6 +629,32 @@ def renumerar(linea: str, indice: int, total: int) -> str:
     """
     resto = linea.split("] ", 1)[1] if linea.startswith("[") and "] " in linea else linea
     return f"[{indice}/{total}] {resto}"
+
+
+def eco_del_repaso(
+    eco: Callable[[str], None] | None, total: int
+) -> Callable[[str], None] | None:
+    """Eco del repaso en serie: numeración propia y marca `repaso` delante.
+
+    La numeración de la campaña ya se cerró cuando el repaso empieza, así que
+    seguir contando sobre ella daría un `[i/n]` fuera de rango. El repaso cuenta
+    lo suyo, y la marca deja ver por pantalla que eso ya no es la campaña. Las
+    líneas de la línea base pasan tal cual, como en `eco_compartido`: no son
+    mutantes y numerarlas descuadraría el `[i/n]`.
+    """
+    if eco is None:
+        return None
+    hechos = 0
+
+    def _eco(linea: str) -> None:
+        nonlocal hechos
+        if linea.startswith(MARCA_LINEA_BASE):
+            eco(f"repaso {linea}")
+            return
+        hechos += 1
+        eco(f"repaso {renumerar(linea, hechos, total)}")
+
+    return _eco
 
 
 class _ParticionCancelable:
@@ -493,8 +695,21 @@ def ejecutar_campania_paralela(
     centinela: Centinela | None = None,
     timeout_base_s: int | None = None,
     timeout_fijado: bool = False,
+    regla: ReglaMuestreo | None = None,
+    mutantes: list[Mutante] | None = None,
+    ficheros: list[str] | None = None,
+    seleccion: bool | None = None,
 ) -> InformeMutacion:
     """Evalúa los mutantes del alcance repartidos entre varios worktrees.
+
+    `ficheros` (F-023) son las rutas no versionadas declaradas en
+    `mutacion.ficheros_no_versionados`: se copian a cada worktree antes de
+    lanzar ningún worker (`copiar_no_versionados`). Su existencia ya la
+    comprobó `main`, antes de crear nada.
+
+    Con `regla` (F-058) los elige `seleccionar`, como en serie. Con `mutantes`
+    se evalúan exactamente esos, sin generar ni sortear: es lo que pide la
+    repetición incremental, que ya sabe cuáles reevaluar.
 
     Devuelve el mismo `InformeMutacion` que produciría la campaña en serie
     sobre el mismo commit: mismos totales y mismas listas en el mismo orden.
@@ -514,15 +729,34 @@ def ejecutar_campania_paralela(
     # copia a ninguna parte. Ver `volcar_variables` para el porqué completo.
     volcar_variables(raiz)
 
-    mutantes, generados, muestreado = generar_y_muestrear(
-        alcance, raiz, max_mutantes, semilla
+    # F-026 (R16): la cifra por fichero sale de la lista ENTERA, antes de
+    # sortear, igual que en serie (o de la lista dada, si la hay). Generar es
+    # AST puro: repetirlo aquí cuesta milisegundos y deja intactas las
+    # funciones que eligen la muestra.
+    por_fichero = mutantes_por_fichero(
+        alcance,
+        list(mutantes) if mutantes is not None else generar_del_alcance(alcance, raiz),
     )
+    candidatos: int | None = None
+    if mutantes is not None:
+        mutantes, generados, muestreado = (list(mutantes), len(mutantes), False)
+    elif regla is not None:
+        mutantes, generados, candidatos, max_mutantes = generar_y_seleccionar(
+            alcance, raiz, regla, semilla
+        )
+        muestreado = len(mutantes) < candidatos
+    else:
+        mutantes, generados, muestreado = generar_y_muestrear(
+            alcance, raiz, max_mutantes, semilla
+        )
     fabrica = fabrica or fabrica_de_ejecutores(servicios, raiz_venvs=raiz)
     efectivo = max(1, min(workers, len(mutantes)))
     total = len(mutantes)
 
     cerrojo = threading.Lock()
     hechos = 0
+    #: F-019: los mapas que mide el coordinador en `wk_0` antes de los hilos.
+    mapas_compartidos: dict | None = None
 
     def eco_compartido(linea: str) -> None:
         nonlocal hechos
@@ -539,14 +773,19 @@ def ejecutar_campania_paralela(
             indice = hechos
         eco(renumerar(linea, indice, total))
 
-    def correr(raiz_worker: str, particion: object) -> InformeMutacion:
+    def correr(
+        raiz_worker: str,
+        particion: object,
+        eco_propio: Callable[[str], None] | None = None,
+        workers_declarados: int | None = None,
+    ) -> InformeMutacion:
         return ejecutar_campania(
             alcance,
             EjecutorPytest(raiz=raiz_worker),
             timeout_s=timeout_s,
             raiz=raiz_worker,
             mutantes=particion,  # type: ignore[arg-type]
-            eco=eco_compartido if eco is not None else None,
+            eco=eco_propio or (eco_compartido if eco is not None else None),
             ejecutor_de=lambda fichero: fabrica(fichero, raiz_worker),
             centinela=centinela,
             # Cada worker deriva SU timeout de la línea base de SU worktree: es
@@ -554,15 +793,19 @@ def ejecutar_campania_paralela(
             # que el reloj se adapte a la máquina sin fórmula que lo adivine.
             timeout_base_s=timeout_base_s,
             timeout_fijado=timeout_fijado,
-            workers=efectivo,
+            workers=workers_declarados or efectivo,
             # El worktree acaba de nacer de HEAD: comprobar que está limpio
             # sería preguntarle a git lo que git acaba de hacer. Lo que sí se
             # comprueba, y aquí es donde importa, es su LÍNEA BASE.
             comprobar_arbol=False,
+            # F-019: el MISMO mapa, medido en `wk_0`, para todos los workers y
+            # para el repaso; cada uno comprueba su HEAD contra el del mapa (R6).
+            seleccion=seleccion,
+            mapas=mapas_compartidos,
         )
 
     def informe_final(parciales: list[InformeMutacion]) -> InformeMutacion:
-        return fusionar(
+        informe = fusionar(
             alcance,
             parciales,
             generados=generados,
@@ -571,12 +814,66 @@ def ejecutar_campania_paralela(
             max_mutantes=max_mutantes,
             semilla=semilla,
             workers=efectivo,
+            por_fichero=por_fichero,
         )
+        if regla is not None and candidatos is not None:
+            informe.regla = regla
+            informe.candidatos = candidatos
+        return informe
+
+    def repasar(informe: InformeMutacion, raiz_repaso: str) -> InformeMutacion:
+        """Vuelve a juzgar EN SERIE los mutantes que quedaron en `timeout`.
+
+        Con N suites peleándose por la máquina, el reloj de un mutante mide la
+        contención y no al mutante: medido el 2026-09-02, una suite de 38,7 s
+        pasaba a 131,6 s con 16 workers contra un tope de 120 s, y tres campañas
+        de la misma feature y el mismo commit dieron 15, 27 y 0 timeouts sobre
+        mutantes distintos. Aquí se juzga uno detrás de otro, sobre UN solo
+        worktree —el árbol principal no se muta nunca en modo paralelo, y esa
+        garantía no se rompe ni para esto—, así que lo que siga en `timeout`
+        después ya sí señala un cuelgue de verdad.
+
+        El repaso mide su propia línea base, que es lo que se busca: sin
+        contención sale un timeout derivado más ajustado y honesto. Si esa línea
+        base saliera rota, la campaña YA HECHA no se tira por la borda: se
+        devuelve tal cual, con sus timeouts sin aclarar y su aviso.
+        """
+        if not informe.timeouts:
+            return informe
+
+        pendientes = list(informe.timeouts)
+        if eco is not None:
+            eco(
+                f"Repaso en serie de {len(pendientes)} mutante(s) en timeout: "
+                "sin concurrencia, el reloj mide al mutante y no a la máquina."
+            )
+        try:
+            reintento = correr(
+                raiz_repaso,
+                pendientes,
+                eco_propio=eco_del_repaso(eco, len(pendientes)),
+                workers_declarados=1,
+            )
+        except BaseRota:
+            if eco is not None:
+                eco(
+                    "Repaso abortado: la línea base del worktree del repaso no "
+                    "está verde. La campaña se entrega tal cual, con sus "
+                    "timeouts sin aclarar."
+                )
+            return informe
+        return reemplazar_timeouts(informe, reintento)
 
     # R8: con menos de dos mutantes que evaluar, paralelizar solo cuesta. Se
     # muta in situ, como toda la vida, y no se crea ni un worktree. Como aquí sí
     # se escribe en el árbol principal, la guardia de árbol limpio vuelve a
     # aplicar: es exactamente el caso que puede dejarte un mutante en el diff.
+    #
+    # Aquí NO se repasan los timeouts, y es a propósito: sin concurrencia, el
+    # repaso repetiría exactamente la misma medición que acaba de hacerse. Un
+    # timeout de una campaña in situ ya es el veredicto que el repaso buscaba, y
+    # repetirlo solo duplicaría el coste del único caso en que de verdad hay un
+    # cuelgue. Por eso `timeouts_repasados` se queda en cero: nadie repasó nada.
     if efectivo < 2:
         parciales = (
             [
@@ -592,6 +889,8 @@ def ejecutar_campania_paralela(
                     timeout_base_s=timeout_base_s,
                     timeout_fijado=timeout_fijado,
                     workers=efectivo,
+                    # In situ, la campaña mide su propio mapa en este árbol.
+                    seleccion=seleccion,
                 )
             ]
             if mutantes
@@ -638,6 +937,22 @@ def ejecutar_campania_paralela(
     with restauracion_ante_senales(rescate), Worktrees(
         raiz, efectivo, etiqueta=alcance.feature
     ) as rutas:
+        if ficheros:
+            # Antes de la línea base de cada worker: sin esto, la suite que
+            # necesita un fichero ignorado arranca roja en el worktree.
+            copiar_no_versionados(raiz, rutas, ficheros)
+        if seleccion:
+            # F-019 (R1, R5): UN mapa por ejecutor implicado, en `wk_0` y ANTES
+            # de arrancar los hilos: mientras se mide, ningún worker compite.
+            # Clave relativa al worktree, para que valga en todos.
+            mapas_compartidos = medir_mapas(
+                sorted({mutante.fichero for mutante in mutantes}),
+                EjecutorPytest(raiz=rutas[0]),
+                lambda fichero: fabrica(fichero, rutas[0]),
+                rutas[0],
+                timeout_base_s or timeout_de_linea_base(timeout_s, efectivo),
+                eco,
+            )
         hilos = [
             threading.Thread(
                 target=trabajo, args=(indice, ruta), name=f"mutacion-{indice}"
@@ -658,7 +973,13 @@ def ejecutar_campania_paralela(
                 hilo.join()
             raise
 
-    if fallos:
-        raise fallos[0]
+        if fallos:
+            raise fallos[0]
 
-    return informe_final([parcial for parcial in resultados if parcial is not None])
+        # El repaso va DENTRO del `with`: necesita un worktree vivo, y el árbol
+        # principal no se muta nunca en modo paralelo. Salir por aquí retira los
+        # worktrees igual que salir por cualquier otro sitio.
+        informe = informe_final(
+            [parcial for parcial in resultados if parcial is not None]
+        )
+        return repasar(informe, rutas[0])

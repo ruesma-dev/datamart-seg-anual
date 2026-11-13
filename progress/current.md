@@ -9,6 +9,14 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-13 · Arnés 1.10.1 integrado en `main` · F-161 con la spec lista (`spec_ready`)
+
+- **Arnés:** de la 1.7.7 a la 1.10.1, en la rama `chore/arnes-1.10.0`. Informe en `progress/impl_arnes_1.10.0.md`.
+  - El hotfix 1.10.1 (F-074 de arnes-base) corrigió los tests R6 y R7.
+  - La puerta con `.env` sobre `258a0ba` da exit 0, con 13.075 passed. Tardó 1 h 30.
+  - El espejo `dev` lo adelanta el líder (R1).
+- **F-161:** la spec está en la rama `feature/F-161-versiones-sin-reparto` (`6a1684a`). Falta el resumen de la spec, con D5 a D14 pendientes del OK del humano.
+
 ## 2026-11-12 · F-162 · `done` (cerrada por el humano) · F-053 absorbida · VIGILAR la nocturna del 13
 
 - **Cerrada el 2026-11-12** por decisión del humano, sin esperar a la nocturna. Resumen en `history.md`.

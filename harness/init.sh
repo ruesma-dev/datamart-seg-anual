@@ -8,8 +8,8 @@
 # ------------------
 # Lo que SIEMPRE se comprueba (vale para cualquier lenguaje): que estén los
 # ficheros del arnés, que `harness/features.json` sea válido y tenga como
-# mucho una feature `in_progress`, que exista `.env` si el proyecto lo usa, y
-# que no estés trabajando en `main`.
+# mucho una feature activa (`in_progress`, `in_review` o `human_review`), que
+# exista `.env` si el proyecto lo usa, y que no estés trabajando en `main`.
 #
 # Lo que depende del lenguaje (compilación, lint, tests) se activa solo si el
 # proyecto es Python. En un proyecto que no lo sea, esas secciones se saltan
@@ -46,6 +46,10 @@ COMPROBACIONES_EXTRA=0   # sin comprobaciones extra en la sección 9
 # vale para cerrar una feature: el cierre exige el portero completo
 # (`bash harness/init.sh` a secas).
 SALTAR_SUITES="${ARNES_SALTAR_SUITES:-0}"
+
+# Sin caché: con ARNES_SIN_CACHE=1 las suites de los servicios (sección 7 bis)
+# se ejecutan aunque haya un verde reutilizable, y lo refrescan si salen en verde.
+SIN_CACHE="${ARNES_SIN_CACHE:-0}"
 
 set -u
 cd "$(dirname "$0")/.." || exit 1
@@ -162,8 +166,14 @@ for f in CLAUDE.md CHECKPOINTS.md harness/features.json harness/rigor.json \
     if [ -f "$f" ]; then ok "Existe $f"; else ko "Falta $f"; fi
 done
 
-# --- 3. features.json: esquema, estados y UNA sola in_progress --------------
+# --- 3. features.json: esquema, estados y UNA sola feature activa -----------
 # Se valida con el primer intérprete disponible. Sin ninguno, degrada a texto.
+#
+# Los ocho estados y los tres activos (`in_progress`, `in_review`,
+# `human_review`; `todo` no lo es) se repiten en cada validador porque node y
+# jq no pueden importar harness/estados.py, que es la fuente única. Que las listas
+# coincidan lo vigila la suite (tests/test_init_sh_estados.py). No se lee
+# `rules.valid_status`: en un proyecto instalado es su copia vieja.
 VALIDADOR=""
 if [ -n "$PY" ]; then VALIDADOR=python
 elif command -v node >/dev/null 2>&1; then VALIDADOR=node
@@ -177,21 +187,22 @@ import json, sys
 try:
     with open("harness/features.json", encoding="utf-8") as fh:
         data = json.load(fh)
-    estados = {"pending", "spec_ready", "in_progress", "done", "blocked"}
-    en_curso = []
+    estados = {"pending", "todo", "spec_ready", "in_progress", "in_review", "human_review", "done", "blocked"}
+    activos = {"in_progress", "in_review", "human_review"}
+    activas = []
     for f in data["features"]:
         assert {"id", "title", "status", "sdd"} <= set(f), f"Feature incompleta: {f}"
         assert f["status"] in estados, f"Estado inválido en {f['id']}: {f['status']}"
-        if f["status"] == "in_progress":
-            en_curso.append(f["id"])
-    if len(en_curso) > 1:
-        print(f"Hay {len(en_curso)} features in_progress ({', '.join(en_curso)}). Máximo 1.",
-              file=sys.stderr)
+        if f["status"] in activos:
+            activas.append(f["id"])
+    if len(activas) > 1:
+        print(f"Hay {len(activas)} features activas (in_progress/in_review/human_review): "
+              f"{', '.join(activas)}. Máximo 1.", file=sys.stderr)
         sys.exit(1)
     bloqueadas = [f["id"] for f in data["features"] if f["status"] == "blocked"]
     abiertas = sum(1 for f in data["features"] if f["status"] != "done")
     print(f"    {len(data['features'])} features, {abiertas} abiertas, "
-          f"en curso: {en_curso or 'ninguna'}, bloqueadas: {bloqueadas or 'ninguna'}")
+          f"activa: {activas or 'ninguna'}, bloqueadas: {bloqueadas or 'ninguna'}")
 except Exception as exc:  # noqa: BLE001
     print(f"features.json inválido: {exc}", file=sys.stderr)
     sys.exit(1)
@@ -203,56 +214,71 @@ node)
 const fs = require("fs");
 try {
   const d = JSON.parse(fs.readFileSync("harness/features.json", "utf8"));
-  const estados = ["pending","spec_ready","in_progress","done","blocked"];
-  const enCurso = [];
+  const estados = ["pending","todo","spec_ready","in_progress","in_review","human_review","done","blocked"];
+  const activos = ["in_progress","in_review","human_review"];
+  const activas = [];
   for (const f of d.features) {
     for (const k of ["id","title","status","sdd"]) {
       if (!(k in f)) throw new Error("Feature incompleta, falta " + k + ": " + JSON.stringify(f));
     }
     if (!estados.includes(f.status)) throw new Error("Estado inválido en " + f.id + ": " + f.status);
-    if (f.status === "in_progress") enCurso.push(f.id);
+    if (activos.includes(f.status)) activas.push(f.id);
   }
-  if (enCurso.length > 1) {
-    console.error("Hay " + enCurso.length + " features in_progress (" + enCurso.join(", ") + "). Máximo 1.");
+  if (activas.length > 1) {
+    console.error("Hay " + activas.length + " features activas (in_progress/in_review/human_review): " +
+                  activas.join(", ") + ". Máximo 1.");
     process.exit(1);
   }
   const bloq = d.features.filter(f => f.status === "blocked").map(f => f.id);
   const abiertas = d.features.filter(f => f.status !== "done").length;
-  console.log("    " + d.features.length + " features, " + abiertas + " abiertas, en curso: " +
-              (enCurso.length ? enCurso.join(", ") : "ninguna") + ", bloqueadas: " +
+  console.log("    " + d.features.length + " features, " + abiertas + " abiertas, activa: " +
+              (activas.length ? activas.join(", ") : "ninguna") + ", bloqueadas: " +
               (bloq.length ? bloq.join(", ") : "ninguna"));
 } catch (e) { console.error("features.json inválido: " + e.message); process.exit(1); }
 '
     RES=$?
     ;;
 jq)
-    if jq -e '
+    # `.status as $s | [...] | index($s)`: la forma `[...] | index(.status)`
+    # evaluaba `.status` contra el array y fallaba con cualquier fichero.
+    ACTIVAS_JQ=$(jq -r '[.features[] | select(.status as $s | ["in_progress","in_review","human_review"] | index($s)) | .id] | join(", ")' harness/features.json 2>/dev/null)
+    N_ACTIVAS_JQ=$(jq '[.features[] | select(.status as $s | ["in_progress","in_review","human_review"] | index($s))] | length' harness/features.json 2>/dev/null)
+    if [ "${N_ACTIVAS_JQ:-0}" -gt 1 ] 2>/dev/null; then
+        echo "Hay $N_ACTIVAS_JQ features activas (in_progress/in_review/human_review): $ACTIVAS_JQ. Máximo 1." >&2
+        RES=1
+    elif jq -e '
         (.features | length) > 0
-        and ([.features[] | select(.status == "in_progress")] | length) <= 1
         and all(.features[]; (has("id") and has("title") and has("status") and has("sdd"))
-                and (["pending","spec_ready","in_progress","done","blocked"] | index(.status)))
+                and (.status as $s | ["pending","todo","spec_ready","in_progress","in_review","human_review","done","blocked"] | index($s)))
     ' harness/features.json >/dev/null 2>&1; then
-        printf "    %s features, en curso: %s\n" \
+        printf "    %s features, activa: %s\n" \
             "$(jq '.features | length' harness/features.json)" \
-            "$(jq -r '[.features[] | select(.status=="in_progress") | .id] | if length == 0 then "ninguna" else join(", ") end' harness/features.json)"
+            "${ACTIVAS_JQ:-ninguna}"
         RES=0
     else
-        echo "features.json inválido, o más de una feature in_progress" >&2
+        INVALIDAS_JQ=$(jq -r '[.features[] | select((.status as $s | ["pending","todo","spec_ready","in_progress","in_review","human_review","done","blocked"] | index($s)) | not) | "\(.id): \(.status)"] | join(", ")' harness/features.json 2>/dev/null)
+        echo "features.json inválido (JSON roto, feature incompleta o estado inválido${INVALIDAS_JQ:+: $INVALIDAS_JQ})" >&2
         RES=1
     fi
     ;;
 *)
     warn "Sin python, node ni jq: validación de features.json DEGRADADA (solo texto)"
-    EN_CURSO=$(grep -o '"status"[[:space:]]*:[[:space:]]*"in_progress"' harness/features.json 2>/dev/null | wc -l)
-    if [ "${EN_CURSO:-0}" -gt 1 ]; then
-        echo "Hay $EN_CURSO features in_progress. Máximo 1." >&2
+    # Empareja cada "status" activo con el último "id" visto antes que él.
+    ACTIVAS_TXT=$(grep -oE '"(id|status)"[[:space:]]*:[[:space:]]*"[^"]*"' harness/features.json 2>/dev/null \
+        | awk -F'"' '$2 == "id" { id = $4 }
+                     $2 == "status" && ($4 == "in_progress" || $4 == "in_review" || $4 == "human_review") {
+                         n++; lista = lista sep id; sep = ", " }
+                     END { print n + 0 "|" lista }')
+    N_ACTIVAS_TXT=${ACTIVAS_TXT%%|*}
+    if [ "${N_ACTIVAS_TXT:-0}" -gt 1 ]; then
+        echo "Hay $N_ACTIVAS_TXT features activas (in_progress/in_review/human_review): ${ACTIVAS_TXT#*|}. Máximo 1." >&2
         RES=1
     else
         RES=0
     fi
     ;;
 esac
-if [ "$RES" -eq 0 ]; then ok "features.json válido"; else ko "features.json inválido (o >1 in_progress)"; fi
+if [ "$RES" -eq 0 ]; then ok "features.json válido"; else ko "features.json inválido (o más de una feature activa)"; fi
 
 # --- 3 bis. BACKLOG.md: proyección legible de features.json -----------------
 # features.json es la fuente de verdad, pero nadie lee un JSON de un vistazo.
@@ -278,10 +304,40 @@ else
     warn "Sin Python: no se regenera BACKLOG.md desde features.json"
 fi
 
+# --- 3 ter. Estado y fechas de la feature de la rama (solo avisos) -----------
+# Una feature `done` lleva `ok_humano` (el día del OK del humano a la PARADA
+# 2) y una `sdd: true` activa o `done` lleva `spec_aprobada`. Se mira SOLO la
+# feature de la rama (la que la declara; si ninguna, la activa): las `done`
+# anteriores a estos campos quedan amnistiadas por construcción, como en la
+# puerta de tamaño. Son avisos, nunca rojo. Las transiciones (de qué estado se
+# viene) no se validan: esa regla vive en .claude/agents/leader.md.
+if [ -n "$PY" ] && [ -f "harness/estados.py" ]; then
+    AVISOS_ESTADO=$($PY -m harness.estados --avisos 2>&1)
+    if [ $? -ne 0 ]; then
+        warn "AVISOS DE ESTADO: no se pudieron calcular (python -m harness.estados --avisos): $AVISOS_ESTADO"
+    elif [ -n "$AVISOS_ESTADO" ]; then
+        while IFS= read -r LINEA_ESTADO; do
+            [ -n "$LINEA_ESTADO" ] && warn "$LINEA_ESTADO"
+        done <<EOF_ESTADO
+$AVISOS_ESTADO
+EOF_ESTADO
+    fi
+elif [ -z "$PY" ]; then
+    warn "AVISOS DE ESTADO: N/A (no hay intérprete de Python en el PATH: no se comprueban ok_humano ni spec_aprobada de la feature de la rama)"
+else
+    warn "AVISOS DE ESTADO: N/A (no existe harness/estados.py: arnés anterior a los ocho estados)"
+fi
+
 # --- 3b. Niveles de rigor: configuración válida y niveles declarados válidos -
 # Lo que exige cada nivel vive en harness/rigor.json. Una feature que no
 # declara nivel NO es un error: se le aplica el nivel por defecto. Declarar uno
 # inexistente sí lo es. Necesita Python: sin él, degrada con aviso.
+# Capa local (F-063): harness/rigor.local.json, si existe, pisa a rigor.json
+# clave a clave; --validar la valida, la fusiona e imprime sus claves. Si la
+# capa cambia en esta rama respecto a $RAMA_BASE (o no está versionada), se
+# avisa: rebajar una puerta en la misma feature que se beneficia necesita el OK
+# explícito del humano, y lo comprueba el reviewer. Sin git o sin la rama base,
+# no se avisa.
 if [ -n "$PY" ]; then
     if $PY -m harness.rigor --validar; then
         ok "harness/rigor.json y niveles declarados: válidos"
@@ -290,6 +346,13 @@ if [ -n "$PY" ]; then
     fi
 else
     warn "Sin Python: no se validan los niveles de rigor de harness/rigor.json"
+fi
+if [ -f "harness/rigor.local.json" ] && command -v git >/dev/null 2>&1 \
+    && git rev-parse --verify --quiet "$RAMA_BASE^{commit}" >/dev/null 2>&1; then
+    if ! git ls-files --error-unmatch harness/rigor.local.json >/dev/null 2>&1 \
+        || ! git diff --quiet "$RAMA_BASE" -- harness/rigor.local.json >/dev/null 2>&1; then
+        warn "CAPA LOCAL DE RIGOR: harness/rigor.local.json cambia en esta rama respecto a $RAMA_BASE (o no está versionada): el cambio necesita el OK explícito del humano antes de cerrar la feature"
+    fi
 fi
 
 # --- 4. Aviso de features bloqueadas (no bloquea, pero se ve) ---------------
@@ -389,7 +452,18 @@ fi
 # La declaración rota NO degrada a mono-proyecto: sería dejar servicios enteros
 # sin comprobar mientras el portero imprime que todo va bien. El esquema y un
 # ejemplo comentado están en harness/servicios.ejemplo.json.
+#
+# Caché de suites: la decide `python -m harness.cache_suites`, no este bash. Su
+# clave reúne el árbol del servicio en HEAD, el de cada ruta de `depende_de`, el
+# intérprete, dónde resuelve ese intérprete cada módulo de `importa` y la huella
+# (metadatos, nunca el contenido) de los .env y las `entradas_no_versionadas`.
+# Con cambios sin commitear no hay clave; con un módulo importado desde fuera
+# del repositorio, tampoco, y lo dice con un [AVISO]. Si el módulo falla, la
+# suite se ejecuta y no se guarda nada: el error va al lado seguro. Las rutas
+# de `ejecutar_siempre` (líneas SIEMPRE|, F-028) se ejecutan aunque se sirva la
+# caché: son los barridos de todo el repositorio que ninguna clave ve cambiar.
 if [ -f "harness/servicios.json" ]; then
+    [ "$SIN_CACHE" = "1" ] && warn "ARNES_SIN_CACHE=1: las suites de los servicios se ejecutan sin caché (y la refrescan si salen en verde)"
     if [ -z "$PY" ]; then
         warn "Sin Python: no se puede leer harness/servicios.json y NADIE está comprobando los servicios"
     elif ! $PY -m harness.servicios --validar; then
@@ -414,23 +488,51 @@ if [ -f "harness/servicios.json" ]; then
                     warn "servicio $NOMBRE ($RUTA): suite saltada (portero ligero)"
                     continue
                 fi
-                # Caché de suite: si el árbol del servicio no ha cambiado desde
-                # su último verde (mismo árbol commiteado y sin ficheros sucios
-                # en su ruta), la suite se salta. Cualquier edición, commit o
-                # fichero nuevo bajo la ruta del servicio invalida la caché.
-                HASH_SRV=$(git rev-parse "HEAD:$RUTA" 2>/dev/null)
-                SUCIO_SRV=$(git status --porcelain -- "$RUTA" 2>/dev/null | head -n 1)
-                CACHE_SRV=".arnes_cache/suite_${NOMBRE}.ok"
-                if [ -n "$HASH_SRV" ] && [ -z "$SUCIO_SRV" ] && [ -f "$CACHE_SRV" ] \
-                   && [ "$(cat "$CACHE_SRV" 2>/dev/null)" = "$HASH_SRV" ]; then
-                    # Con coverage disponible, solo vale la caché si el
-                    # coverage.json de ese mismo árbol sigue ahí (la puerta
-                    # de la sección 7b puede necesitarlo).
-                    if ! "$INTERPRETE" -c "import coverage" >/dev/null 2>&1 \
-                       || [ -f "$RUTA/coverage.json" ]; then
-                        ok "servicio $NOMBRE ($RUTA): pytest en verde (caché: árbol sin cambios desde el último verde)"
-                        continue
+                # Caché de suite (ver el comentario de la sección). `</dev/null`:
+                # ni el módulo ni su sonda pueden comerse la entrada del bucle.
+                OPCION_CACHE=""
+                [ "$SIN_CACHE" = "1" ] && OPCION_CACHE="--sin-cache"
+                CLAVE_SRV=""
+                FECHA_VERDE=""
+                SIEMPRE_SRV=()
+                if DECISION=$($PY -m harness.cache_suites --servicio "$NOMBRE" $OPCION_CACHE </dev/null); then
+                    while IFS='|' read -r TIPO VALOR; do
+                        # En Windows, Python escribe `\r\n` a una tubería y
+                        # `$(…)` solo quita el último salto: sin recortar el
+                        # `\r`, pytest recibiría `tests/x\r`, que no existe.
+                        # Siempre cae en VALOR, el último campo: toda línea
+                        # del protocolo lleva `|`.
+                        VALOR=${VALOR%$'\r'}
+                        case "$TIPO" in
+                            AVISO)    warn "servicio $NOMBRE ($RUTA): $VALOR" ;;
+                            SIEMPRE)  SIEMPRE_SRV+=("$VALOR") ;;
+                            SERVIR)   FECHA_VERDE="$VALOR" ;;
+                            EJECUTAR) CLAVE_SRV="$VALOR" ;;
+                        esac
+                    done <<EOF_CACHE
+$DECISION
+EOF_CACHE
+                else
+                    warn "servicio $NOMBRE ($RUTA): no se pudo decidir la caché (python -m harness.cache_suites --servicio $NOMBRE); se ejecuta la suite y no se guarda"
+                fi
+                if [ -n "$FECHA_VERDE" ]; then
+                    # `ejecutar_siempre` se ejecuta aunque se sirva la caché, sin
+                    # coverage (el coverage.json del verde sigue siendo el de la
+                    # clave) y sin tocar la caché: si sale en rojo, el siguiente
+                    # portero vuelve a ejecutarlo. El array solo se expande con
+                    # elementos: vacío y con `set -u`, bash < 4.4 revienta.
+                    if [ "${#SIEMPRE_SRV[@]}" -gt 0 ]; then
+                        ( cd "$RUTA" && "$INTERPRETE" -m pytest -q --tb=short -p no:cacheprovider \
+                            "${SIEMPRE_SRV[@]}" </dev/null )
+                        if [ $? -eq 0 ]; then
+                            ok "servicio $NOMBRE ($RUTA): pytest en verde (caché: ni el servicio ni sus dependencias han cambiado desde el verde del $FECHA_VERDE; ejecutar_siempre: ${#SIEMPRE_SRV[@]} rutas en verde)"
+                        else
+                            ko "servicio $NOMBRE ($RUTA): ejecutar_siempre en rojo con la caché válida del $FECHA_VERDE"
+                        fi
+                    else
+                        ok "servicio $NOMBRE ($RUTA): pytest en verde (caché: ni el servicio ni sus dependencias han cambiado desde el verde del $FECHA_VERDE)"
                     fi
+                    continue
                 fi
                 if "$INTERPRETE" -c "import coverage" >/dev/null 2>&1; then
                     ( cd "$RUTA" && rm -f coverage.json \
@@ -445,11 +547,9 @@ if [ -f "harness/servicios.json" ]; then
                 fi
                 if [ "$RESULTADO" -eq 0 ]; then
                     ok "servicio $NOMBRE ($RUTA): pytest en verde"
-                    # Solo se cachea un verde de árbol limpio: el hash describe
-                    # el árbol commiteado, no el estado sucio.
-                    if [ -n "$HASH_SRV" ] && [ -z "$SUCIO_SRV" ]; then
-                        mkdir -p .arnes_cache && printf '%s' "$HASH_SRV" > "$CACHE_SRV"
-                    fi
+                    # Solo se cachea con clave: sin ella (árbol sucio, módulo
+                    # de fuera, sonda rota) el verde no describe nada fijo.
+                    [ -n "$CLAVE_SRV" ] && mkdir -p .arnes_cache && printf '%s' "$CLAVE_SRV" > ".arnes_cache/suite_${NOMBRE}.ok"
                 else
                     ko "servicio $NOMBRE ($RUTA): pytest en rojo"
                 fi
@@ -491,7 +591,12 @@ if [ "$SALTAR_SUITES" -eq 1 ]; then
 elif [ "$ES_PYTHON" -eq 1 ] && [ -n "$PY" ]; then
     SALIDA_COBERTURA=$($PY -m harness.cobertura --base "$RAMA_BASE" --config harness/rigor.json 2>&1)
     if [ $? -eq 0 ]; then
-        ok "$SALIDA_COBERTURA"
+        # Una cobertura informativa (F-040) sale con 0 y este prefijo. Va por
+        # prefijo a propósito: el CR final de Windows no le afecta.
+        case "$SALIDA_COBERTURA" in
+            "PUERTA COBERTURA: AVISO"*) warn "$SALIDA_COBERTURA" ;;
+            *) ok "$SALIDA_COBERTURA" ;;
+        esac
     else
         ko "$SALIDA_COBERTURA"
     fi
@@ -564,7 +669,7 @@ print(ficha.get("id", "") if ficha else "")
 EOF
 )
     if [ -z "$FEATURE_TAMANO" ]; then
-        warn "PUERTA TAMAÑO: N/A (no hay papeleo abierto que medir: ni la rama actual corresponde a una feature sin cerrar ni hay ninguna in_progress)"
+        warn "PUERTA TAMAÑO: N/A (no hay papeleo abierto que medir: ni la rama actual corresponde a una feature sin cerrar ni hay ninguna activa)"
     else
         SALIDA_TAMANO=$($PY -m harness.tamano --feature "$FEATURE_TAMANO" 2>&1)
         case "$?" in
@@ -579,6 +684,60 @@ elif [ -z "$PY" ]; then
     warn "PUERTA TAMAÑO: N/A (no hay intérprete de Python en el PATH: la puerta no se puede medir)"
 else
     warn "PUERTA TAMAÑO: N/A (proyecto sin Python: harness.tamano necesita el intérprete del arnés)"
+fi
+
+# --- 7 quinquies. Puerta de CARRIL: límites del nivel de la feature ---------
+# Un nivel que declara `limites` en harness/rigor.json promete un cambio pequeño
+# y sin riesgo; harness.carril lo comprueba contra el diff comprometido. Los
+# números viven en rigor.json: aquí no hay ninguno que tocar. Sin `limites` en
+# el nivel de la feature, la puerta dice N/A con su motivo.
+#
+# Python no le pasa a bash ningún valor: bash decide por el código de salida
+# (0 cabe o no aplica, 1 se sale, otro no se pudo leer la configuración) y el
+# texto solo se imprime, sin el CR que Python escribe en Windows. No depende de
+# el portero ligero, igual que la 7 quater: mide git, no ejecuta tests.
+if [ "$ES_PYTHON" -eq 1 ] && [ -n "$PY" ] && [ -f "harness/carril.py" ]; then
+    SALIDA_CARRIL=$($PY -m harness.carril --base "$RAMA_BASE" 2>&1)
+    CODIGO_CARRIL=$?
+    SALIDA_CARRIL=${SALIDA_CARRIL//$'\r'/}
+    case "$CODIGO_CARRIL" in
+        0) ok "$SALIDA_CARRIL" ;;
+        1) ko "$SALIDA_CARRIL" ;;
+        *) warn "$SALIDA_CARRIL" ;;
+    esac
+elif [ "$ES_PYTHON" -eq 1 ] && [ -n "$PY" ]; then
+    warn "PUERTA CARRIL: N/A (no existe harness/carril.py: arnés anterior a la puerta de carril)"
+elif [ -z "$PY" ]; then
+    warn "PUERTA CARRIL: N/A (no hay intérprete de Python en el PATH: la puerta no se puede medir)"
+else
+    warn "PUERTA CARRIL: N/A (proyecto sin Python: harness.carril necesita el intérprete del arnés)"
+fi
+
+# --- 7 sexies. CAPA E2E: ¿aplica a la feature y está su resumen en verde? ----
+# La capa e2e (tests Playwright versionados) la ejecuta `python -m harness.e2e
+# --feature F-XXX`, que lanza el agente qa-e2e: es cara (levanta la aplicación
+# y un navegador) y por eso esta sección NUNCA la ejecuta. Solo pregunta con
+# --estado si aplica (algún servicio declara el bloque `e2e` en
+# harness/servicios.json, el nivel la exige o la informa, y el diff toca sus
+# `rutas_ui` o la spec marca requisitos `(capa: e2e)`) y si el resumen de
+# progress/e2e_F-XXX.md está en verde. Mismo contrato que la 7 ter: 0 OK o
+# N/A con su motivo, 3 AVISO (capa informativa), cualquier otro KO. No depende
+# del portero ligero: mide git y lee un fichero.
+if [ "$ES_PYTHON" -eq 1 ] && [ -n "$PY" ] && [ -f "harness/e2e.py" ]; then
+    SALIDA_E2E=$($PY -m harness.e2e --estado --base "$RAMA_BASE" 2>&1)
+    CODIGO_E2E=$?
+    SALIDA_E2E=${SALIDA_E2E//$'\r'/}
+    case "$CODIGO_E2E" in
+        0) ok "$SALIDA_E2E" ;;
+        3) warn "$SALIDA_E2E" ;;
+        *) ko "$SALIDA_E2E" ;;
+    esac
+elif [ "$ES_PYTHON" -eq 1 ] && [ -n "$PY" ]; then
+    warn "CAPA E2E: N/A (no existe harness/e2e.py: arnés anterior a la capa e2e)"
+elif [ -z "$PY" ]; then
+    warn "CAPA E2E: N/A (no hay intérprete de Python en el PATH: la capa no se puede consultar)"
+else
+    warn "CAPA E2E: N/A (proyecto sin Python: harness.e2e necesita el intérprete del arnés)"
 fi
 
 # --- 8. Marcas de adaptación sin resolver -----------------------------------

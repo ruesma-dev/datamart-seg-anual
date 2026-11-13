@@ -19,6 +19,7 @@ from harness.rigor import (
     cargar_rigor,
     exige,
     feature_de_rama,
+    informativa,
     nivel_de_feature,
     supervivientes_maximos,
     timeout_mutacion,
@@ -209,7 +210,10 @@ PALABRAS_DEL_PROYECTO = (
     r"\bmart\b",
     # `cierre` cualificado, no la palabra suelta: el arnés la usa en castellano
     # llano («la línea base de cierre EXPIRÓ») y el esquema se cita `cierre.algo`.
-    r"cierre\.\w",
+    # Desde el arnés 1.10.0, `backlog.py` tiene una variable `cierre` (la fecha
+    # de cierre de una feature) y llama a sus métodos de fecha: esos no son el
+    # esquema y se descartan con el lookahead.
+    r"cierre\.(?!(?:toordinal|isoformat|year|month|day)\b)\w",
     r"\bobra\b",
     r"\bobras\b",
     r"\bamb\b",
@@ -307,9 +311,15 @@ def test_f015_r15_sin_rigor_declarado_se_aplica_el_nivel_por_defecto(rigor: dict
     assert nivel_de_feature({"id": "F-042", "rigor": None}, rigor) == por_defecto
     # Un valor inválido tampoco relaja nada.
     assert nivel_de_feature({"id": "F-042", "rigor": "flojito"}, rigor) == por_defecto
-    # Y omitirlo sigue sin ser la vía fácil: las tres puertas se exigen enteras.
+    # Y omitirlo sigue sin ser la vía fácil: fase RED y cobertura se exigen.
+    # Desde el arnés 1.8.0 (F-040 del taller) la mutación de `estandar` es
+    # INFORMATIVA: la campaña se lanza siempre, pero no bloquea.
     for puerta in PUERTAS:
-        assert exige(por_defecto, puerta, rigor) is True
+        if puerta == "mutacion":
+            assert exige(por_defecto, puerta, rigor) is False
+            assert informativa(por_defecto, puerta, rigor) is True
+        else:
+            assert exige(por_defecto, puerta, rigor) is True
     # Lo único que ya no se hereda son los cero supervivientes de `critico`.
     assert por_defecto != "critico", "`critico` se declara, no se hereda"
     assert supervivientes_maximos(por_defecto, rigor) is None
@@ -325,9 +335,16 @@ def test_f015_r15_cada_nivel_declara_lo_que_exige(rigor: dict) -> None:
     assert exige("documental", "cobertura", rigor) is False
     assert exige("documental", "fase_red", rigor) is False
 
-    # El nivel estándar sí, pero admite supervivientes documentados.
+    # El nivel estándar exige fase RED y cobertura; la mutación, desde el arnés
+    # 1.8.0 (F-040 del taller), se lanza pero es informativa.
     for puerta in PUERTAS:
-        assert exige("estandar", puerta, rigor) is True
+        if puerta == "mutacion":
+            assert exige("estandar", puerta, rigor) is False
+            assert informativa("estandar", puerta, rigor) is True
+        else:
+            assert exige("estandar", puerta, rigor) is True
+    # La que sigue exigiéndola es `critico`.
+    assert exige("critico", "mutacion", rigor) is True
     assert supervivientes_maximos("estandar", rigor) is None
 
 

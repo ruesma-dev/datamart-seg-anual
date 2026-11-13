@@ -34,9 +34,15 @@ def seccion_multiservicio() -> str:
 
 
 def cuerpo_del_bucle() -> str:
-    """Texto del bucle que recorre los servicios, sin la validación previa."""
+    """Texto del bucle que recorre los servicios, sin la validación previa.
+
+    Desde el arnés 1.8.0 (caché de suites, F-028 del taller) el bucle lleva
+    dentro otro `while ... done <<EOF_CACHE`: se corta por los delimitadores
+    del bucle de servicios, no por el primer `done <<`.
+    """
     seccion = seccion_multiservicio()
-    return seccion[seccion.index("IFS='|' read -r") : seccion.index("done <<")]
+    inicio = seccion.index("IFS='|' read -r NOMBRE")
+    return seccion[inicio : seccion.index("done <<EOF_SERVICIOS", inicio)]
 
 
 # --- R10: sin declaración no se ejecuta nada de esto ------------------------
@@ -48,10 +54,16 @@ def test_f020_r10_seccion_multiservicio_condicionada_a_la_declaracion() -> None:
     # Todo el bloque cuelga de que exista la declaración.
     assert re.search(r'if \[ -f "harness/servicios\.json" \]', seccion)
     # Y el fichero solo se nombra dentro de la sección: nada más del portero
-    # depende de él.
-    assert guion().count("harness/servicios.json") == seccion.count(
-        "harness/servicios.json"
-    )
+    # depende de él. Se cuenta solo lo que se ejecuta: desde el arnés 1.8.0 la
+    # sección de la capa e2e (7 sexies) lo cita en un comentario.
+    def ejecutable(texto: str) -> str:
+        return "\n".join(
+            linea for linea in texto.splitlines() if not linea.lstrip().startswith("#")
+        )
+
+    fuera = guion().replace(seccion, "")
+    assert "harness/servicios.json" not in ejecutable(fuera)
+    assert "harness/servicios.json" in ejecutable(seccion)
 
 
 def test_f020_r10_este_repositorio_sigue_siendo_mono_proyecto() -> None:
