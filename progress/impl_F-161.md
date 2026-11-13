@@ -115,30 +115,58 @@ el coste por partida y versión y la tabla mensual «último cierre frente a tem
 
 ## Pendiente MANUAL (líder o humano)
 
-- **T3**: `EXPLAIN (ANALYZE)` en Azure, solo lectura, fuera de 00-05 UTC, de `CATALOGO_ANTERIOR` y del
+- **T3** (incluye O2 del review: medir la CTE `lineas`/`EXISTS` de `stg/10`): `EXPLAIN (ANALYZE)` en Azure, solo lectura, fuera de 00-05 UTC, de `CATALOGO_ANTERIOR` y del
   `SELECT` de `stg/10_master_versiones.sql` (sin el INSERT). PARAR si el nuevo supera en > 5 min (R19).
-- **T7**: remedir en Azure (solo lectura) motivos y tabla §5.3; `SELECT count(*)` del borrador de
+- **T7**: remedir en Azure (solo lectura) motivos y tabla §5.3, y cuántas versiones que entran son de tipo temporal (lo pide el review); `SELECT count(*)` del borrador de
   `master_importe_mensual`.
-- **T10 (azure-apps)**: `git -C C:/Users/pgris/PycharmProjects/azure-apps pull --rebase`; en
-  `datamart_seg_anual.md`, fila tras `stg.plan_mensual_fase0` con `stg.master_versiones`,
-  `stg.v_master_lineas`, `mart.master_versiones_tipadas` (+9 columnas), `mart.v_master_version_partida`,
-  `mart.master_importe_mensual`, «SIN DESPLEGAR (diccionario v77)», y sección «El catálogo completo
-  de versiones master (F-161, 2026-11-13, SIN DESPLEGAR)» antes de tesorería (≈ +1.450 filas, filtrar
-  `tiene_reparto`, lo temporal no cambia, reiniciar `mcp-bbdd` tras publicar v77). Commit local
-  aparte `F-161: datamart_seg_anual.md nombra el catálogo completo de versiones`; sin push.
-- **T11**: `F161_SANDBOX_DSN=<dsn local> .venv/Scripts/python.exe -m pytest tests/test_f161_sandbox.py`
-  (ya verde aquí: 15 passed en contenedor local desechable).
+- **T10 (azure-apps)**: HECHO por el líder (`d6bb377` en azure-apps, sin push); r21 en verde.
+- **T11**: HECHO (reviewer 15 passed; tras la pasada 1, 20 passed; ver abajo).
 - **T12/T13**: design §8 pasos 0-5 (huellas antes, imagen, job puntual `--yaml`, comparar,
   `check-cp-tipologia` 0 diferencias, `sql_comparacion_catalogo()` 0 filas, v24 de la 0698 = 776
   filas / 2.107.662,97 €, R16, tiempos R19, publicar diccionario v77 con su imagen y reiniciar MCP).
 - **T14**: `bash harness/init.sh` en la copia con `.env` (en el worktree da rojo por falta de `.env`).
+
+## Review pasada 1: cambio requerido atendido (2026-11-13)
+
+**Hallazgo**: ninguna versión sin reparto de la sandbox era de tipo temporal, así que R10/R16 no
+podían fallar. **Cambio** (`8d02b31`, solo `tests/test_f161_sandbox.py`): v6 «PLANIFICACION
+CUATRIMESTRAL MAR-26» (ámbito 8, `plafec` 0, `fec` 2026-03-15, una línea de 150 € sin `planif`),
+posterior a la v2 (2026-02-10) y dentro de los meses del mensual; partida 4 de categoría CP en la v2
+para que `fact_cp_tipologia` tenga planificado; y la sandbox ejecuta además `retenciones/05_fin_obra.sql`
+(con `raw.obr`/`raw.con`/`raw.obrctr`/`cierre.fact_cierre_mensual` mínimos y `fn_sigrid_date` copiada
+de `00_setup.sql`). Asertos nuevos: v6 Cuatrimestral/NINGUNO; el PLANIFICADO de la obra A es v1, v1,
+v2, v2, v2 (nunca 6); `master_vigente_anual` 2026 = v2 y `fact_cp_tipologia` 2026 = 80,00 €; `fin_obra` =
+(2, 2026-04-01, ULTIMO_CUATRIMESTRAL_MAS_1_MES); en 2026-03 `master_importe_mensual` da importe v6
+Cuatrimestral y temporal v2. Ajustadas r1 (9 versiones) y r2 (línea con reparto de la partida 4).
+Elegí marzo y no octubre (la propuesta del review) porque el mensual solo tiene meses hasta abril de
+2026: con octubre, la mutación de `02` no habría tenido mes en el que ganar.
+
+```
+$ F161_SANDBOX_DSN=postgresql://postgres@127.0.0.1:55161/postgres pytest tests/test_f161_sandbox.py -q
+20 passed in 2.47s
+```
+
+**Muerde** (cada mutación en una copia `git archive HEAD` del scratchpad, el árbol sin tocar; script
+`muta_f161.sh`, Postgres 16 local desechable con `initdb` en el scratchpad, puerto 55161):
+
+| Mutación (quitar `tiene_reparto`) | Resultado | Tests que caen |
+|---|---|---|
+| `mart/02_build_fact.sql:70` | 2 failed, 18 passed | r16, r10_d4_el_mensual… |
+| `mart/06_cp_tipologia.sql:150` | 2 failed, 18 passed | r10_master_vigente_anual…, r10_d4_la_vigencia_anual_y_cp… |
+| `mart/01b_master_versiones.sql:207` | 4 failed, 16 passed | r14 oráculo, r14 hoy, r16, r14_d4_en_marzo… |
+| `retenciones/05_fin_obra.sql` (CTE `cuatrimestral`) | 1 failed, 19 passed | r10_d4_el_fin_de_obra… |
+
+**Observaciones no bloqueantes**: no implementadas (ninguna es trivial sin tocar producción o el
+diccionario publicado). O1 la decide el humano; O2 y la cuenta de temporales, añadidas a T3 y T7;
+O3 (R16 hasta el mes del build) y O4 (`JOIN stg.partidas` interno), para el cierre; O6 (`n_lineas`
+con `agregacion: suma`), menor, cambia el diccionario publicado.
 
 ## Evidencias
 
 | Evidencia | Valor |
 |---|---|
 | Tests ejecutados | suite completa 13073 passed / 116 failed (3 corregidos, 1 MANUAL, 112 de entorno que pasan con `SIGRID_API_*` ficticios) / 2552 skipped |
-| Tests de F-161 | dominio 33, sql 72, diccionario 13 (+1 MANUAL), sandbox 15 con DSN local |
+| Tests de F-161 | dominio 33, sql 72, diccionario 14 (r21 verde tras `d6bb377`), sandbox 20 con DSN local |
 | Cobertura de líneas cambiadas | NO MEDIDA aquí: `init.sh` da rojo en el worktree sin `.env`; la línea `PUERTA COBERTURA` la toma el líder en T14 |
 | Mutación | pendiente de la pasada de campaña (tras el APPROVED), como manda el protocolo |
 | Tiempo de la suite | 1389,61 s (con otras dos tandas de pytest compitiendo en la máquina) |

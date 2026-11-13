@@ -9,12 +9,17 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-11-13 · F-161 · `in_progress` · spec APROBADA por el humano · rama `feature/F-161-versiones-sin-reparto`
+## 2026-11-13 · F-161 · `in_progress` (review pasada 1 atendida) · spec APROBADA por el humano · rama `feature/F-161-versiones-sin-reparto`
 
 - **Resumen de la spec aprobado el 2026-11-13** («hecho»): todas las recomendaciones. D5 a D14 en (a); en D10, (a) y además (b) como columna aparte. `spec_aprobada` anotada. Implementer lanzado sobre el arnés 1.10.1.
-- **Implementer (terminado):** worktree `agent-a6aed2aa…`, T1-T2, T4-T6 y T8-T9 hechas, T10 salvo
-  azure-apps (edición denegada por permisos: MANUAL, con el texto exacto en el informe). Informe en
-  `progress/impl_F-161.md`. T3, T7, T10 (azure-apps) y T11-T14 quedan MANUAL para el líder.
+- **Review principal, pasada 1 (2026-11-13): CHANGES_REQUESTED** (`progress/review_F-161.md`): la
+  sandbox no ejercitaba D4. **Corregido** (`8d02b31`): v6 Cuatrimestral SIN reparto en la sandbox; 20
+  passed, y quitar `tiene_reparto` de 02, 06, `01b` o `05_fin_obra` la pone en rojo (2, 2, 4 y 1
+  fallos). Pendiente: review pasada 2.
+- **Implementer:** T1-T2, T4-T6 y T8-T11 hechas (T10 azure-apps por el líder, `d6bb377`; T11 en
+  Postgres local desechable). Informe en `progress/impl_F-161.md`. MANUAL del líder: T3 (con O2 del
+  review), T7 (con cuántas versiones que entran son temporales), T12-T14. O1 (`05_fin_obra` con
+  `tiene_reparto` y fecha NULL) la decide el humano.
 - **Diccionario v77 (árbol, SIN PUBLICAR):** 320 objetos, 2742 columnas y 157 de consumo.
 
 - El spec-author ha escrito la spec en `specs/F-161-versiones-sin-reparto/`. Las cifras y las
