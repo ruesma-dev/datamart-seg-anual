@@ -24,6 +24,16 @@ RAIZ = Path(__file__).resolve().parents[1]
 SQL = RAIZ / "etl_sigrid" / "infrastructure" / "postgres" / "sql"
 INTOCABLES = (SQL / "retenciones", SQL / "tesoreria")
 
+# Ficheros que una feature POSTERIOR a F-040 cambia a propósito, con su spec detrás.
+# El diff se mide contra `main`, así que la guarda de F-040 se dispara en la rama de
+# cualquier feature que toque estas carpetas; la lista dice cuáles y por qué, y lo
+# que F-040 protege (el lado de ingresos, `v_src_lineas_venta`, `00_setup.sql` y
+# toda `tesoreria/`) sigue sin poder cambiar.
+#   F-161 (R10): `05_fin_obra.sql` filtra `tiene_reparto` en el catálogo único.
+TOCADOS_DESPUES = frozenset({
+    "etl_sigrid/infrastructure/postgres/sql/retenciones/05_fin_obra.sql",
+})
+
 
 def _git(*args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
@@ -52,7 +62,8 @@ def test_f040_r30_sin_diff_en_retenciones_ni_tesoreria() -> None:
     rutas = [str(c.relative_to(RAIZ)).replace("\\", "/") for c in INTOCABLES]
     diff = _git("diff", "--name-only", base, "--", *rutas)
     assert diff.returncode == 0, diff.stderr
-    assert diff.stdout.strip() == "", f"F-040 no toca este SQL (R30): {diff.stdout}"
+    cambiados = [r for r in diff.stdout.split() if r not in TOCADOS_DESPUES]
+    assert cambiados == [], f"F-040 no toca este SQL (R30): {cambiados}"
     sin_seguimiento = _git("ls-files", "--others", "--exclude-standard", "--", *rutas)
     assert sin_seguimiento.stdout.strip() == "", sin_seguimiento.stdout
 
