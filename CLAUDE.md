@@ -8,9 +8,10 @@ protocolo. Todo en español.
 ## Autorización permanente de subagentes
 
 El humano **autoriza y espera** que lances los subagentes de
-`.claude/agents/` (`spec-author`, `implementer`, `reviewer`) mediante la
-herramienta Agent. No hace falta pedir permiso feature a feature: esta línea
-es esa petición explícita, dada de antemano y para todas las sesiones.
+`.claude/agents/` (`spec-author`, `implementer`, `reviewer` y `qa-e2e`)
+mediante la herramienta Agent. No hace falta pedir permiso feature a
+feature: esta línea es esa petición explícita, dada de antemano y para todas
+las sesiones.
 
 **Delegar es la vía normal de trabajo, no la excepción.** El flujo SDD de
 este arnés está pensado para que cada rol lo ejecute su subagente: el líder
@@ -31,14 +32,18 @@ que trabajes sin delegar. Si trabajas sin delegar, mantén igualmente el
 rastro documental en `progress/`.
 
 Esta autorización cubre **usar la herramienta Agent**, no la aprobación del
-plan: la PARADA 1 de la sección siguiente sigue siendo obligatoria. Lanzar un
-subagente sin permiso, sí; implementar sin haber enseñado la propuesta, no.
+plan: la primera parada (el resumen de la spec, o la PARADA 1 sin spec) sigue
+siendo obligatoria. Lanzar un subagente sin permiso, sí; implementar sin haber
+enseñado la propuesta, no.
 
 ## Ritmo de trabajo con el humano (obligatorio)
 
-Dos paradas fijas en todo trabajo, por pequeño que sea:
+Dos paradas fijas en todo trabajo, por pequeño que sea, siempre con un
+resumen en pantalla según las plantillas de `.claude/agents/leader.md`:
 
-1. **Antes de implementar.** Cuando estudiemos una feature o un cambio,
+1. **Antes de implementar.** Con spec, la primera parada es el **resumen de la
+   spec**: sustituye a esta propuesta y su OK aprueba la spec y el plan. Sin
+   spec, cuando estudiemos una feature o un cambio,
    primero piensa cómo hacerlo y **explica la propuesta**: qué ficheros se
    tocan, en qué orden, qué decisiones se toman, qué riesgos hay y qué queda
    fuera. Luego **espera confirmación del humano antes de escribir nada**.
@@ -47,8 +52,11 @@ Dos paradas fijas en todo trabajo, por pequeño que sea:
    antes de gastar trabajo en la dirección equivocada.
 2. **Después de implementar.** Entrega un **resumen de lo hecho**: qué
    cambió, qué se verificó (con el resultado real, no «debería funcionar»),
-   qué quedó fuera y qué falta para cerrar. El detalle largo vive en
-   `progress/`; por el chat va solo el resumen.
+   qué quedó fuera, qué falta para cerrar y **qué queda listo para que el
+   humano haga push** (el push lo hace siempre el humano). El detalle largo
+   vive en `progress/`; por el chat va solo el resumen, que termina con la
+   línea: «Tu OK es el permiso para integrar y desplegar; el arnés nunca
+   despliega.»
 
 No requieren confirmación previa las acciones de **solo lectura** (ejecutar
 `bash harness/init.sh`, leer ficheros, buscar en el árbol) ni aquello que el
@@ -65,8 +73,11 @@ confirmación cubre el plan que se enseñó, no lo que apareció después.
 2. Lee `progress/current.md`. Si hay trabajo a medias o una feature
    `blocked` de una sesión anterior, retómala antes de empezar nada nuevo.
 3. Lee `harness/features.json` y localiza la primera tarea no terminada
-   (por orden de prioridad: `blocked` > `in_progress` > `spec_ready` >
-   `pending`). Máximo UNA feature `in_progress` a la vez (init.sh lo valida).
+   (por orden de prioridad: `blocked` > `human_review` > `in_review` >
+   `in_progress` > `spec_ready` > `todo`). `pending` no se arranca sin el
+   compromiso del humano: sin nada en `todo`, proponle qué comprometer.
+   Máximo UNA feature activa (`in_progress`, `in_review` o `human_review`) a
+   la vez (init.sh lo valida); `todo` no es activa.
 4. Sigue el flujo SDD descrito en `.claude/agents/leader.md`.
 
 ## Mapa del repositorio (no leas todo el proyecto, ve a lo que necesites)
@@ -180,30 +191,6 @@ confirmación cubre el plan que se enseñó, no lo que apareció después.
   repositorio. Lo escribe el instalador; no lo edites a mano.
 - `infra/` — scripts PowerShell de despliegue a Azure + `Dockerfile` en raíz.
 
-## Los otros proyectos: `azure-apps/`
-
-Este ETL no vive solo. `C:\Users\pgris\PycharmProjects\azure-apps` es un
-repositorio git con un documento por proyecto del ecosistema —`sigrid-api`,
-`albaranes`, `partes`, `remesas`, `portal` y este mismo— explicando qué
-expone cada uno, qué consume y qué se rompe si cambia.
-
-**Consúltalo antes de diseñar nada que cruce la frontera del proyecto**: una
-llamada a `sigrid-api`, el PostgreSQL compartido `psql-albaranes-rs9k2`, el
-ACR común `acralbaranesdev`.
-
-Dos reglas: el documento de este proyecto
-(`azure-apps/datamart_seg_anual.md`) **se actualiza cuando cambie lo que
-exponemos o consumimos**, en el mismo trabajo y no después; y **no se
-duplican aquí** los documentos de otros proyectos, se enlazan. Ya pasó con
-`sigrid_api.md`: dos copias, una de 515 líneas y otra de 890.
-
-Además de un documento por proyecto, `azure-apps/` guarda la **documentación
-del sistema origen común**: `sigrid_api.md` (la pasarela) y
-`sigrid_tablas.md` (el diccionario completo de la BBDD de Sigrid: tablas,
-campos, tipos e índices, movido allí el 2026-08-18). Cuando necesites saber
-qué es una tabla o un campo de Sigrid, ve ahí; en `docs/referencia/` de este
-proyecto solo queda el puntero `01_sigrid_tablas.md`.
-
 ## Documentos que llegan de fuera (PDF y ofimática)
 
 Cuando el humano pase un PDF —o un `.docx`, `.xlsx`, `.pptx`— conviértelo a
@@ -222,7 +209,91 @@ original NO se versiona: al repositorio entra solo el Markdown.
   personales, credenciales), **no lo conviertas sin preguntar**: acabaría
   versionado en git.
 
-## El arnés genérico: `arnes-base`
+## Reglas duras (no negociables)
+
+- PROHIBIDO marcar una feature como `done` sin que `bash harness/init.sh`
+  termine en verde (incluye pytest) y sin veredicto APROBADO del reviewer
+  contra `CHECKPOINTS.md`.
+- PROHIBIDO tocar `.env` o subirlo a git. Los secretos no se escriben en
+  ningún fichero del repo ni en specs ni en progress.
+- PROHIBIDO ejecutar comandos que escriban contra Sigrid o contra el Postgres
+  de producción. En local solo lecturas de Sigrid (`ingest`) y escrituras al
+  Postgres local/dev definido en `.env`.
+- Cada feature se desarrolla en su rama `feature/F-XXX-slug`. Nunca commits
+  directos a `dev` ni a `main`: allí solo llegan merges (ver `leader.md`,
+  «Commits, merges y push»).
+- ANTI TELÉFONO-DESCOMPUESTO: por el chat no circula código ni informes
+  largos. Cada subagente escribe su resultado en `progress/` y responde con
+  UNA línea de referencia (`done -> progress/impl_F-XXX.md`). Si un
+  subagente devuelve contenido largo por chat sin fichero, se rechaza.
+- Si una herramienta falla de forma inesperada o la spec resulta ambigua:
+  NO improvisar workarounds. Marcar la feature `blocked`, anotar el motivo
+  en `progress/current.md` y parar.
+- Los agentes ejecutan `bash harness/init.sh` tal cual (o
+  `ARNES_SIN_CACHE=1 bash harness/init.sh`, que también está en la
+  allowlist), sin pipes, tail, otras variables ni decoración (la allowlist de
+  permisos cubre el comando limpio).
+- Convenciones de código: `docs/CONVENTIONS.md`. Arquitectura:
+  `docs/ARCHITECTURE.md`. Léelos antes de diseñar o implementar.
+- LÍMITE DE RESPONSABILIDAD: este repositorio es el ETL del datamart de
+  seguimiento anual, con una responsabilidad acotada. Si una feature exige
+  lógica que se sale de ese límite (otro dominio, una integración que merece
+  vida propia, cosas que tocan a `sigrid-api`, `albaranes` o `partes`), NO se
+  implementa aquí: se marca `blocked` y se propone al humano dónde vive.
+- Los agentes nunca hacen `git push`: lo hace siempre un humano. Commits y
+  merges, sí: sin preguntar, salvo el merge a `main`, que se pregunta antes (ver
+  `leader.md`, «Commits, merges y push»). PRs, solo con petición explícita.
+
+<!-- ==================== INICIO · ENTORNO DE RUESMA ==================== -->
+<!-- Esta sección NO es del arnés: describe convenios de la organización    -->
+<!-- Construcciones Ruesma. Si instalas el arnés fuera de ese entorno,      -->
+<!-- BORRA el bloque entero, desde este comentario hasta el de cierre.      -->
+
+## Convenios del entorno de Ruesma
+
+### El ecosistema: `azure-apps/`
+
+Este ETL no vive solo. `C:\Users\pgris\PycharmProjects\azure-apps` es un
+repositorio git con un documento por proyecto del ecosistema —`sigrid-api`,
+`albaranes`, `partes`, `remesas`, `portal` y este mismo— explicando qué
+expone cada uno, qué consume y qué se rompe si cambia.
+
+**Consúltalo antes de diseñar nada que cruce la frontera del proyecto**: una
+llamada a `sigrid-api`, el PostgreSQL compartido `psql-albaranes-rs9k2`, el
+ACR común `acralbaranesdev`.
+
+Dos reglas: el documento de este proyecto
+(`azure-apps/datamart_seg_anual.md`) **se actualiza cuando cambie lo que
+exponemos o consumimos**, en el mismo trabajo y no después; y **no se
+duplican aquí** los documentos de otros proyectos, se enlazan. Ya pasó con
+`sigrid_api.md`: dos copias, una de 515 líneas y otra de 890.
+
+`azure-apps` es el **repositorio del ecosistema** de este proyecto, el que
+nombran `implementer.md`, `reviewer.md` y `CHECKPOINTS.md` (C3 quater), y está
+**compartido en GitHub**: otros proyectos escriben en él a la vez. Protocolo:
+
+1. `git pull --rebase` antes de editar, en su rama por defecto.
+2. Se toca **solo el documento del propio proyecto**.
+3. Va en un **commit aparte** en `azure-apps`, nunca mezclado con la feature; el
+   commit lo hace el agente sin preguntar.
+4. **el push lo hace siempre el humano**: el resumen final dice qué queda
+   listo para su push.
+5. Ante un conflicto del `pull --rebase`, **PARAR**: la feature pasa a `blocked`
+   y nadie lo resuelve por su cuenta.
+
+Cuentas de GitHub: los repositorios viven en la organización `ruesma-dev`.
+Solo la cuenta `pablogris` sube directamente a `main` y `dev`; el resto entra
+por pull request con revisión previa de `pablogris`. El push lo hace siempre un
+humano.
+
+Además de un documento por proyecto, `azure-apps/` guarda la **documentación
+del sistema origen común**: `sigrid_api.md` (la pasarela) y
+`sigrid_tablas.md` (el diccionario completo de la BBDD de Sigrid: tablas,
+campos, tipos e índices, movido allí el 2026-08-18). Cuando necesites saber
+qué es una tabla o un campo de Sigrid, ve ahí; en `docs/referencia/` de este
+proyecto solo queda el puntero `01_sigrid_tablas.md`.
+
+### El arnés genérico: `arnes-base`
 
 Este arnés no es solo de este proyecto. Su versión genérica y reutilizable
 vive en **`C:\Users\pgris\PycharmProjects\arnes-base`**, hoy ya un
@@ -252,33 +323,4 @@ existe, que es justo lo que hay que cambiar:
 .\instalar_arnes.ps1 -Destino "<ruta-del-proyecto>" -Modo actualizar
 ```
 
-## Reglas duras (no negociables)
-
-- PROHIBIDO marcar una feature como `done` sin que `bash harness/init.sh`
-  termine en verde (incluye pytest) y sin veredicto APROBADO del reviewer
-  contra `CHECKPOINTS.md`.
-- PROHIBIDO tocar `.env` o subirlo a git. Los secretos no se escriben en
-  ningún fichero del repo ni en specs ni en progress.
-- PROHIBIDO ejecutar comandos que escriban contra Sigrid o contra el Postgres
-  de producción. En local solo lecturas de Sigrid (`ingest`) y escrituras al
-  Postgres local/dev definido en `.env`.
-- Cada feature se desarrolla en su rama `feature/F-XXX-slug`. Nunca commits
-  directos a `dev` ni a `main`.
-- ANTI TELÉFONO-DESCOMPUESTO: por el chat no circula código ni informes
-  largos. Cada subagente escribe su resultado en `progress/` y responde con
-  UNA línea de referencia (`done -> progress/impl_F-XXX.md`). Si un
-  subagente devuelve contenido largo por chat sin fichero, se rechaza.
-- Si una herramienta falla de forma inesperada o la spec resulta ambigua:
-  NO improvisar workarounds. Marcar la feature `blocked`, anotar el motivo
-  en `progress/current.md` y parar.
-- Los agentes ejecutan `bash harness/init.sh` tal cual, sin pipes, tail,
-  variables ni decoración (la allowlist de permisos cubre el comando limpio).
-- Convenciones de código: `docs/CONVENTIONS.md`. Arquitectura:
-  `docs/ARCHITECTURE.md`. Léelos antes de diseñar o implementar.
-- LÍMITE DE RESPONSABILIDAD: este repositorio es el ETL del datamart de
-  seguimiento anual, con una responsabilidad acotada. Si una feature exige
-  lógica que se sale de ese límite (otro dominio, una integración que merece
-  vida propia, cosas que tocan a `sigrid-api`, `albaranes` o `partes`), NO se
-  implementa aquí: se marca `blocked` y se propone al humano dónde vive.
-- Los agentes NO hacen `git push` ni crean PRs salvo petición explícita del
-  humano. Commits locales sí, según protocolo del implementer.
+<!-- ===================== FIN · ENTORNO DE RUESMA ====================== -->

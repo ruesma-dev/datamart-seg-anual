@@ -126,7 +126,9 @@ def test_f015_r2_tests_y_no_python_quedan_fuera() -> None:
 
     assert set(lineas) == {"etl_x/util.py"}
     assert es_produccion("etl_x/util.py") is True
-    assert es_produccion("harness/mutacion.py") is True
+    # Arnés 1.7.8 (llegó aquí con la 1.10.0): el arnés sale del alcance
+    # automático, como tests o docs. Antes este assert esperaba True.
+    assert es_produccion("harness/mutacion.py") is False
     for fuera in (
         "tests/test_util.py",
         "specs/F-001-x/design.md",

@@ -1,0 +1,21 @@
+# __RUTA_TESTS__/conftest.py
+"""Capa e2e del servicio (plantilla del arnés, F-059).
+
+Esta carpeta solo se colecta con `ARNES_E2E=1`, que pone `python -m
+harness.e2e`. Sin la variable, pytest la ignora entera: la suite unitaria que
+ejecuta `init.sh` no lanza nunca un navegador. Las reglas de estos tests
+(selectores, esperas, datos, nombres) están en `.claude/agents/qa-e2e.md`.
+"""
+
+import os
+
+import pytest
+
+if os.environ.get("ARNES_E2E") != "1":
+    collect_ignore_glob = ["*"]
+
+
+@pytest.fixture(scope="session")
+def url_base() -> str:
+    """URL de la aplicación levantada en local; la fija `harness.e2e`."""
+    return os.environ.get("ARNES_E2E_URL_BASE", "http://localhost:8000")

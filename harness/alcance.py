@@ -15,15 +15,49 @@ from __future__ import annotations
 import json
 import re
 import subprocess
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from harness.servicios import Servicio, cargar_servicios, servicio_de_ruta
 
 #: Directorios cuyo contenido nunca es código de producción mutable. Se
 #: comparan como SEGMENTO de ruta a cualquier profundidad, no como prefijo de
 #: la raíz: en un repositorio con servicios en subcarpetas, los tests de un
 #: servicio son tests igual que los de la raíz.
-DIRECTORIOS_EXCLUIDOS: tuple[str, ...] = ("tests", "specs", "progress", "docs")
+#:
+#: `harness` está aquí por la misma razón que `tests`: es utillaje, no producto.
+#: Sin excluirlo, tocar el arnés desde la rama de una feature mete sus propias
+#: líneas en el alcance, y entonces la campaña **se muta a sí misma** y la
+#: puerta de cobertura mide la herramienta en vez de lo que la herramienta
+#: vigila.
+#:
+#: La excepción la declara el propio proyecto, servicio a servicio, con
+#: `"alcance_incluye": ["harness"]` en `harness/servicios.json` (F-052): en el
+#: repositorio que fabrica el arnés, `<payload>/harness/` es el producto. Ver
+#: `excluidos_de_ruta`.
+DIRECTORIOS_EXCLUIDOS: tuple[str, ...] = (
+    "tests",
+    "specs",
+    "progress",
+    "docs",
+    "harness",
+)
+
+#: Exclusiones que aplican cuando el alcance lo DECLARA una persona con
+#: `--ficheros`. `harness` NO está, a propósito: la exclusión de arriba protege
+#: el alcance AUTOMÁTICO —el que sale del diff, que nadie eligió y que arrastra
+#: el arnés sin querer en cuanto una rama lo toca—, y aquí no hay nada de lo que
+#: proteger a quien escribe la lista. Medir si la maquinaria del arnés está
+#: protegida por sus tests es, literalmente, la razón por la que `--ficheros`
+#: existe (ver `alcance_de_ficheros`), y en el repositorio del propio arnés esa
+#: maquinaria es el producto, no el utillaje.
+DIRECTORIOS_EXCLUIDOS_AL_DECLARAR: tuple[str, ...] = (
+    "tests",
+    "specs",
+    "progress",
+    "docs",
+)
 
 #: Ruta por defecto del inventario de features del arnés.
 RUTA_FEATURES = "harness/features.json"
@@ -109,24 +143,62 @@ def parsear_diff(texto: str) -> dict[str, set[int]]:
     return {ruta: lineas for ruta, lineas in resultado.items() if lineas}
 
 
-def es_produccion(ruta: str) -> bool:
+def es_produccion(
+    ruta: str, excluidos: tuple[str, ...] = DIRECTORIOS_EXCLUIDOS
+) -> bool:
     """¿Es `ruta` código de producción susceptible de mutarse o medirse?
 
     Solo Python, y con ningún directorio excluido en su camino: basta con que
-    `tests`, `specs`, `progress` o `docs` aparezca como un segmento completo,
-    esté en la raíz o dentro de un servicio del monorepo. El nombre del propio
-    fichero no cuenta: `app/docs.py` es código.
+    uno de `excluidos` aparezca como un segmento completo, esté en la raíz o
+    dentro de un servicio del monorepo. El nombre del propio fichero no cuenta
+    (`app/docs.py` es código), ni vale como prefijo (`harnesses/util.py` también
+    lo es).
+
+    `excluidos` se pasa a mano en un solo sitio: el alcance declarado con
+    `--ficheros`, que sí puede nombrar el arnés. Ver
+    `DIRECTORIOS_EXCLUIDOS_AL_DECLARAR`.
     """
     normalizada = ruta.replace("\\", "/")
     if not normalizada.endswith(".py"):
         return False
     directorios = normalizada.split("/")[:-1]
-    return not any(nombre in DIRECTORIOS_EXCLUIDOS for nombre in directorios)
+    return not any(nombre in excluidos for nombre in directorios)
 
 
-def filtrar_produccion(lineas: dict[str, set[int]]) -> dict[str, set[int]]:
-    """Deja solo los ficheros de producción del mapa de líneas."""
-    return {ruta: nums for ruta, nums in lineas.items() if es_produccion(ruta)}
+def excluidos_de_ruta(
+    ruta: str, servicios: Sequence[Servicio] = ()
+) -> tuple[str, ...]:
+    """Exclusiones del alcance automático que aplican a `ruta` (F-052).
+
+    Las de siempre, menos lo que declare en `alcance_incluye` el servicio al
+    que pertenece la ruta. La pertenencia es por SEGMENTOS, la misma de
+    `servicio_de_ruta`: `arnes-base-x/harness/a.py` no cae bajo `arnes-base`.
+    Sin servicios, o con servicios que no declaran nada, el resultado es
+    exactamente `DIRECTORIOS_EXCLUIDOS`.
+    """
+    servicio = servicio_de_ruta(ruta, list(servicios))
+    if servicio is None or not servicio.alcance_incluye:
+        return DIRECTORIOS_EXCLUIDOS
+    return tuple(
+        nombre
+        for nombre in DIRECTORIOS_EXCLUIDOS
+        if nombre not in servicio.alcance_incluye
+    )
+
+
+def filtrar_produccion(
+    lineas: dict[str, set[int]], servicios: Sequence[Servicio] = ()
+) -> dict[str, set[int]]:
+    """Deja solo los ficheros de producción del mapa de líneas.
+
+    `servicios` es la declaración de `harness/servicios.json`: solo cambia algo
+    si algún servicio declara `alcance_incluye` (ver `excluidos_de_ruta`).
+    """
+    return {
+        ruta: nums
+        for ruta, nums in lineas.items()
+        if es_produccion(ruta, excluidos_de_ruta(ruta, servicios))
+    }
 
 
 # --- Resolución de referencias ----------------------------------------------
@@ -135,7 +207,7 @@ def filtrar_produccion(lineas: dict[str, set[int]]) -> dict[str, set[int]]:
 #: Solo es el último recurso: la base de verdad la declara cada proyecto.
 RAMA_BASE_POR_DEFECTO = "dev"
 
-#: Ramas de larga vida que se vigilan al diagnosticar la base (F-112): si los
+#: Ramas de larga vida que se vigilan al diagnosticar la base (1.7.14): si los
 #: commits que la puerta mediría ya viven en alguna de ellas, no son de la
 #: rama, y la base se ha quedado por detrás de donde se integra el trabajo.
 RAMAS_DE_LARGA_VIDA: tuple[str, ...] = ("main", "master", "dev", "develop")
@@ -152,7 +224,7 @@ def rama_base_configurada(raiz: str = ".") -> str:
     las puertas, y las herramientas que se lanzan a mano (`harness.mutacion`,
     `harness.cobertura`, `harness.rutas_sensibles`) la leen de aquí cuando no
     se les pasa. Antes cada una traía `dev` cableado, y en un repositorio que
-    integra en `main` eso medía semanas de trabajo ajeno sin avisar (F-112).
+    integra en `main` eso medía semanas de trabajo ajeno sin avisar (1.7.14).
     Sin `init.sh` o sin la variable, `RAMA_BASE_POR_DEFECTO`.
     """
     guion = Path(raiz) / "harness" / "init.sh"
@@ -185,7 +257,7 @@ def diagnosticar_base(
     La puerta calcula el diff desde el merge-base de `rama` con `base`: si
     alguno de esos commits ya vive en otra rama de larga vida, es trabajo ajeno
     que la puerta atribuiría a la feature. Es exactamente lo que pasaba con
-    `dev` parada y el trabajo integrándose en `main` (F-112): la cobertura
+    `dev` parada y el trabajo integrándose en `main` (1.7.14): la cobertura
     «de la feature» era la de semanas de features cerradas, y dos features
     distintas daban la misma cifra.
 
@@ -273,7 +345,7 @@ def resolver_refs(
             # La rama entera ya está dentro de la base: o se integró, o aún no
             # tiene commits propios. En el primer caso el diff base..rama sale
             # VACÍO y la feature parecería no haber tocado nada; lo que cambió
-            # es lo que trajo el merge que la integró (F-112).
+            # es lo que trajo el merge que la integró (1.7.14).
             merge = merge_que_integra(rama, base, git=git)
             if merge:
                 return (f"{merge}^1", merge, "merge")
@@ -368,11 +440,12 @@ def alcance_de_ficheros(rutas: list[str], feature_id: str, raiz: str = ".") -> A
                 f"--ficheros: {normalizada} no existe en {base.as_posix()}. "
                 "Abortado sin tocar nada."
             )
-        if not es_produccion(normalizada):
+        if not es_produccion(normalizada, DIRECTORIOS_EXCLUIDOS_AL_DECLARAR):
             raise SystemExit(
                 f"--ficheros: {normalizada} no es código de producción "
                 "(solo .py fuera de "
-                f"{', '.join(DIRECTORIOS_EXCLUIDOS)}). Abortado sin tocar nada."
+                f"{', '.join(DIRECTORIOS_EXCLUIDOS_AL_DECLARAR)}). "
+                "Abortado sin tocar nada."
             )
         total = len(fichero.read_text(encoding="utf-8").splitlines())
         lineas[normalizada] = set(range(1, total + 1))
@@ -404,9 +477,17 @@ def alcance_de_feature(
     rama: str | None = None,
     raiz: str = ".",
     git: EjecutorGit | None = None,
+    servicios: Sequence[Servicio] | None = None,
 ) -> Alcance:
-    """Calcula el alcance de una feature desde el diff de git."""
+    """Calcula el alcance de una feature desde el diff de git.
+
+    `servicios`: la declaración ya cargada por quien llama (la puerta de
+    cobertura y la campaña la necesitan igualmente); sin ella se lee la de
+    `raiz`, y una declaración rota lanza `ValueError` como en `cargar_servicios`.
+    """
     git = git or git_en(raiz)
+    if servicios is None:
+        servicios = cargar_servicios(raiz=raiz)
     if rama is None:
         rama = rama_de_feature(feature_id, str(Path(raiz) / RUTA_FEATURES))
 
@@ -416,5 +497,5 @@ def alcance_de_feature(
         feature=feature_id,
         origen=origen,
         ref_diff=(ref_a, ref_b),
-        lineas=filtrar_produccion(parsear_diff(texto)),
+        lineas=filtrar_produccion(parsear_diff(texto), servicios),
     )

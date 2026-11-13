@@ -1,0 +1,18 @@
+// playwright.config.ts
+// Capa e2e del servicio (plantilla del arnés, F-059). La lanza
+// `python -m harness.e2e`, que fija ARNES_E2E_URL_BASE y ARNES_E2E_SALIDA. Las
+// reglas de los tests están en `.claude/agents/qa-e2e.md`.
+import { defineConfig } from '@playwright/test';
+
+const salida = process.env.ARNES_E2E_SALIDA;
+
+export default defineConfig({
+  testDir: './__RUTA_TESTS__',
+  timeout: 30_000,
+  expect: { timeout: 10_000 },
+  outputDir: salida ? `${salida}/trazas` : 'test-results',
+  use: {
+    baseURL: process.env.ARNES_E2E_URL_BASE ?? 'http://localhost:5173',
+    trace: 'retain-on-failure',
+  },
+});

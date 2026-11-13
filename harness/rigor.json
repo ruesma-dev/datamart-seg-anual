@@ -1,11 +1,11 @@
 {
-  "$doc": "Niveles de rigor del arnes. El umbral de cobertura, el timeout de mutacion, los topes de tamano del papeleo y lo que exige cada nivel se editan AQUI, nunca en init.sh ni en el codigo. Si una feature no declara 'rigor' en features.json se le aplica 'nivel_por_defecto'.",
+  "$doc": "Niveles de rigor del arnes. Un proyecto los afina en harness/rigor.local.json (capa local, F-063): pisa a este fichero clave a clave, el instalador no la toca y cambiarla dentro de una feature necesita el OK explicito del humano. El umbral de cobertura, el timeout de mutacion, los topes de tamano del papeleo y lo que exige cada nivel se editan AQUI, nunca en init.sh ni en el codigo. Si una feature no declara 'rigor' en features.json se le aplica 'nivel_por_defecto'. Cada nivel declara fase_red, cobertura y mutacion: true la exige y false no. Claves opcionales de un nivel, que activan el mecanismo por datos y no por nombre: 'informativas' (puertas que se miden y no bloquean), 'limites' (puerta de carril), 'tamano' (topes propios) y 'spec' (false: no admite sdd true). Muestreo de mutacion (F-058): 'un_mutante_por_linea' (true: antes de sortear se deja UN mutante por fichero y linea, elegido con la semilla; si uno muere, los de su linea suelen morir con el), 'fraccion_mutantes' (tope proporcional a los C candidatos que quedan tras esa reduccion: min(max_mutantes, max(min_mutantes, ceil(fraccion_mutantes * C))); sin ella, max_mutantes es un tope fijo y min_mutantes no pinta nada), 'min_mutantes' (suelo) y 'umbral_cobertura' (entero 0-100 que pisa el global para ese nivel). Si los candidatos no pasan del tope, campana completa: no se sortea nada. La campana entera se pide con '--max-mutantes 0' en la orden (conserva el uno por linea) o, para siempre, quitando 'fraccion_mutantes' y 'un_mutante_por_linea' del nivel y poniendo 'max_mutantes: null'. mutacion.incremental (OPCIONAL): muestra de control de '--incremental', max(control_minimo, ceil(control_fraccion * muertos)); sin el bloque, 0.1 y 5. Puerta opcional 'e2e' (F-059): capa de tests de navegador de 'python -m harness.e2e'; ausente no se exige, declarada es true o false y puede ir en 'informativas'. Hoy es informativa en estandar y critico (se mide y no bloquea, salvo un ROJO reproducido, que devuelve la feature a in_progress); pasa a puerta (e2e: true) solo por decision del piloto F-047.",
   "nivel_por_defecto": "estandar",
   "cobertura": {
     "umbral_lineas_cambiadas": 80
   },
   "mutacion": {
-    "$doc": "timeout_por_mutante_s: SUELO de segundos por mutante, nunca un techo. El timeout EFECTIVO se deriva de la linea base que la campana ya mide dentro de cada worktree con los W workers compitiendo: max(suelo, ceil(peor_linea_base_s * 2)). Un mutante nunca recibe menos que este valor, y la propia linea base corre con suelo*5. El margen y la holgura son constantes del codigo (harness/mutacion.py), no configuracion: son parametros del mecanismo, no de la maquina. Tiene que ser un entero estrictamente positivo; un booleano NO vale (true daria 1 segundo). workers (OPCIONAL, no declarada aqui a proposito): evaluadores concurrentes de 'python -m harness.mutacion'; sin ella el default es min(max(1, (nucleos - 2) // 2), 4), que se adapta a la maquina en vez de viajar cableado de una a otra. El // 2 y el tope 4 vienen de una medicion del 2026-08-21: cada worker arranca una suite COMPLETA (interprete, importaciones, E/S), no un hilo, asi que el recurso escaso es la maquina y no el nucleo. Precedencia: --workers > mutacion.workers > default; lo que se pida a mano no se recorta.",
+    "$doc": "timeout_por_mutante_s: SUELO de segundos por mutante, nunca un techo. El timeout EFECTIVO se deriva de la linea base que la campana ya mide dentro de cada worktree con los W workers compitiendo: max(suelo, ceil(peor_linea_base_s * 2)). Un mutante nunca recibe menos que este valor, y la propia linea base corre con suelo*5*W (W = workers de la campana, minimo 1: con W suites compitiendo, cada una avanza hasta W veces mas despacio; F-019). El margen y la holgura son constantes del codigo (harness/mutacion.py), no configuracion: son parametros del mecanismo, no de la maquina. Tiene que ser un entero estrictamente positivo; un booleano NO vale (true daria 1 segundo). workers (OPCIONAL, no declarada aqui a proposito): evaluadores concurrentes de 'python -m harness.mutacion'; sin ella el default es min(max(1, (nucleos - 2) // 2), 4), que se adapta a la maquina en vez de viajar cableado de una a otra. El // 2 y el tope 4 vienen de una medicion del 2026-08-21: cada worker arranca una suite COMPLETA (interprete, importaciones, E/S), no un hilo, asi que el recurso escaso es la maquina y no el nucleo. Precedencia: --workers > mutacion.workers > default; lo que se pida a mano no se recorta. ficheros_no_versionados (OPCIONAL, F-023, no declarada aqui a proposito): lista de rutas relativas a la raiz, sin .. ni absolutas, que la suite necesita y git no versiona; la campana paralela las copia a cada worktree y, si falta alguna en el arbol principal, aborta nombrandola. El .env nunca se copia (se vuelca como variables). Se declara en harness/rigor.local.json; sin ella, solo llega el .env, como siempre. seleccion_de_tests (OPCIONAL, F-019, no declarada aqui a proposito): true enciende la seleccion de tests por mutante (mapa linea -> tests medido con coverage, poda de lo que no ejecuta nadie y subconjuntos validados, revalidando con la suite entera lo que no matan); ausente o false, cada mutante se juzga con la suite entera, como en la 1.9.0. Apagada por defecto porque en la suite del propio arnes costo un 34 % mas de lo que ahorro. Se enciende tambien con '--con-seleccion'; la orden manda sobre la clave y '--sin-seleccion' la apaga. Se declara en harness/rigor.local.json.",
     "timeout_por_mutante_s": 120
   },
   "tamano": {
@@ -25,23 +25,50 @@
       "max_mutantes": null,
       "semilla": null
     },
+    "express": {
+      "$doc": "Carril rapido: cambio pequeno y sin riesgo. Sin fase RED ni mutacion; cobertura informativa (se mide y no bloquea). spec false: una feature sdd true no puede usar este nivel. limites los comprueba la puerta de carril (harness/carril.py, seccion 7 quinquies de init.sh) contra el diff comprometido; no_cuentan usa los patrones de harness/rutas_sensibles.py, y lo que quede fuera cuenta: error por exceso, nunca por defecto. Una ruta sensible declarada se sale del carril cuente o no. tamano pisa los topes globales clave a clave. Los 3 ficheros vienen del plan de velocidad; las 150 lineas y el review de 60 son una propuesta sin medicion detras (2026-10-30): se afinan aqui tras usarlos.",
+      "fase_red": false,
+      "cobertura": false,
+      "mutacion": false,
+      "informativas": ["cobertura"],
+      "spec": false,
+      "supervivientes_maximos": null,
+      "max_mutantes": null,
+      "semilla": null,
+      "limites": {
+        "ficheros": 3,
+        "lineas": 150,
+        "no_cuentan": ["progress/**", "specs/**", "BACKLOG.md", "harness/features.json", "tests/**", "**/tests/**"]
+      },
+      "tamano": {
+        "impl": 40,
+        "review": 60
+      }
+    },
     "estandar": {
-      "$doc": "Codigo sin riesgo sobre sistemas compartidos. Los supervivientes se documentan y el reviewer juzga. La campana va MUESTREADA a 20 mutantes con semilla fija: acota el coste de analizar supervivientes por escrito y es reproducible (dos reviewers obtienen los mismos 20). Sus numeros NO son comparables con los de campanas completas anteriores.",
+      "$doc": "Codigo sin riesgo sobre sistemas compartidos. La mutacion es INFORMATIVA: la campana se lanza siempre, y ni sus supervivientes ni su ausencia bloquean (mutacion false + informativas; sin informativas, mutacion false significaria que no se lanza). Uno por linea y MUESTREADA a 20 mutantes fijos con semilla fija: es reproducible (dos reviewers obtienen los mismos 20); con 0 supervivientes el informe da la cota de la regla del tres, solo informativa. Usa el umbral de cobertura global. Sus numeros NO son comparables con los de campanas anteriores.",
       "fase_red": true,
       "cobertura": true,
-      "mutacion": true,
+      "mutacion": false,
+      "informativas": ["mutacion", "e2e"],
       "supervivientes_maximos": null,
+      "un_mutante_por_linea": true,
       "max_mutantes": 20,
       "semilla": 20260820
     },
     "critico": {
-      "$doc": "Infraestructura compartida, produccion, seguridad o dinero. Cada superviviente exige un test nuevo o una justificacion escrita aceptada por el humano. max_mutantes null = SIN TOPE: aqui se mide la campana entera.",
+      "$doc": "Dinero, escritura en produccion o en un recurso compartido, seguridad, contrato publico o una puerta del trabajo: el criterio esta en CHECKPOINTS.md. Cada superviviente de la muestra exige un test nuevo o una justificacion escrita aceptada por el humano. Uno por linea y el 60 % de los candidatos, acotado a [100, 300]: con 100 candidatos o menos, campana completa. Semilla 20261030, nueva con F-058: estas campanas NO son comparables con las enteras anteriores. La entera la pide el humano con '--max-mutantes 0'. Cobertura 90 %, del nivel.",
       "fase_red": true,
       "cobertura": true,
       "mutacion": true,
+      "informativas": ["e2e"],
       "supervivientes_maximos": 0,
-      "max_mutantes": null,
-      "semilla": null
+      "un_mutante_por_linea": true,
+      "fraccion_mutantes": 0.6,
+      "min_mutantes": 100,
+      "max_mutantes": 300,
+      "semilla": 20261030,
+      "umbral_cobertura": 90
     }
   }
 }

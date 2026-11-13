@@ -1,0 +1,11 @@
+// __RUTA_TESTS__/f000_r1_smoke.spec.ts
+// Smoke de la capa e2e (plantilla del arnés): la portada abre y enseña su
+// título. Renómbralo al requisito que cubra (`fXXX_rN_...`) o bórralo cuando
+// haya tests de verdad. Espera por estado, nunca con un sleep.
+import { test, expect } from '@playwright/test';
+
+test('f000_r1_smoke: la portada abre', async ({ page }) => {
+  await page.goto('/');
+
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 10_000 });
+});

@@ -235,16 +235,16 @@ se suman ni se mezclan (D3). `00_global.yaml`: `R-VERSION-MASTER` (`resumen` inc
 
 | Id | Pregunta | Opciones | Recomendación | Decidido |
 |---|---|---|---|---|
-| D5 | Universo del catálogo | (a) líneas de `stg.presupuesto` ∪ versiones de `plan_mensual`, cabecera opcional · (b) solo cabeceras con líneas | (a): no se pierde ningún importe (2 versiones sin cabecera) y contiene el de hoy por construcción | |
-| D6 | Versión 0 de los ámbitos 8 y 11 | (a) fuera, salvo las 8 filas que hoy ya están por tener reparto · (b) fuera todas · (c) dentro todas | (a): (b) cambia la vista de hoy y (c) mete el vivo de F-157 en el catálogo | |
-| D7 | Qué es una línea con reparto | (a) deja filas en `plan_mensual` · (b) tiene `planif` escrito | (a): (b) da 751 donde hay 690 en la 0698 v23. Y COMPLETO/PARCIAL se mira sobre `importe` <> 0 | |
-| D8 | Qué versiones cuentan para el último cierre | (a) >= 1 con líneas y fecha, de cualquier tipo (incluye la v1 «CIERRE INICIAL_OBRA») · (b) además fuera las «CIERRE INICIAL_*» | (a): es D1 literal y da importe a la 0721 | |
-| D9 | Grano de `master_importe_mensual` | (a) obra × ámbito × mes, hasta el mes del build · (b) solo la foto de hoy | (a): es el «al lado del mensual» de D3, y la foto es su último mes | |
-| D10 | `diferencia_importe` | (a) total del último cierre − total de la temporal · (b) contra lo que la temporal reparte (`importe_con_reparto`) | (a), y se publica también (b) como columna: las dos cifras sin mezclarlas | |
-| D11 | Un solo catálogo | (a) `02` lee `mart.master_versiones_tipadas` · (b) `02` no se toca y un test vigila que los dos coinciden | (a): es el alcance (4), y R11, R16 y la huella lo prueban | |
-| D12 | La marca por línea | (a) vista con `EXISTS` (sin disco) · (b) tabla de ~4,6 M de filas | (a): el disco es compartido y por obra va por índice | |
-| D13 | Cabecera duplicada en `obrfasamb` | (a) la de `ide` mayor, como `descompuestos` · (b) dos filas, como hoy | (a): hoy hay 0 casos y el grano queda único | |
-| D14 | Ámbitos de la vista por partida | (a) coste y venta · (b) solo coste | (a): la venta sin reparto (0693 v20) también se pierde hoy | |
+| D5 | Universo del catálogo | (a) líneas de `stg.presupuesto` ∪ versiones de `plan_mensual`, cabecera opcional · (b) solo cabeceras con líneas | (a): no se pierde ningún importe (2 versiones sin cabecera) y contiene el de hoy por construcción || (a), 2026-11-13 |
+| D6 | Versión 0 de los ámbitos 8 y 11 | (a) fuera, salvo las 8 filas que hoy ya están por tener reparto · (b) fuera todas · (c) dentro todas | (a): (b) cambia la vista de hoy y (c) mete el vivo de F-157 en el catálogo || (a), 2026-11-13 |
+| D7 | Qué es una línea con reparto | (a) deja filas en `plan_mensual` · (b) tiene `planif` escrito | (a): (b) da 751 donde hay 690 en la 0698 v23. Y COMPLETO/PARCIAL se mira sobre `importe` <> 0 || (a), 2026-11-13 |
+| D8 | Qué versiones cuentan para el último cierre | (a) >= 1 con líneas y fecha, de cualquier tipo (incluye la v1 «CIERRE INICIAL_OBRA») · (b) además fuera las «CIERRE INICIAL_*» | (a): es D1 literal y da importe a la 0721 || (a), 2026-11-13 |
+| D9 | Grano de `master_importe_mensual` | (a) obra × ámbito × mes, hasta el mes del build · (b) solo la foto de hoy | (a): es el «al lado del mensual» de D3, y la foto es su último mes || (a), 2026-11-13 |
+| D10 | `diferencia_importe` | (a) total del último cierre − total de la temporal · (b) contra lo que la temporal reparte (`importe_con_reparto`) | (a), y se publica también (b) como columna: las dos cifras sin mezclarlas || (a) y (b) como columna, 2026-11-13 |
+| D11 | Un solo catálogo | (a) `02` lee `mart.master_versiones_tipadas` · (b) `02` no se toca y un test vigila que los dos coinciden | (a): es el alcance (4), y R11, R16 y la huella lo prueban || (a), 2026-11-13 |
+| D12 | La marca por línea | (a) vista con `EXISTS` (sin disco) · (b) tabla de ~4,6 M de filas | (a): el disco es compartido y por obra va por índice || (a), 2026-11-13 |
+| D13 | Cabecera duplicada en `obrfasamb` | (a) la de `ide` mayor, como `descompuestos` · (b) dos filas, como hoy | (a): hoy hay 0 casos y el grano queda único || (a), 2026-11-13 |
+| D14 | Ámbitos de la vista por partida | (a) coste y venta · (b) solo coste | (a): la venta sin reparto (0693 v20) también se pierde hoy || (a), 2026-11-13 |
 
 Queda fuera, y se avisa al humano: que la temporal se elija por TENER reparto en vez de por tipo (era
 D2, revocada); el reparto incompleto dentro de una línea; la obra 1562946; y el `.pbix`.

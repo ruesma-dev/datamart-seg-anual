@@ -9,7 +9,9 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-11-13 · F-161 · `spec_ready` · spec escrita, pendiente de la PARADA 1 · rama `feature/F-161-versiones-sin-reparto`
+## 2026-11-13 · F-161 · `in_progress` · spec APROBADA por el humano · rama `feature/F-161-versiones-sin-reparto`
+
+- **Resumen de la spec aprobado el 2026-11-13** («hecho»): todas las recomendaciones. D5 a D14 en (a); en D10, (a) y además (b) como columna aparte. `spec_aprobada` anotada. Implementer lanzado sobre el arnés 1.10.1.
 
 - El spec-author ha escrito la spec en `specs/F-161-versiones-sin-reparto/`. Las cifras y las
   consultas están en `progress/spec_F-161.md`.
@@ -22,7 +24,7 @@
   - el catálogo único `mart.master_versiones_tipadas`, que pasa a `mart/01b_master_versiones.sql`;
   - `mart.v_master_version_partida`;
   - `mart.master_importe_mensual`, con el último cierre al lado de la temporal y su diferencia.
-- **Decisiones abiertas para el humano (design §10):**
+- **Decisiones del humano (design §10, ya decididas):**
   - D5: universo del catálogo;
   - D6: versión 0;
   - D7: qué es una línea con reparto;
@@ -43,6 +45,13 @@
   - la ficha de `stg.plan_mensual` niega que haya versión 0, y la hay en 4 obras;
   - la obra 1338614 está fuera de `stg.obras` y sigue en el catálogo;
   - hay líneas con `planif` que no dejan ningún mes.
+
+## 2026-11-13 · Arnés 1.10.1 integrado en `main` · F-161 con la spec lista (`spec_ready`)
+
+- **Arnés:** de la 1.7.7 a la 1.10.1, en la rama `chore/arnes-1.10.0`. Informe en `progress/impl_arnes_1.10.0.md`.
+  - El hotfix 1.10.1 (F-074 de arnes-base) corrigió los tests R6 y R7.
+  - La puerta con `.env` sobre `258a0ba` da exit 0, con 13.075 passed. Tardó 1 h 30.
+  - El espejo `dev` lo adelanta el líder (R1).
 
 ## 2026-11-12 · F-162 · `done` (cerrada por el humano) · F-053 absorbida · VIGILAR la nocturna del 13
 

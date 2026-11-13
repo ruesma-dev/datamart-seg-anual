@@ -21,7 +21,8 @@ el implementer y la relee el reviewer. Por eso el papeleo tiene tope:
 Los números viven en el bloque `tamano` de `harness/rigor.json` y los mide
 `python -m harness.tamano --feature F-XXX`, que `bash harness/init.sh` ejecuta
 sobre la feature en curso (sección 7 quater): pasarse **pone el portero en
-rojo**.
+rojo**. Un nivel puede declarar topes propios en su bloque `tamano`, que pisan
+los generales clave a clave.
 
 Los cuatro se **ampliaron el 2026-08-20** (eran 120 / 200 / 150 / 100). En el
 repositorio donde se calibraron, la mediana histórica era ~484 líneas en los
@@ -51,6 +52,13 @@ Cada requisito con id `R1, R2...` y una de estas plantillas:
 Regla de oro: cada R se traduce a >= 1 test. Si no puedes imaginar el test,
 el requisito está mal escrito.
 
+**Capa del test.** Cada requisito termina con la capa que lo prueba: `(capa:
+unit)`, `(capa: integración)` o `(capa: e2e)`. Sin marca, cuenta como unit: las
+specs anteriores siguen valiendo. `(capa: e2e)` solo vale si el servicio
+declara el bloque `e2e` en `harness/servicios.json`; sus tests los escribe el
+agente `qa-e2e`, no el implementer, y `python -m harness.e2e` los traza por
+nombre (`test_fXXX_rN_*`).
+
 Ejemplo:
 > R1. CUANDO el usuario ejecuta `python main.py version`, el sistema debe
 > imprimir la versión semántica y salir con código 0.
@@ -67,6 +75,20 @@ Secciones obligatorias:
 - **SQL** (si aplica): capa/esquema al que pertenece, numeración del
   fichero siguiendo la convención `NN_nombre.sql`, tablas/vistas afectadas.
 - **Riesgos y decisiones**: alternativas descartadas y por qué.
+- **Frontera**: responde «¿Cruza la frontera del proyecto?» con sí/no. Si sí,
+  qué cambia (endpoint, tabla, variable de entorno, base de datos u otro
+  recurso compartido) y qué documento del ecosistema se actualiza (el
+  repositorio del ecosistema que declare `CLAUDE.md`, si lo declara).
+- **Decisiones**: lo que el humano tiene que decidir, en una tabla con esta
+  cabecera exacta, «Decidido» vacío al entregar:
+
+  | Decisión | Opciones | Recomendado | Decidido |
+  |---|---|---|---|
+  | D1 … | (a) …; (b) … | (a) | |
+
+  La columna «Decidido» lo escribe el líder con la respuesta del humano, en el
+  mismo commit en que anota `spec_aprobada`. Sin decisiones abiertas, la tabla
+  dice «ninguna».
 
 ## 3. tasks.md — lista de tareas atómicas (una tarea por línea)
 
