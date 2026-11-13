@@ -146,6 +146,8 @@ candidatos AS (
     CROSS JOIN params p
     JOIN mart.master_versiones_tipadas vt
         ON vt.obra_id = ao.obra_id
+       -- F-161 (R10, D4): solo las versiones con reparto, las de siempre.
+       AND vt.tiene_reparto
        AND vt.tipo_master IN ('Planif Inicial', 'ABC', 'Cuatrimestral')
        AND vt.version_fec_efectiva <= CASE
                 WHEN ao.anio < p.anio_actual THEN make_date(ao.anio, 12, 31)
