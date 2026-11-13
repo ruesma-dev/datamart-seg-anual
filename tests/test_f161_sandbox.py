@@ -34,6 +34,10 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+from etl_sigrid.infrastructure.postgres.master_versiones_sql import (
+    CATALOGO_ANTERIOR,
+    sql_comparacion_catalogo,
+)
 
 from etl_sigrid.application.steps.build_stg_step import (
     DIRECTORIO_SQL_STG,
@@ -44,10 +48,6 @@ from etl_sigrid.domain.master_versiones import (
     clasificar_reparto,
     tipo_master,
     version_vigente,
-)
-from etl_sigrid.infrastructure.postgres.master_versiones_sql import (
-    CATALOGO_ANTERIOR,
-    sql_comparacion_catalogo,
 )
 
 DSN = os.environ.get("F161_SANDBOX_DSN")

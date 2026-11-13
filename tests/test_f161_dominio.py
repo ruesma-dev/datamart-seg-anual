@@ -18,7 +18,7 @@ pequeño. Sin red ni BBDD: la sandbox compara este oráculo con el SQL.
 from __future__ import annotations
 
 from datetime import date
-from decimal import Decimal as D
+from decimal import Decimal
 
 import pytest
 
@@ -29,6 +29,8 @@ from etl_sigrid.domain.master_versiones import (
     tipo_master,
     version_vigente,
 )
+
+D = Decimal
 
 # --- tipo_master: la cascada (R7) -------------------------------------------
 
