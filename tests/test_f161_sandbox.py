@@ -34,10 +34,6 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from etl_sigrid.infrastructure.postgres.master_versiones_sql import (
-    CATALOGO_ANTERIOR,
-    sql_comparacion_catalogo,
-)
 
 from etl_sigrid.application.steps.build_stg_step import (
     DIRECTORIO_SQL_STG,
@@ -48,6 +44,10 @@ from etl_sigrid.domain.master_versiones import (
     clasificar_reparto,
     tipo_master,
     version_vigente,
+)
+from etl_sigrid.infrastructure.postgres.master_versiones_sql import (
+    CATALOGO_ANTERIOR,
+    sql_comparacion_catalogo,
 )
 
 DSN = os.environ.get("F161_SANDBOX_DSN")
@@ -161,7 +161,8 @@ def _cargar(c) -> None:
     )
     c.execute(componer_sql_tramo(_stg("08_plan_mensual.sql"), [OBRA_A, OBRA_B]))
     c.execute(_stg("10_master_versiones.sql"))
-    for nombre in ("01_ddl.sql", "01b_master_versiones.sql", "02_build_fact.sql"):
+    for nombre in ("01_ddl.sql", "01b_master_versiones.sql", "02_build_fact.sql",
+                   "06_cp_tipologia.sql"):
         c.execute(_mart(nombre))
 
 
@@ -197,7 +198,8 @@ def test_f161_r2_la_marca_por_linea_es_dejar_filas(conexion) -> None:
         "SELECT obra_id, ambito_id, version, partida_id FROM stg.v_master_lineas "
         "WHERE tiene_reparto ORDER BY 1, 2, 3, 4"
     ).fetchall()
-    assert con == [(OBRA_A, 8, 1, 1), (OBRA_A, 8, 2, 1), (OBRA_A, 8, 4, 1), (OBRA_A, 11, 1, 1)]
+    # La v4 tiene `planif` pero no cabecera: `08` no la reparte.
+    assert con == [(OBRA_A, 8, 1, 1), (OBRA_A, 8, 2, 1), (OBRA_A, 11, 1, 1)]
     assert conexion.execute(
         "SELECT count(*) FROM stg.v_master_lineas WHERE version = 0"
     ).fetchone() == (0,)
@@ -408,3 +410,16 @@ def test_f161_r16_el_mensual_usa_la_version_temporal(conexion) -> None:
         "WHERE f.tipo_dato = 'PLANIFICADO'"
     ).fetchone()[0]
     assert cubiertos > 0, "control: el cruce no puede estar vacío"
+
+
+# --- R10 · la vigencia anual solo mira versiones con reparto --------------------
+
+
+def test_f161_r10_master_vigente_anual_solo_con_reparto(conexion) -> None:
+    fuera = conexion.execute(
+        "SELECT va.obra_id, va.ambito_id, va.version FROM mart.master_vigente_anual va "
+        "JOIN mart.master_versiones_tipadas vt USING (obra_id, ambito_id, version) "
+        "WHERE NOT vt.tiene_reparto"
+    ).fetchall()
+    assert fuera == []
+    assert conexion.execute("SELECT count(*) FROM mart.master_vigente_anual").fetchone()[0] > 0
