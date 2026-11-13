@@ -823,7 +823,18 @@
 # `R-EMPRESA-POR-DEFECTO` alcanza a `stg`, `mart` y `cierre` y dice como leer una
 # obra sin empresa; `R-UNIVERSO-OBRA` ya no deduplica; `R-CODIGO-POR-EMPRESA`
 # alcanza a las dos vistas. Las preguntas de «la obra X» llevan la regla.
-version: 76
+#
+# version 77 (F-161, 2026-11-13): EL CATALOGO DE VERSIONES MASTER ESTA COMPLETO.
+# `mart.master_versiones_tipadas` y su vista tienen todas las versiones con
+# lineas, con o sin reparto en el tiempo, y nueve columnas nuevas detras
+# (`tiene_reparto`, `reparto`, lineas e importes, cabecera y ancla). Fichas
+# nuevas: `stg.master_versiones`, `stg.v_master_lineas`,
+# `mart.v_master_version_partida` (el coste de una version por partida) y
+# `mart.master_importe_mensual` (el ultimo cierre al lado de la temporal, sin
+# reescalar). `R-VERSION-MASTER` alcanza a los cuatro y dice que solo las de
+# `tiene_reparto` rigen; P18 reconoce la version sin reparto. La ficha de
+# `stg.plan_mensual` ya no niega la version 0 de los master.
+version: 77
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -1595,22 +1606,35 @@ reglas:
       - mart.master_vigente_anual
       - mart.v_master_versiones_tipadas
       - mart.v_master_vigente_anual
+      - stg.master_versiones
+      - stg.v_master_lineas
+      - mart.v_master_version_partida
+      - mart.master_importe_mensual
     resumen: >-
-      En `stg.plan_mensual` conviven todas las versiones master: filtrar solo
-      por obra y ámbito multiplica. El planificado vigente está en
-      `mart.fact_seguimiento_mensual`; 'Cierre mensual' nunca es master
-      vigente.
+      Las versiones master conviven: filtrar solo por obra y ámbito
+      multiplica. Planificado vigente: `mart.fact_seguimiento_mensual` (solo
+      rigen las de `tiene_reparto`); último cierre: `mart.master_importe_mensual`.
     regla: >-
       Consultar `stg.plan_mensual` filtrando solo por obra y ambito multiplica
       los importes por el numero de versiones master de esa obra. La version
       vigente solo esta resuelta AGUAS ABAJO: para planificado se va a
       `mart.fact_seguimiento_mensual`, nunca a `stg`. Ademas, solo son master
       vigente las de tipo 'Planif Inicial', 'ABC' y 'Cuatrimestral'; las de
-      'Cierre mensual' NO reemplazan al plan.
+      'Cierre mensual' NO reemplazan al plan. Y solo las que tienen reparto en
+      el tiempo (`tiene_reparto` en `mart.master_versiones_tipadas`): una
+      version sin `planif` esta en el catalogo pero no rige el mensual. El
+      ultimo cierre de cada mes (cualquier tipo, el planificado de importe) y su
+      diferencia con la temporal estan en `mart.master_importe_mensual`, al
+      lado y sin sumarse; el coste de una version por partida, en
+      `mart.v_master_version_partida`.
     motivo: >-
       Los ambitos master (8 y 11) guardan una fila por version y mes. `mart`
       elige la vigente por mes con la regla de `sql/mart/02_build_fact.sql`; el
-      que va a `stg` directamente se salta esa eleccion y suma todas.
+      que va a `stg` directamente se salta esa eleccion y suma todas. Desde
+      F-161 (2026-11-13) el catalogo tiene todas las versiones con lineas: la
+      v24 de coste de la 0698 (CIERRE SEPTIEMBRE-26, 2.107.662,97 EUR) no tenia
+      `planif` y no salia en ningun sitio. Por decision del humano (D4) la
+      parte temporal no cambia.
 
   - codigo: R-FAS-AMBIGUO
     titulo: fas significa dos cosas y cambia de nombre en cada capa
@@ -2498,8 +2522,11 @@ preguntas_aceptacion:
       - mart.fact_seguimiento_mensual
     respuesta_correcta: >-
       Reconoce el sintoma: obras que solo tienen versiones de tipo 'Cierre
-      mensual', que no reemplazan al plan. Y que un mes sin fila de la version
-      vigente da importes 0 sin dejar por ello de ser la vigente.
+      mensual', que no reemplazan al plan, y obras cuyas versiones no tienen
+      reparto en el tiempo (`mart.v_master_versiones_tipadas` con
+      reparto = 'NINGUNO', como la 0721): estan en el catalogo pero no rigen el
+      mensual. Y que un mes sin fila de la version vigente da importes 0 sin
+      dejar por ello de ser la vigente.
     reglas_implicadas: [R-VERSION-MASTER]
     estado: respondible
 

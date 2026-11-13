@@ -39,6 +39,14 @@ from tests.test_f006_formato import _dicc, _ficha, _regla
 #: fórmula de R17. Solo baja (trinquete: R19 falla si sobra más de
 #: `HOLGURA_TRINQUETE`). Historia, de la más reciente a la más antigua:
 #:
+#: * 37.356 · 2026-11-13, F-161 (diccionario v77), SUBIDO con motivo: el
+#:   catalogo completo de versiones master (D5-D14 del humano). Reglas 8.376
+#:   (`R-VERSION-MASTER` dice que solo rigen las de `tiene_reparto` y donde esta
+#:   el ultimo cierre), enrutado 18.918 (cuatro fichas recomendadas nuevas,
+#:   dos preguntas cortas cada una: `mart.v_master_version_partida` y
+#:   `mart.master_importe_mensual` enrutan «cuanto es la version V» y «ultimo
+#:   cierre frente a la temporal»; `stg.master_versiones` y `stg.v_master_lineas`
+#:   son consultables por la regla de F-079), bloques 10.062 sin cambio.
 #: * 37.042 · 2026-11-09, F-040 (diccionario v75), SUBIDO con motivo: el lado
 #:   de ingresos, dos esquemas nuevos. Reglas 8.464 (+660: las nuevas
 #:   `R-VENTAS-TRES-CIFRAS` y `R-VENTAS-RESTRINGIDA`, bloqueantes, con resumen,
@@ -99,7 +107,7 @@ from tests.test_f006_formato import _dicc, _ficha, _regla
 #:   todas las preguntas): 78.057.
 #: * 29.787 · 2026-10-22, F-147 T5: PROVISIONAL, la medida de T2 sobre la v58
 #:   (sin resúmenes todavía: reglas 2.233, enrutado 13.886, bloques 13.668).
-PRESUPUESTO_MAX = 37_042
+PRESUPUESTO_MAX = 37_356
 
 
 def _medir(dicc) -> PresupuestoContexto:
