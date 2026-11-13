@@ -36,6 +36,7 @@ import functools
 import re
 import shutil
 import subprocess
+from harness.tiempos import escalar_timeout
 import tempfile
 from pathlib import Path
 
@@ -130,7 +131,7 @@ def _consulta_compuesta() -> str:
             text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=300,
+            timeout=escalar_timeout(300),
         )
 
     assert proceso.returncode == 0, (

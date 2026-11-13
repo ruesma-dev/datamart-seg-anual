@@ -1,0 +1,14 @@
+# __RUTA_TESTS__/test_f000_r1_smoke.py
+"""Smoke de la capa e2e (plantilla del arnés): la portada abre y enseña su título.
+
+Renómbralo al requisito que cubra (`test_fXXX_rN_*`) o bórralo cuando haya
+tests de verdad. Espera por estado, nunca con `sleep`, y con tiempo máximo.
+"""
+
+from playwright.sync_api import Page, expect
+
+
+def test_f000_r1_smoke_la_portada_abre(page: Page, url_base: str) -> None:
+    page.goto(url_base, timeout=15_000)
+
+    expect(page.get_by_role("heading", level=1)).to_be_visible(timeout=10_000)

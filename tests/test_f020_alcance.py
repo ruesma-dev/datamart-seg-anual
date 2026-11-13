@@ -65,7 +65,10 @@ def test_f020_r11_prefijos_de_raiz_siguen_excluidos() -> None:
     """No romper F-015: lo que se excluía en la raíz se sigue excluyendo."""
     for ruta in ("tests/test_x.py", "specs/a.py", "progress/b.py", "docs/c.py"):
         assert es_produccion(ruta) is False
-    assert es_produccion("harness/alcance.py") is True
+    # Desde el arnés 1.7.8 `harness` también sale del alcance automático: el
+    # arnés es utillaje y la campaña no debe mutarse a sí misma (llegó con la
+    # 1.10.0 a este repositorio; antes este assert esperaba True).
+    assert es_produccion("harness/alcance.py") is False
     assert es_produccion("main.py") is True
     # Lo que no es Python nunca entra.
     assert es_produccion("services/email/app/plantilla.html") is False
@@ -74,7 +77,8 @@ def test_f020_r11_prefijos_de_raiz_siguen_excluidos() -> None:
 
 
 def test_f020_r11_la_constante_declara_segmentos_no_prefijos() -> None:
-    assert set(DIRECTORIOS_EXCLUIDOS) == {"tests", "specs", "progress", "docs"}
+    # `harness` se suma en el arnés 1.7.8 (ver test_f020_r11_prefijos_...).
+    assert set(DIRECTORIOS_EXCLUIDOS) == {"tests", "specs", "progress", "docs", "harness"}
     assert not any(nombre.endswith("/") for nombre in DIRECTORIOS_EXCLUIDOS)
 
 
@@ -84,7 +88,8 @@ def test_f020_r11_la_constante_declara_segmentos_no_prefijos() -> None:
 def test_f020_r12_alcance_conserva_rutas_de_subcarpetas() -> None:
     lineas = filtrar_produccion(parsear_diff(DIFF_MONOREPO))
 
-    assert sorted(lineas) == ["harness/servicios.py", "services/email/app/flujo.py"]
+    # `harness/servicios.py` ya no entra: arnés 1.7.8, harness fuera del alcance.
+    assert sorted(lineas) == ["services/email/app/flujo.py"]
     assert lineas["services/email/app/flujo.py"] == {2, 3}
 
 
@@ -98,8 +103,9 @@ def test_f020_r12_el_alcance_de_una_feature_no_recorta_las_rutas() -> None:
 
     alcance = alcance_de_feature("F-020", rama="feature/F-020-x", git=git_falso)
 
+    # Sin `harness/servicios.py` (arnés 1.7.8): solo quedan las dos líneas del
+    # servicio, con su ruta completa desde la raíz.
     assert alcance.ficheros() == [
-        "harness/servicios.py",
         "services/email/app/flujo.py",
     ]
-    assert alcance.total_lineas() == 3
+    assert alcance.total_lineas() == 2

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import re
 import subprocess
+from harness.tiempos import escalar_timeout
 from pathlib import Path
 
 import pytest
@@ -274,7 +275,7 @@ def _version_de_main() -> tuple[int, str] | None:
     try:
         r = subprocess.run(
             ["git", "show", "main:config/diccionario/00_global.yaml"],
-            cwd=RAIZ, capture_output=True, text=True, encoding="utf-8", timeout=30,
+            cwd=RAIZ, capture_output=True, text=True, encoding="utf-8", timeout=escalar_timeout(30),
         )
     except (OSError, subprocess.SubprocessError):
         return None

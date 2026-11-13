@@ -9,7 +9,25 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-11-12 · F-162 · `in_progress` · APROBADA y fusionada en `main` (`01d877b`), DESPLEGANDO
+## 2026-11-13 · Arnés 1.10.1 integrado en `main` · F-161 con la spec lista (`spec_ready`)
+
+- **Arnés:** de la 1.7.7 a la 1.10.1, en la rama `chore/arnes-1.10.0`. Informe en `progress/impl_arnes_1.10.0.md`.
+  - El hotfix 1.10.1 (F-074 de arnes-base) corrigió los tests R6 y R7.
+  - La puerta con `.env` sobre `258a0ba` da exit 0, con 13.075 passed. Tardó 1 h 30.
+  - El espejo `dev` lo adelanta el líder (R1).
+- **F-161:** la spec está en la rama `feature/F-161-versiones-sin-reparto` (`6a1684a`). Falta el resumen de la spec, con D5 a D14 pendientes del OK del humano.
+
+## 2026-11-12 · F-162 · `done` (cerrada por el humano) · F-053 absorbida · VIGILAR la nocturna del 13
+
+- **Cerrada el 2026-11-12** por decisión del humano, sin esperar a la nocturna. Resumen en `history.md`.
+- **Vigilancia al empezar la próxima sesión** (ya no es condición de cierre). La nocturna del 2026-11-13 tiene que cumplir tres cosas:
+  - llevar la imagen `r20261112-1745`;
+  - acabar en SUCCESS `build_stg`, `build_mart`, `build_maestros` y `build_cierre`;
+  - dar KO en `check-cobertura` solo por la 0726.
+  - Si falla: vuelta atrás a `r20261112-0941` y reabrir F-162.
+- **Siguiente:** arnés 1.10.0 (rama `chore/arnes-1.10.0`) y después F-161 (spec-author).
+
+### Registro del despliegue (antes del cierre)
 
 - Reviewer APROBADO (`progress/review_F-162.md`). Puerta en verde sobre `fd4439d`: 11.179 passed. Mutación oficial: 20/20 muertos (`progress/mutacion_F-162.md`).
 - T12, T13 y T15 hechas. Lo medido ANTES y el `EXPLAIN` (9 ms, +0 s) están en `progress/impl_F-162.md` §T13.
@@ -20,7 +38,10 @@
   - Tesorería de control: 0. `check-unicidad`: 0 claves rotas.
   - Diccionario v76 publicado a las 14:41 UTC y MCP reiniciado.
 - **El despliegue destapó la 0517.** `check-cobertura` daba KO porque su master (versiones 15 y 16) no tiene `tex`. Vuelve a las excepciones solo para los ámbitos 8 y 11, con F-117 y decisión del humano (`2c02911`, delta APROBADO). La 0726 da KO desde antes de F-162 y queda apuntada en F-117, sin excepción.
-- **Pendiente:** imagen nueva con `2c02911`, para que la nocturna lleve el YAML. `done` tras la primera nocturna buena.
+- **Imagen `r20261112-1745` en el job desde el 2026-11-12 (17:45)**, con `2c02911`. La vuelta atrás es `r20261112-0941`. `main` y `dev` están subidos.
+- **(Superado por el cierre de arriba)** Al empezar la próxima sesión, mirar la nocturna del 2026-11-13. La ejecución tiene que llevar la imagen `r20261112-1745`; `build_stg`, `build_mart`, `build_maestros` y `build_cierre` tienen que acabar en SUCCESS; y `check-cobertura` solo puede dar KO por la 0726.
+  - Si sale así: F-162 a `done` (con su entrada en `history.md`), F-053 cerrada como absorbida y adelante con F-161.
+  - Pendiente del humano: Power BI (D3).
 
 ### 2026-11-11 · implementada (T1-T11), pendiente del review · rama `feature/F-162-obra-duplicada-ruesma`
 
