@@ -166,7 +166,7 @@ def test_f161_r6_se_reconstruye_entera() -> None:
 
 def test_f161_r1_lee_presupuesto_plan_mensual_y_la_cabecera() -> None:
     texto = _ejecutable(VERSIONES_STG)
-    for origen in ("FROM stg.presupuesto pp", "FROM stg.plan_mensual", "FROM raw.obrfasamb fa"):
+    for origen in ("FROM stg.presupuesto pp", "FROM stg.plan_mensual", "FROM raw.obrfasamb WHERE amb IN (8, 11)"):
         assert origen in texto, origen
     assert "mart." not in texto, "stg no lee de mart"
 
