@@ -9,6 +9,41 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-13 · F-161 · `spec_ready` · spec escrita, pendiente de la PARADA 1 · rama `feature/F-161-versiones-sin-reparto`
+
+- El spec-author ha escrito la spec en `specs/F-161-versiones-sin-reparto/`. Las cifras y las
+  consultas están en `progress/spec_F-161.md`.
+- Estado: el humano la comprometió hoy (`todo`) y pasa a `spec_ready`. El `init.sh` de este
+  repositorio (arnés 1.7.7) no admite `todo`, así que ese paso solo queda anotado en `notes`.
+- **Parte de D1, D3 y D4 del humano, que no se reabren.** La parte temporal no cambia. Lo nuevo es
+  aditivo:
+  - `stg.master_versiones`, el resumen de reparto por versión;
+  - `stg.v_master_lineas`, la marca por línea;
+  - el catálogo único `mart.master_versiones_tipadas`, que pasa a `mart/01b_master_versiones.sql`;
+  - `mart.v_master_version_partida`;
+  - `mart.master_importe_mensual`, con el último cierre al lado de la temporal y su diferencia.
+- **Decisiones abiertas para el humano (design §10):**
+  - D5: universo del catálogo;
+  - D6: versión 0;
+  - D7: qué es una línea con reparto;
+  - D8: qué versiones cuentan como último cierre;
+  - D9: grano mensual;
+  - D10: la diferencia;
+  - D11: un solo catálogo, leído también por `02_build_fact.sql`;
+  - D12: la marca por línea, como vista;
+  - D13: cabeceras duplicadas;
+  - D14: ámbitos 8 y 11 en la vista por partida.
+- **Medido, solo lectura, 2026-11-13 de 00:05 a 00:20 UTC, durante la ingesta.** Entran 722 versiones
+  de coste (168 obras, 2.917 M€) y 726 de venta (164 obras, 2.929 M€). La 0721 queda visible: su
+  versión 1 tiene 13,52 M€ y no tiene temporal.
+- **Lo que no se pudo medir.** `raw` no está en el MCP, y el clasificador de permisos denegó leer el
+  `.env` del checkout principal. El motivo de cada versión y las fechas de las que no tienen reparto
+  quedan para T7, y los tiempos para T3.
+- **Hallazgos para el líder** (`progress/spec_F-161.md`, al final):
+  - la ficha de `stg.plan_mensual` niega que haya versión 0, y la hay en 4 obras;
+  - la obra 1338614 está fuera de `stg.obras` y sigue en el catálogo;
+  - hay líneas con `planif` que no dejan ningún mes.
+
 ## 2026-11-12 · F-162 · `done` (cerrada por el humano) · F-053 absorbida · VIGILAR la nocturna del 13
 
 - **Cerrada el 2026-11-12** por decisión del humano, sin esperar a la nocturna. Resumen en `history.md`.
