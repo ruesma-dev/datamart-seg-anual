@@ -168,9 +168,25 @@ con `agregacion: suma`), menor, cambia el diccionario publicado.
 | Tests ejecutados | suite completa 13073 passed / 116 failed (3 corregidos, 1 MANUAL, 112 de entorno que pasan con `SIGRID_API_*` ficticios) / 2552 skipped |
 | Tests de F-161 | dominio 33, sql 72, diccionario 14 (r21 verde tras `d6bb377`), sandbox 20 con DSN local |
 | Cobertura de líneas cambiadas | NO MEDIDA aquí: `init.sh` da rojo en el worktree sin `.env`; la línea `PUERTA COBERTURA` la toma el líder en T14 |
-| Mutación | pendiente de la pasada de campaña (tras el APPROVED), como manda el protocolo |
+| Mutación | 20 mutantes (muestra `estandar`, informativa): 16 muertos, 4 supervivientes (2 equivalentes, 2 huecos). Ver «Pasada de campaña» y `progress/mutacion_F-161.md` |
 | Tiempo de la suite | 1389,61 s (con otras dos tandas de pytest compitiendo en la máquina) |
 | Capa e2e | N/A: ETL sin interfaz de navegador; la spec no marca requisitos `(capa: e2e)` |
 | `bash harness/init.sh` | no ejecutado en verde aquí (sin `.env`, rojo esperado): T14 del líder |
 
 Contenedor desechable `f161pg` (sandbox local): al terminar, Docker ya no estaba en marcha (`docker stop` sin daemon), así que no queda nada corriendo; si reaparece, `docker rm -f f161pg`.
+
+## Pasada de campaña (mutación informativa, 2026-11-13)
+
+`python -m harness.mutacion --feature F-161 --timeout 2400 --workers 3` sobre
+`2ebe20f`: 20 mutantes, todos en `etl_sigrid/domain/master_versiones.py`. Con la
+suite entera, 11 muertos, 2 supervivientes y 7 timeouts. El repaso en serie de
+los timeouts se paró por orden del líder (su base tardó 2348,5 s de 2400) y los 7
+se reclasificaron con `tests/test_f161_*.py`: 5 muertos (:89, :93, :95, :96, :112)
+y 2 supervivientes (:94, :97). Total: **16 muertos, 4 supervivientes**.
+
+- :88 (`year + 2` en diciembre): hueco de test, falta una versión del año siguiente.
+- :94 (`return True` con `fec_efectiva` nula): equivalente, el llamante la filtra.
+- :97 (`n_lineas > 1`): hueco de test, falta una versión de cierre con 1 línea.
+- :104 (`day=2`): equivalente, `_mes_siguiente` ignora el día.
+
+No se ha matado ninguno: la campaña es informativa. Detalle en `progress/mutacion_F-161.md`.
