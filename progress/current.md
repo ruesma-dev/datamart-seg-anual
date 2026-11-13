@@ -12,6 +12,8 @@
 ## 2026-11-13 · F-161 · `in_progress` · spec APROBADA por el humano · rama `feature/F-161-versiones-sin-reparto`
 
 - **Resumen de la spec aprobado el 2026-11-13** («hecho»): todas las recomendaciones. D5 a D14 en (a); en D10, (a) y además (b) como columna aparte. `spec_aprobada` anotada. Implementer lanzado sobre el arnés 1.10.1.
+- **Implementer (en curso):** worktree `agent-a6aed2aa…`, commit por tarea. Avance, decisiones y
+  desviaciones en `progress/impl_F-161.md`. T3, T7 y T11-T13 quedan MANUAL para el líder.
 
 - El spec-author ha escrito la spec en `specs/F-161-versiones-sin-reparto/`. Las cifras y las
   consultas están en `progress/spec_F-161.md`.
