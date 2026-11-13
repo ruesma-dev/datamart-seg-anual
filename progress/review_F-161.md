@@ -1,118 +1,134 @@
-Revisión completa (pasada 1) · principal · `main` (d450937)...`fbac82e`
+Revisión incremental desde 99119e6 (pasada 2) · principal · delta `99119e6..9a8b655`
 
 # F-161 · Review principal
 
-- **Veredicto: CHANGES_REQUESTED** (un cambio requerido, en tests; el código de producción se da por bueno).
-- **Nivel de rigor:** `estandar`, declarado en `harness/features.json` (sin `rigor.local.json`). Exige fase RED,
-  cobertura de lo cambiado y C1-C5; mutación y e2e informativas. Carril `estandar`: sin RM1-RM7.
-- **Puerta:** `init.sh` NO ejecutado aquí por orden del líder (worktree sin `.env`; lo pasa él con `.env` sobre
-  `fbac82e`). C1 y la línea `PUERTA COBERTURA` quedan a su resultado.
+- **Veredicto: APPROVED** (pasada 2). La condición es que el `init.sh` con `.env` del líder salga en exit 0 y con
+  `PUERTA COBERTURA` en `[OK]` sobre este HEAD.
+- **Pasada 1** (`fbac82e`, revisión completa): CHANGES_REQUESTED por un único hallazgo. La sandbox no ejercitaba D4:
+  quitar `tiene_reparto` de 02, 06 o `01b` la dejaba en verde. El código de producción ya se dio por bueno entonces.
+- **Nivel de rigor:** `estandar`, declarado en `harness/features.json` (no hay `rigor.local.json`). Exige fase RED,
+  cobertura de las líneas cambiadas y C1-C5. La mutación y la capa e2e son informativas. El carril `estandar`
+  no lleva RM1-RM7.
 
-## Lo que ejecuté (2026-11-13, worktree, `SIGRID_API_*` ficticios)
+## Pasada 2: qué miré y qué ejecuté (2026-11-13)
 
-- `tests/test_f161_{dominio,sql,diccionario}.py`: **119 passed** (r21 de azure-apps ya en verde por `d6bb377`).
-- **Sandbox SIN skip** en un PostgreSQL 16 local desechable (`initdb` en mi scratchpad, puerto 55161, borrado
-  al terminar): `test_f161_sandbox.py` **15 passed**; `test_f157_sandbox.py` + `test_f162_sandbox.py` (cargan el
-  `stg/01_ddl.sql` cambiado) **33 passed**. T11 queda así verificado por el reviewer.
-- Regresión dirigida (f006, f019, f024, f025, f040, f047, f078, f079, f095, f097, f110, f118, f140, f147, f148,
-  f149, f157, f162, f161): **6036 passed, 2477 skipped, 0 failed** en 1006 s (los skip, sandboxes sin DSN).
-- Mutaciones a mano en una COPIA (`git archive HEAD` en el scratchpad; el árbol no se tocó), ver hallazgo 1.
+- **El delta no toca producción.** `git diff --name-only 99119e6..HEAD -- etl_sigrid config main.py infra` sale
+  vacío. Solo cambian `tests/test_f161_sandbox.py` y papeleo: `impl_F-161.md`, `current.md`, `tasks.md` (T10 y T11
+  marcadas), `features.json` y `BACKLOG.md`. Ninguna firma ni alcance de lo aprobado se mueve.
+- **La sandbox nueva** (`8d02b31`):
+  - v6 «PLANIFICACION CUATRIMESTRAL MAR-26»: ámbito 8, `plafec` 0, `fec` 2026-03-15, una línea de 150 € sin `planif`.
+  - Una partida CP en la v2, para que `fact_cp_tipologia` tenga planificado.
+  - Ahora la sandbox ejecuta también los ficheros reales `06_cp_tipologia.sql` y `retenciones/05_fin_obra.sql`, con
+    un `raw` y un `cierre` mínimos. La función `fn_sigrid_date` se extrae de `00_setup.sql`, no se reescribe.
+  - Asertos concretos: el mensual planificado en v1, v1, v2, v2, v2 (nunca v6); vigencia anual 2026 en v2; CP
+    planificado 80,00 €; `fin_obra` = (2, 2026-04-01, …); en marzo, importe en v6 y temporal en v2.
+  - El cambio de octubre a marzo es correcto: el mensual del fixture acaba en abril de 2026, así que con octubre
+    la mutación de 02 no habría tenido ningún mes en el que ganar.
+- **Lo reproduje yo**, en un PostgreSQL 16 desechable (`initdb` en el scratchpad, puerto 55171, parado y borrado al
+  terminar). Cada mutación se hizo en una copia `git archive HEAD`; el árbol de trabajo no se tocó.
+  - HEAD: **20 passed**.
+  - Quitar `tiene_reparto` en las cuatro mutaciones da exactamente la tabla del implementer:
 
-## Checkpoints
+| Mutación (quitar `tiene_reparto`) | Resultado | Tests que caen |
+|---|---|---|
+| `mart/02_build_fact.sql:70` | 2 failed | r16, r10_d4_el_mensual… |
+| `mart/06_cp_tipologia.sql:150` | 2 failed | r10_master_vigente_anual…, r10_d4_la_vigencia_anual_y_cp… |
+| `mart/01b_master_versiones.sql:207` | 4 failed | r14 oráculo, r14 hoy, r16, r14_d4_en_marzo… |
+| `retenciones/05_fin_obra.sql:162` | 1 failed | r10_d4_el_fin_de_obra… |
 
-- C1 `[x]` condicionado: `init.sh` con `.env` es del líder (instrucción expresa). Sin su exit 0, no vale este informe.
-- C2 `[x]` una activa (F-161 `in_review`), rama `feature/F-161-versiones-sin-reparto`. `current.md` arrastra secciones
-  de otras features: preexistente en `main`, no de esta rama (observación O5).
-- C3 `[x]` hexagonal: `domain/master_versiones.py` puro (solo stdlib); `master_versiones_sql.py` solo construye texto;
-  SQL por capa (`stg/10`, `mart/01b`). Primera línea con ruta en los 8 ficheros nuevos; sin `print`, TODO ni secretos.
-  Semántica Sigrid: `fas` = versión en 8/11, `importe` sin coeficientes, v0 según D6.
-- C3 bis `N/A`: no entra ningún documento de fuera. C3 ter `N/A`: no registra conversación nueva; D1-D14 citadas
-  con fecha y origen en `features.json` y design §10.
-- C3 quater `[x]`: `azure-apps` `d6bb377`, commit aparte, solo `datamart_seg_anual.md` (+19), sin push, contenido
-  igual a la frontera de design §1 (cuatro objetos, sin permisos nuevos, reiniciar `mcp-bbdd`).
-- C4 `[ ]` **por el hallazgo 1**: cada requisito tiene test trazable y pasa (tabla abajo), pero la capa sandbox de
-  R10/R16 —la que demuestra D4 con SQL ejecutado— no puede fallar. Unit tests sin red ni BBDD `[x]`. MANUAL listadas
-  `[x]` por referencia (`current.md` → `impl_F-161.md` y design §8, como en F-040). Dobles: no hay dobles nuevos.
-- C4 bis: rigor declarado `[x]`; **fase RED `[x]`** (salida real: `ModuleNotFoundError` y 83 failed, con las trazas de
-  R10 y R9; las 3 verdes en RED son guardas de «no cambia», legítimas); **cobertura**: pendiente de `PUERTA COBERTURA`
-  del líder; **mutación** `N/A por nivel` (informativa, la campaña corre tras esta pasada); RM1-RM7 `N/A` por carril;
-  Evidencias `[x]` (los cuatro números y la fila e2e); capa e2e `N/A`: ETL sin interfaz y ningún requisito `(capa: e2e)`.
-- C4 ter `N/A`: no existe `harness/rutas_sensibles.json`.
-- C5 `[x]` con pendientes del líder: T1-T2, T4-T6, T8-T9 `[x]` con commit `F-161 Tn`; T3, T7, T12, T13 MANUAL tras
-  merge; T10 hecho (`3e17f08` + `d6bb377`) y T11 hecho (arriba) pero sin marcar; T14 es la puerta del líder.
-  Árbol limpio.
+- `ARNES_SIN_CACHE=1 bash harness/init.sh` NO lo ejecuté. El líder lo pasa con `.env` y pidió no duplicarlo; el
+  worktree no tiene `.env` y daría los rojos de entorno conocidos.
+- Tests sin `.env`, con `SIGRID_API_*` ficticios:
+  - F-161 (dominio, sql, diccionario, sandbox sin DSN), más f110, f040_frontera y f006_contexto: **176 passed,
+    21 skipped**. Los 21 skipped son sandboxes que se quedan sin DSN.
+  - Regresión dirigida de la pasada 1: 6036 passed y 0 failed. Desde entonces no ha cambiado código de producción.
+
+## Checkpoints (estado tras la pasada 2)
+
+- **C1** `[x]` condicionado: el exit 0 de `init.sh` con `.env` es del líder.
+- **C2** `[x]`. Hay una sola feature activa, y la sección F-161 de `current.md` ya está al día. Las secciones de
+  otras features que siguen en `current.md` vienen de `main`.
+- **C3** `[x]`.
+  - Hexagonal: el dominio es puro y `master_versiones_sql.py` solo construye texto.
+  - Convenciones: ruta en la primera línea; sin `print`, TODO ni secretos.
+  - Semántica Sigrid: `fas` es la versión, `importe` va sin coeficientes y la v0 sigue D6.
+- **C3 bis** `N/A`: no entra ningún documento de fuera.
+- **C3 ter** `N/A`: no se registra ninguna conversación nueva. D1-D14 llevan fecha y origen.
+- **C3 quater** `[x]`: commit aparte `d6bb377` en `azure-apps`, solo en el documento propio y sin push.
+- **C4** `[x]`. Cada requisito tiene un test trazable en verde (tabla abajo), y la capa sandbox de R10 y R16 ahora
+  sí muerde. Los unit tests no tocan red ni BBDD. Las tareas MANUAL constan en `current.md` y `impl_F-161.md`, con
+  los comandos de design §8. No hay dobles de test nuevos.
+- **C4 bis**:
+  - Rigor declarado `[x]`.
+  - Fase RED `[x]`: trae la salida real (`ModuleNotFoundError`, 83 failed y las trazas de R9 y R10).
+  - Cobertura: pendiente de la `PUERTA COBERTURA` del líder.
+  - Mutación `N/A por nivel`: es informativa y la campaña corre después de esta pasada.
+  - RM1-RM7 `N/A` por carril.
+  - Sección «Evidencias» `[x]`.
+  - Capa e2e `N/A`: ETL sin interfaz y ningún requisito `(capa: e2e)`.
+- **C4 ter** `N/A`: no existe `harness/rutas_sensibles.json`.
+- **C5** `[x]`:
+  - T1, T2 y T4-T11 están `[x]` con su commit.
+  - T3, T7, T12 y T13 son MANUAL en Azure, para después del merge. T14 es la puerta del líder.
+  - El árbol queda limpio (salvo este informe).
 
 ## Cobertura requisito → test
 
 | R | Tests (todos en verde) |
 |---|---|
-| R1-R5 | `test_f161_sql` r1-r5 (DDL, PK, universo, D6, D13, expresiones de 08) + sandbox r1-r5 con oráculo |
-| R6 | sql r6 ×5 (detrás de fase0, último, entero, fuera de sello y ventana) + `test_f157_step` |
-| R7-R9 | sql r7 ×9, r8, r9 ×4; dominio r7 (cascada) |
-| R10 | sql r10 ×9 (02, 06, 05 y su `DO`); dominio r10; sandbox r10 (**vacía para D4**, hallazgo 1) |
-| R11 | sql r11 ×2 (`CATALOGO_ANTERIOR` = 06 en `491fbf1`; `EXCEPT` doble) + sandbox r11; MANUAL paso 4 |
-| R12 | sql r12 ×2 + sandbox r12 (versión sin reparto por partida) |
+| R1-R5 | `test_f161_sql` r1-r5 + sandbox r1-r5 contra el oráculo (9 versiones con la v6) |
+| R6 | sql r6 ×5 + `test_f157_step` |
+| R7-R9 | sql r7 ×9, r8, r9 ×4; dominio r7 |
+| R10 | sql r10 ×9; dominio r10; sandbox r10 + **r10_d4 ×4** (02, 06 + CP, `fin_obra`, catálogo); muerden, ver tabla |
+| R11 | sql r11 ×2 + sandbox r11; MANUAL paso 4 |
+| R12 | sql r12 ×2 + sandbox r12 |
 | R13 | MANUAL (paso 4: 776 filas / 2.107.662,97 €) |
-| R14-R15, R17 | sql r14 ×7, r15, r17; dominio r14; sandbox r14 (oráculo mes a mes), r15 (la 0721) |
-| R16 | sql r14_r16 (predicado de 02 copiado) + sandbox r16 (**vacía para D4**, hallazgo 1); MANUAL paso 4 |
+| R14-R15, R17 | sql r14 ×7, r15, r17; dominio r14; sandbox r14 (oráculo), **r14_d4_en_marzo**, r15 |
+| R16 | sql r14_r16 + sandbox r16 (cae con las mutaciones de 02 y `01b`); MANUAL paso 4 |
 | R18-R19 | MANUAL (huellas, `check-cp-tipologia`, T3) |
-| R20-R21 | `test_f161_diccionario` r20 ×10, r21 ×3 + f006, f079, f147 |
+| R20-R21 | `test_f161_diccionario` r20 ×10, r21 ×3, más f006, f079 y f147 |
 
 ## Cambios requeridos
 
-1. **La sandbox no ejercita D4: R10 y R16 pasan aunque se quite el filtro.** `tests/test_f161_sandbox.py:69-79`
-   (`CABECERAS`): todas las versiones sin reparto son «CIERRE…» (o sin texto), así que caen por `tipo_master`
-   antes de llegar a `tiene_reparto`. Lo comprobé en una copia: quitando `tiene_reparto` de
-   `mart/02_build_fact.sql:70`, de `mart/06_cp_tipologia.sql:150` y de `mart/01b_master_versiones.sql:207` (la CTE
-   `temporales`), la sandbox sigue **15/15 en verde**; solo lo cazan los tests de texto (`test_f161_r10_02_filtra…`,
-   `…_master_vigente_anual_filtra_reparto`, `…_r14_r16_la_temporal_con_el_predicado_de_02`). Es el caso real que el
-   filtro protege: las 927 versiones «sin `plafec`» del diagnóstico (§5.2) entran ahora al catálogo y pueden ser de
-   tipo temporal. **Pido:** una versión de tipo temporal SIN reparto y posterior a la temporal vigente (p. ej.
-   OBRA_A, ámbito 8, v6 «PLANIFICACION CUATRIMESTRAL OCT-26», `plafec` 0, `fec` octubre 2026, una línea con importe y
-   sin `planif`) y que la sandbox afirme: `fact_seguimiento_mensual.version_master` nunca es 6;
-   `master_vigente_anual` no la elige; en `master_importe_mensual` del mes del build, `version_temporal` = 2 y
-   `version_importe` = 6, con `tipo_master_importe` = 'Cuatrimestral'. Ajustar las expectativas que cambien (r1, r3,
-   r14 «hoy»). Criterio de hecho: repetir mi mutación de 02, 06 o `01b` debe poner la sandbox en rojo.
+Ninguno. El cambio requerido 1 de la pasada 1 está atendido y comprobado (tabla de arriba).
 
-## Observaciones (no bloquean)
+## Observaciones (siguen abiertas, no bloquean)
 
-- **O1 · D4 en `retenciones/05_fin_obra.sql:162` y `:119`** (desviación 4 del implementer): el catálogo trae ahora
-  versiones con `tiene_reparto` y `version_fec_efectiva` NULL, que el de antes excluía (06 filtraba la fecha). La CTE
-  `cuatrimestral` elige por `MAX(version)` sin mirar fecha (F-110 D1 lo exige y `test_f110…:97` lo veta), así que una
-  Cuatrimestral con reparto y sin fecha cambiaría el fin de obra. Hoy 0 casos y es literal a R10; que el líder lo
-  enseñe al humano en el resumen: aceptarlo o añadir `AND v.version_fec_efectiva IS NOT NULL` (y aflojar ese veto).
-- **O2 · Coste de `stg/10_master_versiones.sql:76-91`**: el `EXISTS` correlado sobre la CTE `plan` dentro de un `OR`
-  no se convierte en semi-join (recorre la CTE por cada línea v0), y el de `con_reparto` es una sonda de índice por
-  línea (~1 M). T3 debe medir esa CTE en concreto; si duele, `(obra_id, ambito_id, fase_num) IN (SELECT … FROM plan)`
-  (subplan con hash) o un `UNION ALL` de las dos ramas.
-- **O3 · R16 solo hasta el mes del build** (desviación 3): el mensual proyecta meses futuros y `master_importe_mensual`
-  no los tiene (D9). Coherente con D9, pero R16 dice «todo mes»: anotarlo en la spec al cerrar.
-- **O4 · `mart/01b_master_versiones.sql:170`** `JOIN stg.partidas` interno: una línea con partida ausente desaparece
-  de la vista por partida. El paso MANUAL 4 (776 filas de R13) lo detectaría; valorar `LEFT JOIN`.
-- **O5 · Papeleo del líder**: la sección F-161 de `current.md` dice `in_progress` y T10 MANUAL (ya hecho en
-  `d6bb377`); marcar T10 y T11 en `tasks.md`.
-- **O6 · `config/diccionario/stg.yaml`** (`master_versiones`): `n_lineas` lleva `agregacion: suma` y los importes
-  `no_sumable`; sumar `n_lineas` entre versiones también multiplica. Menor.
+- **O1 · Para el humano. `retenciones/05_fin_obra.sql:162` y `:119`.**
+  - El catálogo trae ahora versiones con `tiene_reparto` y `version_fec_efectiva` NULL, que antes no estaban.
+  - La CTE elige por `MAX(version)` sin mirar fecha: es F-110 D1, y `test_f110…:97` veta las columnas de fecha ahí.
+  - Hoy hay 0 casos, y el código es literal a R10.
+  - El humano decide: aceptarlo, o añadir `AND v.version_fec_efectiva IS NOT NULL` y aflojar ese veto.
+- **O2 · Coste de `stg/10_master_versiones.sql:76-91`.**
+  - El `EXISTS` correlado dentro de un `OR` no se convierte en semi-join.
+  - Hay además una sonda de índice por línea.
+  - Ya está anotado en T3. Si duele, la alternativa es un `IN (SELECT … FROM plan)` con hash o un `UNION ALL`.
+- **O3 · R16 solo llega hasta el mes del build.** Es coherente con D9; anotarlo en la spec al cerrar.
+- **O4 · `mart/01b_master_versiones.sql:170`.** El `JOIN stg.partidas` es interno: una partida ausente se perdería.
+  El paso MANUAL 4 (R13) lo detecta; valorar un `LEFT JOIN`.
+- **O6 · `config/diccionario/stg.yaml` (`master_versiones`).** `n_lineas` lleva `agregacion: suma`, y sumarlo entre
+  versiones multiplica. Es menor.
+- **O5 (papeleo) está resuelta** en `dff7418`.
 
-## Juicio de lo que pidió el líder
+## Juicio de lo que pidió el líder (de la pasada 1, sigue vigente)
 
-- **Desviaciones 1-9**: legítimas. La 1 (`CASE` y no `COALESCE`) es mejor que el design: con `COALESCE` un NULL de
-  `plan_mensual` se rellenaría con la cabecera y rompería R4/R11. La 4 y la 3, en O1 y O3. La 8 la resolvió el líder.
-- **Tests de otras features adaptados, ninguno relaja una guarda**: `f097_r17` mira los mismos nueve literales donde
-  vive ahora la cascada (`01b`); `f040_r30` exime solo `retenciones/05_fin_obra.sql`, con motivo, y sigue vetando
-  `tesoreria/` y el resto de `retenciones/`; `f095` y `f110` alargan la cadena con `AND tiene_reparto` y mantienen
-  todo lo demás (incluido el veto de fechas); `f157_step` sigue exigiendo fase0 justo detrás de `plan_mensual`;
-  `f147` sube el tope con su entrada de historia; el de f006 es solo la línea de recuentos de `current.md`.
-- **MANUAL (T3, T7, T12/T13)**: suficientes. Comandos de design §8 con criterio de parada explícito (cualquier
-  diferencia de huella o de `check-cp-tipologia` → PARAR y volver a la imagen anterior; T3 > 5 min → PARAR). Añadir a
-  T3 lo de O2 y a T7 cuántas de las versiones que entran son de tipo temporal (la población que protege D4).
-- **Código de producción**: correcto contra design §3. Orden de `build_mart` (`01b` antes de `02`); `01b` deja la
-  vista de 8 columnas + 9 detrás (R8); `02` cambia solo la CTE; `tesoreria/07` sigue bien (busca por clave, una fila);
-  ningún objeto fuera de `mart` depende del catálogo, así que el `DROP … CASCADE` de `01b` no arrastra nada nuevo;
-  `stg/01_ddl.sql` no está en `FICHEROS_DEL_SELLO`.
+- **Desviaciones 1-9 del implementer: legítimas.**
+  - La 1 (`CASE` en vez de `COALESCE`) mejora el design: protege R4 y R11.
+  - La 3 queda en O3 y la 4 en O1. La 8 la resolvió el líder con `d6bb377`.
+- **Tests de otras features adaptados: ninguno relaja una guarda.**
+  - `f097_r17` comprueba los mismos literales en `01b`, que es donde vive ahora la cascada.
+  - `f040_r30` exime un solo fichero, con su motivo.
+  - `f095` y `f110` alargan la cadena esperada y mantienen el resto, incluido el veto de fechas.
+  - `f157_step` sigue exigiendo que `fase0` vaya justo detrás de `plan_mensual`.
+  - `f147` sube el tope con su entrada de historia.
+  - El de f006 es solo la línea de recuentos de `current.md`.
+- **MANUAL (T3, T7, T12/T13): suficientes.**
+  - Llevan criterio de parada explícito: cualquier diferencia de huella o de `check-cp-tipologia`, PARAR y volver a
+    la imagen anterior; si T3 crece más de 5 min, PARAR.
+  - T3 ya incluye O2, y T7 ya incluye contar las versiones de tipo temporal.
 
 ## Automejora (propuesta, no aplicada)
 
-- `reviewer.md`, punto 2 del protocolo: «si un requisito declara capa sandbox y protege un filtro, el reviewer
-  comprueba que la sandbox se pone en rojo al quitarlo». Es el RM7 aplicado a SQL y sirve también en `estandar`:
-  aquí la sandbox estaba en verde y era vacía para la decisión más importante de la feature.
+- Para `reviewer.md`, punto 2: «si un requisito con capa sandbox protege un filtro, el reviewer comprueba que la
+  sandbox se pone en rojo al quitarlo». Es el RM7 llevado a SQL y vale también en `estandar`: en la pasada 1 la
+  sandbox estaba en verde y no veía la decisión central de la feature (D4).
