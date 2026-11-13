@@ -9,7 +9,13 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-11-13 · F-161 · `in_progress` (review pasada 1 atendida) · spec APROBADA por el humano · rama `feature/F-161-versiones-sin-reparto`
+## 2026-11-13 · F-161 · `human_review` (PARADA 2 entregada) · rama `feature/F-161-versiones-sin-reparto`
+
+- **Review pasada 2: APPROVED** (`2ebe20f`). Puerta con `.env` en `2ebe20f`: exit 0, 13.220 passed, cobertura 100 % (59/59).
+- **Campaña de mutación (informativa):** 20 mutantes, 16 muertos y 4 supervivientes (2 equivalentes, :94 y :104; 2 huecos de test, :88 y :97, sin matar). Los 7 timeouts de la suite entera, reclasificados con los tests de F-161 (`progress/mutacion_F-161.md`, `5ef3d43`).
+- **Pendiente del humano:** OK al resumen final, O1 (`05_fin_obra`), push de azure-apps `d6bb377`; MANUAL T3, T7, T12-T14.
+
+### Antes · 2026-11-13 · F-161 · `in_progress` (review pasada 1 atendida) · spec APROBADA por el humano · rama `feature/F-161-versiones-sin-reparto`
 
 - **Resumen de la spec aprobado el 2026-11-13** («hecho»): todas las recomendaciones. D5 a D14 en (a); en D10, (a) y además (b) como columna aparte. `spec_aprobada` anotada. Implementer lanzado sobre el arnés 1.10.1.
 - **Review principal, pasada 1 (2026-11-13): CHANGES_REQUESTED** (`progress/review_F-161.md`): la

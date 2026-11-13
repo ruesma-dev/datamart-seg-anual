@@ -2587,7 +2587,7 @@
         "Huella antes/después de los consumidores del catálogo: idéntica salvo los cambios decididos y documentados",
         "Fichas y reglas del diccionario al día; `bash harness/init.sh` en verde"
       ],
-      "status": "in_review",
+      "status": "human_review",
       "sdd": true,
       "rigor": "estandar",
       "priority": 1,

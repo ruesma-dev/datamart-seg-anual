@@ -9,7 +9,7 @@ Resumen: **150 features**, 72 abiertas y 78 terminadas. Por columna: 1 en Review
 
 | # | Feature | La tiene | Prioridad | Rigor | Rama |
 |---|---|---|---|---|---|
-| F-161 | Versiones del máster y coste sin planificación temporal: catálogo desde las cabeceras, coste por versión y partida y vigencia temporal frente a vigencia de importe | reviewer | 1 | estandar | `feature/F-161-versiones-sin-reparto` |
+| F-161 | Versiones del máster y coste sin planificación temporal: catálogo desde las cabeceras, coste por versión y partida y vigencia temporal frente a vigencia de importe | humano | 1 | estandar | `feature/F-161-versiones-sin-reparto` |
 
 ## Blocked
 
@@ -191,7 +191,7 @@ _Nada comprometido._
 
 ### F-161 · Versiones del máster y coste sin planificación temporal: catálogo desde las cabeceras, coste por versión y partida y vigencia temporal frente a vigencia de importe
 
-estado **en QA / revisión** · spec aprobada el 2026-11-13 · prioridad 1 · rigor `estandar` · SDD sí · rama `feature/F-161-versiones-sin-reparto`
+estado **en revisión humana** · spec aprobada el 2026-11-13 · prioridad 1 · rigor `estandar` · SDD sí · rama `feature/F-161-versiones-sin-reparto`
 
 Incidencia de Control de Costes (Juan, 2026-11-10): la v24 de coste de la 0698 (CIERRE SEPTIEMBRE-26, 776 líneas, 2.107.662,97 €) no aparece en `mart.v_master_versiones_tipadas`. Ninguna de sus líneas trae `obrparpre.planif`, el reparto temporal, y el catálogo (`mart/06_cp_tipologia.sql:117`, y su copia en `mart/02_build_fact.sql:55`) se deduce de `stg.plan_mensual`, que descarta las líneas sin `planif` (`stg/08_plan_mensual.sql:224`). Diagnóstico en `progress/explore_0698_v24_coste.md`: 49 versiones enteras sin reparto, y además 304 M€ de coste (en 1.716 versiones) y 195 M€ de venta sin mes dentro de versiones que sí tienen reparto. CRITERIO DEL HUMANO (2026-11-11): no siempre tiene que haber planificación temporal, y eso no quiere decir que no haya que coger y analizar el coste. «Una cosa es el último planificado temporal y otra el último planificado a nivel de importe total, y pueden divergir.» ALCANCE PROPUESTO: (1) el catálogo, desde las cabeceras (`obrfasamb` con líneas en `stg.presupuesto`), con `importe_total`, `importe_con_reparto`, `importe_sin_reparto` y `reparto` (COMPLETO, PARCIAL o NINGUNO); (2) una vista del coste por versión y partida que no dependa del reparto; (3) dos vigencias explícitas: la última versión de importe y la última con reparto temporal, y cómo se combinan en el seguimiento mensual (decisión de Negocio en la spec); (4) un solo catálogo para `fact_seguimiento_mensual` y `06_cp_tipologia`; (5) la ficha del diccionario corregida. Las cifras vigentes de hoy no cambian salvo por decisión explícita, y se comprueba con la huella de `master_vigente_anual`, `fact_cp_tipologia`, `fin_obra` y `devengo_*`.
 

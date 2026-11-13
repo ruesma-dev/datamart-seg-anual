@@ -29,7 +29,7 @@ el worktree `wk_0`, nunca en el árbol principal), se borraron los worktrees
 | Muertos (suite entera) | 11 |
 | Supervivientes (suite entera) | 2 (:88, :104) |
 | Timeouts de la campaña | 7 → reclasificados: 5 muertos, 2 supervivientes |
-| **Total tras reclasificar** | **16 muertos, 4 supervivientes (1 equivalente, 3 huecos)** |
+| **Total tras reclasificar** | **16 muertos, 4 supervivientes (2 equivalentes: :94 y :104; 2 huecos de test: :88 y :97)** |
 
 ## Los 20 mutantes (`etl_sigrid/domain/master_versiones.py`)
 
