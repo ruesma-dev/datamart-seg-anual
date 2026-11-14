@@ -9,57 +9,16 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-11-13 · F-161 · `human_review` (PARADA 2 entregada) · rama `feature/F-161-versiones-sin-reparto`
+## 2026-11-14 · F-161 `done` · DESPLIEGUE pendiente (lo lanza el humano)
 
-- **Review pasada 2: APPROVED** (`2ebe20f`). Puerta con `.env` en `2ebe20f`: exit 0, 13.220 passed, cobertura 100 % (59/59).
-- **Campaña de mutación (informativa):** 20 mutantes, 16 muertos y 4 supervivientes (2 equivalentes, :94 y :104; 2 huecos de test, :88 y :97, sin matar). Los 7 timeouts de la suite entera, reclasificados con los tests de F-161 (`progress/mutacion_F-161.md`, `5ef3d43`).
-- **Pendiente del humano:** OK al resumen final, O1 (`05_fin_obra`), push de azure-apps `d6bb377`; MANUAL T3, T7, T12-T14.
-
-### Antes · 2026-11-13 · F-161 · `in_progress` (review pasada 1 atendida) · spec APROBADA por el humano · rama `feature/F-161-versiones-sin-reparto`
-
-- **Resumen de la spec aprobado el 2026-11-13** («hecho»): todas las recomendaciones. D5 a D14 en (a); en D10, (a) y además (b) como columna aparte. `spec_aprobada` anotada. Implementer lanzado sobre el arnés 1.10.1.
-- **Review principal, pasada 1 (2026-11-13): CHANGES_REQUESTED** (`progress/review_F-161.md`): la
-  sandbox no ejercitaba D4. **Corregido** (`8d02b31`): v6 Cuatrimestral SIN reparto en la sandbox; 20
-  passed, y quitar `tiene_reparto` de 02, 06, `01b` o `05_fin_obra` la pone en rojo (2, 2, 4 y 1
-  fallos). Pendiente: review pasada 2.
-- **Implementer:** T1-T2, T4-T6 y T8-T11 hechas (T10 azure-apps por el líder, `d6bb377`; T11 en
-  Postgres local desechable). Informe en `progress/impl_F-161.md`. MANUAL del líder: T3 (con O2 del
-  review), T7 (con cuántas versiones que entran son temporales), T12-T14. O1 (`05_fin_obra` con
-  `tiene_reparto` y fecha NULL) la decide el humano.
-- **Diccionario v77 (árbol, SIN PUBLICAR):** 320 objetos, 2742 columnas y 157 de consumo.
-
-- El spec-author ha escrito la spec en `specs/F-161-versiones-sin-reparto/`. Las cifras y las
-  consultas están en `progress/spec_F-161.md`.
-- Estado: el humano la comprometió hoy (`todo`) y pasa a `spec_ready`. El `init.sh` de este
-  repositorio (arnés 1.7.7) no admite `todo`, así que ese paso solo queda anotado en `notes`.
-- **Parte de D1, D3 y D4 del humano, que no se reabren.** La parte temporal no cambia. Lo nuevo es
-  aditivo:
-  - `stg.master_versiones`, el resumen de reparto por versión;
-  - `stg.v_master_lineas`, la marca por línea;
-  - el catálogo único `mart.master_versiones_tipadas`, que pasa a `mart/01b_master_versiones.sql`;
-  - `mart.v_master_version_partida`;
-  - `mart.master_importe_mensual`, con el último cierre al lado de la temporal y su diferencia.
-- **Decisiones del humano (design §10, ya decididas):**
-  - D5: universo del catálogo;
-  - D6: versión 0;
-  - D7: qué es una línea con reparto;
-  - D8: qué versiones cuentan como último cierre;
-  - D9: grano mensual;
-  - D10: la diferencia;
-  - D11: un solo catálogo, leído también por `02_build_fact.sql`;
-  - D12: la marca por línea, como vista;
-  - D13: cabeceras duplicadas;
-  - D14: ámbitos 8 y 11 en la vista por partida.
-- **Medido, solo lectura, 2026-11-13 de 00:05 a 00:20 UTC, durante la ingesta.** Entran 722 versiones
-  de coste (168 obras, 2.917 M€) y 726 de venta (164 obras, 2.929 M€). La 0721 queda visible: su
-  versión 1 tiene 13,52 M€ y no tiene temporal.
-- **Lo que no se pudo medir.** `raw` no está en el MCP, y el clasificador de permisos denegó leer el
-  `.env` del checkout principal. El motivo de cada versión y las fechas de las que no tienen reparto
-  quedan para T7, y los tiempos para T3.
-- **Hallazgos para el líder** (`progress/spec_F-161.md`, al final):
-  - la ficha de `stg.plan_mensual` niega que haya versión 0, y la hay en 4 obras;
-  - la obra 1338614 está fuera de `stg.obras` y sigue en el catálogo;
-  - hay líneas con `planif` que no dejan ningún mes.
+- F-161 cerrada con el OK del humano al resumen final (2026-11-14). Resumen en `progress/history.md`.
+- **Despliegue (design §8), pendiente:** paso 0 ANTES con el mismo `raw` (líder, solo lectura), imagen
+  nueva + `85_update_job.ps1`, job puntual SIN ingesta (`stage && build-mart && build-cierre &&
+  build-tesoreria && build-retenciones && apply-grants`), huellas sin diferencias, `check-cp-tipologia`
+  0, la 0698 v24 = 776 filas y 2.107.662,97 €, diccionario v77 con su imagen y reinicio de `mcp-bbdd`.
+  Si sale cualquier diferencia: vuelta atrás a la imagen anterior del job.
+- **Abierto, sin bloquear:** O1 (`retenciones/05_fin_obra.sql:162`, 0 casos hoy) y los dos huecos de
+  test de la campaña (`master_versiones.py:88` y `:97`).
 
 ## 2026-11-13 · Arnés 1.10.1 integrado en `main` · F-161 con la spec lista (`spec_ready`)
 
