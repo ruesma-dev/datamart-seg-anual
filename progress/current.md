@@ -9,13 +9,23 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-14 · F-161 `done` · DESPLIEGUE pendiente (lo lanza el humano)
+
+- F-161 cerrada con el OK del humano al resumen final (2026-11-14). Resumen en `progress/history.md`.
+- **Despliegue (design §8), pendiente:** paso 0 ANTES con el mismo `raw` (líder, solo lectura), imagen
+  nueva + `85_update_job.ps1`, job puntual SIN ingesta (`stage && build-mart && build-cierre &&
+  build-tesoreria && build-retenciones && apply-grants`), huellas sin diferencias, `check-cp-tipologia`
+  0, la 0698 v24 = 776 filas y 2.107.662,97 €, diccionario v77 con su imagen y reinicio de `mcp-bbdd`.
+  Si sale cualquier diferencia: vuelta atrás a la imagen anterior del job.
+- **Abierto, sin bloquear:** O1 (`retenciones/05_fin_obra.sql:162`, 0 casos hoy) y los dos huecos de
+  test de la campaña (`master_versiones.py:88` y `:97`).
+
 ## 2026-11-13 · Arnés 1.10.1 integrado en `main` · F-161 con la spec lista (`spec_ready`)
 
 - **Arnés:** de la 1.7.7 a la 1.10.1, en la rama `chore/arnes-1.10.0`. Informe en `progress/impl_arnes_1.10.0.md`.
   - El hotfix 1.10.1 (F-074 de arnes-base) corrigió los tests R6 y R7.
   - La puerta con `.env` sobre `258a0ba` da exit 0, con 13.075 passed. Tardó 1 h 30.
   - El espejo `dev` lo adelanta el líder (R1).
-- **F-161:** la spec está en la rama `feature/F-161-versiones-sin-reparto` (`6a1684a`). Falta el resumen de la spec, con D5 a D14 pendientes del OK del humano.
 
 ## 2026-11-12 · F-162 · `done` (cerrada por el humano) · F-053 absorbida · VIGILAR la nocturna del 13
 

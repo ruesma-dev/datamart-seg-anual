@@ -113,6 +113,12 @@ confirmación cubre el plan que se enseñó, no lo que apareció después.
   `auxiliar/`, `descompuestos/`, `postventa/`, `ventas/`. En `stg/`, **`plan_mensual_fase0`
   (F-157)** es el presupuesto vivo de hoy (fase 0, coste 3 y venta 7) repartido
   en el tiempo con el `planif` del jefe de obra; no se suma con `plan_mensual`.
+  **`master_versiones` (F-161)** es el catálogo COMPLETO de versiones master
+  (con o sin reparto; `stg.v_master_lineas`, la marca por línea), y en `mart/`
+  `01b_master_versiones.sql` publica el único catálogo `master_versiones_tipadas`,
+  `v_master_version_partida` (coste de una versión por partida) y
+  `master_importe_mensual` (el último cierre al lado de la temporal, sin
+  reescalar). Solo las de `tiene_reparto` rigen el mensual: la parte temporal no cambia.
   **`postventa/` (F-156)** son unidades, incidencias, tareas, su histórico, sus adjuntos y el coste por obra
   de origen (solo facturas), sin personas y con el texto enmascarado; los datos
   personales, en `postventa_restringida`, que solo leen el perfil postventa

@@ -279,6 +279,25 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
   cierres (fases 1 a N) ni con la planificación del master, se compara con
   ellos. La construye el sub-paso `build_plan_mensual_fase0` de `build_stg`,
   acotado a las obras del plan y de una pasada; nadie fuera de `stg` la lee.
+- **EL CATÁLOGO DE VERSIONES MASTER ESTÁ COMPLETO (F-161).** `stg.plan_mensual`
+  solo tiene las líneas con reparto (`planif`), así que una versión entera sin
+  él (la v24 de coste de la 0698, «CIERRE SEPTIEMBRE-26», 2.107.662,97 €) no
+  salía en ningún sitio. El sub-paso `build_master_versiones` de `build_stg`
+  (`10_master_versiones.sql`, el último, entero y fuera del sello) construye
+  **`stg.master_versiones`**: una fila por versión (ámbitos 8 y 11) de toda
+  versión >= 1 con líneas en `stg.presupuesto` y de toda versión con reparto,
+  con o sin cabecera, y con `tiene_reparto`, `reparto` (NINGUNO / COMPLETO /
+  PARCIAL) y sus importes. La marca por línea es la vista
+  **`stg.v_master_lineas`** (la línea tiene reparto si deja filas en
+  `plan_mensual`). En `mart`, `01b_master_versiones.sql` va entre `01_ddl` y
+  `02_build_fact` y publica el ÚNICO catálogo, `mart.master_versiones_tipadas`
+  (la cascada del tipo vive solo ahí), el coste por versión y partida
+  **`mart.v_master_version_partida`** y **`mart.master_importe_mensual`**: por
+  obra, ámbito y mes hasta el del build, el último cierre de cualquier tipo (el
+  planificado de importe) al lado de la versión temporal y su diferencia, sin
+  reescalar. **La parte temporal no cambia** (decisión del humano, D4): `02`,
+  la vigencia anual de `06` y la Cuatrimestral de `retenciones/05_fin_obra.sql`
+  filtran `tiene_reparto` y ven las mismas versiones que antes.
 - **EL MES DE UN CIERRE REAL LO DA SU TEXTO (F-051, absorbida en F-118).** El
   mes de cada fila real de `stg.plan_mensual` es `stg.fn_mes_de_fase`: manda el
   texto de la fase (`obrfas.res`, «Agosto 2026»), aunque discrepe de las fechas

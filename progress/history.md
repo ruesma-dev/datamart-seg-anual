@@ -2172,3 +2172,20 @@ Detonante: la 0721 salía con la ficha vacía de PORSAN (empresa 28) en lugar de
 **Cierre:** decisión del humano el 2026-11-12, sin esperar a la nocturna del 13. Esa nocturna queda como vigilancia en `current.md`. **F-053** se cierra con ella, absorbida.
 
 **Fuera, pendiente:** Power BI (D3), del humano. La 0721 sigue sin master hasta F-161 porque no tiene `planif`.
+
+## F-161 — Versiones del máster sin planificación temporal: catálogo completo, coste por partida e importe frente a temporal · `done` (2026-11-14)
+
+**Qué cambia.** Incidencia de Control de Costes (2026-11-10): la v24 de coste de la 0698 (2.107.662,97 €) no salía en el catálogo porque no trae `planif`.
+- `stg.master_versiones` (catálogo COMPLETO, con `reparto` NINGUNO/COMPLETO/PARCIAL) y `stg.v_master_lineas` (marca por línea).
+- `mart/01b_master_versiones.sql`: un solo catálogo `mart.master_versiones_tipadas`, `mart.v_master_version_partida` (coste de cualquier versión por partida) y `mart.master_importe_mensual` (último cierre de importe al lado de la temporal, sin sumar ni reescalar).
+- La parte temporal NO cambia (D4 del humano): `02`, `06` y `retenciones/05_fin_obra` filtran `tiene_reparto`.
+- Decisiones: D1-D4 del humano (2026-11-11); D5-D14 en (a) y D10 también (b), aprobadas el 2026-11-13. Diccionario v77.
+
+**Verificado:**
+- Review: pasada 1 CHANGES_REQUESTED (la sandbox no tenía una Cuatrimestral sin reparto); pasada 2 APPROVED (`2ebe20f`).
+- Puerta con `.env` en `2ebe20f`: 13.220 passed, cobertura 100 % (59/59).
+- Mutación informativa (`progress/mutacion_F-161.md`): 20 mutantes, 16 muertos; supervivientes :94 y :104 equivalentes, :88 y :97 huecos de test sin matar.
+
+**Ecosistema:** `azure-apps/datamart_seg_anual.md`, commit `d6bb377`.
+
+**Fuera, pendiente:** despliegue (design §8, en `current.md`), O1 (`05_fin_obra:162`, 0 casos), los dos huecos de test, la obra 1338614 fuera de `stg.obras` y las 61 líneas de la 0698 v23 con `planif` que no dan mes.

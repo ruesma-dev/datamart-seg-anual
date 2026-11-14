@@ -276,7 +276,8 @@ def test_f110_r14_guarda_de_la_version_y_del_plan() -> None:
     ) in guarda
     assert (
         "IF NOT EXISTS (SELECT 1 FROM mart.master_versiones_tipadas "
-        "WHERE tipo_master = 'Cuatrimestral') THEN RAISE EXCEPTION 'fin_obra: "
+        # F-161 (D4): la guarda mira las Cuatrimestrales con reparto.
+        "WHERE tipo_master = 'Cuatrimestral' AND tiene_reparto) THEN RAISE EXCEPTION 'fin_obra: "
     ) in guarda
     assert (
         "IF NOT EXISTS (SELECT 1 FROM stg.plan_mensual WHERE ambito_id IN (8, 11)) THEN "
