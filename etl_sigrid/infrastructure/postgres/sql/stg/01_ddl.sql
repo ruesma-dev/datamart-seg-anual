@@ -409,3 +409,64 @@ LEFT JOIN LATERAL (
 WHERE pp.fase_num = 0
   AND pp.ambito_id IN (3, 7)
 GROUP BY pp.obra_id, pp.ambito_id;
+
+
+-- ---------------------------------------------------------------------------
+-- stg.master_versiones (F-161): una fila por versión master (ámbitos 8 y 11)
+-- con su resumen de reparto. Es el universo del catálogo de `mart`
+-- (`mart.master_versiones_tipadas`, en `mart/01b_master_versiones.sql`):
+-- toda versión >= 1 con líneas en `stg.presupuesto` y toda versión con filas
+-- en `stg.plan_mensual`, tenga o no cabecera en `raw.obrfasamb` (D5, D6).
+--
+-- `tiene_reparto` dice si la versión deja filas en `stg.plan_mensual`; solo
+-- esas rigen el mensual (D4). La construye `10_master_versiones.sql` entera
+-- cada noche (TRUNCATE + INSERT): no es una tabla acotada por la ventana de
+-- F-025, porque lee `stg.presupuesto` y `stg.plan_mensual`, que tienen todas
+-- las obras, también las congeladas.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS stg.master_versiones (
+    obra_id              BIGINT        NOT NULL,
+    ambito_id            INTEGER       NOT NULL,
+    version              INTEGER       NOT NULL,
+    version_fec_creacion DATE          NULL,
+    version_fec_efectiva DATE          NULL,
+    version_descripcion  TEXT          NULL,
+    version_tex          TEXT          NULL,
+    tiene_reparto        BOOLEAN       NOT NULL,
+    reparto              VARCHAR(8)    NOT NULL,           -- NINGUNO | COMPLETO | PARCIAL
+    n_lineas             INTEGER       NOT NULL,
+    n_lineas_con_reparto INTEGER       NOT NULL,
+    importe_total        NUMERIC(18,2) NOT NULL,
+    importe_con_reparto  NUMERIC(18,2) NOT NULL,
+    importe_sin_reparto  NUMERIC(18,2) NOT NULL,
+    tiene_cabecera       BOOLEAN       NOT NULL,
+    tiene_ancla          BOOLEAN       NOT NULL,
+    _built_at            TIMESTAMP     NOT NULL DEFAULT NOW(),
+    CONSTRAINT pk_master_versiones PRIMARY KEY (obra_id, ambito_id, version),
+    CONSTRAINT ck_master_versiones_ambito CHECK (ambito_id IN (8, 11)),
+    CONSTRAINT ck_master_versiones_reparto CHECK (reparto IN ('NINGUNO', 'COMPLETO', 'PARCIAL'))
+);
+
+-- La marca por línea (F-161, D7 y D12): una línea master tiene reparto si su
+-- `presupuesto_id` deja al menos una fila en `stg.plan_mensual`. Vista y no
+-- tabla (D12): serían ~4,6 M de filas en el disco compartido, y filtrada por
+-- obra va por `idx_plan_mensual_presupuesto` (210 ms para 12 versiones de la
+-- 0698). Ámbitos 8 y 11, versión >= 1; `fase_num` se publica como `version`.
+CREATE OR REPLACE VIEW stg.v_master_lineas AS
+SELECT
+    pp.presupuesto_id,
+    pp.obra_id,
+    pp.partida_id,
+    pp.ambito_id,
+    pp.fase_num AS version,
+    pp.cantidad,
+    pp.precio,
+    pp.importe,
+    EXISTS (
+        SELECT 1
+        FROM stg.plan_mensual pm
+        WHERE pm.presupuesto_id = pp.presupuesto_id
+    ) AS tiene_reparto
+FROM stg.presupuesto pp
+WHERE pp.ambito_id IN (8, 11)
+  AND pp.fase_num >= 1;

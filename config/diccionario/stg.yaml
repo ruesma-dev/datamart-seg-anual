@@ -59,6 +59,12 @@ objetos:
       (el presupuesto vivo de hoy de coste y venta) no esta aqui: su reparto en
       el tiempo es `stg.plan_mensual_fase0` (F-157), y no se suma con esta.
 
+      **SOLO ESTAN LAS LINEAS CON REPARTO.** Una version master entera sin
+      `planif` (la v24 de coste de la 0698, 776 lineas) no tiene ni una fila
+      aqui. El catalogo COMPLETO de versiones, con o sin reparto, es
+      `stg.master_versiones` (y `mart.master_versiones_tipadas`); la marca por
+      linea, `stg.v_master_lineas` (F-161).
+
       **ES EL OBJETO MAS PELIGROSO DEL DATAMART, Y ESTO NO ES UNA PREFERENCIA DE
       ENRUTADO SINO UNA ADVERTENCIA DE CORRECCION:** aqui conviven TODAS las
       versiones master de cada obra, asi que una consulta por obra y ambito sin
@@ -188,9 +194,12 @@ objetos:
           El campo `fas` de Sigrid, y **significa dos cosas segun el ambito**: en
           los REALES (3 y 7) es el MES de cada cierre (1 a N) y en los MASTER (8
           y 11) es el NUMERO DE VERSION. Cruzar las dos lecturas produce series
-          temporales inventadas. Aqui NO hay filas de la fase 0 (el presupuesto
-          vivo de hoy): su reparto en el tiempo esta en `stg.plan_mensual_fase0`
-          (F-157).
+          temporales inventadas. En los REALES no hay filas de la fase 0 (el
+          presupuesto vivo de hoy): su reparto en el tiempo esta en
+          `stg.plan_mensual_fase0` (F-157). En los MASTER si puede haber version 0,
+          la que trae `planif`: medido el 2026-11-13, 8 filas del catalogo en 4
+          obras (0578, 0613, 0578-B y 1338614), todas 'Sin clasificar' o 'Cierre
+          mensual', asi que no rigen el mensual.
 
           **Es el numero de fase ORIGINAL de Sigrid, sin renumerar, y por eso
           TIENE HUECOS en las 9 obras a las que la regla de un cierre por mes
@@ -565,6 +574,166 @@ objetos:
         agregacion: suma
     ejemplos_preguntas:
       - Cuanto de la fase 0 de la obra X esta planificado
+
+  master_versiones:
+    tipo: tabla
+    capa: preparacion
+    consumo_recomendado: true
+    descripcion: >-
+      El catalogo COMPLETO de las versiones master (ambitos 8 coste y 11 venta)
+      con el resumen de su reparto en el tiempo (F-161). Entra toda version >= 1
+      con lineas en `stg.presupuesto` y toda version con filas en
+      `stg.plan_mensual` (la version 0 solo en ese caso), tenga o no cabecera en
+      `raw.obrfasamb`. Hasta F-161 el catalogo se deducia de
+      `stg.plan_mensual` y una version sin `planif` no salia en ningun sitio.
+
+      **`tiene_reparto` decide si la version rige el mensual.** Solo las que
+      tienen filas en `stg.plan_mensual` lo hacen; las demas (un cierre sin
+      reparto, la v1 de la 0721) solo informan. La publica, con el tipo,
+      `mart.master_versiones_tipadas`.
+
+      Con reparto, fechas y textos son los de `stg.plan_mensual`; sin el, los
+      de la cabecera con la misma regla; sin cabecera, nulos. Se rehace entera
+      cada noche.
+    grano: >-
+      Una fila por (`obra_id`, `ambito_id`, `version`), su clave primaria. Solo
+      ambitos 8 y 11. Del orden de 6.000 filas (4.534 con reparto el
+      2026-11-13).
+    clave_negocio: [obra_id, ambito_id, version]
+    paso_etl: build_stg
+    refresco: nocturno
+    columnas:
+      obra_id:
+        significado: Identificador de la obra en Sigrid.
+        agregacion: no_sumable
+      ambito_id:
+        significado: 8 = master de coste; 11 = master de venta.
+        valores: ["8", "11"]
+        agregacion: no_sumable
+      version:
+        significado: Numero de version master (el `fas` de Sigrid en los ambitos 8 y 11).
+        agregacion: no_sumable
+      version_fec_creacion:
+        significado: Fecha de creacion de la version en Sigrid.
+        agregacion: no_sumable
+        nulo_significa: La version no tiene cabecera en `raw.obrfasamb`, o la cabecera no trae fecha.
+      version_fec_efectiva:
+        significado: >-
+          Fecha desde la que la version rige. Igual a la de creacion salvo en
+          las cuatrimestrales entregadas tarde (`stg.fn_master_fecha_efectiva`).
+        agregacion: no_sumable
+        nulo_significa: La version no tiene cabecera, o la cabecera no trae fecha.
+      version_descripcion:
+        significado: Etiqueta de la version (`res` de la cabecera, o 'Master coste/venta sin descripcion').
+        nulo_significa: La version no tiene cabecera.
+      version_tex:
+        significado: >-
+          Texto libre del jefe de obra ("CIERRE SEPTIEMBRE-26"). En venta, si
+          esta vacio, el de la version de coste del mismo numero.
+        nulo_significa: Sin texto, o la version no tiene cabecera.
+      tiene_reparto:
+        significado: >-
+          La version deja filas en `stg.plan_mensual`. Solo estas rigen el
+          mensual.
+        agregacion: no_sumable
+      reparto:
+        significado: >-
+          NINGUNO si la version no tiene reparto; COMPLETO si lo tiene y ninguna
+          linea con importe distinto de cero se queda sin el; PARCIAL en el
+          resto.
+        valores: [NINGUNO, COMPLETO, PARCIAL]
+      n_lineas:
+        significado: Lineas de la version en `stg.presupuesto`.
+        agregacion: suma
+      n_lineas_con_reparto:
+        significado: Las que dejan al menos un mes en `stg.plan_mensual`.
+        agregacion: suma
+      importe_total:
+        significado: Suma de `importe` de sus lineas (sin coeficientes). Es el total de ESA version.
+        unidad: EUR
+        agregacion: no_sumable
+      importe_con_reparto:
+        significado: Importe de las lineas con reparto.
+        unidad: EUR
+        agregacion: no_sumable
+      importe_sin_reparto:
+        significado: El total menos el de las lineas con reparto.
+        unidad: EUR
+        agregacion: no_sumable
+      tiene_cabecera:
+        significado: La version tiene fila en `raw.obrfasamb`.
+        agregacion: no_sumable
+      tiene_ancla:
+        significado: La cabecera trae `plafec` > 0 (el mes desde el que se reparte).
+        agregacion: no_sumable
+      _built_at:
+        significado: Instante de construccion de la fila. Instrumentacion, no negocio.
+        agregacion: no_sumable
+    relaciones:
+      - de: obra_id
+        a: mart.master_versiones_tipadas.obra_id
+        cardinalidad: "N:N"
+        porque: >-
+          La misma fila con el tipo de la version; se une por
+          `(obra_id, ambito_id, version)`.
+    ejemplos_preguntas:
+      - Versiones master de la obra X sin reparto
+      - Importe no repartido de la version V
+
+  v_master_lineas:
+    tipo: vista
+    capa: preparacion
+    consumo_recomendado: true
+    descripcion: >-
+      Las lineas master (ambitos 8 y 11, version >= 1) de `stg.presupuesto` con
+      la marca de si tienen reparto en el tiempo (F-161): `tiene_reparto` es
+      que su `presupuesto_id` deja al menos una fila en `stg.plan_mensual`. Una
+      linea con `planif` escrito puede no dejar ningun mes, y entonces no tiene
+      reparto. Vista sin disco: filtrada por obra va por indice. La publica
+      con partida y tipo `mart.v_master_version_partida`.
+    grano: Una fila por linea (`presupuesto_id`) master de version >= 1.
+    clave_negocio: [presupuesto_id]
+    paso_etl: build_stg
+    refresco: nocturno
+    columnas:
+      presupuesto_id:
+        significado: La linea de `stg.presupuesto`.
+        agregacion: no_sumable
+      obra_id:
+        significado: Identificador de la obra en Sigrid.
+        agregacion: no_sumable
+      partida_id:
+        significado: Partida de la linea.
+        agregacion: no_sumable
+      ambito_id:
+        significado: 8 = master de coste; 11 = master de venta.
+        valores: ["8", "11"]
+        agregacion: no_sumable
+      version:
+        significado: Numero de version master (`stg.presupuesto.fase_num`).
+        agregacion: no_sumable
+      cantidad:
+        significado: Cantidad de la linea en esa version.
+        agregacion: no_sumable
+      precio:
+        significado: Precio unitario de la linea en esa version.
+        agregacion: no_sumable
+      importe:
+        significado: >-
+          Importe de la linea en esa version (sin coeficientes). Se suma solo
+          dentro de UNA version: sumar versiones multiplica.
+        unidad: EUR
+        agregacion: suma
+      tiene_reparto:
+        significado: La linea deja al menos un mes en `stg.plan_mensual`.
+        agregacion: no_sumable
+    relaciones:
+      - de: presupuesto_id
+        a: stg.presupuesto.presupuesto_id
+        cardinalidad: "1:1"
+        porque: Es la misma linea; el resto de sus columnas estan alli.
+    ejemplos_preguntas:
+      - Lineas sin reparto de la version V
 
   presupuesto:
     tipo: tabla

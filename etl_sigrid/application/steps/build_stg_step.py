@@ -18,6 +18,9 @@ Flujo:
         08_plan_mensual.sql            - por tramos (F-019) y acotado (F-025)
         09_plan_mensual_fase0.sql      - la fase 0 (3 y 7) repartida en el tiempo
                                          (F-157): acotado, de una pasada
+        10_master_versiones.sql        - TRUNCATE + INSERT stg.master_versiones
+                                         (F-161): el catálogo completo de las
+                                         versiones master, entero y fuera del sello
 
 Cada sub-step se registra en _meta.etl_runs con su tiempo y filas procesadas.
 
@@ -472,6 +475,17 @@ class BuildStgStep(PipelineStep):
                 "stg",
                 "plan_mensual_fase0",
                 acotado_fase0=True,
+            ),
+            # F-161 (R6). El último: lee `stg.presupuesto` y `stg.plan_mensual`
+            # de esta noche y `raw.obrfasamb`. Se ejecuta ENTERO (las dos tablas
+            # que lee tienen todas las obras, también las congeladas de F-025),
+            # así que ni es acotado ni entra en `FICHEROS_DEL_SELLO`: cambiarlo
+            # no obliga a reconstruir las 634 fichas. Si falla, falla build_stg.
+            _SubStep(
+                "build_master_versiones",
+                "10_master_versiones.sql",
+                "stg",
+                "master_versiones",
             ),
         ]
 

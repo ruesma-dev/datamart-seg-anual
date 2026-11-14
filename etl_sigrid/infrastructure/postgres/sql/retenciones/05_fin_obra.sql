@@ -105,7 +105,7 @@
 --
 -- LA GUARDA (F-110 R14), ANTES DEL DROP: el sub-paso falla con su nombre si no
 -- existe mart.master_versiones_tipadas, si no tiene ninguna version
--- Cuatrimestral, si stg.plan_mensual no tiene filas de los ambitos 8 u 11, o si
+-- Cuatrimestral con reparto (F-161), si stg.plan_mensual no tiene filas de los ambitos 8 u 11, o si
 -- no existe cierre.fact_cierre_mensual. Una tabla del cierre VACIA ya no lo
 -- tumba (sustituye a R21 de F-095): solo deja ultimo_cierre a NULL, que es
 -- informativa.
@@ -116,7 +116,7 @@ BEGIN
     IF to_regclass('mart.master_versiones_tipadas') IS NULL THEN
         RAISE EXCEPTION 'fin_obra: no existe la tabla mart.master_versiones_tipadas; lanza build-mart antes de build-retenciones';
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM mart.master_versiones_tipadas WHERE tipo_master = 'Cuatrimestral') THEN
+    IF NOT EXISTS (SELECT 1 FROM mart.master_versiones_tipadas WHERE tipo_master = 'Cuatrimestral' AND tiene_reparto) THEN
         RAISE EXCEPTION 'fin_obra: mart.master_versiones_tipadas no tiene ninguna version Cuatrimestral; sin ella ninguna obra sin garantia tendria fin de obra';
     END IF;
     IF NOT EXISTS (SELECT 1 FROM stg.plan_mensual WHERE ambito_id IN (8, 11)) THEN
@@ -154,10 +154,12 @@ cierres AS (
     GROUP BY f.obra_id
 ),
 cuatrimestral AS (
-    -- D1: la ultima Cuatrimestral por numero, en el ambito 8 o en el 11
+    -- D1: la ultima Cuatrimestral por numero, en el ambito 8 o en el 11.
+    -- F-161 (D4): solo las que tienen reparto, como hasta ahora; una sin
+    -- reparto dejaria ultimo_mes_planificado a NULL y la obra sin fin de obra.
     SELECT v.obra_id, MAX(v.version) AS version_cuatrimestral
     FROM mart.master_versiones_tipadas v
-    WHERE v.tipo_master = 'Cuatrimestral'
+    WHERE v.tipo_master = 'Cuatrimestral' AND v.tiene_reparto
     GROUP BY v.obra_id
 ),
 plan AS (

@@ -1215,7 +1215,8 @@ CONTRATO_SQL: dict[str, list[tuple[bool, list[str], list[str]]]] = {
                 'MAX(v.version) AS version_cuatrimestral',
             ],
             [
-                "WHERE v.tipo_master = 'Cuatrimestral'",
+                # F-161 (D4): solo las Cuatrimestrales con reparto, las de siempre.
+                "WHERE v.tipo_master = 'Cuatrimestral' AND v.tiene_reparto",
                 'GROUP BY v.obra_id',
             ],
         ),

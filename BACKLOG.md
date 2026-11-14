@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **150 features**, 72 abiertas y 78 terminadas. Por columna: 0 en Review, 0 en Blocked, 0 en In progress, 1 en Spec aprobada, 0 en To do, 71 en Backlog y 78 en Done.
+Resumen: **150 features**, 71 abiertas y 79 terminadas. Por columna: 0 en Review, 0 en Blocked, 0 en In progress, 1 en Spec aprobada, 0 en To do, 70 en Backlog y 79 en Done.
 
 ## Review
 
@@ -31,7 +31,6 @@ _Nada comprometido._
 
 | # | Feature | Prioridad | Rigor | Rama |
 |---|---|---|---|---|
-| F-161 | Versiones del máster y coste sin planificación temporal: catálogo desde las cabeceras, coste por versión y partida y vigencia temporal frente a vigencia de importe | 1 | estandar | `feature/F-161-versiones-sin-reparto` |
 | F-104 | La retencion de CLIENTE no esta saneada: 22,16 M EUR «vivos» de los que 19,93 M tienen fecha de baja, y la contabilidad dice 13,81 M | 3 | estandar | `feature/F-104-retenciones-cliente` |
 | F-160 | Ventas fase 2: contraste producido / certificado de todas las obras y los conceptos certificados fuera de coeficiente | 4 | estandar | `feature/F-160-ventas-contraste-fase2` |
 | F-151 | La función de caja proyectada (fase 2): `tesoreria.fn_caja_proyectada(obra, hipótesis del usuario)` | 5 | critico | `feature/F-151-funcion-caja-proyectada` |
@@ -107,6 +106,7 @@ _Nada comprometido._
 
 | # | Feature | Cierre | OK humano | Prioridad | Rigor |
 |---|---|---|---|---|---|
+| F-161 | Versiones del máster y coste sin planificación temporal: catálogo desde las cabeceras, coste por versión y partida y vigencia temporal frente a vigencia de importe | 2026-11-14 | 2026-11-14 | 1 | estandar |
 | F-162 | El seguimiento lleva TODAS las fichas de obra, cada una con su empresa, y marca la ficha por defecto de cada código (0721 en Ruesma y en PORSAN) | 2026-11-12 | 2026-11-12 | 0 | estandar |
 | F-053 | El desempate rn=1 de stg.obras elige la ficha vacia: tres obras reales no aparecen en el datamart | 2026-11-12 | 2026-11-12 | 53 | critico |
 | F-158 | Hotfix: un céntimo negativo en el coste por contrato (guarda R50) tumba build_tesoreria | sin fecha | sin anotar | 0 | estandar |
@@ -187,12 +187,6 @@ _Nada comprometido._
 | F-142 | Que cualquier IA pueda leer los adjuntos: `abrir_adjunto` devuelve el contenido CONVERTIDO (texto por página, o imagen si es un escaneo) de PDF y ofimática, también Word 97 y Excel antiguos, y el original a petición | sin fecha | sin anotar | 74 | estandar |
 
 ## Detalle
-
-### F-161 · Versiones del máster y coste sin planificación temporal: catálogo desde las cabeceras, coste por versión y partida y vigencia temporal frente a vigencia de importe
-
-estado **pendiente** · prioridad 1 · rigor `estandar` · SDD sí · rama `feature/F-161-versiones-sin-reparto`
-
-Incidencia de Control de Costes (Juan, 2026-11-10): la v24 de coste de la 0698 (CIERRE SEPTIEMBRE-26, 776 líneas, 2.107.662,97 €) no aparece en `mart.v_master_versiones_tipadas`. Ninguna de sus líneas trae `obrparpre.planif`, el reparto temporal, y el catálogo (`mart/06_cp_tipologia.sql:117`, y su copia en `mart/02_build_fact.sql:55`) se deduce de `stg.plan_mensual`, que descarta las líneas sin `planif` (`stg/08_plan_mensual.sql:224`). Diagnóstico en `progress/explore_0698_v24_coste.md`: 49 versiones enteras sin reparto, y además 304 M€ de coste (en 1.716 versiones) y 195 M€ de venta sin mes dentro de versiones que sí tienen reparto. CRITERIO DEL HUMANO (2026-11-11): no siempre tiene que haber planificación temporal, y eso no quiere decir que no haya que coger y analizar el coste. «Una cosa es el último planificado temporal y otra el último planificado a nivel de importe total, y pueden divergir.» ALCANCE PROPUESTO: (1) el catálogo, desde las cabeceras (`obrfasamb` con líneas en `stg.presupuesto`), con `importe_total`, `importe_con_reparto`, `importe_sin_reparto` y `reparto` (COMPLETO, PARCIAL o NINGUNO); (2) una vista del coste por versión y partida que no dependa del reparto; (3) dos vigencias explícitas: la última versión de importe y la última con reparto temporal, y cómo se combinan en el seguimiento mensual (decisión de Negocio en la spec); (4) un solo catálogo para `fact_seguimiento_mensual` y `06_cp_tipologia`; (5) la ficha del diccionario corregida. Las cifras vigentes de hoy no cambian salvo por decisión explícita, y se comprueba con la huella de `master_vigente_anual`, `fact_cp_tipologia`, `fin_obra` y `devengo_*`.
 
 ### F-104 · La retencion de CLIENTE no esta saneada: 22,16 M EUR «vivos» de los que 19,93 M tienen fecha de baja, y la contabilidad dice 13,81 M
 
@@ -619,6 +613,12 @@ RENUMERADA el 2026-09-29 al integrar main en la rama de F-052: se ficho como F-0
 estado **pendiente** · prioridad 78 · rigor `estandar` · SDD sí · rama `feature/F-143-tipo-contrato-compra`
 
 Nace el 2026-10-17 de la decisión D5 = A del humano en F-128: F-128 no ingiere catálogos nuevos y «el tipo de contrato de compra (cocide) pasa al backlog como feature aparte». QUÉ ES: `cocide` («Tipo de contrato de compra», índice a `auxobrcoc`, «Obras: Tipos de contratos compra») está en `ctr`, `dca`, `dcf` (y en `com`, `dco`, `dcp`, `defpli`, según `azure-apps/sigrid_tablas.md`). LO MEDIDO EL 2026-10-17 en `raw` (Azure, solo lectura): `ctr.cocide` informado en 14.453 de 19.137 contratos (75,5 %, 19 valores distintos); `dcf.cocide` en 15.726 facturas (9,4 %); `dca.cocide` en 37.157 albaranes (11,8 %); el catálogo tiene ~20 valores. La columna ya se ingiere en las tres tablas; el catálogo `auxobrcoc` NO se ingiere y ningún SQL del datamart usa `cocide` hoy. HAY QUE: ingerir `auxobrcoc` (catálogo pequeño, refresco completo) y publicar el tipo de contrato (id y nombre) AL FINAL de `compras.contratos` y, si la spec lo justifica, de `compras.albaranes` y `compras.facturas` (en F-128 están inventariados como CATALOGO_NO_INGERIDO). La spec decide si en el documento se publica o se hereda del contrato.
+
+### F-161 · Versiones del máster y coste sin planificación temporal: catálogo desde las cabeceras, coste por versión y partida y vigencia temporal frente a vigencia de importe
+
+estado **terminada** · cerrada el 2026-11-14 · spec aprobada el 2026-11-13 · OK del humano el 2026-11-14 · prioridad 1 · rigor `estandar` · SDD sí · rama `feature/F-161-versiones-sin-reparto`
+
+Incidencia de Control de Costes (Juan, 2026-11-10): la v24 de coste de la 0698 (CIERRE SEPTIEMBRE-26, 776 líneas, 2.107.662,97 €) no aparece en `mart.v_master_versiones_tipadas`. Ninguna de sus líneas trae `obrparpre.planif`, el reparto temporal, y el catálogo (`mart/06_cp_tipologia.sql:117`, y su copia en `mart/02_build_fact.sql:55`) se deduce de `stg.plan_mensual`, que descarta las líneas sin `planif` (`stg/08_plan_mensual.sql:224`). Diagnóstico en `progress/explore_0698_v24_coste.md`: 49 versiones enteras sin reparto, y además 304 M€ de coste (en 1.716 versiones) y 195 M€ de venta sin mes dentro de versiones que sí tienen reparto. CRITERIO DEL HUMANO (2026-11-11): no siempre tiene que haber planificación temporal, y eso no quiere decir que no haya que coger y analizar el coste. «Una cosa es el último planificado temporal y otra el último planificado a nivel de importe total, y pueden divergir.» ALCANCE PROPUESTO: (1) el catálogo, desde las cabeceras (`obrfasamb` con líneas en `stg.presupuesto`), con `importe_total`, `importe_con_reparto`, `importe_sin_reparto` y `reparto` (COMPLETO, PARCIAL o NINGUNO); (2) una vista del coste por versión y partida que no dependa del reparto; (3) dos vigencias explícitas: la última versión de importe y la última con reparto temporal, y cómo se combinan en el seguimiento mensual (decisión de Negocio en la spec); (4) un solo catálogo para `fact_seguimiento_mensual` y `06_cp_tipologia`; (5) la ficha del diccionario corregida. Las cifras vigentes de hoy no cambian salvo por decisión explícita, y se comprueba con la huella de `master_vigente_anual`, `fact_cp_tipologia`, `fin_obra` y `devengo_*`.
 
 ### F-162 · El seguimiento lleva TODAS las fichas de obra, cada una con su empresa, y marca la ficha por defecto de cada código (0721 en Ruesma y en PORSAN)
 
