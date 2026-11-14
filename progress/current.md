@@ -17,6 +17,7 @@
   build-tesoreria && build-retenciones && apply-grants`), huellas sin diferencias, `check-cp-tipologia`
   0, la 0698 v24 = 776 filas y 2.107.662,97 €, diccionario v77 con su imagen y reinicio de `mcp-bbdd`.
   Si sale cualquier diferencia: vuelta atrás a la imagen anterior del job.
+- **Diccionario v77 (en `main`, SIN PUBLICAR):** 320 objetos, 2742 columnas y 157 de consumo. Se publica con su imagen (paso 5).
 - **Abierto, sin bloquear:** O1 (`retenciones/05_fin_obra.sql:162`, 0 casos hoy) y los dos huecos de
   test de la campaña (`master_versiones.py:88` y `:97`).
 
