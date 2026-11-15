@@ -131,7 +131,7 @@ Verde tras el código: `tests/test_f025_*`, `test_f148`, `test_f157_step` 215 pa
 |---|---|
 | Tests ejecutados | 13.253 passed, 2.526 skipped, 0 failed (suite completa de `init.sh`) |
 | Cobertura de líneas cambiadas | 100,0 % (17/17), `PUERTA COBERTURA` |
-| Mutantes | Campaña no lanzada en esta pasada: va en la **pasada de campaña** tras el APPROVED (implementer.md) |
+| Mutantes | Pasada de campaña (informativa, `--con-seleccion --timeout 5400 --workers 3`, sobre `1122cc1`): 17 generados, 11 evaluados, **10 muertos, 1 superviviente** (`ventana.py:660`, `days=1` -> `days=2`), 0 timeouts, 7.268 s. Detalle: `progress/mutacion_F-163.md` |
 | Tiempo de la suite | 2.054 s (34 min 14 s) |
 | Capa e2e | N/A (`CAPA E2E: N/A`, sin `harness/servicios.json`) |
 
