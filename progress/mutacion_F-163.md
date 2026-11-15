@@ -3,6 +3,17 @@
 
 Generado por `python -m harness.mutacion --feature F-163 --base main --workers 3 --con-seleccion` el 2026-11-15 20:40.
 
+**Orden exacta lanzada** (2026-11-15 17:39 UTC, sobre `1122cc1`, tras el APPROVED de la pasada 2
+sobre `f75357d`): `python -m harness.mutacion --feature F-163 --con-seleccion --timeout 5400 --workers 3`.
+Nivel `estandar`: campaña **INFORMATIVA**, los supervivientes no se analizan. La herramienta no
+admite elegir ficheros de test; su selección de tests (`--con-seleccion`, F-019) es la vía: mide
+una vez el mapa línea -> tests y juzga cada mutante con los tests que ejecutan su línea (37 de
+media), revalidando con la suite entera lo que no matan. `--timeout 5400` por la lección de F-161
+(la suite entera tarda ~1.650 s por worktree): la línea base cupo con holgura y no hubo timeouts.
+Sin mutantes aplicados en el árbol principal (`--estado`: «Sin campaña de mutación en curso»); los
+worktrees `mutacion_F-163_*` los retiró la propia herramienta (`git worktree list` sin ellos).
+Código de salida 1 = hay supervivientes (informativo, no bloquea).
+
 ## Alcance
 
 Origen del diff: **rama** (`e086ee4ccbe6a7f2e6f8d3e15661248105d715d4` .. `feature/F-163-completa-fin-de-semana`).
@@ -70,10 +81,12 @@ Cada superviviente es una línea que ningún test comprueba de verdad, o una mut
 - Mutado:   `if ultima.date() < hoy - timedelta(days=2):`
 - Juicio: MEDIDO
 
-#### Análisis (PENDIENTE del implementer)
+#### Análisis (nivel `estandar`: informativo, no se analiza)
 
-> Por qué ningún test lo caza: PENDIENTE.
-> Decisión: ¿test nuevo o mutante equivalente justificado?
+> Nota sin análisis formal: el borde entre `days=1` y `days=2` es una completa registrada el
+> VIERNES (solo posible con `--reconstruir-todo` o con la de D2) seguida de un domingo; los tests
+> del domingo usan el domingo anterior (7 días) o el propio sábado. Lo cerraría un caso
+> «viernes -> domingo dispara».
 
 ## No muertos: código de salida
 
@@ -87,31 +100,31 @@ Cada uno tiene líneas en alcance y el generador no ha sacado de ellas ni un mut
 
 ### `config/settings.py` — 8 líneas en alcance, 0 mutantes
 
-#### Declaración (PENDIENTE del implementer)
+#### Declaración
 
-> Por qué no hay nada que mutar, o qué test lo cubre: PENDIENTE.
+> Solo el texto de `description` de `ventana_dia_completa` (cadena): nada que mutar. El defecto 6 no cambia y lo fija `test_f025_settings`.
 
 ### `etl_sigrid/application/steps/build_stg_step.py` — 3 líneas en alcance, 0 mutantes
 
-#### Declaración (PENDIENTE del implementer)
+#### Declaración
 
-> Por qué no hay nada que mutar, o qué test lo cubre: PENDIENTE.
+> Solo un comentario: nada que mutar.
 
 ### `etl_sigrid/infrastructure/postgres/postgres_client.py` — 4 líneas en alcance, 0 mutantes
 
-#### Declaración (PENDIENTE del implementer)
+#### Declaración
 
-> Por qué no hay nada que mutar, o qué test lo cubre: PENDIENTE.
+> Solo comentarios: nada que mutar.
 
 ### `etl_sigrid/infrastructure/postgres/ventana_sql.py` — 5 líneas en alcance, 0 mutantes
 
-#### Declaración (PENDIENTE del implementer)
+#### Declaración
 
-> Por qué no hay nada que mutar, o qué test lo cubre: PENDIENTE.
+> Docstring y la cadena del `detalle` de la firma divergente: nada que mutar con los operadores del generador.
 
 ### `main.py` — 12 líneas en alcance, 0 mutantes
 
-#### Declaración (PENDIENTE del implementer)
+#### Declaración
 
-> Por qué no hay nada que mutar, o qué test lo cubre: PENDIENTE.
+> Solo cadenas de `help` y del docstring de `check-ventana`: nada que mutar.
 
