@@ -2619,6 +2619,25 @@
       "spec_aprobada": "2026-11-11",
       "ok_humano": "2026-11-12",
       "fecha_cierre": "2026-11-12"
+    },
+    {
+      "id": "F-163",
+      "title": "La reconstrucción completa solo en las noches del fin de semana y techo del job de 14 h",
+      "description": "La nocturna del 2026-11-15 (domingo, reconstrucción completa de F-025) terminó Failed por DeadlineExceeded a las 07:00 UTC: el techo del job (replicaTimeout 25.200 s, 7 h) cortó las comprobaciones finales con todos los pasos en SUCCESS. Criterio del humano (2026-11-15): «las completas solo pueden hacer la noche del viernes al sábado o del sábado al domingo; si no, tendremos fallos en cascada» y «ponle límite 14h». QUÉ HACE: (1) `toca_reconstruccion_completa` (`etl_sigrid/domain/ventana.py`) solo dispara en las ejecuciones de sábado y domingo a las 00:00 UTC; entre semana nunca, aunque pasen 7 días. `DIAS_MAXIMOS_SIN_COMPLETA` (7) queda solo como umbral de la alerta «completa vencida» de `check-ventana`. (2) `VENTANA_REANUDACION` (F-148) de 8 h a 15 h, mayor que el techo. (3) `infra/env/dev.json` `replicaTimeoutSeconds` 25.200 -> 50.400 (14 h). (4) Tests de F-025 y F-148, diccionario (`stg.yaml`, `_meta.yaml`, versión), comentario de `infra/97_create_alert_ventana.ps1` y `azure-apps/datamart_seg_anual.md` en commit aparte.",
+      "acceptance": [
+        "PARADA 1 confirmada por el humano (sin spec), con D1 y D2",
+        "La completa dispara el sábado; el domingo solo si la del sábado no quedó registrada; ningún día laborable dispara, ni con 7 o más días sin completa; sin ninguna completa registrada dispara esa misma noche",
+        "`check-ventana` sigue avisando de «completa vencida» a los 7 días",
+        "`VENTANA_REANUDACION` = 15 h y mayor que `replicaTimeoutSeconds` de `infra/env/dev.json` (50.400)",
+        "Diccionario y documentos al día (incluido azure-apps en commit aparte); `bash harness/init.sh` en verde",
+        "Despliegue: imagen nueva y `az containerapp job update --replica-timeout 50400`, lanzados por el humano"
+      ],
+      "status": "todo",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 0,
+      "branch": "feature/F-163-completa-fin-de-semana",
+      "notes": "2026-11-15: alta por el líder tras el OK del humano a la PARADA 1 («ok»). El humano no eligió entre opciones: se toman las recomendadas. D1 (a): la completa la hace la noche del viernes al sábado (ejecución del sábado 00:00 UTC) y la del domingo solo si la del sábado no quedó registrada. D2 (a): sin ninguna completa registrada (instalación nueva), se hace esa misma noche, sea el día que sea. D3: techo 14 h (50.400 s) y ventana de reanudación 15 h. Va detrás del cierre del despliegue de F-161 (job puntual caj-datamart-seg-dev-swc0pcf en curso)."
     }
   ]
 }
