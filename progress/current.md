@@ -9,10 +9,28 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-11-14 · F-161 `done` · DESPLIEGUE pendiente (lo lanza el humano)
+## 2026-11-15 · F-163 `todo` (completa solo en fin de semana, techo 14 h) · F-161 desplegada y verificada
+
+- **F-163** dada de alta en `todo` (rama `feature/F-163-completa-fin-de-semana`, 1c42f7d) tras el OK
+  del humano a la PARADA 1; D1 (a) y D2 (a), las recomendadas. Motivo: la nocturna del domingo
+  2026-11-15 (completa) acabó `Failed` por `DeadlineExceeded` a las 07:00 UTC con todos los pasos en
+  SUCCESS hasta las 06:58 (`build_stg.reconstruccion_completa` registrada a las 03:28).
+- **F-161, despliegue VERIFICADO (2026-11-15).** Imagen `r20261115-1004` en el job (vuelta atrás:
+  `r20261112-1745`). Huellas ANTES a las 09:16 UTC; job puntual sin ingesta `swc0pcf`, `Succeeded`
+  09:09-12:55 UTC. DESPUÉS, todo en solo lectura:
+  - `comparar-huellas` (`mart`, 35.934 celdas, 355 obras): 0 cambios; ámbitos 8 y 11, 0.
+  - `compare-fingerprints` (`retenciones`, `tesoreria`, 11 vistas, 206 métricas): equivalentes.
+  - `check-cp-tipologia` (con `--timeout 5400`; con el defecto de 1.800 s se corta): 1.761 filas, 0 diferencias.
+  - R11 `sql_comparacion_catalogo()`: 0 filas. R13: 0698 v24 = 776 líneas, 2.107.662,97 €, NINGUNO.
+  - R15: la 0721 con versión de importe v1 y sin temporal. R16: 0 discrepancias en 3.761 celdas
+    (302 sin fila en `master_importe_mensual`, todas meses futuros 2026-12..2028-07, D9).
+  - §5.2: entran 727 versiones de coste y 731 de venta sin reparto (722/726 el día 13).
+  - **Pendiente del humano:** publicar el diccionario v77 y reiniciar `mcp-bbdd` (paso 5).
+
+## 2026-11-14 · F-161 `done` · DESPLIEGUE (lo lanza el humano)
 
 - F-161 cerrada con el OK del humano al resumen final (2026-11-14). Resumen en `progress/history.md`.
-- **Despliegue (design §8), pendiente:** paso 0 ANTES con el mismo `raw` (líder, solo lectura), imagen
+- **Despliegue (design §8):** paso 0 ANTES con el mismo `raw` (líder, solo lectura), imagen
   nueva + `85_update_job.ps1`, job puntual SIN ingesta (`stage && build-mart && build-cierre &&
   build-tesoreria && build-retenciones && apply-grants`), huellas sin diferencias, `check-cp-tipologia`
   0, la 0698 v24 = 776 filas y 2.107.662,97 €, diccionario v77 con su imagen y reinicio de `mcp-bbdd`.
