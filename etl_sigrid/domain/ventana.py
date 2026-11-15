@@ -79,7 +79,7 @@ import hashlib
 import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 #: El literal que dispara la alerta del guardián. **Estable y buscable**: sin
@@ -104,16 +104,25 @@ MOTIVOS = (
     MOTIVO_VENTANA,
 )
 
-#: Día de la reconstrucción completa, en la numeración de `date.weekday()`
-#: (lunes = 0). **Domingo**, decidido por el humano (DA-4): es la noche que
-#: puede permitirse volver a costar lo que cuesta hoy.
+#: Las dos noches de la reconstrucción completa, en la numeración de
+#: `date.weekday()` (lunes = 0), con el día UTC de la ejecución de las 00:00.
+#: F-163 (2026-11-15), decidido por el humano: «las completas solo pueden
+#: hacerse la noche del viernes al sábado o del sábado al domingo; si no,
+#: tendremos fallos en cascada». La completa va el **sábado**; el **domingo**
+#: es la reserva, solo si la del sábado no quedó registrada. Hasta F-163 era
+#: el domingo (DA-4) más una red por antigüedad que podía caer entre semana.
+SABADO = 5
 DOMINGO = 6
 
-#: Tope de seguridad entre reconstrucciones completas. Es de donde sale el
-#: «hasta 6 días» de R3: si un domingo se pierde —el job no corrió, o falló—,
-#: la siguiente noche la completa entra igual por antigüedad. Sin este tope,
-#: perder un domingo dejaría las 880 obras congeladas dos semanas.
+#: Umbral de la alerta «completa vencida» de `check-ventana` (R26). Desde F-163
+#: **ya no dispara la completa**: una completa entre semana es una noche de más
+#: de 7 h que se come la siguiente. Si se pierden el sábado y el domingo, la
+#: alerta lo denuncia y la completa espera al fin de semana siguiente (o se
+#: lanza a mano con `--reconstruir-todo`).
 DIAS_MAXIMOS_SIN_COMPLETA = 7
+
+#: Nombre de cada día de `date.weekday()`, para los motivos que se publican.
+NOMBRES_DIA = ("lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo")
 
 #: Caracteres de un `sha256` que se muestran al comparar dos sellos en un
 #: mensaje. Ocho: suficientes para distinguirlos, pocos para que la frase se
@@ -594,7 +603,7 @@ def sello_sql(textos: Sequence[str], params: Mapping[str, object] | None = None)
 
 
 # ---------------------------------------------------------------------------
-# La reconstrucción completa semanal (R25, DA-4)
+# La reconstrucción completa del fin de semana (R25, DA-4, F-163)
 # ---------------------------------------------------------------------------
 
 
@@ -602,7 +611,6 @@ def toca_reconstruccion_completa(
     ultima: datetime | None,
     ahora: datetime,
     dia_semana: int = DOMINGO,
-    dias_maximos: int = DIAS_MAXIMOS_SIN_COMPLETA,
 ) -> tuple[bool, str]:
     """`(toca, por qué)`. Se dispara **desde `run-all`**, no desde un cron nuevo.
 
@@ -610,34 +618,57 @@ def toca_reconstruccion_completa(
     que sigue desactivado: **un cron aparte es lo que se olvida**. Aquí la
     decisión se toma cada noche, con el registro delante.
 
-    Tres motivos, en orden:
+    `dia_semana` es el **último** día de la ventana (`PG_VENTANA_DIA_COMPLETA`,
+    domingo por defecto y en `dev.json`); el primero es su víspera (el sábado).
+    Así el valor ya desplegado (6) sigue significando lo correcto sin tocar el
+    entorno del job. Las reglas (F-163, D1 y D2):
 
-    1. **Nunca se ha hecho una completa.** No hay línea base: se hace.
-    2. **Hoy es el día** y todavía no se ha hecho hoy.
-    3. **Han pasado más de `dias_maximos`.** Es la red del domingo perdido: sin
-       ella, un domingo que el job no corra dejaría las 880 obras congeladas dos
-       semanas, y el «hasta 6 días» que el humano aceptó dejaría de ser cierto.
+    1. **Nunca se ha hecho una completa** (D2): no hay línea base, se hace esa
+       misma noche, sea el día que sea.
+    2. **La víspera (sábado)**: toca si todavía no se ha hecho hoy.
+    3. **El último día (domingo)**: toca solo si la de la víspera no quedó
+       registrada, es decir, si no hay completa ni de ayer ni de hoy. La marca
+       se registra al acabar `build_stg` de la completa: una del sábado que
+       acabe ya en domingo cuenta como de hoy y tampoco se repite.
+    4. **Cualquier otro día, nunca**, aunque hayan pasado 7 días o más: eso era
+       lo que provocaba los fallos en cascada. La antigüedad solo la denuncia
+       `check-ventana` (`DIAS_MAXIMOS_SIN_COMPLETA`).
     """
     if ultima is None:
         return True, "no hay ninguna reconstruccion completa registrada"
 
     dias = (ahora - ultima).total_seconds() / 86400.0
+    hoy = ahora.date()
+    fecha_ultima = ultima.date().isoformat()
+    vispera = (dia_semana - 1) % 7
+    nombre_vispera = NOMBRES_DIA[vispera]
+    nombre_ultimo = NOMBRES_DIA[dia_semana]
 
-    if ahora.weekday() == dia_semana and ultima.date() < ahora.date():
-        return True, (
-            f"hoy es el dia de la reconstruccion completa y la ultima fue el "
-            f"{ultima.date().isoformat()}"
-        )
+    if ahora.weekday() == vispera:
+        if ultima.date() < hoy:
+            return True, (
+                f"hoy es {nombre_vispera}, la noche de la reconstruccion completa, y la "
+                f"ultima fue el {fecha_ultima}"
+            )
+        return False, f"la reconstruccion completa de hoy ya se hizo ({fecha_ultima})"
 
-    if dias >= dias_maximos:
-        return True, (
-            f"han pasado {dias:.1f} dias desde la ultima reconstruccion completa "
-            f"({ultima.date().isoformat()}), mas del maximo de {dias_maximos}"
+    if ahora.weekday() == dia_semana:
+        if ultima.date() < hoy - timedelta(days=1):
+            return True, (
+                f"hoy es {nombre_ultimo} y la completa del {nombre_vispera} no quedo "
+                f"registrada; "
+                f"la ultima fue el {fecha_ultima}"
+            )
+        return False, (
+            f"la completa del fin de semana ya quedo registrada ({fecha_ultima}): "
+            f"el {nombre_ultimo} solo es la reserva del {nombre_vispera}"
         )
 
     return False, (
-        f"la ultima reconstruccion completa fue hace {dias:.1f} dias "
-        f"({ultima.date().isoformat()})"
+        f"la reconstruccion completa solo se hace el fin de semana ({nombre_vispera}, "
+        f"o {nombre_ultimo} si falta la del {nombre_vispera}); la ultima fue hace "
+        f"{dias:.1f} dias "
+        f"({fecha_ultima})"
     )
 
 
