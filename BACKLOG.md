@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **151 features**, 72 abiertas y 79 terminadas. Por columna: 0 en Review, 0 en Blocked, 0 en In progress, 1 en Spec aprobada, 1 en To do, 70 en Backlog y 79 en Done.
+Resumen: **151 features**, 72 abiertas y 79 terminadas. Por columna: 0 en Review, 0 en Blocked, 1 en In progress, 1 en Spec aprobada, 0 en To do, 70 en Backlog y 79 en Done.
 
 ## Review
 
@@ -15,7 +15,9 @@ _Ninguna feature bloqueada._
 
 ## In progress
 
-_Ninguna feature en implementación._
+| # | Feature | La tiene | Prioridad | Rigor | Rama |
+|---|---|---|---|---|---|
+| F-163 | La reconstrucción completa solo en las noches del fin de semana y techo del job de 14 h | implementer | 0 | estandar | `feature/F-163-completa-fin-de-semana` |
 
 ## Spec aprobada
 
@@ -25,9 +27,7 @@ _Ninguna feature en implementación._
 
 ## To do
 
-| # | Feature | Prioridad | Rigor | Rama |
-|---|---|---|---|---|
-| F-163 | La reconstrucción completa solo en las noches del fin de semana y techo del job de 14 h | 0 | estandar | `feature/F-163-completa-fin-de-semana` |
+_Nada comprometido._
 
 ## Backlog
 
@@ -192,7 +192,7 @@ _Ninguna feature en implementación._
 
 ### F-163 · La reconstrucción completa solo en las noches del fin de semana y techo del job de 14 h
 
-estado **to do (comprometida)** · prioridad 0 · rigor `estandar` · SDD no · rama `feature/F-163-completa-fin-de-semana`
+estado **en curso** · prioridad 0 · rigor `estandar` · SDD no · rama `feature/F-163-completa-fin-de-semana`
 
 La nocturna del 2026-11-15 (domingo, reconstrucción completa de F-025) terminó Failed por DeadlineExceeded a las 07:00 UTC: el techo del job (replicaTimeout 25.200 s, 7 h) cortó las comprobaciones finales con todos los pasos en SUCCESS. Criterio del humano (2026-11-15): «las completas solo pueden hacer la noche del viernes al sábado o del sábado al domingo; si no, tendremos fallos en cascada» y «ponle límite 14h». QUÉ HACE: (1) `toca_reconstruccion_completa` (`etl_sigrid/domain/ventana.py`) solo dispara en las ejecuciones de sábado y domingo a las 00:00 UTC; entre semana nunca, aunque pasen 7 días. `DIAS_MAXIMOS_SIN_COMPLETA` (7) queda solo como umbral de la alerta «completa vencida» de `check-ventana`. (2) `VENTANA_REANUDACION` (F-148) de 8 h a 15 h, mayor que el techo. (3) `infra/env/dev.json` `replicaTimeoutSeconds` 25.200 -> 50.400 (14 h). (4) Tests de F-025 y F-148, diccionario (`stg.yaml`, `_meta.yaml`, versión), comentario de `infra/97_create_alert_ventana.ps1` y `azure-apps/datamart_seg_anual.md` en commit aparte.
 
