@@ -85,13 +85,20 @@ def test_f148_dominio_el_sufijo_cabe_donde_el_aleatorio() -> None:
     assert len(sufijo_de_ejecucion_job("a")) == len(nueva_ejecucion().batch_id.split("-")[1])
 
 
-def test_f148_dominio_ventana_de_ocho_horas_y_mayor_que_el_techo_del_job() -> None:
-    """Una réplica no puede vivir más que `replicaTimeout`: la ventana lo cubre."""
+def test_f148_dominio_ventana_de_quince_horas_y_mayor_que_el_techo_del_job() -> None:
+    """Una réplica no puede vivir más que `replicaTimeout`: la ventana lo cubre.
+
+    F-163 (2026-11-15): el techo sube de 7 h a 14 h (50.400 s) por decisión del
+    humano, y la ventana de 8 h a 15 h. Si la ventana quedara por debajo del
+    techo, la reanudación de una réplica larga no encontraría su propio lote.
+    """
     techo = json.loads((RAIZ / "infra" / "env" / "dev.json").read_text(encoding="utf-8"))[
         "replicaTimeoutSeconds"
     ]
-    assert timedelta(hours=8) == VENTANA_REANUDACION
+    assert techo == 50400
+    assert timedelta(hours=15) == VENTANA_REANUDACION
     assert timedelta(seconds=techo) < VENTANA_REANUDACION
+    assert timedelta(hours=24) > VENTANA_REANUDACION, "no debe alcanzar la noche anterior"
 
 
 def test_f148_dominio_apply_grants_nunca_se_omite() -> None:
@@ -689,7 +696,7 @@ def test_f148_r18_sin_lote_previo_el_batch_lleva_el_sufijo_del_job(
     assert batch[:16] >= antes.strftime("%Y%m%dT%H%M%SZ")
     ((sufijo, desde),) = pg.busquedas
     assert sufijo == SUFIJO
-    assert antes - timedelta(hours=8) <= desde <= despues - timedelta(hours=8)
+    assert antes - VENTANA_REANUDACION <= desde <= despues - VENTANA_REANUDACION
     assert pg.batches_de_la_marca == [batch]
 
 
