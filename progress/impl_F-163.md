@@ -31,11 +31,11 @@ La reconstrucción completa solo en las noches del fin de semana y techo del job
 
 `PG_VENTANA_DIA_COMPLETA` (`ventana_dia_completa`, default 6) **pasa a ser el ÚLTIMO día de la
 ventana**: la completa va la víspera (`(dia - 1) % 7`) y ese día solo como reserva. Motivo: el
-job desplegado lleva `PG_VENTANA_DIA_COMPLETA=6` en su entorno y `85_update_job.ps1` no lo
-reescribe; si el ajuste significara «el día principal» habría que cambiarlo a 5 en Azure, y con
-el 6 heredado la completa caería el domingo y la reserva el LUNES (un laborable). Con esta
-lectura el 6 ya desplegado da exactamente sábado + domingo sin tocar el entorno del job, y
-`dev.json` (`ventanaDiaCompleta: 6`) y `test_f025_settings` siguen cuadrando. Se mantiene el
+job desplegado NO fija `PG_VENTANA_DIA_COMPLETA` (corrección del líder, leído en Azure el
+2026-11-15; el ciclo 0 de este informe decía, por error, que lo llevaba a 6): rige el DEFECTO 6
+de `config/settings.py`. Si el ajuste significara «el día principal», con ese 6 la completa
+caería el domingo y la reserva el LUNES (un laborable). Con esta lectura el defecto da sábado +
+domingo sin tocar el entorno del job; quien fije otro valor mueve la ventana. `dev.json` (`ventanaDiaCompleta: 6`) y `test_f025_settings` siguen cuadrando. Se mantiene el
 nombre del parámetro `dia_semana` (firma compatible con `build_stg_step.py:669`, que lo pasa
 posicional).
 
@@ -134,3 +134,33 @@ Verde tras el código: `tests/test_f025_*`, `test_f148`, `test_f157_step` 215 pa
 | Mutantes | Campaña no lanzada en esta pasada: va en la **pasada de campaña** tras el APPROVED (implementer.md) |
 | Tiempo de la suite | 2.054 s (34 min 14 s) |
 | Capa e2e | N/A (`CAPA E2E: N/A`, sin `harness/servicios.json`) |
+
+## Ciclo 1 (CHANGES_REQUESTED de `progress/review_F-163.md`)
+
+1. **[Media] `detalle` de la completa**: `_decidir` publicaba «reconstruccion completa semanal
+   (domingo)» en `_meta.v_frescura_obra`; ahora «reconstruccion completa: entra todo». Lo fija
+   `test_f163_el_detalle_de_la_completa_no_nombra_ningun_dia` (ningún nombre de día ni
+   «semanal»). RED real: `AssertionError: assert {'reconstrucc...al (domingo)'} ==
+   {'reconstrucc...: entra todo'}`.
+2. **[Baja] Restos de «domingo»**: `ventana.py` (docstring del módulo x2, precedencias, y el de
+   `toca_reconstruccion_completa`, que ya no dice que el job lleve la variable),
+   `postgres_client.py` (3 comentarios), `tests/test_f025_cli.py:309` (docstring),
+   `config/settings.py` (descripción: «6 = el sábado hace la completa y el domingo es la
+   reserva», y que rige el defecto) e `infra/env/dev.json` `$aviso_ventanaEnv` (significado de
+   `ventanaDiaCompleta`: último día de la ventana, la completa va la víspera; el job vivo no la
+   fija).
+3. **[Baja] azure-apps**: marca **SIN DESPLEGAR** en los cuatro pasajes de F-163 de
+   `datamart_seg_anual.md`. `git pull --rebase` sin conflicto («up to date»). Commit aparte
+   **`0511029`**. Sin push.
+4. **Recomendado**: `test_f163_el_lunes_como_ultimo_dia_da_la_vispera_en_domingo`
+   (`dia_semana=0`). Con la mutación `(dia_semana - 1) % 7` -> `(dia_semana - 1)` aplicada a mano
+   falla (`assert False is True`); con el código real, verde. Mutación restaurada.
+
+**Riesgo para el despliegue (O1 del reviewer, NO se cambia aquí):** `infra/env/dev.json` dice
+`ventanaActiva: "false"` y el job vivo tiene `PG_VENTANA_ACTIVA=true`. Quien recree el job con
+`80_create_job.ps1` apagaría la ventana y la nocturna volvería a reconstruir las 920 obras.
+
+**Commit del ciclo 1:** `4a33ed8` «F-163 ciclo 1: detalle neutro de la completa, restos de domingo
+y test de la vispera con dia 0». Tests de F-025/F-003 tocados: 280 passed.
+
+**Puerta:** PENDIENTE_GATE_C1
