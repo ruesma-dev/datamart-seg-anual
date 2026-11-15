@@ -163,4 +163,6 @@ Verde tras el código: `tests/test_f025_*`, `test_f148`, `test_f157_step` 215 pa
 **Commit del ciclo 1:** `4a33ed8` «F-163 ciclo 1: detalle neutro de la completa, restos de domingo
 y test de la vispera con dia 0». Tests de F-025/F-003 tocados: 280 passed.
 
-**Puerta:** PENDIENTE_GATE_C1
+**Puerta** (`bash harness/init.sh` sobre `3cf0239`): **EXIT 0, «ENTORNO LISTO»**. 13.255 passed,
+2.526 skipped en 3.875 s (1 h 04 min 35 s); `PUERTA COBERTURA` 100,0 % (18/18); `PUERTA TAMAÑO`
+impl 166/220, review 140/140; `PUERTA CARRIL` y `CAPA E2E` N/A.
