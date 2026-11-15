@@ -35,6 +35,7 @@ from etl_sigrid.domain.ventana import (
     MOTIVO_SIN_FILAS,
     MOTIVO_VENTANA,
     MOTIVOS,
+    NOMBRES_DIA,
     SABADO,
     Criterio,
     ObraCensada,
@@ -329,3 +330,30 @@ def test_f163_el_ultimo_dia_de_la_ventana_es_configurable() -> None:
         datetime(2026, 11, 17, 3, 0), miercoles, dia_semana=2
     )[0] is False
     assert toca_reconstruccion_completa(DOMINGO_ANTERIOR, SABADO_2026_11_14, dia_semana=2)[0] is False
+
+
+def test_f163_el_lunes_como_ultimo_dia_da_la_vispera_en_domingo() -> None:
+    """`dia_semana=0` (lunes) tiene la víspera en el DOMINGO (6), no en el -1:
+    sin el `% 7` la víspera no coincidiría con ningún `weekday()` y la completa
+    principal no se haría nunca. Mata la mutación `(dia_semana - 1) % 7` ->
+    `(dia_semana - 1)` que sobrevivió en la revisión del ciclo 1."""
+    toca, motivo = toca_reconstruccion_completa(
+        DOMINGO_ANTERIOR, DOMINGO_2026_11_15, dia_semana=0
+    )
+
+    assert toca is True
+    assert "hoy es domingo" in motivo
+
+
+def test_f163_el_detalle_de_la_completa_no_nombra_ningun_dia() -> None:
+    """El `detalle` de una obra reconstruida por la completa se publica en
+    `_meta.v_frescura_obra`. Desde F-163 la completa puede ser del sábado o del
+    domingo: el texto no puede afirmar un día que no es (revisión del ciclo 1)."""
+    plan = plan_de(CENSO, completa=True)
+
+    detalles = {d.detalle for d in plan.reconstruir}
+    assert detalles == {"reconstruccion completa: entra todo"}
+    for detalle in detalles:
+        for dia in NOMBRES_DIA:
+            assert dia not in detalle
+        assert "semanal" not in detalle

@@ -501,9 +501,10 @@ class PostgresSettings(BaseSettings):
                     "de date.weekday() (lunes=0). Es el ULTIMO dia de la ventana "
                     "(F-163): la completa se hace la vispera y este dia solo "
                     "si la de la vispera no quedo registrada; entre semana, "
-                    "nunca. Seis = DOMINGO (sabado y domingo): es la "
-                    "noche que puede permitirse volver a costar lo que cuesta "
-                    "hoy. De aquí sale el «hasta 6 días» de antigüedad.",
+                    "nunca. 6 = el sábado hace la completa y el domingo es la "
+                    "reserva. El job no fija PG_VENTANA_DIA_COMPLETA: rige este "
+                    "defecto, y quien lo cambie mueve la ventana. De aquí sale "
+                    "el «hasta 6 días» de antigüedad.",
     )
     ventana_rescate: bool = Field(
         False,

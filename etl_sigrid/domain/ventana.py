@@ -46,7 +46,8 @@ reconstrucción, y **ninguna puede sacar a ninguna**. Esa asimetría es
 deliberada: equivocarse por exceso cuesta tiempo de CPU; equivocarse por defecto
 deja un dato viejo publicado, que es el modo de fallo de F-052.
 
-* **Reconstrucción completa** (R25) — los domingos entra todo.
+* **Reconstrucción completa** (R25, F-163) — la noche del sábado (o la del
+  domingo si falta la del sábado) entra todo.
 * **Sello del SQL** (R17) — si `08_plan_mensual.sql` o `06_presupuesto.sql`
   cambian, se reconstruyen **todas**. Sin esto, un arreglo como el de F-052 solo
   alcanzaría a las 40 obras vivas y las otras 880 seguirían publicando lo de
@@ -64,8 +65,8 @@ antigüedad entre reconstrucciones completas. (Cifra CORREGIDA el 2026-09-03: el
 §DA-1 y `mediciones.md` §2.) Por eso, cuando la
 firma del origen de una obra congelada cambia, este módulo **la nombra y la deja
 congelada**: reconstruirla por su cuenta contradiría la decisión que el humano
-tomó con ese dato delante. El domingo la pone al día, y el interruptor
-`PG_VENTANA_RESCATE` (default **off**) convierte la denuncia en reconstrucción
+tomó con ese dato delante. La completa del fin de semana la pone al día, y el
+interruptor `PG_VENTANA_RESCATE` (default **off**) convierte la denuncia en reconstrucción
 si algún día cambia de idea.
 
 Capa **domain**: funciones puras, sin BBDD, sin ficheros y **sin reloj**. `hoy`
@@ -415,7 +416,8 @@ def clasificar_obras(
     La precedencia, y el orden importa porque decide el motivo que queda
     escrito:
 
-    1. **`completa`** — la noche del domingo entra todo, se mire lo que se mire.
+    1. **`completa`** — la noche de la completa (sábado, o domingo de reserva)
+       entra todo, se mire lo que se mire.
     2. **`sin_filas`** — no está construida, o el registro no la cubre (R18).
        Va antes que el sello porque «no existe» explica mejor que «el sello no
        coincide», que es su consecuencia.
@@ -475,7 +477,7 @@ def _decidir(
 ) -> tuple[str | None, str]:
     """`(motivo_de_reconstruir | None, detalle)`. `None` = se congela."""
     if completa:
-        return MOTIVO_COMPLETA, "reconstruccion completa semanal (domingo)"
+        return MOTIVO_COMPLETA, "reconstruccion completa: entra todo"
 
     if not obra.tiene_filas:
         return MOTIVO_SIN_FILAS, "no tiene filas construidas: completar no es actualizar"
@@ -620,8 +622,10 @@ def toca_reconstruccion_completa(
 
     `dia_semana` es el **último** día de la ventana (`PG_VENTANA_DIA_COMPLETA`,
     domingo por defecto y en `dev.json`); el primero es su víspera (el sábado).
-    Así el valor ya desplegado (6) sigue significando lo correcto sin tocar el
-    entorno del job. Las reglas (F-163, D1 y D2):
+    El job no fija `PG_VENTANA_DIA_COMPLETA` (leído en Azure el 2026-11-15): rige
+    el defecto 6 de `config/settings.py`, que así da sábado + domingo sin tocar
+    el entorno del job; quien fije otro valor mueve la ventana. Las reglas
+    (F-163, D1 y D2):
 
     1. **Nunca se ha hecho una completa** (D2): no hay línea base, se hace esa
        misma noche, sea el día que sea.
