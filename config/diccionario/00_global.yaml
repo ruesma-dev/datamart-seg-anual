@@ -834,7 +834,15 @@
 # reescalar). `R-VERSION-MASTER` alcanza a los cuatro y dice que solo las de
 # `tiene_reparto` rigen; P18 reconoce la version sin reparto. La ficha de
 # `stg.plan_mensual` ya no niega la version 0 de los master.
-version: 77
+#
+# version 78 (F-163, 2026-11-15): LA RECONSTRUCCION COMPLETA SOLO EN FIN DE
+# SEMANA. Las obras congeladas se rehacen enteras la noche del sabado, o la del
+# domingo si la del sabado no quedo registrada; entre semana nunca, aunque
+# pasen 7 dias (la completa del domingo 2026-11-15 murio por el techo de 7 h
+# del job). Cambia el texto de `stg` (tema de la ventana y `presupuesto`), de
+# `_meta.v_frescura_obra` (motivo `completa`, `firma_divergente`) y la consulta
+# de obras vivas de este fichero. Ningun objeto ni columna nuevos.
+version: 78
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -1587,7 +1595,8 @@ reglas:
       date_part('year', f.ultima)) * 12 + date_part('month', current_date) -
       date_part('month', f.ultima) <= 12`. `_meta.v_frescura_obra` con `motivo
       = 'ventana' AND NOT congelada` no es equivalente: una obra viva sin filas
-      va como `sin_filas` y los domingos todas van como `completa`.
+      va como `sin_filas` y la noche de la completa (el sabado, o el domingo si
+      falta la del sabado; F-163) todas van como `completa`.
       `stg.obras.activa` es un literal TRUE y `maestro.obras.es_activa` sale de
       una fecha de baja que Sigrid no informa: contar con cualquiera de las dos
       da el total disfrazado.

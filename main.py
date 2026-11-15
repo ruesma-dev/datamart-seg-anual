@@ -546,7 +546,8 @@ def load_aux() -> None:
     is_flag=True,
     default=False,
     help="Ignora la ventana y rehace TODAS las obras esta vez (F-025). Es lo "
-         "que hace sola la noche del domingo; este flag sirve para forzarlo a "
+         "que hace sola la noche del sabado (o la del domingo si falta la del "
+         "sabado, F-163); este flag sirve para forzarlo a "
          "mano. Cuesta lo que costaba la nocturna entera.",
 )
 def stage(sin_puerta: bool, reconstruir_todo: bool) -> None:
@@ -734,8 +735,9 @@ def build_pipeline_steps(
     is_flag=True,
     default=False,
     help="Ignora la ventana de negocio y rehace TODAS las obras (F-025). No "
-         "hace falta programarlo: la noche del domingo se dispara sola por "
-         "antiguedad registrada. Esta bandera es para forzarla a mano.",
+         "hace falta programarlo: se dispara sola la noche del sabado (o la del "
+         "domingo si falta la del sabado, F-163). Esta bandera es para "
+         "forzarla a mano.",
 )
 def run_all(full_refresh: bool, reconstruir_todo: bool) -> None:
     """
@@ -1801,7 +1803,7 @@ def _guardian_de_cobertura(pg: PostgresClient):
     "reconstruir_todo",
     is_flag=True,
     default=False,
-    help="Simula la noche del domingo: la reconstruccion completa.",
+    help="Simula la noche del sabado: la reconstruccion completa.",
 )
 @click.option(
     "--detalle",
@@ -1926,13 +1928,16 @@ def check_ventana_cmd(timeout: int, dry_run: bool) -> None:
 
       * FIRMA DIVERGENTE   la obra congelada ha cambiado en Sigrid. No se
                            rescata -contradiria la decision del humano- pero se
-                           NOMBRA, y el domingo la pone al dia.
+                           NOMBRA, y la completa del fin de semana la pone al dia.
       * CONGELADA SIN FILAS no deberia poder pasar (R18 la reconstruiria). Si
                            pasa, la obra esta ausente del datamart.
       * SELLO NO VIGENTE   se quedo con una version anterior del SQL, porque
                            la noche en que cambio murio a mitad.
-      * COMPLETA VENCIDA   el domingo no corrio y el "hasta 6 dias" que el
-                           humano acepto ha dejado de ser cierto.
+      * COMPLETA VENCIDA   7 dias o mas sin completa: el fin de semana no
+                           corrio y el "hasta 6 dias" que el humano acepto ha
+                           dejado de ser cierto. Desde F-163 la completa NO
+                           entra entre semana: espera al sabado o se fuerza a
+                           mano con --reconstruir-todo.
 
     UN VERDE SOBRE CERO OBRAS ES UN KO. Si `_meta.obra_build` esta vacia no hay
     nada que comprobar, y decir OK seria confundir "no hay nada malo" con "no he

@@ -794,7 +794,7 @@ objetos:
         significado: >-
           Por que se decidio lo que se decidio, en un vocabulario cerrado de
           cinco valores. `ventana` = lo decidio el criterio de negocio;
-          `completa` = la reconstruccion semanal del domingo; `sello` = cambio
+          `completa` = la reconstruccion completa del fin de semana (el sabado, o el domingo si falta la del sabado; F-163); `sello` = cambio
           el SQL; `sin_filas` = no estaba construida, y completar no es
           actualizar; `firma` = el origen cambio y el rescate estaba activado.
         valores: [ventana, completa, sello, sin_filas, firma]
@@ -825,8 +825,8 @@ objetos:
       **Consultala siempre que la pregunta sea sobre una obra concreta y la
       frescura importe.** Desde el 2026-09-03 el datamart no reconstruye todas
       las obras cada noche: las congeladas conservan su ultima version buena,
-      que puede tener hasta 6 dias de antiguedad -todas se rehacen enteras los
-      domingos-. **El CRITERIO y la CONDUCTA son dos cifras distintas, y las dos son ciertas.** El criterio dice **40 vivas / 880 congeladas**: a cuantas obras del maestro les toca por actividad. La conducta real de una noche, medida el 2026-09-07 en la ejecucion acotada `swtg78p`, es **592 rehechas / 328 congeladas**. De las 592, solo **40 son obras vivas**; las otras **552 entran porque no tienen filas construidas**, y **512 siguen vacias despues** -son fichas del maestro crudo sin presupuesto ni planificacion: plantillas y codigos repetidos-. **CONSECUENCIA AL CITAR FRESCURA: esas 552 se rehacen TODAS las noches, asi que su dato tiene horas, no seis dias.** El 'hasta 6 dias' vale para las 328 congeladas de verdad. Quien cite frescura por obra debe mirar `_meta.v_frescura_obra`, no suponerlo. Arreglar el dato en si es F-071.
+      que puede tener hasta 6 dias de antiguedad -todas se rehacen enteras la
+      noche del sabado, o la del domingo si falta la del sabado (F-163)-. **El CRITERIO y la CONDUCTA son dos cifras distintas, y las dos son ciertas.** El criterio dice **40 vivas / 880 congeladas**: a cuantas obras del maestro les toca por actividad. La conducta real de una noche, medida el 2026-09-07 en la ejecucion acotada `swtg78p`, es **592 rehechas / 328 congeladas**. De las 592, solo **40 son obras vivas**; las otras **552 entran porque no tienen filas construidas**, y **512 siguen vacias despues** -son fichas del maestro crudo sin presupuesto ni planificacion: plantillas y codigos repetidos-. **CONSECUENCIA AL CITAR FRESCURA: esas 552 se rehacen TODAS las noches, asi que su dato tiene horas, no seis dias.** El 'hasta 6 dias' vale para las 328 congeladas de verdad. Quien cite frescura por obra debe mirar `_meta.v_frescura_obra`, no suponerlo. Arreglar el dato en si es F-071.
       Las cifras de una obra congelada son
       correctas; lo que hay que decir al citarlas es de cuando son.
     grano: >-
@@ -894,8 +894,8 @@ objetos:
           **La denuncia.** `TRUE` = la obra esta congelada y su origen HA
           CAMBIADO en Sigrid desde que se construyo, asi que su dato esta
           desactualizado. No se reconstruye por su cuenta -es una decision de
-          negocio- pero queda nombrada, y la reconstruccion del domingo la pone
-          al dia. Si vas a citar cifras de una obra con esto en `TRUE`, dilo.
+          negocio- pero queda nombrada, y la reconstruccion completa del fin de
+          semana la pone al dia. Si vas a citar cifras de una obra con esto en `TRUE`, dilo.
 
           Es `FALSE` tambien cuando falta alguna de las dos firmas: "no se sabe"
           no es "cambio".

@@ -21,8 +21,10 @@ cuatro maneras distintas de que eso pase, y cada una necesita su pregunta:
 3. **El sello no es el vigente.** El SQL cambió y esa obra se quedó con la
    versión anterior. R17 lo evita reconstruyendo todo, así que esto denuncia el
    caso en el que R17 no llegó a aplicarse: una noche que murió a mitad.
-4. **La reconstrucción completa está vencida.** El domingo no corrió, y el
-   «hasta 6 días» que el humano aceptó ha dejado de ser cierto.
+4. **La reconstrucción completa está vencida.** Siete días o más sin
+   completa: el fin de semana no corrió, y el «hasta 6 días» que el humano
+   aceptó ha dejado de ser cierto. Desde F-163 la completa no entra entre
+   semana: espera al sábado siguiente o se fuerza con `--reconstruir-todo`.
 
 Ninguna de las cuatro barre `stg.plan_mensual`: todas se resuelven sobre
 `_meta.obra_build`, que tiene una fila por obra —del orden de 900—. Es
@@ -187,7 +189,7 @@ def hallazgos_de(
                     f"el origen ha cambiado desde que se construyo "
                     f"({_fecha(construido_at)}); comprobado el "
                     f"{_fecha(comprobado_at)}. NO se reconstruye por su cuenta "
-                    f"(decision del humano): la pone al dia el domingo"
+                    f"(decision del humano): la pone al dia la completa del fin de semana"
                 ),
             )
         )

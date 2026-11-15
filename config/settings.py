@@ -497,8 +497,11 @@ class PostgresSettings(BaseSettings):
         6,
         ge=0,
         le=6,
-        description="Día de la reconstrucción completa semanal, en la numeración "
-                    "de date.weekday() (lunes=0). Seis = DOMINGO (DA-4): es la "
+        description="Día de la reconstrucción completa del fin de semana, en la numeración "
+                    "de date.weekday() (lunes=0). Es el ULTIMO dia de la ventana "
+                    "(F-163): la completa se hace la vispera y este dia solo "
+                    "si la de la vispera no quedo registrada; entre semana, "
+                    "nunca. Seis = DOMINGO (sabado y domingo): es la "
                     "noche que puede permitirse volver a costar lo que cuesta "
                     "hoy. De aquí sale el «hasta 6 días» de antigüedad.",
     )

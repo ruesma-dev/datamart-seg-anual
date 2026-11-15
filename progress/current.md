@@ -15,6 +15,12 @@
   del humano a la PARADA 1; D1 (a) y D2 (a), las recomendadas. Motivo: la nocturna del domingo
   2026-11-15 (completa) acabó `Failed` por `DeadlineExceeded` a las 07:00 UTC con todos los pasos en
   SUCCESS hasta las 06:58 (`build_stg.reconstruccion_completa` registrada a las 03:28).
+- **F-163 en curso (implementer, 2026-11-15).** T1 `toca_reconstruccion_completa`: sábado; domingo solo
+  sin la del sábado; entre semana nunca; `None` cualquier día. **Decisión:** `PG_VENTANA_DIA_COMPLETA`
+  pasa a ser el ÚLTIMO día de la ventana (víspera = día principal), así el 6 ya desplegado en el job
+  sigue valiendo sin tocar su entorno. T2 techo 50.400 s y `VENTANA_REANUDACION` 15 h. T3 textos y
+  diccionario v78 (sin objetos nuevos: 320 objetos, 2742 columnas y 157 de consumo, los de v77).
+  T4 `azure-apps` (commit aparte, sin push). Informe: `progress/impl_F-163.md`.
 - **F-161, despliegue VERIFICADO (2026-11-15).** Imagen `r20261115-1004` en el job (vuelta atrás:
   `r20261112-1745`). Huellas ANTES a las 09:16 UTC; job puntual sin ingesta `swc0pcf`, `Succeeded`
   09:09-12:55 UTC. DESPUÉS, todo en solo lectura:
