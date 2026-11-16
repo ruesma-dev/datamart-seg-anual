@@ -162,7 +162,7 @@ objetos y cambia la cifra de CLIENTE, y `ventas` gana tres. Se actualiza
 | D9 `entidad_cif` de CLIENTE [nueva] | (a) NULL, el CIF por `ventas.clientes`; (b) de `cli.cif` (pasa a `critico`) | (a) | (a), humano 2026-11-16 |
 | D10 conciliación por FACTURA [nueva] | (a) feature aparte; (b) dentro, en `ventas` | (a) | **(b)**, humano 2026-11-16 |
 | D11 lo cobrado por un AGR [nueva] | (a) explicar, no atribuir; (b) atribuir por (cuenta, fecha de baja) | (a) | (a), humano 2026-11-16 |
-| **D12 qué retención de la factura se concilia [nueva, 16-11]** | (a) los recargos de `dvfrec` que van a una cuenta de `cuentas_cliente`, sea cual sea su clase (lo que ve la contabilidad); garantía y RETESP de `ventas.facturas` como columnas informativas; (b) garantía + RETESP de `ventas.facturas`; (c) solo la garantía de `ventas.facturas` (clases 4 y 5, D4 provisional de F-040) | (a) | |
+| **D12 qué retención de la factura se concilia [nueva, 16-11]** | (a) los recargos de `dvfrec` que van a una cuenta de `cuentas_cliente`, sea cual sea su clase (lo que ve la contabilidad); garantía y RETESP de `ventas.facturas` como columnas informativas; (b) garantía + RETESP de `ventas.facturas`; (c) solo la garantía de `ventas.facturas` (clases 4 y 5, D4 provisional de F-040) | (a) | (a), humano 2026-11-16 |
 
 **D12, el dato**: los tres mayores descuadres (ESPACIO 0686, LEVITT, MK MADRID II) llevan la
 retención como RETESP (clase 1, «Retención 5% garantía (sin iva)»), contra 4308, y su suma es
