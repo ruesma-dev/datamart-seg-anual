@@ -20,8 +20,9 @@ tres meses, quien pregunte por qué la 0599 no se actualizó.
 
 from __future__ import annotations
 
+import inspect
 from dataclasses import replace
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import pytest
 
@@ -34,6 +35,8 @@ from etl_sigrid.domain.ventana import (
     MOTIVO_SIN_FILAS,
     MOTIVO_VENTANA,
     MOTIVOS,
+    NOMBRES_DIA,
+    SABADO,
     Criterio,
     ObraCensada,
     clasificar_obras,
@@ -191,128 +194,166 @@ def test_f025_r1_el_recuento_por_motivo_cuadra_con_las_dos_listas() -> None:
 
 
 # ---------------------------------------------------------------------------
-# R25, DA-4 · Cuándo toca la reconstrucción completa
+# R25, DA-4, F-163 · Cuándo toca la reconstrucción completa
 # ---------------------------------------------------------------------------
+#
+# F-163 (2026-11-15): la completa del domingo 2026-11-15 murió a las 07:00 UTC
+# por el techo del job. Criterio del humano: «las completas solo pueden hacerse
+# la noche del viernes al sábado o del sábado al domingo; si no, tendremos
+# fallos en cascada». D1: el sábado; el domingo solo si la del sábado no quedó
+# registrada. D2: sin ninguna completa registrada, esa misma noche.
 
-DOMINGO_2026_09_06 = datetime(2026, 9, 6, 2, 0)
-LUNES_2026_09_07 = datetime(2026, 9, 7, 2, 0)
+#: Semana de referencia (noviembre de 2026): el 13 es viernes, el 14 sábado, el
+#: 15 domingo y el 16 lunes. La hora es la de la nocturna (00:00 UTC).
+SABADO_2026_11_14 = datetime(2026, 11, 14, 0, 0)
+DOMINGO_2026_11_15 = datetime(2026, 11, 15, 0, 0)
+DOMINGO_ANTERIOR = datetime(2026, 11, 8, 3, 30)
+
+#: Lunes 16 a viernes 20 de noviembre de 2026.
+LABORABLES = [datetime(2026, 11, dia, 0, 0) for dia in range(16, 21)]
 
 
-def test_f025_r25_sin_ninguna_completa_registrada_toca() -> None:
-    toca, motivo = toca_reconstruccion_completa(None, LUNES_2026_09_07)
+def test_f163_sabado_y_domingo_son_los_de_python() -> None:
+    """`date.weekday()`, lunes = 0. Con `isoweekday()` (domingo = 7) la
+    completa no se dispararía nunca por calendario."""
+    assert SABADO == 5
+    assert DOMINGO == 6
+    assert SABADO_2026_11_14.weekday() == SABADO
+    assert DOMINGO_2026_11_15.weekday() == DOMINGO
+    assert [d.weekday() for d in LABORABLES] == [0, 1, 2, 3, 4]
+
+
+@pytest.mark.parametrize("dia", range(9, 16))
+def test_f163_d2_sin_ninguna_completa_registrada_toca_cualquier_dia(dia: int) -> None:
+    """D2: una instalación nueva no espera al sábado; no hay línea base."""
+    toca, motivo = toca_reconstruccion_completa(None, datetime(2026, 11, dia, 0, 0))
 
     assert toca is True
     assert "ninguna" in motivo
 
 
-def test_f025_r25_el_domingo_toca() -> None:
-    assert DOMINGO_2026_09_06.weekday() == DOMINGO
+def test_f163_d1_el_sabado_toca() -> None:
+    toca, motivo = toca_reconstruccion_completa(DOMINGO_ANTERIOR, SABADO_2026_11_14)
 
+    assert toca is True
+    assert "sabado" in motivo
+    assert "2026-11-08" in motivo
+
+
+def test_f163_d1_el_sabado_toca_aunque_la_ultima_fuera_ayer() -> None:
+    """El sábado no mira la antigüedad: basta con que no se haya hecho hoy."""
     toca, _ = toca_reconstruccion_completa(
-        datetime(2026, 9, 5, 2, 0), DOMINGO_2026_09_06
+        datetime(2026, 11, 13, 4, 0), SABADO_2026_11_14
     )
     assert toca is True
 
 
-def test_f025_r25_el_domingo_solo_toca_UNA_vez() -> None:  # noqa: N802
-    """Si ya se hizo hoy, no se repite: la completa cuesta lo que costaba la
-    nocturna entera, y hacerla dos veces la misma noche vaciaría la hucha de
-    créditos, que es la avería que esta feature repara."""
+def test_f163_d1_el_sabado_no_se_repite_el_mismo_dia() -> None:
+    """Dos veces la misma noche vaciaría la hucha de créditos de CPU. La
+    comparación es por FECHA, no por horas transcurridas."""
+    toca, motivo = toca_reconstruccion_completa(
+        datetime(2026, 11, 14, 0, 5), datetime(2026, 11, 14, 23, 55)
+    )
+    assert toca is False
+    assert "hoy" in motivo
+
+
+def test_f163_d1_el_domingo_toca_si_falta_la_del_sabado() -> None:
+    """La red del sábado perdido: el job no corrió, o falló antes de registrar
+    la marca de la completa."""
+    toca, motivo = toca_reconstruccion_completa(DOMINGO_ANTERIOR, DOMINGO_2026_11_15)
+
+    assert toca is True
+    assert "sabado" in motivo
+
+
+@pytest.mark.parametrize(
+    "ultima",
+    [
+        datetime(2026, 11, 14, 0, 0),  # la del sábado, recién empezada la noche
+        datetime(2026, 11, 14, 4, 52),  # la del sábado, a su hora de siempre
+        datetime(2026, 11, 14, 23, 59),  # la del sábado, a última hora
+    ],
+)
+def test_f163_d1_el_domingo_no_toca_si_la_del_sabado_quedo_registrada(
+    ultima: datetime,
+) -> None:
+    """El borde que provocó F-163: dos completas seguidas son dos noches largas
+    seguidas. La del sábado basta."""
+    toca, motivo = toca_reconstruccion_completa(ultima, DOMINGO_2026_11_15)
+
+    assert toca is False
+    assert "2026-11-14" in motivo
+
+
+def test_f163_d1_el_domingo_no_repite_la_del_propio_domingo() -> None:
     toca, _ = toca_reconstruccion_completa(
-        datetime(2026, 9, 6, 2, 5), datetime(2026, 9, 6, 23, 0)
+        datetime(2026, 11, 15, 0, 10), datetime(2026, 11, 15, 23, 0)
     )
     assert toca is False
 
 
-def test_f025_r25_entre_semana_no_toca() -> None:
-    toca, motivo = toca_reconstruccion_completa(
-        datetime(2026, 9, 6, 2, 0), LUNES_2026_09_07
-    )
+@pytest.mark.parametrize("dias_sin_completa", [1, 6, 7, 8, 20])
+@pytest.mark.parametrize("ahora", LABORABLES, ids=["lun", "mar", "mie", "jue", "vie"])
+def test_f163_entre_semana_nunca_toca_ni_con_la_completa_vencida(
+    ahora: datetime, dias_sin_completa: int
+) -> None:
+    """**El corazón de F-163.** Una completa entre semana es una noche de más
+    de 7 h que se come la siguiente: los fallos en cascada que el humano no
+    quiere. La antigüedad ya no dispara; solo la denuncia `check-ventana`."""
+    ultima = ahora - timedelta(days=dias_sin_completa)
+
+    toca, motivo = toca_reconstruccion_completa(ultima, ahora)
 
     assert toca is False
-    assert "1.0 dias" in motivo
+    assert "fin de semana" in motivo
 
 
-def test_f025_r25_un_domingo_perdido_lo_recoge_la_antiguedad() -> None:
-    """**La red del domingo perdido.** Si el job no corrió ese domingo, la
-    completa entra igual el día que se pase de los siete días. Sin esto, las 880
-    obras se quedarían congeladas dos semanas y el «hasta 6 días» que el humano
-    aceptó dejaría de ser cierto."""
-    toca, motivo = toca_reconstruccion_completa(
-        datetime(2026, 8, 30, 2, 0), datetime(2026, 9, 8, 2, 0)
-    )
-
-    assert toca is True
-    assert "maximo" in motivo
-
-
-def test_f025_r25_justo_en_el_maximo_ya_toca() -> None:
-    ultima = datetime(2026, 9, 1, 2, 0)
-    ahora = datetime(2026, 9, 1 + DIAS_MAXIMOS_SIN_COMPLETA, 2, 0)
-
-    toca, _ = toca_reconstruccion_completa(ultima, ahora)
-    assert toca is True
-
-
-def test_f025_r25_el_dia_de_la_completa_es_configurable() -> None:
-    """`PG_VENTANA_DIA_COMPLETA`: cambiar de día no debe exigir tocar código."""
-    miercoles = datetime(2026, 9, 2, 2, 0)
-    assert miercoles.weekday() == 2
-
-    toca, _ = toca_reconstruccion_completa(
-        datetime(2026, 9, 1, 2, 0), miercoles, dia_semana=2
-    )
-    assert toca is True
-
-    toca_domingo, _ = toca_reconstruccion_completa(
-        datetime(2026, 9, 1, 2, 0), miercoles, dia_semana=DOMINGO
-    )
-    assert toca_domingo is False
-
-
-def test_f025_r3_el_tope_de_dias_es_el_que_sostiene_el_HASTA_6_DIAS() -> None:  # noqa: N802
-    """**El numero que el humano acepto, cruzado con la constante que lo
-    produce.** R3 dice que una obra congelada puede llevar "hasta 6 dias" de
-    antiguedad, y eso no es una estimacion: sale de que la reconstruccion
-    completa se dispara al llegar a los 7. Si alguien sube la constante a 8, el
-    "hasta 6 dias" de la spec, del diccionario y del documento del ecosistema
-    deja de ser cierto, y nadie se entera.
-
-    Lo delato la campana de mutacion de T26: `DIAS_MAXIMOS_SIN_COMPLETA = 7 ->
-    8` sobrevivia porque ningun test fijaba el valor.
-    """
+def test_f163_el_tope_de_siete_dias_queda_solo_para_la_alerta() -> None:
+    """`DIAS_MAXIMOS_SIN_COMPLETA` sigue siendo 7: es el umbral de «completa
+    vencida» de `check-ventana`, no un disparador (lo prueba
+    `test_f025_r26_una_completa_vencida_se_denuncia`)."""
     assert DIAS_MAXIMOS_SIN_COMPLETA == 7
+    assert "dias_maximos" not in inspect.signature(toca_reconstruccion_completa).parameters
 
-    # Con la completa hecha hace 6 dias todavia NO toca: esa es la antiguedad
-    # maxima que puede tener una obra congelada.
-    # `dia_semana=DOMINGO` y ninguna de las dos fechas es domingo (el 7 es
-    # lunes y el 8, martes): asi lo unico que decide es el tope de dias.
-    seis, _ = toca_reconstruccion_completa(
-        datetime(2026, 9, 1, 2, 0), datetime(2026, 9, 7, 2, 0), dia_semana=DOMINGO
+
+def test_f163_el_ultimo_dia_de_la_ventana_es_configurable() -> None:
+    """`PG_VENTANA_DIA_COMPLETA` es el ÚLTIMO día de la ventana (6, domingo, por
+    defecto y en `dev.json`): la completa se hace la víspera y ese día solo si
+    la víspera no quedó registrada. Cambiarlo no exige tocar código."""
+    martes = datetime(2026, 11, 17, 0, 0)
+    miercoles = datetime(2026, 11, 18, 0, 0)
+
+    assert toca_reconstruccion_completa(DOMINGO_ANTERIOR, martes, dia_semana=2)[0] is True
+    assert toca_reconstruccion_completa(DOMINGO_ANTERIOR, miercoles, dia_semana=2)[0] is True
+    assert toca_reconstruccion_completa(
+        datetime(2026, 11, 17, 3, 0), miercoles, dia_semana=2
+    )[0] is False
+    assert toca_reconstruccion_completa(DOMINGO_ANTERIOR, SABADO_2026_11_14, dia_semana=2)[0] is False
+
+
+def test_f163_el_lunes_como_ultimo_dia_da_la_vispera_en_domingo() -> None:
+    """`dia_semana=0` (lunes) tiene la víspera en el DOMINGO (6), no en el -1:
+    sin el `% 7` la víspera no coincidiría con ningún `weekday()` y la completa
+    principal no se haría nunca. Mata la mutación `(dia_semana - 1) % 7` ->
+    `(dia_semana - 1)` que sobrevivió en la revisión del ciclo 1."""
+    toca, motivo = toca_reconstruccion_completa(
+        DOMINGO_ANTERIOR, DOMINGO_2026_11_15, dia_semana=0
     )
-    assert seis is False, "a los 6 dias todavia no toca: por eso el tope es 6"
 
-    siete, motivo = toca_reconstruccion_completa(
-        datetime(2026, 9, 1, 2, 0), datetime(2026, 9, 8, 2, 0), dia_semana=DOMINGO
-    )
-    assert siete is True
-    assert "7" in motivo
+    assert toca is True
+    assert "hoy es domingo" in motivo
 
 
-def test_f025_r25_el_dia_de_la_semana_se_lee_como_lo_lee_python() -> None:
-    """`DOMINGO` tiene que ser el 6 de `date.weekday()` (lunes = 0). Con el
-    valor de `isoweekday()` -donde domingo es 7- la completa no se dispararia
-    NUNCA por calendario, y solo la salvaria el tope de los siete dias."""
-    assert DOMINGO == 6
-    assert datetime(2026, 9, 6).weekday() == DOMINGO
-    assert datetime(2026, 9, 6).strftime("%w") == "0"
+def test_f163_el_detalle_de_la_completa_no_nombra_ningun_dia() -> None:
+    """El `detalle` de una obra reconstruida por la completa se publica en
+    `_meta.v_frescura_obra`. Desde F-163 la completa puede ser del sábado o del
+    domingo: el texto no puede afirmar un día que no es (revisión del ciclo 1)."""
+    plan = plan_de(CENSO, completa=True)
 
-
-def test_f025_r25_una_completa_del_mismo_dia_no_se_repite_ni_por_horas() -> None:
-    """Dos veces la misma noche vaciaria la hucha de creditos de CPU, que es la
-    averia que esta feature repara. La comparacion es por FECHA, no por horas
-    transcurridas."""
-    toca, _ = toca_reconstruccion_completa(
-        datetime(2026, 9, 6, 0, 5), datetime(2026, 9, 6, 23, 55)
-    )
-    assert toca is False
+    detalles = {d.detalle for d in plan.reconstruir}
+    assert detalles == {"reconstruccion completa: entra todo"}
+    for detalle in detalles:
+        for dia in NOMBRES_DIA:
+            assert dia not in detalle
+        assert "semanal" not in detalle

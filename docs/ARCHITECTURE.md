@@ -1157,8 +1157,12 @@ puro (`domain/ventana.py`): cambiarlo no toca código.
 
 Por encima hay tres mecanismos que **solo añaden** obras, nunca quitan:
 
-- **Reconstrucción completa** (domingos, por antigüedad registrada desde
-  `run-all`, no por un cron nuevo: un cron aparte es lo que se olvida).
+- **Reconstrucción completa** (la noche del sábado, o la del domingo si la del
+  sábado no quedó registrada; entre semana **nunca**, aunque pasen 7 días: F-163,
+  2026-11-15, porque una completa de más de 7 h en laborable se come la noche
+  siguiente. Se decide desde `run-all` con el registro delante, no por un cron
+  nuevo: un cron aparte es lo que se olvida. Los 7 días sin completa solo los
+  denuncia `check-ventana`).
 - **Sello del SQL**: si `06`/`08` cambian, esa noche entran **todas**. Sin esto,
   un arreglo como el de F-052 solo alcanzaría a las 40 vivas y las otras 880
   seguirían publicando lo de antes, **en silencio**.
@@ -1204,7 +1208,7 @@ Se arregló en F-025, y `check-ventana` nació con la regla puesta.
 #### Cuatro ajustes, y la ventana nace apagada
 
 `PG_VENTANA_ACTIVA` (**false** por defecto), `PG_VENTANA_MESES` (12),
-`PG_VENTANA_DIA_COMPLETA` (6 = domingo) y `PG_VENTANA_RESCATE` (off). Mientras
+`PG_VENTANA_DIA_COMPLETA` (6 = domingo, el último día de la ventana: sábado y domingo) y `PG_VENTANA_RESCATE` (off). Mientras
 esté apagada, el contenido publicado es exactamente el de hoy; lo que **no**
 vuelve es el `TRUNCATE`, porque borrar y reescribir todas las obras deja el
 mismo resultado y además sobrevive a un tramo que falle.

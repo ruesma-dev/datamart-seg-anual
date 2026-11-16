@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **150 features**, 71 abiertas y 79 terminadas. Por columna: 0 en Review, 0 en Blocked, 0 en In progress, 1 en Spec aprobada, 0 en To do, 70 en Backlog y 79 en Done.
+Resumen: **151 features**, 71 abiertas y 80 terminadas. Por columna: 0 en Review, 0 en Blocked, 0 en In progress, 1 en Spec aprobada, 0 en To do, 70 en Backlog y 80 en Done.
 
 ## Review
 
@@ -106,6 +106,7 @@ _Nada comprometido._
 
 | # | Feature | Cierre | OK humano | Prioridad | Rigor |
 |---|---|---|---|---|---|
+| F-163 | La reconstrucción completa solo en las noches del fin de semana y techo del job de 14 h | 2026-11-16 | 2026-11-16 | 0 | estandar |
 | F-161 | Versiones del máster y coste sin planificación temporal: catálogo desde las cabeceras, coste por versión y partida y vigencia temporal frente a vigencia de importe | 2026-11-14 | 2026-11-14 | 1 | estandar |
 | F-162 | El seguimiento lleva TODAS las fichas de obra, cada una con su empresa, y marca la ficha por defecto de cada código (0721 en Ruesma y en PORSAN) | 2026-11-12 | 2026-11-12 | 0 | estandar |
 | F-053 | El desempate rn=1 de stg.obras elige la ficha vacia: tres obras reales no aparecen en el datamart | 2026-11-12 | 2026-11-12 | 53 | critico |
@@ -613,6 +614,12 @@ RENUMERADA el 2026-09-29 al integrar main en la rama de F-052: se ficho como F-0
 estado **pendiente** · prioridad 78 · rigor `estandar` · SDD sí · rama `feature/F-143-tipo-contrato-compra`
 
 Nace el 2026-10-17 de la decisión D5 = A del humano en F-128: F-128 no ingiere catálogos nuevos y «el tipo de contrato de compra (cocide) pasa al backlog como feature aparte». QUÉ ES: `cocide` («Tipo de contrato de compra», índice a `auxobrcoc`, «Obras: Tipos de contratos compra») está en `ctr`, `dca`, `dcf` (y en `com`, `dco`, `dcp`, `defpli`, según `azure-apps/sigrid_tablas.md`). LO MEDIDO EL 2026-10-17 en `raw` (Azure, solo lectura): `ctr.cocide` informado en 14.453 de 19.137 contratos (75,5 %, 19 valores distintos); `dcf.cocide` en 15.726 facturas (9,4 %); `dca.cocide` en 37.157 albaranes (11,8 %); el catálogo tiene ~20 valores. La columna ya se ingiere en las tres tablas; el catálogo `auxobrcoc` NO se ingiere y ningún SQL del datamart usa `cocide` hoy. HAY QUE: ingerir `auxobrcoc` (catálogo pequeño, refresco completo) y publicar el tipo de contrato (id y nombre) AL FINAL de `compras.contratos` y, si la spec lo justifica, de `compras.albaranes` y `compras.facturas` (en F-128 están inventariados como CATALOGO_NO_INGERIDO). La spec decide si en el documento se publica o se hereda del contrato.
+
+### F-163 · La reconstrucción completa solo en las noches del fin de semana y techo del job de 14 h
+
+estado **terminada** · cerrada el 2026-11-16 · OK del humano el 2026-11-16 · prioridad 0 · rigor `estandar` · SDD no · rama `feature/F-163-completa-fin-de-semana`
+
+La nocturna del 2026-11-15 (domingo, reconstrucción completa de F-025) terminó Failed por DeadlineExceeded a las 07:00 UTC: el techo del job (replicaTimeout 25.200 s, 7 h) cortó las comprobaciones finales con todos los pasos en SUCCESS. Criterio del humano (2026-11-15): «las completas solo pueden hacer la noche del viernes al sábado o del sábado al domingo; si no, tendremos fallos en cascada» y «ponle límite 14h». QUÉ HACE: (1) `toca_reconstruccion_completa` (`etl_sigrid/domain/ventana.py`) solo dispara en las ejecuciones de sábado y domingo a las 00:00 UTC; entre semana nunca, aunque pasen 7 días. `DIAS_MAXIMOS_SIN_COMPLETA` (7) queda solo como umbral de la alerta «completa vencida» de `check-ventana`. (2) `VENTANA_REANUDACION` (F-148) de 8 h a 15 h, mayor que el techo. (3) `infra/env/dev.json` `replicaTimeoutSeconds` 25.200 -> 50.400 (14 h). (4) Tests de F-025 y F-148, diccionario (`stg.yaml`, `_meta.yaml`, versión), comentario de `infra/97_create_alert_ventana.ps1` y `azure-apps/datamart_seg_anual.md` en commit aparte.
 
 ### F-161 · Versiones del máster y coste sin planificación temporal: catálogo desde las cabeceras, coste por versión y partida y vigencia temporal frente a vigencia de importe
 

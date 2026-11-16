@@ -99,7 +99,8 @@ objetos:
       (`construido_at`, `congelada`, `motivo`). **Citala siempre que la
       pregunta sea sobre una obra concreta y la frescura importe.** Una obra
       congelada puede llevar hasta 6 dias de retraso: todas se rehacen enteras
-      los domingos.
+      la noche del sabado (o la del domingo si la del sabado no quedo
+      registrada; entre semana nunca, F-163).
 
       QUE OBRA SE CONGELA lo decide `config/business_rules.yaml`, bloque
       `ventana:`, con tres reglas en union: estado 1, 11 o 25; codigo de seis
@@ -759,7 +760,8 @@ objetos:
       consultables**: el build borra solo las obras que va a reinsertar, en la
       misma transaccion. De cuando es el dato de cada obra lo dice
       `_meta.v_frescura_obra`, y una obra congelada puede llevar hasta 6 dias de
-      retraso -todas se rehacen enteras los domingos-.
+      retraso -todas se rehacen enteras la noche del sabado, o la del domingo si
+      falta la del sabado (F-163)-.
 
       **Dos trampas antes de escribir nada, y las dos multiplican importes.**
 
