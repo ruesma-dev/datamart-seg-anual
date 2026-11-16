@@ -1644,8 +1644,8 @@
       "rigor": "estandar",
       "priority": 1,
       "branch": "feature/F-104-retenciones-cliente",
-      "notes": "2026-10-27: prioridad 21 -> 3 por orden del humano (tras F-150 van F-040 y F-104). 2026-11-16: COMPROMETIDA por el humano («vamos con las 5 que quedan de ventas, ponlas en las primeras prioridades»): prioridad 3 -> 1; el resto del backlog baja 5 puestos. Spec escrita el 2026-11-06 en su rama (specs/F-104-retenciones-cliente/) y aprobada por el humano el 2026-11-07 (lo recomendado en D1-D8; D6 = 0686). Se revalida contra main antes del implementer: desde entonces entraron F-040, F-162 y F-161.",
-      "spec_aprobada": "2026-11-07"
+      "notes": "2026-10-27: prioridad 21 -> 3 por orden del humano (tras F-150 van F-040 y F-104). 2026-11-16: COMPROMETIDA por el humano («vamos con las 5 que quedan de ventas, ponlas en las primeras prioridades»): prioridad 3 -> 1; el resto del backlog baja 5 puestos. Spec escrita el 2026-11-06 en su rama (specs/F-104-retenciones-cliente/) y aprobada por el humano el 2026-11-07 (lo recomendado en D1-D8; D6 = 0686). Se revalida contra main antes del implementer: desde entonces entraron F-040, F-162 y F-161. 2026-11-16: spec revalidada (c2e40a7). Resumen de la spec al humano, que pregunta si cuadra con contabilidad (no: 16,00 M contable frente a 10,53 M en efectos; manda la contabilidad, D4, como en proveedores). DECISIONES DEL HUMANO («si a todo pero mete d10»): D3 (a) unión cueretide ∪ 43x8 con criterio_seleccion y cliente_id; D9 (a) entidad_cif a NULL, el CIF en ventas.clientes; D10 (b) la conciliación por FACTURA de cliente entra en F-104 (vista en ventas que lee retenciones.movimientos); D11 (a) el cobro vía AGR se explica sin atribuir. D1, D2, D4-D8 siguen como el 2026-11-07. El spec-author ajusta la spec a D10 (b); después, implementer (F-164 entra cuando F-104 cierre).",
+      "spec_aprobada": "2026-11-16"
     },
     {
       "id": "F-105",
