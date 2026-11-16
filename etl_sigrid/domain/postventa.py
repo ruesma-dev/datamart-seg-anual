@@ -203,6 +203,73 @@ def familia_adjunto(tip: int | None, gratipide: int | None) -> str | None:
 
 
 # ---------------------------------------------------------------------------
+# F-164 · la familia PUBLICADA: los partes firmados, siempre en REPARACION
+# ---------------------------------------------------------------------------
+# `familia_adjunto` es la familia POR DOCUMENTO (F-156), que se publica como
+# `familia_documento`. La que decide quién abre el fichero es `familia_publicada`:
+# solo queda abierta una pareja (tipo, clase) de la LISTA ABIERTA sin señal de
+# parte firmado; todo lo demás, incluida cualquier clase futura, va a REPARACION
+# (la lista es de lo que se abre, no de lo que se cierra: R5). Los partes de
+# 2021-2023 cuelgan de la incidencia SIN clase (`progress/spec_F-164.md` §4).
+
+#: PV001 «Fotos de incidencias», PV004 «Informes» y PV006 «Ficha de inmueble».
+GRATIPIDE_FOTOS_INCIDENCIA: Final[int] = 34
+GRATIPIDE_INFORMES: Final[int] = 37
+GRATIPIDE_FICHA_INMUEBLE: Final[int] = 39
+
+#: Lo ÚNICO que abre cualquier perfil (R1, R5): (tipo de documento, clase de gráfico).
+LISTA_ABIERTA: Final[frozenset[tuple[int, int]]] = frozenset({
+    (TIPO_INCIDENCIA, GRATIPIDE_FOTOS_INCIDENCIA),
+    (TIPO_UNIDAD, GRATIPIDE_FICHA_INMUEBLE),
+    (TIPO_TAREA, GRATIPIDE_INFORMES),
+})
+
+#: Valen igual en Python (`re.search`) y en el ARE de PostgreSQL (`~`), sobre el
+#: texto en mayúsculas: sin `\b`, `\m`, `\y` ni clases POSIX. S2, la firma como
+#: palabra («FIRMADO», «FIRMADA», «FIRMADAS», «FIRMA», «FIRMAS»; no «CONFIRMADO»).
+PATRON_SENAL_FIRMA: Final[str] = r"(^|[^A-ZÁÉÍÓÚÑÜ])FIRMA(D|S?([^A-ZÁÉÍÓÚÑÜ]|$))"
+#: S3, el código de una incidencia (`RS24.11-0123` y variantes), la convención de
+#: Posventa para nombrar los partes. Solo se mira en el NOMBRE (design §3).
+PATRON_SENAL_CODIGO: Final[str] = r"RS\s*[0-9]{2}\.[0-9]{2}\s*[-/_. ]\s*[0-9]{3,5}"
+
+_RE_SENAL_FIRMA: Final[re.Pattern[str]] = re.compile(PATRON_SENAL_FIRMA)
+_RE_SENAL_CODIGO: Final[re.Pattern[str]] = re.compile(PATRON_SENAL_CODIGO)
+
+
+def _texto_senal(texto: str | None) -> str:
+    """Como el SQL: `upper(COALESCE(NULLIF(BTRIM(x), ''), ''))`; `BTRIM` quita solo espacios."""
+    return (texto or "").strip(" ").upper()
+
+
+def senal_parte_firmado(nombre: str | None, descripcion: str | None) -> bool:
+    """S2 sobre nombre + ' ' + descripción; S3 solo sobre el nombre (R2). None cuenta como ''."""
+    nom = _texto_senal(nombre)
+    if _RE_SENAL_FIRMA.search(f"{nom} {_texto_senal(descripcion)}"):
+        return True
+    return _RE_SENAL_CODIGO.search(nom) is not None
+
+
+def familia_publicada(
+    tip: int | None, gratipide: int | None, nombre: str | None, descripcion: str | None
+) -> str | None:
+    """La familia que se publica en `familia` (R1-R7).
+
+    Abierta (la familia por documento) solo si (tip, gratipide) está en
+    `LISTA_ABIERTA` y no hay señal de parte firmado; si no, REPARACION. Un tipo
+    nulo va a REPARACION (R4: ningún nulo abre); un tipo que no es de postventa
+    da None, como `familia_adjunto`.
+    """
+    if tip is None:
+        return "REPARACION"
+    documento = familia_adjunto(tip, gratipide)
+    if documento is None:
+        return None
+    if (tip, gratipide) in LISTA_ABIERTA and not senal_parte_firmado(nombre, descripcion):
+        return documento
+    return "REPARACION"
+
+
+# ---------------------------------------------------------------------------
 # R25 · la obra de origen de una partida de una obra de postventa (D4)
 # ---------------------------------------------------------------------------
 
