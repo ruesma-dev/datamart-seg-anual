@@ -114,3 +114,99 @@ documento, serie); Q5 mayor y efectos de las cuentas 1025308 y 1680579; Q6-Q8 un
 y cuadre por cuenta (`contabilidad.mayor.importe_saldo` frente a `cob` PREVISTO); Q9-Q10 ESPACIO
 PROMOCIÓN VIII y ARCHER; Q11 casación de altas con `raw.dvf`; Q12 casación original→AGR por
 (cuenta, fecha = `fecbaj`); Q13 saldo al 22-09 y retención de las obras de la receta.
+
+## Revalidación 2026-11-16 (spec-author, contra `main` 9957fd7)
+
+Rama `feature/F-104-retenciones-cliente` con `main` dentro (merge 9957fd7). Medido en Azure en SOLO
+LECTURA (`PostgresClient` con `_bootstrap_done = True`, `filas_solo_lectura` en transacción `READ
+ONLY` con timeout ≤ 240 s), sobre la nocturna del 16-11 (cobertura de `ventas` de las 03:42 UTC).
+Scripts en el scratchpad de la sesión (`q_f104_base.py`, `qb_cliente.py`, `qc_cuadre.py`,
+`qd_ventas.py`), no en el repositorio. Nada escrito contra Azure ni contra Sigrid.
+
+### 7. Qué ha cambiado en `main` y cómo afecta a la spec
+
+| Cambio | Efecto en F-104 |
+|---|---|
+| F-040 ingiere `raw.cli` (con `cueretide`, `cueide`), `dvfpro`, `dvfrec` | **D3 se reabre** (§8). `v_src_lineas_venta` ya tiene 29.285 filas: 0 filas CLIENTE sin obra |
+| F-040 deja escritas tres promesas a F-104 (`ventas.yaml` cabecera, `v_factura_cobro`, `cobertura_enlace`; `ARCHITECTURE.md`; su `requirements.md`): `entidad_cif`, conciliación por documento, cobro vía AGR | **D9, D10, D11 nuevas**; R25 corrige los textos |
+| `tests/test_f040_frontera.py` protege `retenciones/00_setup.sql` y vigila el diff de `retenciones/` | `cuentas_cliente` se muda al principio de `01`; R24 añade `01` y `08` a `TOCADOS_DESPUES` |
+| F-162 (`stg.obras` por empresa) | Sin efecto: `maestro.centros_coste` no cambió y nada nuevo agrega por `codigo_obra` |
+| F-161 (catálogo de versiones) | Solo tocó `retenciones/05_fin_obra.sql` (`tiene_reparto`), que F-104 no toca |
+| F-163 (completa en fin de semana) | Diario incremental por `tiemod`: afecta igual a `saldo_contable_cliente` y a `contabilidad.mayor` (los dos leen `raw.apu`); riesgo (5) del design |
+| Diccionario v72 → **v78** | R18: `main` + 1 al implementar (v79 si F-160/F-099 no suben antes) |
+| Arnés 1.7.7 → 1.10.1 | Capa por requisito, rigor arriba del design, «Frontera», tabla «Decisiones», mutación informativa en `estandar` |
+| `config/tables_sigrid.yaml`: el comentario de `cob` dice «sigue saliendo solo de fecrea, sin verificar» | R26: se corrige el comentario |
+
+Ningún objeto, nombre ni fichero que la spec da por nuevo existe hoy: no hay `08_*.sql` en
+`retenciones/`, ni `cuentas_cliente`, `saldo_contable_cliente`, `v_cuadre_cliente`,
+`origen_retencion` o `cuenta_id` en `movimientos` (columnas leídas en `information_schema`).
+
+### 8. El universo de cuentas, ahora que existe `cli.cueretide` (D3)
+
+| Universo | cuentas | con apuntes | saldo contable (`contabilidad.mayor`) |
+|---|---|---|---|
+| 43x8 `tip 17` (lo aprobado) | 221 (214 4308, 3 4328, 4 4338) | 167 | 16.002.697,94 |
+| `cli.cueretide` (1:1: 211 clientes, 211 cuentas) | 211 (203 4308, 2 4328, 2 4338, 3 5540, 1 4380) | 162 | 15.053.935,40 |
+| en los dos | 207 | 160 | 15.053.935,40 |
+| solo 43x8 | 14 | 7 | 948.762,54 |
+| solo `cueretide` | 4 (5540 «retenciones suplidos» de UTE, 4380 «Anticipos») | 2 | 0,00 |
+| **unión (recomendada)** | **225** | **169** | **16.002.697,94** |
+
+- Lo que solo trae el prefijo es **UNEXUM REAL ESTATE** (4338001593, 947.835,66) y ROSADO ESTEVEZ
+  (4308000145, 926,88). UNEXUM SÍ es cliente (`cli.ide` 2246663), pero su `cueretide` apunta a
+  4308001593 y el dinero está en 4338001593: error de ficha en Sigrid, para la lista de D8.
+- Lo que solo trae `cueretide`: 4 cuentas con saldo 0 y 1 efecto `retide = 0` (3.957,70, no vivo).
+- Ninguna cuenta de cliente (43x8 ni `cueretide`) es `cueretide` de un proveedor.
+- Por eso la recomendación pasa de «prefijo provisional → `cueretide`» a **la unión**, con
+  `criterio_seleccion` por fila y `cliente_id`: la regla de F-095 donde existe el dato, y el
+  prefijo para no perder 0,95 M que Sigrid tiene mal declarados.
+
+### 9. Cifras de 06-11 frente a 16-11
+
+| Medida | 06-11 | 16-11 |
+|---|---|---|
+| CLIENTE en `movimientos` (filas / VIVA publicado) | 2.254 / 22.406.732,96 (2.212) | 2.256 / 22.438.322,16 (2.214) |
+| VIVA con baja, `est 1` | 1.956 / 19.928.538,74 | 1.956 / 19.928.538,74 |
+| VIVA sin baja, `est 1` (= VIVA con R1) | 245 / 2.371.937,54 | 247 / 2.403.526,74 |
+| VIVA sin baja, `est 10` (pasa a LIQUIDADA) | 11 / 106.256,68 | 11 / 106.256,68 |
+| CLIENTE con R1: BAJA / LIQUIDADA | — | 1.957 / 19.937.206,76 · 52 / 420.440,16 |
+| PROVEEDOR VIVA (no debe moverse, R9) | — | 7.621 / 8.856.229,44 |
+| Efectos `retide = 0` que entran por R6 | 1.204 | 1.205 (1.204 de 43x8 + 1 de `cueretide`) |
+| CLIENTE tras F-104 (filas) | 3.458 | 3.461 |
+| Efectos vivos de las cuentas (R1) | 345 / 10.495.108,25 | 347 / 10.526.697,45 (247 con `retide`, 100 AGR/DIV/sin tipo: 8.123.170,71) |
+| Saldo contable de las cuentas | 15.485.863,29 (43x8) | 16.002.697,94 (43x8 = unión) |
+| Cuadre (cuentas con ≥ 1 €) | 18 CUADRA, 25 descuadran, 14 solo saldo, 5 solo efectos | 20 CUADRA, 23 descuadran (20 CONTAB_MAYOR + 3 EFECTOS_MAYOR), 16 solo saldo, 5 solo efectos |
+| 4308001150 TERTIO MILLENNIO | CUADRA 12.000,00 | CUADRA 12.000,00 |
+| 4308001634 ESPACIO PROMOCIÓN VIII (0686) | 1.679.407,38 / 622.160,33 | 1.735.233,86 / 622.160,33 (dif. 1.113.073,53) |
+| 4308001550 ARCHER | SIN_SALDO 945.000,05 | SIN_SALDO 945.000,05 |
+
+Los mayores descuadres hoy: LEVITT (1,23 M), ESPACIO 0686 (1,11 M), MK MADRID II (1,02 M), UNEXUM
+(0,95 M sin efectos), ARCHER (−0,95 M), VÍA CÉLERE (0,54 M), SABINA (−0,53 M), REDES 2 (0,33 M),
+IDS ALJARAFE (0,32 M), CUYAM (0,31 M), PRORED (0,24 M sin efectos), BTS (−0,22 M).
+
+### 10. Las tres promesas de F-040 a F-104, medidas (D9-D11)
+
+- **`entidad_cif` (D9)**: las 2.256 filas CLIENTE tienen su `entidad_id` en `raw.cli` y en
+  `ventas.clientes`; 18 (26.334,49 €) son de persona física, cuyo NIF `ventas` publica a NULL.
+  Leerlo de `ventas.clientes` por `entidad_id` ya da el CIF enmascarado; copiarlo a `retenciones`
+  obliga a duplicar `ventas.fn_es_persona_fisica` y es tratar datos personales (disparador 3).
+- **Conciliación por factura (D10)**: 2.904 facturas con garantía (`dvfrec`, clases 4-5;
+  25.951.380,55). De las 2.250 que tienen efectos con `retide`, 2.244 cuadran al céntimo y 6
+  difieren (−1.415,94 en total); **654 facturas (3.315.531,18) no tienen efecto de retención**: son
+  los CONTABILIDAD_MAYOR de `v_cuadre_cliente` (ESPACIO, LEVITT, MK...), que F-104 ya enseña por
+  cuenta. La garantía de venta tiene un único punto de decisión (`ventas.fn_clase_recargo`, D4
+  provisional de F-040) y `retenciones` corre antes que `ventas`: hacerlo dentro de F-104
+  obligaría a copiarlo o a ponerlo en `ventas`.
+- **Cobro vía AGR (D11)**: `ventas.cobertura_enlace` EFECTO_FACTURA = 20.538 de 22.035 efectos
+  (1.206,8 de 1.392,4 M); lo no enlazado son los AGR/DIV. Atribuirlos exige la casación (cuenta,
+  fecha de baja) del §2: 90,4 % de cobertura y 44 grupos en los que el AGR suma más que sus
+  originales.
+
+### 11. Veredicto
+
+**Requiere PARADA 1.** D1, D2, D4-D8 siguen valiendo con las cifras al día (D6: la 0686 tiene hoy
+1,74 M de saldo y 0,62 M en efectos). **D3 cambia de sentido** (unión en vez de «prefijo
+provisional → `cueretide`») y hay **tres decisiones nuevas** (D9-D11), heredadas de lo que F-040
+dejó escrito a nombre de F-104. Tabla en `design.md` §9; el resto de cambios (fichero de
+`cuentas_cliente`, `TOCADOS_DESPUES`, textos, versión, mutación) es técnico y no altera ninguna
+decisión aprobada.

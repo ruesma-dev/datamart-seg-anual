@@ -18,6 +18,14 @@
   90484ea) se escribió antes de F-040, F-162 y F-161: el spec-author la revalida antes del implementer.
 - **Fuera de este repo:** la IA NO ve `ventas`, `ventas_restringida` ni `postventa`: no están en la
   lista blanca de `mcp-bbdd` (su F-034, `pending`).
+- **Revalidación de la spec (spec-author, 2026-11-16): REQUIERE PARADA 1.** Informe en
+  `progress/spec_F-104.md` («Revalidación 2026-11-16»); spec marcada `[rev. 16-11]`, tabla en
+  `design.md` §9. Para el humano: **D3 se reabre** (recomendado: unión `cli.cueretide` ∪ 43x8,
+  porque solo `cueretide` pierde UNEXUM, 0,95 M en una cuenta que su ficha no declara) y tres
+  **nuevas** que F-040 dejó escritas a nombre de F-104: **D9** `entidad_cif` (recomendado: sigue
+  NULL, el CIF por `ventas.clientes`), **D10** conciliación por factura (recomendado: feature nueva;
+  654 facturas, 3,32 M sin efecto de retención) y **D11** cobro vía AGR (recomendado: explicar, no
+  atribuir). D1, D2, D4-D8 siguen valiendo con las cifras al día (VIVA 10,53 M; saldo 16,00 M).
 
 ## 2026-11-16 · F-163 `done` y DESPLEGADA · sin feature activa
 
