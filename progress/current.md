@@ -28,7 +28,7 @@
 ### MANUAL pendientes (T8-T11), con su comando
 
 Desde el checkout con `.env`. El script de huella vive en el scratchpad de la sesión:
-`C:\Users\pgris\AppData\Local\Temp\claude\8c090c429e3d52a1\4d25158c-2f67-4374-862c-39b2583c467e\scratchpad\f164_huella.py`
+`f164_huella.py` (fuera del repositorio; el líder tiene la ruta)
 (abajo, `<huella>`).
 
 - **T8 · Huella ANTES** (líder, solo lectura, el día del despliegue y tras la nocturna):
