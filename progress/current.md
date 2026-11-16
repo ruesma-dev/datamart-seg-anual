@@ -9,9 +9,9 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-11-16 · F-164 · implementer en curso · rama `feature/F-164-partes-firmados-restringidos`
+## 2026-11-16 · F-164 · ciclo 2 del implementer (tras CHANGES_REQUESTED) · rama `feature/F-164-partes-firmados-restringidos`
 
-- Spec aprobada (D1 c, D2-D5 a). Tarea en curso: ver `tasks.md` (las `[x]` son las hechas).
+- Spec aprobada (D1 c, D2-D5 a). T1-T6 y T12 `[x]`; T7 (campaña) tras el APPROVED; T8-T11 MANUAL.
 - Decisión: `familia_publicada(None, ...)` da REPARACION (R4 manda: «ningún NULL abre»); un tipo que no
   es de postventa sigue dando `None`, como `familia_adjunto`.
 - Desviación menor del design §4 (justificada en `progress/impl_F-164.md`): el `CASE` de `familia` va en
@@ -19,11 +19,38 @@
   `b.clase_grafico_id`), envolviendo `b.familia_documento` sin duplicar su expresión.
 - Diccionario v79 en la rama, SIN PUBLICAR: 320 objetos, 2743 columnas (+1, `familia_documento`) y 157
   de consumo.
-- **BLOQUEO (T12, 2026-11-16):** T1-T6 hechas y commiteadas (azure-apps `f61570b`, sin push). La
-  puerta NO ha terminado en verde: la 1ª pasada cazó el recuento de columnas de este fichero
-  (arreglado en `2f77308`); la 2ª la cortó Claude Code por FALTA DE MEMORIA del equipo al 85 % de
-  pytest, sin fallos hasta ahí, y no se relanza sin que lo pidan. Falta: `bash harness/init.sh` con
-  memoria libre y anotar su cobertura en `progress/impl_F-164.md`. No es un fallo del código.
+- **Puerta del líder (T12), en verde sobre `4e5ef33`:** 13525 passed, 2532 skipped, 2 h 12 min,
+  `PUERTA COBERTURA` 24/24, `ENTORNO LISTO`. azure-apps `f61570b` ya está en `origin/main` (lo subió
+  un humano el 2026-11-16).
+- **Ciclo 2 (review H1, H2, H4):** test del `CASE` entero en `tests/test_f164_sql.py` (mata M1-M4 a
+  mano); `_texto_senal` sin `strip` (H4); papeleo. La puerta completa la vuelve a pasar el líder.
+
+### MANUAL pendientes (T8-T11), con su comando
+
+Desde el checkout con `.env`. El script de huella vive en el scratchpad de la sesión:
+`C:\Users\pgris\AppData\Local\Temp\claude\8c090c429e3d52a1\4d25158c-2f67-4374-862c-39b2583c467e\scratchpad\f164_huella.py`
+(abajo, `<huella>`).
+
+- **T8 · Huella ANTES** (líder, solo lectura, el día del despliegue y tras la nocturna):
+  `.venv/Scripts/python.exe <huella> antes` → `f164_huella_antes.csv` (`adjunto_id, familia, md5`);
+  anotar en `impl_F-164.md` el recuento por familia y la imagen del job:
+  `az containerapp job show -n caj-datamart-seg-dev -g rg-datamart-seg-dev --query "properties.template.containers[0].image" -o tsv`.
+- **T9 · Despliegue** (humano): merge (`dev`, y `main` preguntando);
+  `powershell -NoProfile -File infra/70_build_image.ps1` (anotar el tag nuevo);
+  `powershell -NoProfile -File infra/85_update_job.ps1 -Tag <nuevo>`; comprobar la imagen con el mismo
+  `az containerapp job show`. Ejecución puntual SIN ingesta (memoria «job puntual sin ingesta, con
+  --yaml»): `job show --query properties.template` → cambiar solo `command`/`args` a `sh -c "python
+  main.py build-postventa && python main.py apply-grants && python main.py publicar-diccionario"` →
+  `az containerapp job start -n caj-datamart-seg-dev -g rg-datamart-seg-dev --yaml <fichero>`, hasta
+  `Succeeded`. No solapar con la nocturna de las 00:00 UTC.
+- **T10 · Huella DESPUÉS y R14-R15** (líder, solo lectura): `.venv/Scripts/python.exe <huella> despues`
+  → mismo `adjunto_id`, md5 iguales, `familia_documento` = familia de antes, solo INCIDENCIA/UNIDAD →
+  REPARACION (≈ 3.349) y 0 filas en la consulta de R15.
+- **T11 · R16** (humano o sesión `mcp`): reiniciar `mcp-bbdd` (cachea el diccionario); abrir un 708 y
+  un 707 movidos con los 4 perfiles: `PERMISO_DENEGADO` con estándar y restringido, abiertos con
+  postventa y total (el 707 con aviso de huérfano); avisar a la sesión `mcp` (DH10, los 8 de 707).
+- **Vuelta atrás:** `powershell -NoProfile -File infra/85_update_job.ps1 -Tag r20261116-1018` y la
+  misma ejecución puntual (o la nocturna): vuelve la regla de F-156 y su diccionario.
 
 ## 2026-11-16 · F-164 · spec escrita (spec-author) · rama `feature/F-164-partes-firmados-restringidos`
 

@@ -128,21 +128,44 @@ enlaces. Con el mismo motor (ARE de PostgreSQL 16.15 en Azure).
 
 ## Salida de `bash harness/init.sh`
 
-**NO TERMINADA EN VERDE: T12 pendiente.** Dos ejecuciones de `bash harness/init.sh`, tal cual:
+**T12 en verde (puerta del líder, sobre `4e5ef33`):** 13525 passed, 2532 skipped, 2 h 12 min;
+`PUERTA COBERTURA: 100.0% de 24 líneas cambiadas cubiertas (24/24, umbral 90% del nivel critico)`;
+`ENTORNO LISTO`. Antes, dos intentos del implementer: el 1º ROJO por un fallo real de F-164 (el
+recuento de columnas de `current.md`, 2742 → 2743; arreglado en `2f77308`) y el 2º cortado por falta
+de memoria del equipo al 85 % de pytest, sin fallos. Tras el ciclo 2 la puerta completa la repasa el
+líder (orden suya: dura más de 2 h).
 
-1. **Primera: ROJA**, por un fallo REAL que provocó F-164 y ya está arreglado:
-   `test_f006_los_recuentos_de_current_son_los_de_hoy` («`current.md` no dice el número real de
-   columnas (2743)»: `familia_documento` sube el diccionario de 2742 a 2743 columnas). Resultado:
-   `1 failed, 675 passed, 1 skipped in 1695.19s` (pytest para en el primer fallo) y, por eso,
-   `PUERTA COBERTURA: 45.8% de 24 líneas` (la suite solo llegó al 4 %; los tests de F-164 no
-   corrieron). TAMAÑO, CARRIL (N/A, `critico`), CAPA E2E (N/A) y rama, en `[OK]`. Arreglo:
-   `2f77308` (current.md con el recuento de v79); `pytest tests/test_f006_contexto.py -k recuentos`
-   → 1 passed.
-2. **Segunda: INTERRUMPIDA por Claude Code por falta de memoria del equipo** (no es un fallo de la
-   puerta) al **85 % de pytest, sin ningún fallo hasta ahí**. Por la nota del sistema no la he
-   relanzado. La tiene que relanzar el líder (o el humano) con el equipo despierto y con memoria:
-   `bash harness/init.sh`, y dar por buenas las líneas `PUERTA COBERTURA` y `PUERTA CARRIL` de esa
-   ejecución.
+## Ciclo 2 (tras CHANGES_REQUESTED de `review_F-164.md`)
+
+Commits: `d8b99e9` (H1), `e5ac228` (H4), `3c95df4` (SIM300 de ruff), y el de H2 (papeleo).
+
+- **H1 · test del `CASE` entero** (`tests/test_f164_sql.py::test_f164_r9_el_case_entero_es_el_del_dominio`):
+  `ORDEN_SQL` fijo con `set(ORDEN_SQL) == set(pv.LISTA_ABIERTA)` y el `esperado` literal del review,
+  armado con `pv.PATRON_SENAL_FIRMA` / `pv.PATRON_SENAL_CODIGO`. Pasa sobre HEAD (10 passed).
+  **RED, mutando a mano `06_adjuntos.sql`** (copia de seguridad en el scratchpad, restaurado tras cada
+  mutante; `git status` limpio después). Comando: `.venv/Scripts/python.exe -m pytest
+  tests/test_f164_sql.py -q -p no:cacheprovider`. M1 (`…clase_grafico_id = 37) OR TRUE) IS TRUE`):
+  ```
+  E       assert "CASE WHEN ((b.tipo_documento_codigo = 708 AND b.clase_grafico_id = 34) OR (b.tipo_documento_codigo = 707 AND b.clase_...-9]{2}\.[0-9]{2}\s*[-/_. ]\s*[0-9]{3,5}') IS FALSE THEN b.familia_documento ELSE 'REPARACION' END::TEXT AS familia," in 'SELECT b.adjunto_id AS adjunto_id, CASE WHEN ((b.tipo_documento_codigo = 708 AND b.clase_grafico_id = 34) OR (b.tipo_..._grafico, b.descripcion AS descripcion, b.fecha_alta AS fecha_alta, b.subido_por AS subido_por, b.posicion AS posicion'
+  FAILED tests/test_f164_sql.py::test_f164_r9_el_case_entero_es_el_del_dominio
+  1 failed, 9 passed in 0.42s
+  ```
+  M2 (`OR b.clase_grafico_id IS NULL`), M3 (`[0-9]{3,5}' AND FALSE) IS FALSE`) y M4 (`OR` entre S2
+  y S3 → `AND`): **los tres, `1 failed, 9 passed`**, con el mismo `FAILED` y solo ese test (confirma
+  el hueco del review: sin él, los cuatro vivían en la puerta).
+- **H4 · `_texto_senal` sin `.strip(" ")`.** La spec no lo exige: el design §3 habla de los textos
+  «tal y como los publica la tabla (`NULLIF(BTRIM(...), '')`)», que es el SQL, no el dominio. Para S2
+  el espacio ya es no letra y S3 no está anclado: quitarlo no cambia ninguna señal, y así no queda
+  un mutante equivalente para T7. El test `r4_los_bordes_se_recortan_como_btrim` pasa a
+  `r4_los_espacios_de_los_bordes_no_cambian_la_senal` (+2 aserciones: S3 con bordes, y sin señal con
+  bordes). Sin otro cambio de comportamiento.
+- **H2 · papeleo:** `current.md` (sin BLOQUEO, puerta del líder y T8-T11 con su comando, nombres de
+  `infra/` comprobados: `70_build_image.ps1`, `85_update_job.ps1`, `caj-datamart-seg-dev` en
+  `infra/env/dev.json`), T12 `[x]` en `tasks.md`, y aquí la fila del tiempo y la línea de azure-apps.
+- **Verificación del ciclo** (sin puerta completa, por orden del líder): los 47 ficheros de `tests/`
+  que nombran `documento_adjuntos` o `postventa` (incluye los cuatro de F-164, `test_f156_*` y
+  `test_f006_fichas*`): **`2278 passed, 14 skipped, 1202 warnings in 843.65s (0:14:03)`**. `ruff
+  check` de los `test_f164_*.py` y `domain/postventa.py`: **`All checks passed!`**.
 
 ## Commits
 
@@ -155,7 +178,7 @@ enlaces. Con el mismo motor (ARE de PostgreSQL 16.15 en Azure).
 | `4e63b8e` | F-164 T5: diccionario v79 (ficha, regla, contactos_incidencia, auxgra) |
 | `0dab130` | F-164 T6: ARCHITECTURE.md (azure-apps f61570b, commit aparte, sin push) |
 | `2f77308` | F-164: current.md con el recuento del diccionario v79 (2743 columnas) |
-| **azure-apps `f61570b`** | F-164: datamart_seg_anual.md, los partes firmados siempre en REPARACION y familia_documento (SIN DESPLEGAR). `main` queda **ahead 2** de `origin/main`: uno ajeno (`3029b50`, F-100 de albaranes) y este. **Sin push**: el humano hace `git -C azure-apps pull` y después `push` |
+| **azure-apps `f61570b`** | F-164: datamart_seg_anual.md, los partes firmados siempre en REPARACION y familia_documento (SIN DESPLEGAR). **Ya está en `origin/main`**: lo subió un humano el 2026-11-16 junto a otro commit (review H3); no queda push pendiente de azure-apps |
 
 ## Pendiente (MANUAL y fuera de esta pasada)
 
@@ -171,15 +194,15 @@ enlaces. Con el mismo motor (ARE de PostgreSQL 16.15 en Azure).
   vuelta atrás `85_update_job.ps1 -Tag r20261116-1018`.
 - **T11 / R16** (humano o sesión `mcp`): reiniciar `mcp-bbdd`, abrir un 708 y un 707 movidos con los
   cuatro perfiles, avisar para cerrar DH10 y de los 8 huérfanos de 707.
-- **T12**: `bash harness/init.sh` en verde, SIN CUMPLIR (ver «Salida de init.sh»).
+- **T12**: hecha (puerta del líder en verde sobre `4e5ef33`); tras el ciclo 2, la repasa el líder.
 
 ## Evidencias
 
 | Evidencia | Valor |
 |---|---|
 | Tests ejecutados (suite) | Puerta del líder (2026-11-16, HEAD 4e5ef33): 13525 passed, 2532 skipped en 2 h 12 min. `ENTORNO LISTO` |
-| Tests de F-164 | dominio 250, SQL 9, diccionario 11 (R13 azure-apps no `skip`: está al lado), sandbox 6 con DSN (6 `skip` sin él, en la puerta) |
+| Tests de F-164 | dominio 250, SQL 10 (ciclo 2: +1, el `CASE` entero), diccionario 11 (R13 azure-apps no `skip`: está al lado), sandbox 6 con DSN (6 `skip` sin él, en la puerta) |
 | Cobertura de líneas cambiadas | `PUERTA COBERTURA: 100.0% de 24 líneas cambiadas cubiertas (24/24, umbral 90% del nivel critico)` (puerta del líder) |
 | Mutantes generados / supervivientes | No en esta pasada: T7, pasada de campaña tras el APPROVED (nivel `critico`, exigida) |
-| Tiempo de la suite | 1ª pasada: 1695 s hasta el primer fallo (4 %); la completa no terminó |
+| Tiempo de la suite | 2 h 12 min (puerta del líder sobre `4e5ef33`) |
 | Capa e2e | N/A (sin interfaz de navegador; ver línea `CAPA E2E` de la puerta) |
