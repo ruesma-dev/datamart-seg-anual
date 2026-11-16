@@ -374,8 +374,9 @@ class BuildStgStep(PipelineStep):
         self._batch_id = batch_id
         self._omitir_puerta = omitir_puerta
         # F-025: fuerza la reconstrucción completa esta noche, se mire el
-        # calendario o no. Lo enciende `--reconstruir-todo` y lo enciende solo
-        # el domingo (R25).
+        # calendario o no. Lo enciende `--reconstruir-todo`; el calendario
+        # (sábado, o domingo si falta la del sábado: R25, F-163) se decide en
+        # `_toca_completa`.
         self._reconstruir_todo = reconstruir_todo
         # El plan de la noche, compuesto por el sub-paso `plan_ventana` y leído
         # por los dos sub-pasos acotados que vienen detrás.

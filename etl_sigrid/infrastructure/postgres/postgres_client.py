@@ -369,7 +369,8 @@ ORDER BY c.ide
 # LA VARIANTE BARATA (R20): no incluye `planif`, que es un texto largo en 13,8
 # M de filas y habría que detoastar entero. La laguna que deja —un cambio de
 # planificación pura que no mueva ninguna cantidad ni ningún precio— queda
-# declarada en el diccionario y la cierra la reconstrucción del domingo (R25).
+# declarada en el diccionario y la cierra la reconstrucción completa del fin de
+# semana (R25, F-163).
 # La variante cara es `SQL_FIRMA_ORIGEN_CON_PLANIF`, aquí abajo, y la mide T2b.
 SQL_FIRMA_ORIGEN = """
 WITH pre AS (
@@ -439,7 +440,7 @@ COLUMNAS_FIRMA_ORIGEN = (
 # es lo único que cierra la laguna de la variante barata. El precio es
 # detoastar un texto largo en 13,8 M de filas sobre un B1ms con techo de
 # 10 MiB/s. Si T2b lo declara asumible, sustituye a `SQL_FIRMA_ORIGEN`; si no,
-# la laguna se queda declarada y la cierra el domingo.
+# la laguna se queda declarada y la cierra la completa del fin de semana.
 SQL_FIRMA_ORIGEN_CON_PLANIF = """
 SELECT pp.obride AS obra_id,
        count(*) AS pre_filas,
@@ -521,7 +522,7 @@ TABLAS_ACOTADAS = ("plan_mensual", "presupuesto", "plan_mensual_fase0")
 # solo para NOMBRAR las que no están en el censo (ver `fetch_obras_con_filas`:
 # no se borran). Va por `DISTINCT` sobre el índice —del orden de 700 valores
 # distintos— y no por un `NOT IN` sobre la tabla entera, que sería un barrido
-# de 29 M de filas cada domingo.
+# de 29 M de filas cada noche de completa.
 SQL_OBRAS_CON_FILAS = "SELECT DISTINCT obra_id FROM stg.{tabla}"
 
 # CUÁNTAS FILAS HA DEJADO CADA OBRA EN EL TRAMO (R14). Alimenta la columna
