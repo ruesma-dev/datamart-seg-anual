@@ -59,7 +59,7 @@ def test_f164_r1_la_lista_abierta_son_tres_parejas() -> None:
     assert pv.GRATIPIDE_FOTOS_INCIDENCIA == PV001
     assert pv.GRATIPIDE_INFORMES == PV004
     assert pv.GRATIPIDE_FICHA_INMUEBLE == PV006
-    assert pv.LISTA_ABIERTA == frozenset({(INC, PV001), (UNI, PV006), (TAR, PV004)})
+    assert frozenset({(INC, PV001), (UNI, PV006), (TAR, PV004)}) == pv.LISTA_ABIERTA
 
 
 def test_f164_r9_los_patrones_son_los_de_la_spec() -> None:
