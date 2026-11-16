@@ -9,6 +9,22 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-16 · F-164 · spec escrita (spec-author) · rama `feature/F-164-partes-firmados-restringidos`
+
+- Spec en `specs/F-164-partes-firmados-restringidos/`; mediciones (Azure, solo lectura, 09:55-10:15
+  UTC, 16.088 enlaces) en `progress/spec_F-164.md`. Ningún código de producción tocado.
+- **Hallazgo que cambia el tamaño del problema:** los partes de 2021-2023 (antes de la convención
+  PV002 de 2024) cuelgan de la incidencia SIN clase de gráfico: 3.338 ficheros 708 sin clase, 3.182
+  subidos a ± 3 días de la resolución, muchos con nombre genérico. El texto «parte firmado» ve 7; el
+  texto ampliado, 1.680 de ellos.
+- **Propuesta (D1 c):** lista abierta (PV001 en incidencia, PV006 en unidad, PV004 en tarea) sin señal
+  de firma o código de incidencia; todo lo demás, REPARACION. Cambian 3.349 enlaces (3.341 de 708 y 8
+  de 707), ninguno sale de REPARACION y los 7 caen dentro.
+- **Decisiones abiertas para el humano** (`design.md` §9): D1 criterio (rec. c); D2 destino REPARACION
+  (rec. a: una familia nueva exige cambiar `mcp-bbdd`); D3 columna `familia_documento` (rec. a); D4
+  aceptar los 8 de 707 como huérfanos en el MCP (rec. a); D5 dejar abiertos los 32 PDF de PV001 del
+  alta (rec. a).
+
 ## 2026-11-16 · F-163 `done` y DESPLEGADA · sin feature activa
 
 - F-163 cerrada con el OK del humano a la PARADA 2. Resumen en `progress/history.md`.
