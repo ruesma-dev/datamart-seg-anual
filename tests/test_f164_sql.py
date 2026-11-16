@@ -101,6 +101,34 @@ def test_f164_r9_los_patrones_del_sql_son_los_del_dominio() -> None:
     assert f"upper({nombre}) ~ '{pv.PATRON_SENAL_CODIGO}'" in caso
 
 
+#: El orden de las parejas en el SQL (`LISTA_ABIERTA` es un `frozenset`).
+ORDEN_SQL: tuple[tuple[int, int], ...] = (
+    (pv.TIPO_INCIDENCIA, pv.GRATIPIDE_FOTOS_INCIDENCIA),
+    (pv.TIPO_UNIDAD, pv.GRATIPIDE_FICHA_INMUEBLE),
+    (pv.TIPO_TAREA, pv.GRATIPIDE_INFORMES),
+)
+
+
+def test_f164_r9_el_case_entero_es_el_del_dominio() -> None:
+    """La ESTRUCTURA del `CASE`, no solo sus literales (review H1).
+
+    La sandbox, que lo ejecuta, hace `skip` sin DSN en la puerta y `harness.mutacion`
+    no muta SQL: sin este test, abrir los sin clase (`OR TRUE`), apagar S3
+    (`AND FALSE`) o cambiar el `OR` de las señales por `AND` dejaba la puerta en verde.
+    """
+    assert set(ORDEN_SQL) == set(pv.LISTA_ABIERTA)
+    lista = " OR ".join(
+        f"(b.tipo_documento_codigo = {t} AND b.clase_grafico_id = {c})" for t, c in ORDEN_SQL)
+    esperado = (
+        f"CASE WHEN ({lista}) IS TRUE AND ("
+        f"upper(COALESCE(b.nombre_fichero, '') || ' ' || COALESCE(b.descripcion, '')) "
+        f"~ '{pv.PATRON_SENAL_FIRMA}' "
+        f"OR upper(COALESCE(b.nombre_fichero, '')) ~ '{pv.PATRON_SENAL_CODIGO}') IS FALSE "
+        "THEN b.familia_documento ELSE 'REPARACION' END::TEXT AS familia,"
+    )
+    assert esperado in _select_final()
+
+
 def test_f164_r9_ningun_otro_patron_ni_clase_en_el_sql() -> None:
     """El CASE no mira la extensión ni `clase_fichero` (R6) ni otra columna."""
     caso = _case_familia()
