@@ -236,9 +236,11 @@ def test_f164_r4_el_parte_de_2026_10_sin_descripcion() -> None:
         == "REPARACION"
 
 
-def test_f164_r4_los_bordes_se_recortan_como_btrim() -> None:
-    """Igual que el SQL: `NULLIF(BTRIM(x), '')`, solo espacios."""
+def test_f164_r4_los_espacios_de_los_bordes_no_cambian_la_senal() -> None:
+    """El SQL recorta con `BTRIM`; el dominio no necesita hacerlo (review H4): da lo mismo."""
     assert pv.senal_parte_firmado("  FIRMA  ", None)
+    assert pv.senal_parte_firmado("  RS24.11-0123.pdf  ", "  ")
+    assert not pv.senal_parte_firmado("  foto.jpg  ", "  ")
     assert pv.familia_publicada(INC, PV001, "  foto.jpg  ", "  ") == "INCIDENCIA"
 
 

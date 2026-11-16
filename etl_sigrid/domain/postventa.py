@@ -237,8 +237,13 @@ _RE_SENAL_CODIGO: Final[re.Pattern[str]] = re.compile(PATRON_SENAL_CODIGO)
 
 
 def _texto_senal(texto: str | None) -> str:
-    """Como el SQL: `upper(COALESCE(NULLIF(BTRIM(x), ''), ''))`; `BTRIM` quita solo espacios."""
-    return (texto or "").strip(" ").upper()
+    """Como el SQL: `upper(COALESCE(x, ''))`.
+
+    Sin recortar: los espacios de los bordes no cambian ninguna señal (para S2 el
+    espacio ya es no letra y S3 no está anclado), así que el `BTRIM` del SQL no
+    necesita espejo aquí (review F-164, H4).
+    """
+    return (texto or "").upper()
 
 
 def senal_parte_firmado(nombre: str | None, descripcion: str | None) -> bool:
