@@ -177,9 +177,9 @@ enlaces. Con el mismo motor (ARE de PostgreSQL 16.15 en Azure).
 
 | Evidencia | Valor |
 |---|---|
-| Tests ejecutados (suite) | Sin cifra completa: 1ª pasada 675 passed + 1 failed (arreglado) al 4 %; 2ª interrumpida por memoria al 85 % sin fallos. Pendiente de la puerta del líder |
+| Tests ejecutados (suite) | Puerta del líder (2026-11-16, HEAD 4e5ef33): 13525 passed, 2532 skipped en 2 h 12 min. `ENTORNO LISTO` |
 | Tests de F-164 | dominio 250, SQL 9, diccionario 11 (R13 azure-apps no `skip`: está al lado), sandbox 6 con DSN (6 `skip` sin él, en la puerta) |
-| Cobertura de líneas cambiadas | Sin medida válida: el 45,8 % (11/24) de la 1ª pasada es de una suite cortada al 4 %. Pendiente de la puerta |
+| Cobertura de líneas cambiadas | `PUERTA COBERTURA: 100.0% de 24 líneas cambiadas cubiertas (24/24, umbral 90% del nivel critico)` (puerta del líder) |
 | Mutantes generados / supervivientes | No en esta pasada: T7, pasada de campaña tras el APPROVED (nivel `critico`, exigida) |
 | Tiempo de la suite | 1ª pasada: 1695 s hasta el primer fallo (4 %); la completa no terminó |
 | Capa e2e | N/A (sin interfaz de navegador; ver línea `CAPA E2E` de la puerta) |
