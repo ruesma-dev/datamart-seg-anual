@@ -5,7 +5,7 @@ cada enlace sale con la familia que da `familia_publicada` del dominio (oráculo
 y con la `familia_documento` de `familia_adjunto` (F-156).
 
 Solo con `F164_SANDBOX_DSN` (un Postgres local de usar y tirar); sin él, `skip`.
-El fixture crea una BASE NUEVA (UTF-8) y la borra al terminar, como
+El fixture crea una BASE NUEVA (UTF-8, ICU) y la borra al terminar, como
 `tests/test_f161_sandbox.py`. Carga un `raw` mínimo con los tipos de la ingesta
 (ids, fechas y `gratipide` `integer`, texto `character varying`), ejecuta el
 `00_setup.sql` y el `06_adjuntos.sql` reales y compara fila a fila. Así se
@@ -103,7 +103,11 @@ def conexion():
 
     base = f"f164_sandbox_{uuid.uuid4().hex[:8]}"
     with psycopg.connect(DSN, autocommit=True) as admin:
-        admin.execute(f"CREATE DATABASE \"{base}\" TEMPLATE template0 ENCODING 'UTF8'")
+        # Azure es `en_US.utf8` y su `upper()` sube los acentos (medido en solo
+        # lectura el 2026-11-16); un clúster local en locale «C» no lo hace. ICU
+        # `und` (PostgreSQL 15+) reproduce el de Azure sin depender del sistema.
+        admin.execute(f"CREATE DATABASE \"{base}\" TEMPLATE template0 ENCODING 'UTF8' "
+                      "LOCALE_PROVIDER icu ICU_LOCALE 'und' LOCALE 'C'")
     try:
         with psycopg.connect(make_conninfo(DSN, dbname=base), autocommit=True) as c:
             c.execute(RAW_DDL)
