@@ -26,6 +26,11 @@
   NULL, el CIF por `ventas.clientes`), **D10** conciliación por factura (recomendado: feature nueva;
   654 facturas, 3,32 M sin efecto de retención) y **D11** cobro vía AGR (recomendado: explicar, no
   atribuir). D1, D2, D4-D8 siguen valiendo con las cifras al día (VIVA 10,53 M; saldo 16,00 M).
+- **Decisiones del humano (b7dc9a2): D3 a, D9 a, D10 b, D11 a.** Spec ajustada a D10 b (conciliación
+  por factura en `ventas`: `retencion_factura`, `retencion_cuenta`, `v_retencion_cliente`, fichero
+  `06b`). **Nueva PARADA 1 por D12**: ESPACIO, LEVITT y MK llevan la retención como RETESP
+  (clase 1), que `ventas.facturas` no cuenta como garantía; recomendado (a) conciliar los recargos
+  que van a una cuenta de retención (`dvfrec.cueide`). `progress/spec_F-104.md` §12-§13 (corrige §10).
 
 ## 2026-11-16 · F-163 `done` y DESPLEGADA · sin feature activa
 

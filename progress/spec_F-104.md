@@ -210,3 +210,74 @@ provisional → `cueretide`») y hay **tres decisiones nuevas** (D9-D11), hereda
 dejó escrito a nombre de F-104. Tabla en `design.md` §9; el resto de cambios (fichero de
 `cuentas_cliente`, `TOCADOS_DESPUES`, textos, versión, mutación) es técnico y no altera ninguna
 decisión aprobada.
+
+### 12. D10 = b (humano, 2026-11-16): la conciliación por factura, medida (y una corrección)
+
+Decisiones del humano registradas en b7dc9a2: D3 a, D9 a, **D10 b**, D11 a; D1, D2, D4-D8 como
+estaban. Medido de nuevo en solo lectura (`qe_factura.py`, `qf_recargos.py`, `qg_retesp.py`,
+`qh_factura2.py`, `qi_cuenta.py`, `qj_resto.py` en el scratchpad).
+
+**CORRECCIÓN de §10.** Dije que las 654 facturas con garantía sin efecto (3,32 M) «son los
+CONTABILIDAD_MAYOR de `v_cuadre_cliente` (ESPACIO, LEVITT, MK...)». **Es falso**: 580 de ellas son
+de 2008-2015 y ESPACIO, LEVITT y MK no tienen ninguna. Sus facturas llevan la retención como
+**RETESP** (clase 1, «Retención 5% garantía (sin iva)»), que `ventas.facturas` no cuenta como
+garantía (D4 provisional de F-040):
+
+| Cliente | facturas | garantía (4-5) | RETESP | saldo de su cuenta 43x8 |
+|---|---|---|---|---|
+| ESPACIO PROMOCIÓN VIII (0686) | 26 | 0,00 | 1.735.233,86 | 1.735.233,86 |
+| LEVITT LAS ROZAS | 74 | 0,00 | 1.561.705,72 | 1.561.705,72 |
+| MK MADRID II | 21 | 0,00 | 1.347.109,23 | 1.347.109,23 |
+
+Recargos de `raw.dvfrec` por clase y por si su `cueide` es cuenta de retención de cliente: clase 1
+(RETESP) 1.067 a cuenta de retención (17.714.201,72) y 22 a otras (616.029,04); clase 4: 72
+(1.312.923,84) y 9 (21.304,14); clase 5: 2.728 (24.323.614,89) y 96 (293.537,68); las clases 0, 2
+y 3 nunca van a una cuenta de retención. **Nueva decisión D12** (design §9): qué retención de la
+factura se concilia. Recomendado (a), los recargos que van a una cuenta de retención: sigue a la
+contabilidad y no depende de la D4 de F-040.
+
+**Los efectos de la factura** tienen que ser los de F-104 (`retide <> 0` o cuenta de retención),
+no solo los de `retide`: ESPACIO tiene 622.160,33 € vivos en su cuenta en 2 efectos SIN documento
+ni `retide` (agrupadores manuales). Por motivo, con D12 = a y ese universo:
+
+| motivo | facturas | retención | efectos | diferencia | efectos vivos | agrupados (BAJA) |
+|---|---|---|---|---|---|---|
+| CUADRA | 2.696 | 25.270.436,45 | 25.270.436,45 | 0,00 | 2.495.450,75 | 21.965.891,86 |
+| SIN_EFECTO | 1.114 | 17.781.786,37 | 0 | 17.781.786,37 | 0 | 0 |
+| DIFIERE | 56 | 298.517,63 | 525.983,34 | −227.465,71 | 12.663,27 | 447.447,98 |
+| EFECTO_SIN_RETENCION | 284 | 0 | 443.750,44 | −443.750,44 | 87.209,93 | 341.376,47 |
+| SIN_CUENTA_RETENCION | 27 | 0 | 0 | (garantía 15.146,34 + RETESP 568.527,49 a otras cuentas) | | |
+
+SIN_EFECTO por año: 2008-2015 159 facturas (1,42 M), 2016-2022 75 (0,81 M), 2023 97 (1,63 M),
+2024 252 (3,69 M), 2025 293 (5,11 M), 2026 238 (5,11 M). Ningún recargo reparte entre dos
+cuentas; en 26 facturas la cuenta del recargo no es la del efecto (por eso la cuenta de una
+factura es la de su recargo). 164 clientes, todas las facturas con cliente.
+
+Con la garantía sola (D12 = c), en cambio: 2.244 CUADRA, 654 SIN_EFECTO (3,32 M), 6 DIFIERE
+(−1.415,94), 6 EFECTO_SIN_RETENCION (123.908,35, que son RETESP), y 1.063 facturas con RETESP
+sin efecto (18,20 M) fuera del universo.
+
+**Por cuenta** (`ventas.retencion_cuenta`): diferencia = saldo − efectos vivos, frente a
+`retencion_sin_efecto` − `viva_sin_factura` (efectos vivos de la cuenta sin documento: 7,93 M en
+37 cuentas). En las 44 cuentas que descuadran (Σ |diferencia| 9.469.807,80), **22 quedan
+explicadas al euro** (ESPACIO: 1.735.233,86 − 622.160,33 = 1.113.073,53; CUYAM; REDES 2; LEVITT y
+MK por su RETESP) y lo sin explicar baja a 4.943.305,62. En las cuentas que CUADRAN la resta da
+5.176.601,32 de «resto» espurio (43 cuentas): facturas antiguas sin efecto cobradas por asiento.
+Por eso `diferencia_sin_explicar` es NULL en `CUADRA`. Lo que queda sin explicar es la lista de
+Administración: UNEXUM (+947.835,66 en 4338001593 y −947.835,66 en 4308001593: se anulan por
+cliente), ARCHER (−945.000,05), SABINA (−525.731,62), SANTANDER DE LEASING (−392.804,75),
+FUNDACIÓN MONCLOA 2000 (−316.205,24), BTS (−221.494,76), COLEGIO JUAN PABLO II (126.294,21).
+
+**Diseño técnico** (sin cambio de fondo): tablas `ventas.retencion_factura` y
+`ventas.retencion_cuenta` y la vista `ventas.v_retencion_cliente` sobre ellas, en
+`ventas/06b_retencion_cliente.sql`, antes de la guarda. Son TABLAS y no vistas sobre `retenciones`
+porque `retenciones/01` hace `DROP TABLE retenciones.movimientos CASCADE` cada noche. Permisos sin
+cambios: `ventas` la leen solo estándar y total, que ya leen `retenciones`.
+
+### 13. Veredicto (sustituye al §11)
+
+**Requiere PARADA 1 por UNA decisión nueva, D12** (qué retención de la factura se concilia).
+Recomendado (a), recargos a cuenta de retención; con (c), la que se deduce literalmente de
+«garantía por `fn_clase_recargo`», la conciliación no explica ninguno de los grandes descuadres.
+Todo lo demás de D10 (b) está diseñado. Tamaño: requirements 146/150, design 180/250; columnas y
+mapa de tests en `specs/F-104-retenciones-cliente/design_detalle.md`.
