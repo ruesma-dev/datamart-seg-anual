@@ -9,9 +9,16 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-11-16 · F-163 `done` · DESPLIEGUE pendiente (lo lanza el humano, ANTES del sábado 21)
+## 2026-11-16 · F-163 `done` y DESPLEGADA · sin feature activa
 
 - F-163 cerrada con el OK del humano a la PARADA 2. Resumen en `progress/history.md`.
+- **Desplegada el 2026-11-16 (humano)**, comprobado por el líder en solo lectura a las 09:29 UTC: imagen
+  `r20261116-1018` (construida tras el merge 406968f), `replicaTimeout` 50.400, `replicaRetryLimit` 1,
+  `PG_VENTANA_ACTIVA=true`, cron `0 0 * * *`. Diccionario v78 publicado por el líder a petición del
+  humano (09:32 UTC, 320 objetos, 2.742 columnas, 24 reglas) y `mcp-bbdd` reiniciado (revisión
+  `--0000023`, Healthy). `azure-apps` 6b9866a quita las marcas SIN DESPLEGAR de F-163 y F-161 (push
+  del humano). **Vigilar:** la completa del sábado 2026-11-21 (primera con el techo de 14 h).
+- El texto de abajo sobre el despliegue queda como registro de lo que se pidió.
 - **Despliegue:** imagen nueva (`infra/70_build_image.ps1` + `infra/85_update_job.ps1 -Tag <nuevo>`),
   y el techo, que `85` NO aplica: `az containerapp job update -g rg-datamart-seg-dev -n
   caj-datamart-seg-dev --replica-timeout 50400`. Comprobar con `az containerapp job show` (imagen,
@@ -24,7 +31,7 @@
   Propuesta de feature aparte, sin alta todavía.
 - **Nocturna del 2026-11-16** (primera con `r20261115-1004`, F-161): `Succeeded` 00:00-05:08 UTC,
   todos los pasos en SUCCESS; `build_stg` + `build_mart` 9.110 s (media previa ~10.050 s);
-  diccionario v77 publicado por la nocturna a las 05:05. Falta reiniciar `mcp-bbdd`.
+  diccionario v77 publicado por la nocturna a las 05:05 (superado por la v78).
 
 ## 2026-11-15 · F-163 (completa solo en fin de semana, techo 14 h) · F-161 desplegada y verificada
 
