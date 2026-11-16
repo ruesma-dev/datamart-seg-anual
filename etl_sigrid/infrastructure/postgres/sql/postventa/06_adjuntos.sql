@@ -9,15 +9,29 @@
 -- documento es de tipo 707, 708 o 47 y cuyo gráfico está en `raw.gra` (JOIN).
 -- 15.986 enlaces el 2026-11-03, todos de la empresa 1.
 --
--- FAMILIA (R20, `familia_adjunto` del dominio):
+-- FAMILIA_DOCUMENTO (R20 de F-156, `familia_adjunto` del dominio): de qué
+-- documento cuelga el fichero. Se publica tal cual en `familia_documento`,
+-- como traza (F-164, D3):
 --   UNIDAD      documento 707 (sobre todo PV006, ficha del inmueble)
 --   TAREA       documento 47 (PV004, informes)
 --   REPARACION  documento 708 con clase de gráfico 35 (PV002 «Fotos
---               Reparaciones»): el PARTE FIRMADO por el cliente, con su DNI
---               MANUSCRITO dentro. `abrir_adjunto` del MCP lo ata a
---               `postventa_restringida`: solo lo abren el perfil postventa y
---               el total (D9). Las FILAS de este índice sí las ven todos.
+--               Reparaciones»)
 --   INCIDENCIA  el resto de 708 (PV001 fotos de incidencias, sin clase...)
+--
+-- FAMILIA (F-164, `familia_publicada` del dominio): la que decide quién ABRE
+-- el fichero. REPARACION es el PARTE FIRMADO por el cliente (con su DNI
+-- MANUSCRITO dentro) o lo que puede serlo: `abrir_adjunto` del MCP lo ata a
+-- `postventa_restringida`, y solo lo abren el perfil postventa y el total (D9
+-- de F-156). Las FILAS de este índice sí las ven todos.
+--   LISTA ABIERTA: solo tres parejas (tipo, clase) conservan su familia por
+--   documento: PV001 (34) en incidencia, PV006 (39) en unidad y PV004 (37) en
+--   tarea. Todo lo demás va a REPARACION: los partes de 2021-2023, que
+--   cuelgan de la incidencia sin clase; PV002 en una unidad; y cualquier clase
+--   que aparezca mañana (la lista es de lo que se abre, no de lo que se cierra).
+--   Y aun dentro de la lista, va a REPARACION si el nombre o la descripción
+--   dicen FIRMA/FIRMADO/FIRMAS (S2) o el nombre lleva el código de una
+--   incidencia, RS99.99-9999 (S3). Seguro ante NULL: solo abre `IS TRUE` /
+--   `IS FALSE`. Los literales son los del dominio (`tests/test_f164_sql.py`).
 --
 -- `extension` y `clase_fichero` son EXACTAMENTE las expresiones del índice de
 -- compras (un test lo compara). `empresa_repositorio` sale de `g.emp` ENTERA:
@@ -56,7 +70,7 @@ WITH base AS (
         CASE WHEN c.tip = 707 THEN 'UNIDAD'
              WHEN c.tip = 47 THEN 'TAREA'
              WHEN g.gratipide = 35 THEN 'REPARACION'
-             ELSE 'INCIDENCIA' END::TEXT        AS familia,
+             ELSE 'INCIDENCIA' END::TEXT        AS familia_documento,
         NULLIF(BTRIM(c.cod), '')                AS codigo_documento,
         CASE c.tip WHEN 708 THEN r.con WHEN 47 THEN NULLIF(t.rcpide, 0) END
                                                 AS incidencia_id,
@@ -86,7 +100,16 @@ WITH base AS (
 )
 SELECT
     b.adjunto_id                                AS adjunto_id,
-    b.familia                                   AS familia,
+    CASE WHEN ((b.tipo_documento_codigo = 708 AND b.clase_grafico_id = 34)
+               OR (b.tipo_documento_codigo = 707 AND b.clase_grafico_id = 39)
+               OR (b.tipo_documento_codigo = 47 AND b.clase_grafico_id = 37)) IS TRUE
+          AND (upper(COALESCE(b.nombre_fichero, '') || ' ' || COALESCE(b.descripcion, ''))
+                   ~ '(^|[^A-ZÁÉÍÓÚÑÜ])FIRMA(D|S?([^A-ZÁÉÍÓÚÑÜ]|$))'
+               OR upper(COALESCE(b.nombre_fichero, ''))
+                   ~ 'RS\s*[0-9]{2}\.[0-9]{2}\s*[-/_. ]\s*[0-9]{3,5}') IS FALSE
+         THEN b.familia_documento
+         ELSE 'REPARACION' END::TEXT            AS familia,
+    b.familia_documento                         AS familia_documento,
     b.documento_id                              AS documento_id,
     b.tipo_documento_codigo                     AS tipo_documento_codigo,
     b.codigo_documento                          AS codigo_documento,
@@ -122,4 +145,4 @@ CREATE INDEX ix_pv_adjuntos_incidencia ON postventa.documento_adjuntos (incidenc
 CREATE INDEX ix_pv_adjuntos_unidad     ON postventa.documento_adjuntos (unidad_id);
 
 COMMENT ON TABLE postventa.documento_adjuntos IS
-'Indice de ficheros adjuntos (Graficos asociados de Sigrid) de unidades, incidencias y tareas de postventa (F-156): una fila por enlace documento-fichero (raw.rcg), familia UNIDAD, INCIDENCIA, REPARACION (parte firmado por el cliente, con su DNI manuscrito: solo lo abren los perfiles postventa y total) o TAREA. Clave adjunto_id (rcg.ide). El fichero NO esta en el datamart: lo sirve sigrid-api con la pareja (empresa_repositorio, cod_repositorio).';
+'Indice de ficheros adjuntos (Graficos asociados de Sigrid) de unidades, incidencias y tareas de postventa (F-156): una fila por enlace documento-fichero (raw.rcg), familia UNIDAD, INCIDENCIA, REPARACION o TAREA. REPARACION = parte firmado o posible parte (F-164), con el DNI manuscrito del cliente: solo lo abren los perfiles postventa y total. Es todo lo que no es foto de incidencia (PV001), ficha de inmueble (PV006) o informe de tarea (PV004), y lo que en ellas lleve FIRMA o el codigo de una incidencia en el nombre. familia_documento guarda la familia por documento (F-156). Clave adjunto_id (rcg.ide). El fichero NO esta en el datamart: lo sirve sigrid-api con la pareja (empresa_repositorio, cod_repositorio).';
