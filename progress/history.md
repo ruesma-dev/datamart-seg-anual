@@ -2189,3 +2189,20 @@ Detonante: la 0721 salía con la ficha vacía de PORSAN (empresa 28) en lugar de
 **Ecosistema:** `azure-apps/datamart_seg_anual.md`, commit `d6bb377`.
 
 **Fuera, pendiente:** despliegue (design §8, en `current.md`), O1 (`05_fin_obra:162`, 0 casos), los dos huecos de test, la obra 1338614 fuera de `stg.obras` y las 61 líneas de la 0698 v23 con `planif` que no dan mes.
+
+## F-163 — La reconstrucción completa solo en las noches del fin de semana y techo del job de 14 h · `done` (2026-11-16)
+
+**Qué cambia.** La nocturna del domingo 2026-11-15 (completa) se cortó por `DeadlineExceeded` a las 7 h. Criterio del humano: completas solo el fin de semana, techo 14 h.
+- `toca_reconstruccion_completa`: el sábado; el domingo solo si la del sábado no quedó registrada; de lunes a viernes nunca (aunque pasen 7+ días); sin ninguna registrada, esa noche (D1 (a), D2 (a)).
+- `DIAS_MAXIMOS_SIN_COMPLETA` (7) queda solo como umbral de la alerta de `check-ventana`.
+- `PG_VENTANA_DIA_COMPLETA` pasa a ser el ÚLTIMO día de la ventana (la completa va la víspera); el job no la fija y rige el defecto 6.
+- `replicaTimeoutSeconds` 25.200 -> 50.400 (`infra/env/dev.json`) y `VENTANA_REANUDACION` 8 h -> 15 h.
+- El `detalle` publicado de la completa ya no nombra un día. Diccionario v78 (solo texto).
+
+**Verificado:**
+- Review: pasada 1 CHANGES_REQUESTED (detalle «(domingo)» publicado, restos de domingo, marca SIN DESPLEGAR); pasada 2 APPROVED con `ARNES_SIN_CACHE=1` sobre `f75357d`: 13.255 passed, cobertura 100 % (18/18).
+- Mutación informativa (`progress/mutacion_F-163.md`): 11 mutantes, 10 muertos, 1 superviviente (`ventana.py:660`, completa forzada un viernes y sábado fallido), 0 timeouts.
+
+**Ecosistema:** `azure-apps/datamart_seg_anual.md`, commits `006b293` y `0511029` (subidos por el humano el 2026-11-15).
+
+**Fuera, pendiente:** despliegue (en `current.md`), O1 (`ventanaActiva` de `dev.json` frente al job vivo), el superviviente de mutación, la nocturna fallida del 2026-11-07.

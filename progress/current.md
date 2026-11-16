@@ -9,7 +9,24 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-11-15 · F-163 `todo` (completa solo en fin de semana, techo 14 h) · F-161 desplegada y verificada
+## 2026-11-16 · F-163 `done` · DESPLIEGUE pendiente (lo lanza el humano, ANTES del sábado 21)
+
+- F-163 cerrada con el OK del humano a la PARADA 2. Resumen en `progress/history.md`.
+- **Despliegue:** imagen nueva (`infra/70_build_image.ps1` + `infra/85_update_job.ps1 -Tag <nuevo>`),
+  y el techo, que `85` NO aplica: `az containerapp job update -g rg-datamart-seg-dev -n
+  caj-datamart-seg-dev --replica-timeout 50400`. Comprobar con `az containerapp job show` (imagen,
+  `replicaTimeout` 50400, `PG_VENTANA_ACTIVA=true`). Diccionario v78: lo publica la nocturna con su
+  imagen; reiniciar `mcp-bbdd` después. Vuelta atrás: `85_update_job.ps1 -Tag r20261115-1004` y
+  `--replica-timeout 25200`.
+- Tras desplegar: el líder quita las marcas «SIN DESPLEGAR» de F-163 en `azure-apps` (commit aparte).
+- **Riesgo abierto (O1 del reviewer):** `infra/env/dev.json` dice `ventanaActiva: "false"` y el job
+  vivo tiene `true`, puesto a mano. Recrear el job con `80_create_job.ps1` apagaría la ventana.
+  Propuesta de feature aparte, sin alta todavía.
+- **Nocturna del 2026-11-16** (primera con `r20261115-1004`, F-161): `Succeeded` 00:00-05:08 UTC,
+  todos los pasos en SUCCESS; `build_stg` + `build_mart` 9.110 s (media previa ~10.050 s);
+  diccionario v77 publicado por la nocturna a las 05:05. Falta reiniciar `mcp-bbdd`.
+
+## 2026-11-15 · F-163 (completa solo en fin de semana, techo 14 h) · F-161 desplegada y verificada
 
 - **F-163** dada de alta en `todo` (rama `feature/F-163-completa-fin-de-semana`, 1c42f7d) tras el OK
   del humano a la PARADA 1; D1 (a) y D2 (a), las recomendadas. Motivo: la nocturna del domingo
