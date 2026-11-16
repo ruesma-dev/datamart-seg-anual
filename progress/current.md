@@ -19,6 +19,11 @@
   `b.clase_grafico_id`), envolviendo `b.familia_documento` sin duplicar su expresión.
 - Diccionario v79 en la rama, SIN PUBLICAR: 320 objetos, 2743 columnas (+1, `familia_documento`) y 157
   de consumo.
+- **BLOQUEO (T12, 2026-11-16):** T1-T6 hechas y commiteadas (azure-apps `f61570b`, sin push). La
+  puerta NO ha terminado en verde: la 1ª pasada cazó el recuento de columnas de este fichero
+  (arreglado en `2f77308`); la 2ª la cortó Claude Code por FALTA DE MEMORIA del equipo al 85 % de
+  pytest, sin fallos hasta ahí, y no se relanza sin que lo pidan. Falta: `bash harness/init.sh` con
+  memoria libre y anotar su cobertura en `progress/impl_F-164.md`. No es un fallo del código.
 
 ## 2026-11-16 · F-164 · spec escrita (spec-author) · rama `feature/F-164-partes-firmados-restringidos`
 
