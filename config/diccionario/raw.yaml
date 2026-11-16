@@ -2700,7 +2700,7 @@ objetos:
     motivo_no_consumo: >-
       Catalogo: la clase ya traducida esta en `postventa.documento_adjuntos`.
     descripcion: >-
-      **LAS CLASES DE GRAFICO** (F-156; 48 filas el 2026-11-03). PV001-PV006 son de postventa; PV002 «Fotos Reparaciones» (`ide` 35) es, en una incidencia, el PARTE FIRMADO por el cliente con su DNI manuscrito: familia REPARACION. En compras la clase esta a 0.
+      **LAS CLASES DE GRAFICO** (F-156; 48 filas el 2026-11-03). PV001-PV006 son de postventa; PV002 «Fotos Reparaciones» (`ide` 35) es, en una incidencia, el PARTE FIRMADO por el cliente con su DNI manuscrito. Desde F-164 PV002 no es la unica marca de REPARACION: solo quedan abiertas PV001 (34) en incidencia, PV006 (39) en unidad y PV004 (37) en tarea sin texto de firma ni codigo de incidencia; todo lo demas, la clase vacia incluida (los partes de 2021-2023), es REPARACION. En compras la clase esta a 0.
 
       **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `auxgra`, y se localiza con `grep -n "^| auxgra " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
 
