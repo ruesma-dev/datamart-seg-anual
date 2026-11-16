@@ -17,6 +17,8 @@
 - Desviación menor del design §4 (justificada en `progress/impl_F-164.md`): el `CASE` de `familia` va en
   el `SELECT` final sobre las columnas ya publicadas de la CTE (`b.nombre_fichero`, `b.descripcion`,
   `b.clase_grafico_id`), envolviendo `b.familia_documento` sin duplicar su expresión.
+- Diccionario v79 en la rama, SIN PUBLICAR: 320 objetos, 2743 columnas (+1, `familia_documento`) y 157
+  de consumo.
 
 ## 2026-11-16 · F-164 · spec escrita (spec-author) · rama `feature/F-164-partes-firmados-restringidos`
 
