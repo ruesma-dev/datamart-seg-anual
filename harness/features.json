@@ -2655,12 +2655,13 @@
         "Diccionario (`postventa.yaml` y la regla `R-POSTVENTA-RESTRINGIDA`) y `azure-apps` al día; `bash harness/init.sh` en verde",
         "Desplegado y verificado en Azure; aviso a la sesión `mcp` de `mcp-bbdd`"
       ],
-      "status": "spec_ready",
+      "status": "in_progress",
       "sdd": true,
       "rigor": "critico",
       "priority": 1,
       "branch": "feature/F-164-partes-firmados-restringidos",
-      "notes": "2026-11-16: alta por el líder tras el «1» del humano (prioridad 1, delante de las cinco de ventas, que pasan a 2-6; el resto del backlog baja 1). Rigor `critico` por el disparador de seguridad y datos personales (DNI manuscrito expuesto a perfiles sin permiso). Spec-author lanzado. 2026-11-16: spec escrita (d9ab6c1; progress/spec_F-164.md). El problema real son ~3.349 ficheros, no 7: los partes de 2021-2023 cuelgan de la incidencia sin clase de gráfico (3.338 del tipo 708). Decisiones D1-D5 para el humano (design §9). spec_ready: resumen de la spec al humano."
+      "notes": "2026-11-16: alta por el líder tras el «1» del humano (prioridad 1, delante de las cinco de ventas, que pasan a 2-6; el resto del backlog baja 1). Rigor `critico` por el disparador de seguridad y datos personales (DNI manuscrito expuesto a perfiles sin permiso). Spec-author lanzado. 2026-11-16: spec escrita (d9ab6c1; progress/spec_F-164.md). El problema real son ~3.349 ficheros, no 7: los partes de 2021-2023 cuelgan de la incidencia sin clase de gráfico (3.338 del tipo 708). Decisiones D1-D5 para el humano (design §9). spec_ready: resumen de la spec al humano. 2026-11-16: resumen de la spec APROBADO por el humano («ok a todo»): D1 (c) lista abierta (PV001 en incidencia, PV006 en unidad, PV004 en tarea) + señales de texto, D2 (a) REPARACION, D3 (a) columna familia_documento, D4 (a) los 8 de unidad huérfanos para el MCP, D5 (a) los 32 PDF de PV001 abiertos. Va ANTES que F-104 por orden del humano. Aviso a la sesión mcp: el riesgo son ~3.349 ficheros, no 7. in_progress; implementer lanzado.",
+      "spec_aprobada": "2026-11-16"
     }
   ]
 }
