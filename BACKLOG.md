@@ -3,11 +3,13 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **152 features**, 72 abiertas y 80 terminadas. Por columna: 0 en Review, 0 en Blocked, 1 en In progress, 2 en Spec aprobada, 4 en To do, 65 en Backlog y 80 en Done.
+Resumen: **152 features**, 72 abiertas y 80 terminadas. Por columna: 1 en Review, 0 en Blocked, 0 en In progress, 2 en Spec aprobada, 4 en To do, 65 en Backlog y 80 en Done.
 
 ## Review
 
-_Nada esperando revisión._
+| # | Feature | La tiene | Prioridad | Rigor | Rama |
+|---|---|---|---|---|---|
+| F-164 | Los partes firmados de postventa (con el DNI manuscrito del cliente) van siempre a la familia restringida, cuelguen de donde cuelguen en Sigrid | reviewer | 1 | critico | `feature/F-164-partes-firmados-restringidos` |
 
 ## Blocked
 
@@ -15,9 +17,7 @@ _Ninguna feature bloqueada._
 
 ## In progress
 
-| # | Feature | La tiene | Prioridad | Rigor | Rama |
-|---|---|---|---|---|---|
-| F-164 | Los partes firmados de postventa (con el DNI manuscrito del cliente) van siempre a la familia restringida, cuelguen de donde cuelguen en Sigrid | implementer | 1 | critico | `feature/F-164-partes-firmados-restringidos` |
+_Ninguna feature en implementación._
 
 ## Spec aprobada
 
@@ -194,7 +194,7 @@ _Ninguna feature bloqueada._
 
 ### F-164 · Los partes firmados de postventa (con el DNI manuscrito del cliente) van siempre a la familia restringida, cuelguen de donde cuelguen en Sigrid
 
-estado **en curso** · spec aprobada el 2026-11-16 · prioridad 1 · rigor `critico` · SDD sí · rama `feature/F-164-partes-firmados-restringidos`
+estado **en QA / revisión** · spec aprobada el 2026-11-16 · prioridad 1 · rigor `critico` · SDD sí · rama `feature/F-164-partes-firmados-restringidos`
 
 Pedida desde `mcp-bbdd` (su F-034, decisión DH10) y confirmada por el humano en esta sesión el 2026-11-16 con prioridad 1. `postventa.documento_adjuntos` (F-156) asigna la `familia` (INCIDENCIA, REPARACION, UNIDAD, TAREA) por el documento del que cuelga el fichero en Sigrid, y `mcp-bbdd` decide quién abre cada adjunto por esa familia: REPARACION solo la abren los perfiles postventa y total; las otras, cualquier perfil, incluido el restringido. MEDIDO por el líder el 2026-11-16 (Azure, solo lectura): de 3.952 ficheros cuyo `nombre_fichero` o `descripcion` dice «parte firmado», 3.945 están en REPARACION y 7 NO: 4 en INCIDENCIA (tipo 708; 3 sin clase de gráfico y 1 en PV001 «Fotos de incidencias») y 3 en UNIDAD (tipo 707, PV002 «Fotos Reparaciones»). Ninguna `clase_grafico` contiene «PARTE» ni «FIRMA»: la marca solo vive en el texto libre, así que 7 es una cota inferior. El humano ACEPTA el riesgo temporal (F-034 se despliega ya) y pide que el datamart lo arregle: un parte firmado cae SIEMPRE en una familia que solo lean postventa y total, con independencia de dónde lo colgó el usuario, INCLUIDOS los que no lo digan en el nombre. En `mcp-bbdd` no hay que cambiar nada (su regla va por familia). Al desplegar, avisar a la sesión `mcp` para cerrar su nota de riesgo.
 

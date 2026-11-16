@@ -200,9 +200,9 @@ Commits: `d8b99e9` (H1), `e5ac228` (H4), `3c95df4` (SIM300 de ruff), y el de H2 
 
 | Evidencia | Valor |
 |---|---|
-| Tests ejecutados (suite) | Puerta del líder (2026-11-16, HEAD 4e5ef33): 13525 passed, 2532 skipped en 2 h 12 min. `ENTORNO LISTO` |
+| Tests ejecutados (suite) | Puerta del líder tras el ciclo 2 (2026-11-16, HEAD 99d7f13): 13526 passed, 2532 skipped en 1 h 32 min, `PUERTA COBERTURA` 24/24, `ENTORNO LISTO`. Antes, sobre 4e5ef33: 13525 passed |
 | Tests de F-164 | dominio 250, SQL 10 (ciclo 2: +1, el `CASE` entero), diccionario 11 (R13 azure-apps no `skip`: está al lado), sandbox 6 con DSN (6 `skip` sin él, en la puerta) |
 | Cobertura de líneas cambiadas | `PUERTA COBERTURA: 100.0% de 24 líneas cambiadas cubiertas (24/24, umbral 90% del nivel critico)` (puerta del líder) |
 | Mutantes generados / supervivientes | No en esta pasada: T7, pasada de campaña tras el APPROVED (nivel `critico`, exigida) |
-| Tiempo de la suite | 2 h 12 min (puerta del líder sobre `4e5ef33`) |
+| Tiempo de la suite | 1 h 32 min (puerta del líder sobre `99d7f13`); 2 h 12 min sobre `4e5ef33` |
 | Capa e2e | N/A (sin interfaz de navegador; ver línea `CAPA E2E` de la puerta) |
