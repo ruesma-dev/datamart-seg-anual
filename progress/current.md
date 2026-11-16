@@ -9,6 +9,15 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-16 · F-164 · implementer en curso · rama `feature/F-164-partes-firmados-restringidos`
+
+- Spec aprobada (D1 c, D2-D5 a). Tarea en curso: ver `tasks.md` (las `[x]` son las hechas).
+- Decisión: `familia_publicada(None, ...)` da REPARACION (R4 manda: «ningún NULL abre»); un tipo que no
+  es de postventa sigue dando `None`, como `familia_adjunto`.
+- Desviación menor del design §4 (justificada en `progress/impl_F-164.md`): el `CASE` de `familia` va en
+  el `SELECT` final sobre las columnas ya publicadas de la CTE (`b.nombre_fichero`, `b.descripcion`,
+  `b.clase_grafico_id`), envolviendo `b.familia_documento` sin duplicar su expresión.
+
 ## 2026-11-16 · F-164 · spec escrita (spec-author) · rama `feature/F-164-partes-firmados-restringidos`
 
 - Spec en `specs/F-164-partes-firmados-restringidos/`; mediciones (Azure, solo lectura, 09:55-10:15
