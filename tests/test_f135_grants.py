@@ -45,7 +45,7 @@ def test_f135_r19_raw_fuera_de_los_esquemas_de_consumo() -> None:
     assert consumo == [
         "mart", "cierre", "compras", "maestro", "retenciones", "personal",
         # F-037 añade `tesoreria` (la general; la restringida, vetada)
-        "contabilidad", "tesoreria", "descompuestos", "postventa", "stg", "aux", "_meta",  # + F-156
+        "contabilidad", "tesoreria", "descompuestos", "postventa", "ventas", "stg", "aux", "_meta",  # + F-156, F-040
     ], "el resto, igual que antes de F-135"
 
 
@@ -60,12 +60,12 @@ def test_f135_settings_vetados_por_defecto() -> None:
 
     # F-037 añade `tesoreria_restringida` a los dos: vetada y del autorizado;
     # F-138, `compras_restringida`.
-    assert DEFAULT_VETOED_SCHEMAS == "contabilidad_restringida,tesoreria_restringida,compras_restringida,postventa_restringida,raw"
+    assert DEFAULT_VETOED_SCHEMAS == "contabilidad_restringida,tesoreria_restringida,compras_restringida,postventa_restringida,ventas_restringida,raw"
     pg = PostgresSettings(_env_file=None)
-    assert pg.vetoed_schema_list == [RESTR, "tesoreria_restringida", "compras_restringida", "postventa_restringida", "raw"]
+    assert pg.vetoed_schema_list == [RESTR, "tesoreria_restringida", "compras_restringida", "postventa_restringida", "ventas_restringida", "raw"]
     assert pg.restricted_role == AUTORIZADO
     assert pg.restricted_schema_list == [RESTR, "tesoreria_restringida", "compras_restringida",
-                                     "postventa_restringida"]  # + F-156
+                                     "postventa_restringida", "ventas_restringida"]  # + F-156, F-040
 
 
 def test_f135_settings_parametrizables_y_limpias() -> None:
@@ -102,9 +102,9 @@ def test_f135_settings_env_example_documenta_las_tres() -> None:
         if linea and not linea.startswith("#") and "=" in linea
     )
     # F-037: con `tesoreria_restringida` en las dos listas.
-    assert lineas["PG_VETOED_SCHEMAS"] == "contabilidad_restringida,tesoreria_restringida,compras_restringida,postventa_restringida,raw"
+    assert lineas["PG_VETOED_SCHEMAS"] == "contabilidad_restringida,tesoreria_restringida,compras_restringida,postventa_restringida,ventas_restringida,raw"
     assert lineas["PG_RESTRICTED_ROLE"] == AUTORIZADO
-    assert lineas["PG_RESTRICTED_SCHEMAS"] == f"{RESTR},tesoreria_restringida,compras_restringida,postventa_restringida"
+    assert lineas["PG_RESTRICTED_SCHEMAS"] == f"{RESTR},tesoreria_restringida,compras_restringida,postventa_restringida,ventas_restringida"
     assert "raw" not in lineas["PG_CONSUMPTION_SCHEMAS"].split(","), (
         "el .env.example no puede reabrir raw: R17 tumbaría apply_grants"
     )
@@ -595,7 +595,7 @@ def test_f135_r20_comprobacion_final() -> None:
     sql = _roles_sql()
     assert (
         "WHERE grantee = 'mcp_sigrid_dm_ro'\n"
-        "  AND table_schema IN ('contabilidad_restringida', 'tesoreria_restringida', 'compras_restringida', 'postventa_restringida', 'raw')"  # F-037, F-138
+        "  AND table_schema IN ('contabilidad_restringida', 'tesoreria_restringida', 'compras_restringida', 'postventa_restringida', 'ventas_restringida', 'raw')"  # F-037, F-138
     ) in sql
     assert (
         "SELECT nspname, has_schema_privilege('mcp_sigrid_dm_ro', nspname, 'USAGE') AS lee"

@@ -17,6 +17,7 @@ Ninguno abre red ni BBDD.
 from __future__ import annotations
 
 import subprocess
+from harness.tiempos import escalar_timeout
 from pathlib import Path
 
 import pytest
@@ -84,7 +85,7 @@ def _solo_en_la_rama_de_f011() -> None:
             cwd=REPO,
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=escalar_timeout(30),
         )
     except (OSError, subprocess.SubprocessError) as e:  # pragma: no cover
         pytest.skip(f"git no disponible: {e}")
@@ -112,7 +113,7 @@ def _ficheros_cambiados(base: str = "dev") -> list[str]:
             cwd=REPO,
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=escalar_timeout(60),
         )
     except (OSError, subprocess.SubprocessError) as e:  # pragma: no cover
         pytest.skip(f"git no disponible: {e}")

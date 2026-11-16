@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from harness.rigor import cargar_rigor, topes_tamano
+from harness.rigor import CLAVES_TAMANO, cargar_rigor, topes_tamano
 from harness.tamano import ETIQUETA, main, medir, slug_de_feature
 
 
@@ -46,11 +46,22 @@ def test_un_tope_absurdo_del_rigor_json_se_descarta() -> None:
     assert topes_tamano(rigor) == {}
 
 
-def test_el_rigor_json_del_repositorio_declara_los_cuatro_topes() -> None:
-    """150 / 250 / 220 / 140: los cuatro ficheros que se pagan por triplicado."""
-    topes = topes_tamano(cargar_rigor())
+def test_el_rigor_json_del_proyecto_declara_los_cuatro_topes_legibles() -> None:
+    """FORMA, no valores (F-038): los cuatro ficheros que se pagan por
+    triplicado tienen tope, y cada tope se puede leer.
 
-    assert topes == {"requirements": 150, "design": 250, "impl": 220, "review": 140}
+    Hasta F-038 fijaba 150 / 250 / 220 / 140, los números del fichero
+    entregado, y se ponía en rojo en cuanto un proyecto los adaptaba. Lo que
+    sigue sin poder pasar es un tope que `topes_tamano` descarte en silencio
+    (un "220" entre comillas, un 0): la puerta dejaría de medir ese fichero.
+    """
+    bloque = cargar_rigor()["tamano"]
+    declarados = {clave: bloque.get(clave) for clave in CLAVES_TAMANO}
+
+    assert topes_tamano(cargar_rigor()) == declarados, (
+        "algún tope de 'tamano' falta o no es un entero positivo, y la puerta "
+        "lo ignoraría"
+    )
 
 
 # --- R14, R16: la medición ---------------------------------------------------
@@ -300,10 +311,11 @@ def test_la_puerta_de_init_descarta_las_features_done() -> None:
 def test_sin_feature_el_cli_no_adivina_cual_medir() -> None:
     """`--feature` es OBLIGATORIA, y sin ella argparse aborta con codigo 2.
 
-    Lo destapo la campana de mutacion de F-047: con `required=False` la opcion
-    llegaria a `None` y la puerta mediria «la feature None», es decir, ningun
-    fichero, y saldria en verde sin haber comprobado nada. Un tope que no mide
-    nada es peor que no tenerlo, porque parece que mide.
+    Lo destapo la campana de mutacion de F-047 en datamart-seg-anual: con
+    `required=False` la opcion llegaria a `None` y la puerta mediria «la feature
+    None», es decir, ningun fichero, y saldria en verde sin haber comprobado
+    nada. Un tope que no mide nada es peor que no tenerlo, porque parece que
+    mide.
     """
     import pytest as _pytest
 

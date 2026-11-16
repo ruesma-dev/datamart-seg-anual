@@ -84,12 +84,18 @@ def repositorio(raiz: Path) -> Path:
 # --- R16: una suite que no recoge tests no caza nada ------------------------
 
 
-def test_f020_r16_exit_5_es_superviviente(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_f020_r16_exit_5_es_indeterminado(monkeypatch: pytest.MonkeyPatch) -> None:
     # pytest devuelve 5 cuando no recoge NINGÚN test. Darlo por «muerto» sería
-    # dar por cazado un mutante que nadie ha comprobado.
+    # dar por cazado un mutante que nadie ha comprobado; y desde el arnés 1.9.0
+    # (F-023 del taller) tampoco es «superviviente»: el único criterio de muerte
+    # es el código 1, y una suite que no juzgó nada es INDETERMINADO.
+    # Antes se llamaba `test_f020_r16_exit_5_es_superviviente`.
     monkeypatch.setattr(subprocess, "run", RunFalso(PYTEST_SIN_TESTS))
 
-    assert EjecutorPytest().ejecutar(10) == SUPERVIVIENTE
+    veredicto = EjecutorPytest().ejecutar(10)
+
+    assert veredicto == INDETERMINADO
+    assert veredicto not in (MUERTO, SUPERVIVIENTE, TIMEOUT)
     assert PYTEST_SIN_TESTS == 5
 
 

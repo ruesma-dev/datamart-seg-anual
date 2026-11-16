@@ -55,7 +55,15 @@ objetos:
     descripcion: >-
       El nucleo temporal del datamart: la explosion MENSUAL del presupuesto, con
       una fila por cada mes en el que una partida tiene importe, para los cuatro
-      ambitos que usa el seguimiento. De aqui salen `mart` y `cierre`.
+      ambitos que usa el seguimiento. De aqui salen `mart` y `cierre`. La fase 0
+      (el presupuesto vivo de hoy de coste y venta) no esta aqui: su reparto en
+      el tiempo es `stg.plan_mensual_fase0` (F-157), y no se suma con esta.
+
+      **SOLO ESTAN LAS LINEAS CON REPARTO.** Una version master entera sin
+      `planif` (la v24 de coste de la 0698, 776 lineas) no tiene ni una fila
+      aqui. El catalogo COMPLETO de versiones, con o sin reparto, es
+      `stg.master_versiones` (y `mart.master_versiones_tipadas`); la marca por
+      linea, `stg.v_master_lineas` (F-161).
 
       **ES EL OBJETO MAS PELIGROSO DEL DATAMART, Y ESTO NO ES UNA PREFERENCIA DE
       ENRUTADO SINO UNA ADVERTENCIA DE CORRECCION:** aqui conviven TODAS las
@@ -91,7 +99,8 @@ objetos:
       (`construido_at`, `congelada`, `motivo`). **Citala siempre que la
       pregunta sea sobre una obra concreta y la frescura importe.** Una obra
       congelada puede llevar hasta 6 dias de retraso: todas se rehacen enteras
-      los domingos.
+      la noche del sabado (o la del domingo si la del sabado no quedo
+      registrada; entre semana nunca, F-163).
 
       QUE OBRA SE CONGELA lo decide `config/business_rules.yaml`, bloque
       `ventana:`, con tres reglas en union: estado 1, 11 o 25; codigo de seis
@@ -184,9 +193,14 @@ objetos:
       version:
         significado: >-
           El campo `fas` de Sigrid, y **significa dos cosas segun el ambito**: en
-          los REALES (3 y 7) es el MES —con `fas = 0` como el "Previsto" vivo— y
-          en los MASTER (8 y 11) es el NUMERO DE VERSION. Cruzar las dos
-          lecturas produce series temporales inventadas.
+          los REALES (3 y 7) es el MES de cada cierre (1 a N) y en los MASTER (8
+          y 11) es el NUMERO DE VERSION. Cruzar las dos lecturas produce series
+          temporales inventadas. En los REALES no hay filas de la fase 0 (el
+          presupuesto vivo de hoy): su reparto en el tiempo esta en
+          `stg.plan_mensual_fase0` (F-157). En los MASTER si puede haber version 0,
+          la que trae `planif`: medido el 2026-11-13, 8 filas del catalogo en 4
+          obras (0578, 0613, 0578-B y 1338614), todas 'Sin clasificar' o 'Cierre
+          mensual', asi que no rigen el mensual.
 
           **Es el numero de fase ORIGINAL de Sigrid, sin renumerar, y por eso
           TIENE HUECOS en las 9 obras a las que la regla de un cierre por mes
@@ -366,6 +380,362 @@ objetos:
     ejemplos_preguntas:
       - De donde sale el planificado de la obra X antes de elegir version
 
+  plan_mensual_fase0:
+    tipo: tabla
+    capa: preparacion
+    consumo_recomendado: true
+    descripcion: >-
+      El presupuesto vivo de hoy (fase 0), repartido en el tiempo. La fase 0 de
+      Sigrid ES el coste (ambito 3) y la venta (ambito 7) de la obra a dia de
+      hoy, el presupuesto que el jefe de obra va evolucionando; aqui esta su
+      reparto por meses, el de la pantalla de Sigrid «Planificacion en el tiempo
+      (por partidas)»: el `planif` de cada partida (% ACUMULADO por mes)
+      anclado en el `plafec` de la fase 0 de su obra y ambito, con la misma
+      regla que la planificacion del master (F-157). Es la foto de HOY: no
+      guarda historia, cada noche se rehace con lo que tenga Sigrid.
+
+      **NO SE SUMA NI SE UNE CON `stg.plan_mensual`.** Alli estan la serie de
+      cierres mensuales de los ambitos 3 y 7 (fases 1 a N: los escenarios Coste
+      Real y Venta Real de `mart`) y la planificacion del master (8 y 11, todas
+      sus versiones). Son otras fotos de la misma obra: la fase 0 se COMPARA con
+      ellas mes a mes (la venta de hoy frente a `mart.fact_seguimiento_mensual`
+      con `escenario = 'Venta Planificada'`, que es la version master vigente;
+      el coste de hoy frente a la venta de hoy en esta misma tabla), nunca se
+      acumula con ellas.
+
+      **SOLO ESTAN LAS PARTIDAS PLANIFICADAS.** Una partida sin `planif`, con
+      todo a cero o en una obra sin `plafec` en esa fase no tiene filas: el ETL
+      no inventa reparto. El 2026-11-05 lo planificado era ~86,5 % del importe
+      de coste y ~93,8 % del de venta en las obras con reparto; lo que falta,
+      por obra y ambito, esta en `stg.v_plan_mensual_fase0_cobertura`. Para el
+      total de la fase 0 de una obra, esa vista o `stg.presupuesto`, no la suma
+      de esta tabla.
+
+      **EL TOTAL DE UNA PARTIDA es `importe_origen` de su ultimo mes**, no la
+      suma de `importe_mes`: cada mes se redondea con los decimales de la obra,
+      como el master, y la suma puede descuadrar unos centimos (hasta 0,03 EUR
+      por partida en la 0726) con `importe_partida`.
+
+      DE CUANDO ES EL DATO: el de `stg.presupuesto` de la obra esa noche; para
+      una obra concreta, `_meta.v_frescura_obra` (una obra congelada lleva hasta
+      6 dias).
+    grano: >-
+      Una fila por (`obra_id`, `ambito_id`, `partida_id`, `anio_mes`), que es
+      su clave primaria. Solo ambitos 3 y 7 y solo meses con valor: los meses
+      anteriores al arranque de la partida (a cero sin movimiento) no estan.
+      Del orden de 1,25 M de filas en unas 140 obras.
+    clave_negocio: [obra_id, ambito_id, partida_id, anio_mes]
+    paso_etl: build_stg
+    refresco: nocturno
+    columnas:
+      presupuesto_id:
+        significado: >-
+          Fila de `stg.presupuesto` (fase 0) de la que sale el reparto: su
+          importe total esta alli.
+        agregacion: no_sumable
+      obra_id:
+        significado: Identificador de la obra en Sigrid.
+        agregacion: no_sumable
+      partida_id:
+        significado: Identificador de la partida en Sigrid.
+        agregacion: no_sumable
+      ambito_id:
+        significado: 3 = coste de hoy (fase 0); 7 = venta de hoy (fase 0).
+        valores: ["3", "7"]
+        agregacion: no_sumable
+      mes_inicio:
+        significado: >-
+          Primer mes del reparto: el mes de `raw.obrfasamb.plafec` de la fase 0
+          de esa obra y ambito (la posicion 1).
+        agregacion: no_sumable
+      anio_mes:
+        significado: >-
+          Mes de la fila, como fecha del dia 1: `mes_inicio` mas `posicion_mes`
+          menos uno.
+        agregacion: no_sumable
+      posicion_mes:
+        significado: >-
+          Posicion del mes en el `planif` de la partida, empezando en 1 en
+          `mes_inicio`. Puede tener huecos (meses a cero antes del arranque).
+        agregacion: no_sumable
+      pct_acumulado:
+        significado: >-
+          Porcentaje ACUMULADO planificado hasta ese mes, en tanto por uno, con
+          la regla del master: un cero intermedio es un estorno; un cero final
+          arrastra el ultimo valor positivo.
+        unidad: "%"
+        agregacion: promedio
+      pct_mes:
+        significado: El porcentaje de ESE mes, diferencia con el acumulado anterior.
+        unidad: "%"
+        agregacion: promedio
+      precio_unitario:
+        significado: Precio unitario de la partida en la fase 0, con seis decimales.
+        unidad: EUR
+        agregacion: no_sumable
+      can_mes:
+        significado: Cantidad planificada para ese mes (`cantidad * pct_mes`).
+        agregacion: suma_solo_dentro_del_mes
+      can_origen:
+        significado: Cantidad planificada acumulada hasta ese mes.
+        agregacion: ultimo_valor
+      importe_mes:
+        significado: >-
+          Importe planificado PARA ESE MES, redondeado con los decimales de la
+          obra como el master. Se suma entre meses para una serie; el total de
+          la partida es `importe_origen` de su ultimo mes.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+      importe_origen:
+        significado: >-
+          Importe planificado ACUMULADO hasta ese mes. Sumarlo a lo largo del
+          tiempo multiplica el resultado.
+        unidad: EUR
+        agregacion: ultimo_valor
+      importe_mes_raw:
+        significado: El importe del mes con el precio sin redondear, a dos decimales.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+      importe_origen_raw:
+        significado: Version sin redondear del acumulado.
+        unidad: EUR
+        agregacion: ultimo_valor
+      importe_partida:
+        significado: >-
+          Importe TOTAL de la partida en la fase 0 (`stg.presupuesto.importe`),
+          repetido en cada mes. No se suma entre meses.
+        unidad: EUR
+        agregacion: no_sumable
+      _built_at:
+        significado: Instante de construccion de la fila. Instrumentacion, no negocio.
+        agregacion: no_sumable
+    relaciones:
+      - de: presupuesto_id
+        a: stg.presupuesto.presupuesto_id
+        cardinalidad: "N:1"
+        porque: Para el importe total de la partida en la fase 0 y sus decimales.
+      - de: obra_id
+        a: stg.v_plan_mensual_fase0_cobertura.obra_id
+        cardinalidad: "N:N"
+        porque: >-
+          Para saber cuanto de la fase 0 de la obra esta repartido. La vista da
+          una fila por `(obra_id, ambito_id)`: se une por las dos columnas, o
+          el coste y la venta se cruzan y duplican importes.
+    ejemplos_preguntas:
+      - Reparto por meses de la venta de hoy de la 0726
+      - Venta viva por meses frente al master vigente
+      - Compara mes a mes el coste de hoy repartido con la venta de hoy repartida de una obra
+
+  v_plan_mensual_fase0_cobertura:
+    tipo: vista
+    capa: preparacion
+    consumo_recomendado: true
+    descripcion: >-
+      Cuanto del presupuesto vivo de hoy (fase 0) de cada obra esta repartido
+      en el tiempo en `stg.plan_mensual_fase0`. Una fila por obra y ambito (3
+      coste, 7 venta) con fase 0 en `stg.presupuesto`, tenga reparto o no: lo
+      que no tiene `planif` aparece en `importe_sin_planificar`. Es la que
+      contesta «cuanto de la fase 0 esta planificado» y el total de la fase 0
+      de la obra (`importe_fase0`).
+    grano: Una fila por (`obra_id`, `ambito_id`), solo ambitos 3 y 7.
+    clave_negocio: [obra_id, ambito_id]
+    paso_etl: build_stg
+    refresco: nocturno
+    columnas:
+      obra_id:
+        significado: Identificador de la obra en Sigrid.
+        agregacion: no_sumable
+      ambito_id:
+        significado: 3 = coste de hoy (fase 0); 7 = venta de hoy (fase 0).
+        valores: ["3", "7"]
+        agregacion: no_sumable
+      mes_inicio:
+        significado: Primer mes del reparto de la obra y ambito.
+        agregacion: no_sumable
+        nulo_significa: Ninguna partida de esa obra y ambito tiene reparto en el tiempo.
+      partidas:
+        significado: Partidas de la fase 0 de esa obra y ambito.
+        agregacion: suma
+      partidas_planificadas:
+        significado: Las que tienen filas en `stg.plan_mensual_fase0`.
+        agregacion: suma
+      importe_fase0:
+        significado: Importe total de la fase 0 (suma de `stg.presupuesto.importe`).
+        unidad: EUR
+        agregacion: suma
+      importe_planificado:
+        significado: Importe total de las partidas planificadas.
+        unidad: EUR
+        agregacion: suma
+      importe_sin_planificar:
+        significado: >-
+          La diferencia: el importe de la fase 0 que no esta repartido en el
+          tiempo y que `stg.plan_mensual_fase0` no contiene.
+        unidad: EUR
+        agregacion: suma
+    ejemplos_preguntas:
+      - Cuanto de la fase 0 de la obra X esta planificado
+
+  master_versiones:
+    tipo: tabla
+    capa: preparacion
+    consumo_recomendado: true
+    descripcion: >-
+      El catalogo COMPLETO de las versiones master (ambitos 8 coste y 11 venta)
+      con el resumen de su reparto en el tiempo (F-161). Entra toda version >= 1
+      con lineas en `stg.presupuesto` y toda version con filas en
+      `stg.plan_mensual` (la version 0 solo en ese caso), tenga o no cabecera en
+      `raw.obrfasamb`. Hasta F-161 el catalogo se deducia de
+      `stg.plan_mensual` y una version sin `planif` no salia en ningun sitio.
+
+      **`tiene_reparto` decide si la version rige el mensual.** Solo las que
+      tienen filas en `stg.plan_mensual` lo hacen; las demas (un cierre sin
+      reparto, la v1 de la 0721) solo informan. La publica, con el tipo,
+      `mart.master_versiones_tipadas`.
+
+      Con reparto, fechas y textos son los de `stg.plan_mensual`; sin el, los
+      de la cabecera con la misma regla; sin cabecera, nulos. Se rehace entera
+      cada noche.
+    grano: >-
+      Una fila por (`obra_id`, `ambito_id`, `version`), su clave primaria. Solo
+      ambitos 8 y 11. Del orden de 6.000 filas (4.534 con reparto el
+      2026-11-13).
+    clave_negocio: [obra_id, ambito_id, version]
+    paso_etl: build_stg
+    refresco: nocturno
+    columnas:
+      obra_id:
+        significado: Identificador de la obra en Sigrid.
+        agregacion: no_sumable
+      ambito_id:
+        significado: 8 = master de coste; 11 = master de venta.
+        valores: ["8", "11"]
+        agregacion: no_sumable
+      version:
+        significado: Numero de version master (el `fas` de Sigrid en los ambitos 8 y 11).
+        agregacion: no_sumable
+      version_fec_creacion:
+        significado: Fecha de creacion de la version en Sigrid.
+        agregacion: no_sumable
+        nulo_significa: La version no tiene cabecera en `raw.obrfasamb`, o la cabecera no trae fecha.
+      version_fec_efectiva:
+        significado: >-
+          Fecha desde la que la version rige. Igual a la de creacion salvo en
+          las cuatrimestrales entregadas tarde (`stg.fn_master_fecha_efectiva`).
+        agregacion: no_sumable
+        nulo_significa: La version no tiene cabecera, o la cabecera no trae fecha.
+      version_descripcion:
+        significado: Etiqueta de la version (`res` de la cabecera, o 'Master coste/venta sin descripcion').
+        nulo_significa: La version no tiene cabecera.
+      version_tex:
+        significado: >-
+          Texto libre del jefe de obra ("CIERRE SEPTIEMBRE-26"). En venta, si
+          esta vacio, el de la version de coste del mismo numero.
+        nulo_significa: Sin texto, o la version no tiene cabecera.
+      tiene_reparto:
+        significado: >-
+          La version deja filas en `stg.plan_mensual`. Solo estas rigen el
+          mensual.
+        agregacion: no_sumable
+      reparto:
+        significado: >-
+          NINGUNO si la version no tiene reparto; COMPLETO si lo tiene y ninguna
+          linea con importe distinto de cero se queda sin el; PARCIAL en el
+          resto.
+        valores: [NINGUNO, COMPLETO, PARCIAL]
+      n_lineas:
+        significado: Lineas de la version en `stg.presupuesto`.
+        agregacion: suma
+      n_lineas_con_reparto:
+        significado: Las que dejan al menos un mes en `stg.plan_mensual`.
+        agregacion: suma
+      importe_total:
+        significado: Suma de `importe` de sus lineas (sin coeficientes). Es el total de ESA version.
+        unidad: EUR
+        agregacion: no_sumable
+      importe_con_reparto:
+        significado: Importe de las lineas con reparto.
+        unidad: EUR
+        agregacion: no_sumable
+      importe_sin_reparto:
+        significado: El total menos el de las lineas con reparto.
+        unidad: EUR
+        agregacion: no_sumable
+      tiene_cabecera:
+        significado: La version tiene fila en `raw.obrfasamb`.
+        agregacion: no_sumable
+      tiene_ancla:
+        significado: La cabecera trae `plafec` > 0 (el mes desde el que se reparte).
+        agregacion: no_sumable
+      _built_at:
+        significado: Instante de construccion de la fila. Instrumentacion, no negocio.
+        agregacion: no_sumable
+    relaciones:
+      - de: obra_id
+        a: mart.master_versiones_tipadas.obra_id
+        cardinalidad: "N:N"
+        porque: >-
+          La misma fila con el tipo de la version; se une por
+          `(obra_id, ambito_id, version)`.
+    ejemplos_preguntas:
+      - Versiones master de la obra X sin reparto
+      - Importe no repartido de la version V
+
+  v_master_lineas:
+    tipo: vista
+    capa: preparacion
+    consumo_recomendado: true
+    descripcion: >-
+      Las lineas master (ambitos 8 y 11, version >= 1) de `stg.presupuesto` con
+      la marca de si tienen reparto en el tiempo (F-161): `tiene_reparto` es
+      que su `presupuesto_id` deja al menos una fila en `stg.plan_mensual`. Una
+      linea con `planif` escrito puede no dejar ningun mes, y entonces no tiene
+      reparto. Vista sin disco: filtrada por obra va por indice. La publica
+      con partida y tipo `mart.v_master_version_partida`.
+    grano: Una fila por linea (`presupuesto_id`) master de version >= 1.
+    clave_negocio: [presupuesto_id]
+    paso_etl: build_stg
+    refresco: nocturno
+    columnas:
+      presupuesto_id:
+        significado: La linea de `stg.presupuesto`.
+        agregacion: no_sumable
+      obra_id:
+        significado: Identificador de la obra en Sigrid.
+        agregacion: no_sumable
+      partida_id:
+        significado: Partida de la linea.
+        agregacion: no_sumable
+      ambito_id:
+        significado: 8 = master de coste; 11 = master de venta.
+        valores: ["8", "11"]
+        agregacion: no_sumable
+      version:
+        significado: Numero de version master (`stg.presupuesto.fase_num`).
+        agregacion: no_sumable
+      cantidad:
+        significado: Cantidad de la linea en esa version.
+        agregacion: no_sumable
+      precio:
+        significado: Precio unitario de la linea en esa version.
+        agregacion: no_sumable
+      importe:
+        significado: >-
+          Importe de la linea en esa version (sin coeficientes). Se suma solo
+          dentro de UNA version: sumar versiones multiplica.
+        unidad: EUR
+        agregacion: suma
+      tiene_reparto:
+        significado: La linea deja al menos un mes en `stg.plan_mensual`.
+        agregacion: no_sumable
+    relaciones:
+      - de: presupuesto_id
+        a: stg.presupuesto.presupuesto_id
+        cardinalidad: "1:1"
+        porque: Es la misma linea; el resto de sus columnas estan alli.
+    ejemplos_preguntas:
+      - Lineas sin reparto de la version V
+
   presupuesto:
     tipo: tabla
     capa: preparacion
@@ -390,7 +760,8 @@ objetos:
       consultables**: el build borra solo las obras que va a reinsertar, en la
       misma transaccion. De cuando es el dato de cada obra lo dice
       `_meta.v_frescura_obra`, y una obra congelada puede llevar hasta 6 dias de
-      retraso -todas se rehacen enteras los domingos-.
+      retraso -todas se rehacen enteras la noche del sabado, o la del domingo si
+      falta la del sabado (F-163)-.
 
       **Dos trampas antes de escribir nada, y las dos multiplican importes.**
 
@@ -760,10 +1131,10 @@ objetos:
     consumo_recomendado: true
     descripcion: >-
       El universo del SEGUIMIENTO: las obras reales, sin las administrativas.
-      Excluye una lista cerrada de codigos de gestion, excluye los codigos con
-      cinco o mas digitos seguidos —el numero de obra de Ruesma es de cuatro— y
-      deduplica los codigos repetidos por el mecanismo de Sigrid que marca cual
-      es la ficha vigente.
+      Excluye una lista cerrada de codigos de gestion y los codigos con cinco o
+      mas digitos seguidos —el numero de obra de Ruesma es de cuatro—, y lleva
+      UNA FILA POR FICHA de obra de TODAS las empresas, cada una con su
+      `empresa_id`, su `clave_obra` y la marca `es_por_defecto` (F-162).
 
       **ADVERTENCIA DE CORRECCION: su columna `activa` no significa nada.** La
       escribe el SQL como una constante `TRUE`, asi que vale TRUE tambien en las
@@ -774,28 +1145,35 @@ objetos:
       El universo completo, con estado y cliente, esta en `maestro.obras`; el
       del seguimiento con etiquetas listas, en `mart.v_pbi_dim_obra`.
 
-      **UNA FICHA POR CODIGO, Y NO SIEMPRE LA DE RUESMA (F-102).** En Sigrid la
-      obra es POR EMPRESA: el mismo codigo existe una vez por empresa --Ruesma,
-      Porsan, cada UTE-- y es la misma obra vista desde cada una, sin
-      consolidar. Esta tabla sigue eligiendo UNA ficha por codigo como hasta hoy
-      --marca de `raw.conext` con `cod = '15'`, despues la modificada mas
-      recientemente y despues el `ide` mayor--, sin mirar la empresa. F-102 NO
-      la cambia: publica en `maestro.obras` la marca `es_ficha_principal` (la
-      ficha de la empresa 1), y las dos eligen distinto en **cuatro codigos**,
-      medido el 2026-09-23: **0581** (aqui la ficha de la UTE 27, con 20 cierres
-      y todo el seguimiento; la de Ruesma no tiene cierres), **0606** (aqui la de
-      la UTE 31, con 24 cierres; la de Ruesma tiene 15), **0671** (aqui la de la
-      UTE 34) y **0720** (aqui la copia vacia de Porsan, 28, sin cierres ni plan;
-      la de Ruesma tiene 2 cierres y 142 filas de plan). Aplicar la marca aqui
-      sacaria la 0581 del `mart` y del `cierre` y reduciria la 0606, asi que se
-      deja como esta: pasar el seguimiento a la ficha de Ruesma y traer las
-      demas empresas como obras propias es **F-106**. Hasta entonces, el
-      `obra_id` de estas cuatro no es el de `es_ficha_principal`.
+      **EL CODIGO NO ES UNICO: UNA FILA POR FICHA, CADA UNA CON SU EMPRESA
+      (F-162, 2026-11-11).** En Sigrid la obra es POR EMPRESA: el mismo codigo
+      existe una vez por empresa --Ruesma (1), Porsan (28), cada UTE-- y es la
+      misma obra vista desde cada una, SIN CONSOLIDAR. Esta tabla las lleva
+      todas: 634 fichas para 585 codigos el 2026-11-11, 49 codigos con varias
+      (la 0721 esta en Ruesma, `1-0721`, y en Porsan, `28-0721`). Lo que cuelga
+      de aqui (`mart`, `cierre`, `tesoreria`, `retenciones`, `personal`) va por
+      `obra_id`: cada ficha con lo suyo. **Por codigo se busca con
+      `empresa_id` o por `clave_obra`** (`R-CODIGO-POR-EMPRESA`).
+
+      **`es_por_defecto`** marca UNA ficha por codigo, la que se lee si la
+      pregunta no dice empresa (`R-EMPRESA-POR-DEFECTO`): la de la empresa 1 si
+      existe; si no, la de mas lineas de presupuesto, despues la modificada mas
+      recientemente y despues el `ide` mayor. La marca de `raw.conext` no
+      interviene. Hoy coincide con `maestro.obras.es_ficha_principal` en todas
+      las fichas. Hasta F-162 esta tabla se quedaba con UNA ficha por codigo y
+      elegia otra que `es_ficha_principal` en 0581, 0606, 0671 y 0720 (la 0721
+      salia por la copia vacia de Porsan). **Ojo**: en 0581 y 0671 los datos
+      del seguimiento estan en la ficha de la UTE, no en la por defecto, y en
+      0606 hay datos en las dos; si la ficha por defecto no tiene datos y otra
+      del codigo si, se avisa.
     grano: >-
-      Una fila por `obra_id`, ya deduplicada. Es SUBCONJUNTO de `maestro.obras`,
-      y esa diferencia es deliberada: contar aqui da menos obras.
+      Una fila por ficha de obra (`obra_id`), de todas las empresas: 634 el
+      2026-11-11 para 585 codigos. `codigo_obra` NO es unico; `clave_obra` si, y
+      `es_por_defecto` es cierto en una fila por codigo (contar obras por codigo
+      es contar `es_por_defecto`, y decirlo). Es SUBCONJUNTO de `maestro.obras`:
+      difiere solo en los filtros de codigo, y esa diferencia es deliberada.
     clave_negocio: [obra_id]
-    claves_alternativas: [[codigo_obra]]
+    claves_alternativas: [[clave_obra], [empresa_id, codigo_obra]]
     paso_etl: build_stg
     refresco: nocturno
     columnas:
@@ -806,10 +1184,11 @@ objetos:
         significado: >-
           Codigo de obra tal y como se teclea en Sigrid. **Nunca es NULL**: sale
           de `con.cod` en crudo y ademas el build excluye las obras sin codigo.
-          Aqui es unico porque la tabla se queda con una ficha por codigo; en
-          `maestro.obras` NO lo es (una ficha por empresa, F-102).
-          Es la clave alternativa de la ficha (584 para 584 el 2026-09-24): la
-          vigila `check-unicidad` contra la base (F-108).
+          **No es unico desde F-162**: se repite una vez por empresa (585 codigos
+          para 634 fichas el 2026-11-11). La clave alternativa es
+          (`empresa_id`, `codigo_obra`), o `clave_obra`; la vigila
+          `check-unicidad` contra la base (F-108). Sin empresa en la pregunta,
+          la ficha del codigo es la de `es_por_defecto`.
         nulo_significa: null
       nombre_obra:
         significado: >-
@@ -827,13 +1206,37 @@ objetos:
       _built_at:
         significado: Instante de construccion de la fila. Instrumentacion, no negocio.
         agregacion: no_sumable
+      empresa_id:
+        significado: >-
+          La empresa de la ficha (`con.emp`): 1 es Construcciones Ruesma, 28
+          Porsan, y cada UTE la suya; el nombre esta en
+          `maestro.obras.nombre_empresa`. Nunca NULL en Sigrid (0 de 925 fichas
+          el 2026-11-11), aunque la columna lo admite. F-162.
+        agregacion: no_sumable
+      clave_obra:
+        significado: >-
+          Clave legible y UNICA de la ficha: `<empresa>-<codigo>` (`1-0721`,
+          `28-0721`), la misma que `maestro.obras.clave_obra`. Es la forma de
+          pedir una ficha concreta cuando el codigo esta en varias empresas, y
+          la clave alternativa de la ficha (634 para 634 el 2026-11-11): la
+          vigila `check-unicidad` contra la base (F-108). F-162.
+        agregacion: no_sumable
+      es_por_defecto:
+        significado: >-
+          Cierto en UNA ficha por codigo: la que se lee si la pregunta no dice
+          empresa. Criterio del humano (2026-11-11), en este orden: (1) la de la
+          empresa 1; (2) mas lineas de presupuesto; (3) `tiemod` mas reciente;
+          (4) `ide` mayor. La marca de `raw.conext` no interviene. Filtrar por
+          ella da una fila por codigo. F-162.
+        agregacion: no_sumable
     relaciones:
       - de: obra_id
         a: maestro.obras.obra_id
         cardinalidad: "1:1"
         porque: >-
-          Para el estado real, el cliente y las fechas. El maestro es
-          SUPERCONJUNTO de esta tabla: tiene ademas las obras administrativas.
+          Para el estado real, el cliente, el nombre de la empresa y las fechas.
+          El maestro es SUPERCONJUNTO de esta tabla: tiene ademas las obras
+          administrativas.
     ejemplos_preguntas:
       - Que obras entran en el seguimiento y cuales quedan fuera
 
@@ -1155,6 +1558,29 @@ objetos:
       implementacion de la regla (decision del humano del 2026-09-22):
       `stg.plan_mensual.anio_mes` la aplica una vez y `cierre.fn_mes_de_fase`
       la envuelve.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_stg
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_explotar_planif:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build, usada solo dentro del SQL que construye
+      `stg.plan_mensual_fase0`. Se documenta porque es la regla con la que se
+      lee el `planif` de la fase 0.
+    descripcion: >-
+      Explota UN `planif` (% acumulado por mes separado por `|`) en sus
+      posiciones con valor: `posicion_mes`, `pct_acumulado` y `pct_mes`, con la
+      regla del master de `stg.plan_mensual` (positivo literal; un cero con un
+      positivo despues es estorno; un cero final arrastra el ultimo positivo).
+      No filtra: el descarte lo aplica el build de `stg.plan_mensual_fase0`
+      (F-157).
     grano: null
     clave_negocio: []
     paso_etl: build_stg

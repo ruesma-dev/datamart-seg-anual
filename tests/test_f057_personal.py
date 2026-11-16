@@ -1021,8 +1021,9 @@ def test_f057_r25_personal_en_esquemas_del_datamart() -> None:
     # (`descompuestos`); trece desde F-135 (`contabilidad_restringida`); quince
     # desde F-037 (`tesoreria` y `tesoreria_restringida`); dieciseis desde F-138
     # (`compras_restringida`); dieciocho desde F-156 (`postventa` y
-    # `postventa_restringida`).
-    assert len(ESQUEMAS_DEL_DATAMART) == 18
+    # `postventa_restringida`); veinte desde F-040 (`ventas` y
+    # `ventas_restringida`).
+    assert len(ESQUEMAS_DEL_DATAMART) == 20
 
 
 def test_f057_r25_el_fichero_de_provision_trae_los_diez_esquemas() -> None:
@@ -1040,7 +1041,8 @@ def test_f057_r25_el_fichero_de_provision_trae_los_diez_esquemas() -> None:
     # general NO recibe, igual que `raw` desde entonces (los dos, VETADOS).
     esperado = set(ESQUEMAS_DEL_DATAMART) | {"contabilidad_restringida"}
     vetados = {"raw", "contabilidad_restringida", "tesoreria_restringida",
-               "compras_restringida", "postventa_restringida"}  # F-037, F-138, F-156
+               "compras_restringida", "postventa_restringida",
+               "ventas_restringida"}  # F-037, F-138, F-156, F-040
 
     creados = set(re.findall(r"CREATE SCHEMA IF NOT EXISTS (\w+);", sql))
     assert creados == esperado, f"punto 4: crea {sorted(creados)} (R25)"

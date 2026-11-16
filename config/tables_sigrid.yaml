@@ -1652,6 +1652,18 @@ tables:
   # casado por mes son de F-040. `cla` 1024 son las rectificativas (en negativo:
   # sumar `totbas` ya las neta); no hay marca de anulada (`estfac` = 0 en todas).
   # `obride` existe pero no se trae: el diseno enlaza la obra por `cenide`.
+  #
+  # F-040 (R3, D6 del humano, 2026-11-07): de 9 a 35 columnas. Las nueve de F-150
+  # siguen DELANTE y en su orden (`tesoreria` no cambia). Entran 15 de negocio
+  # (`obride`, numero, totales, recargos, IVA, forma de pago, estado de
+  # facturacion, origen, expediente y cuenta) y 11 PERSONALES: el CIF y el nombre
+  # de la cabecera (`entcif`, `entres`) y las nueve direcciones (`diremp1-3`,
+  # `dircon1-3`, `dirdir1-3`). Las personales solo se publican en
+  # `ventas_restringida.factura_cabecera` (perfil total). Medido el 2026-11-07:
+  # 15.734 filas; `entcif` en todas (3.635 con forma de NIF de persona), `entres`
+  # en 15.733, `dirdir1` en 15.565 (maximo 148 caracteres), `dircon1-3` en 0.
+  # NUNCA entran `ban*` (cuenta bancaria), `emptex`, `entcod`, `entref`,
+  # `entciftip`, `entcifpai` ni `empcif` (`etl_sigrid/domain/ventas.py`).
 
   - source_table: dvf
     target_table: dvf
@@ -1669,6 +1681,211 @@ tables:
       - totbas
       - totiva
       - totdoc
+      # F-040 (R3): negocio
+      - obride
+      - fas
+      - tot
+      - totpag
+      - impbru
+      - impnet
+      - impdes
+      - imprec
+      - ivaide
+      - pagide
+      - efeide
+      - estfac
+      - docoriide
+      - expide
+      - cueide
+      # F-040 (R3, D6): PERSONALES, solo `ventas_restringida`
+      - entcif
+      - entres
+      - diremp1
+      - dircon1
+      - dirdir1
+      - diremp2
+      - dircon2
+      - dirdir2
+      - diremp3
+      - dircon3
+      - dirdir3
+
+  # ==========================================================================
+  # --- F-040: EL LADO DE INGRESOS (ventas y ventas_restringida) -------------
+  # Medido contra Sigrid en solo lectura el 2026-11-06 y el 2026-11-07
+  # (`progress/spec_F-040.md`): ~60.000 filas, +10 a 20 s de lectura. Ninguna
+  # tiene `tiemod`: carga completa. Lo publican `ventas` y `ventas_restringida`
+  # (`sql/ventas/`, `build_ventas`). Las listas blancas son LITERALMENTE las de
+  # `etl_sigrid/domain/ventas.py` y `tests/test_f040_ingesta.py` falla si no.
+  # `obrcer`, `cerpropar` y `dvfpropar` estan VACIAS en Sigrid: no entran.
+  # ==========================================================================
+
+  # F-040 (R1). LOS CLIENTES (`cli`, propiedades de `con` tipo 4). Medido el
+  # 2026-11-07: 1.210 filas, 173 columnas; 572 personas fisicas (`perfis` <> 0 o
+  # NIF de persona). Entran 13 de negocio y 7 de CONTACTO (D6: `dir1` 1.162,
+  # `dir2` 68, `dircpo` 1.154, `dir` 1.151, `tel` 73, `tel2` 55, `ele` 96), que
+  # solo se publican en `ventas_restringida.clientes_contacto`. NUNCA entran las
+  # bancarias (`ban*`, 33), `fecnac`, `numseg`, `clamai`, `g3wpas` (contrasena),
+  # `fax`, `telsin`/`tel2sin` (duplicados), `dirtex`, `web`, los correos de
+  # facturacion (`fac*`), `dniper`/`nom*` (vacios) ni `munide`/`proide`/`paiide`
+  # (sus maestros no estan en `raw`).
+  - source_table: cli
+    target_table: cli
+    id_column: ide
+    incremental_column: null   # medido 2026-11-06: `cli` no tiene tiemod
+    where: null
+    exclude_columns: []        # lista blanca (R17 de F-150)
+    include_columns:
+      - ide
+      - tipcif
+      - cifpai
+      - cif
+      - raz
+      - perfis
+      - cenide
+      - taride
+      - secide
+      - pagide
+      - efeide
+      - cueide
+      - cueretide
+      # D6: contacto, solo `ventas_restringida`
+      - dir1
+      - dir2
+      - dircpo
+      - dir
+      - tel
+      - tel2
+      - ele
+
+  # F-040 (R2). LAS CERTIFICACIONES (`cer`, propiedades de `con` tipo 54).
+  # Medido el 2026-11-06: 6.308 filas, 135 columnas; obra en el 100 %, contrato
+  # de venta (`ctride`) en el 99,5 %. `idefac` y `feccob` estan a 0 en todas (no
+  # enlazan con la factura: el enlace es `cerprodes`). 27 columnas.
+  - source_table: cer
+    target_table: cer
+    id_column: ide
+    incremental_column: null   # medido 2026-11-06: `cer` no tiene tiemod
+    where: null
+    exclude_columns: []
+    include_columns:
+      - ide
+      - cla
+      - entide
+      - cenide
+      - obride
+      - ctride
+      - expide
+      - fas
+      - fecdoc
+      - fecfac
+      - estfac
+      - idefac
+      - docoriide
+      - pagide
+      - efeide
+      - ivaide
+      - impbru
+      - impnet
+      - impdes
+      - imprec
+      - totbas
+      - totiva
+      - totdoc
+      - tot
+      - totpag
+      - totproori
+      - totprcori
+
+  # F-040 (R2). LAS LINEAS DE CERTIFICACION (`cerpro`). Medido el 2026-11-06:
+  # 6.362 filas, 86 columnas. `tot` es lo certificado en el periodo SIN
+  # recargos (a cuenta); `imporiori`, el a origen (5.993 lineas); `imporiant`,
+  # el anterior (660). `paride` solo en 5: la certificacion no baja a partida.
+  # `res` (descripcion) entra en `raw`, vetado a todos los perfiles (F-135).
+  - source_table: cerpro
+    target_table: cerpro
+    id_column: ide
+    incremental_column: null   # medido 2026-11-06: `cerpro` no tiene tiemod
+    where: null
+    exclude_columns: []
+    include_columns:
+      - ide
+      - docide
+      - pos
+      - res
+      - can
+      - pre
+      - tot
+      - ivaide
+      - ivacuo
+      - cenide
+      - obride
+      - paride
+      - docoritip
+      - docoriide
+      - linoriide
+      - imporiori
+      - imporiant
+      - canoriori
+
+  # F-040 (R2). LOS RECARGOS DE LA CERTIFICACION (`cerrec`): coeficientes y
+  # retenciones. Medido el 2026-11-06: 7.396 filas, 21 columnas; se trae todo
+  # menos `tex` (texto libre).
+  - source_table: cerrec
+    target_table: cerrec
+    id_column: ide
+    incremental_column: null   # medido 2026-11-06: `cerrec` no tiene tiemod
+    where: null
+    exclude_columns: [tex]
+
+  # F-040 (R2). LOS DESTINOS DE LAS LINEAS DE CERTIFICACION (`cerprodes`): el
+  # ENLACE certificacion -> factura (`docdestip` = 11). Medido el 2026-11-06:
+  # 4.349 filas, el 100 % con destino en `dvf`. Siete columnas: entera.
+  - source_table: cerprodes
+    target_table: cerprodes
+    id_column: ide
+    incremental_column: null   # medido 2026-11-06: `cerprodes` no tiene tiemod
+    where: null
+    exclude_columns: []
+
+  # F-040 (R2). LAS LINEAS DE FACTURA DE VENTA (`dvfpro`). Medido el 2026-11-06:
+  # 29.273 filas, 90 columnas; 17 entran. Con ella, `retenciones.v_src_lineas_venta`
+  # deja de estar vacia (0 efectos de retencion de cliente sin centro: no
+  # cambia ninguna cifra). `res` entra en `raw`, vetado a todos (F-135).
+  - source_table: dvfpro
+    target_table: dvfpro
+    id_column: ide
+    incremental_column: null   # medido 2026-11-06: `dvfpro` no tiene tiemod
+    where: null
+    exclude_columns: []
+    include_columns:
+      - ide
+      - docide
+      - pos
+      - res
+      - can
+      - pre
+      - tot
+      - ivaide
+      - ivacuo
+      - cenide
+      - obride
+      - paride
+      - docoritip
+      - docoriide
+      - linoriide
+      - unimed
+      - proide
+
+  # F-040 (R2). LOS RECARGOS DE LA FACTURA DE VENTA (`dvfrec`). Medido el
+  # 2026-11-06: 6.145 filas, 21 columnas; todo menos `tex`. La retencion de
+  # cliente por documento la cuadra F-104, no F-040.
+  - source_table: dvfrec
+    target_table: dvfrec
+    id_column: ide
+    incremental_column: null   # medido 2026-11-06: `dvfrec` no tiene tiemod
+    where: null
+    exclude_columns: [tex]
 
   # ==========================================================================
   # --- F-156: POSTVENTA ENTERA ----------------------------------------------

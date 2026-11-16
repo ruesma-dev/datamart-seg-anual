@@ -674,17 +674,17 @@ def test_f140_r12_pendiente_y_sobre_ejecutado_como_el_dominio() -> None:
     assert "GREATEST(0, d.ejecutado_intervalo - d.plan_desde_version) AS sobre_ejecutado" in texto
 
 
-def test_f140_r14_el_reparto_proporcional_con_el_resto_al_ultimo_mes() -> None:
+def test_f140_r14_el_reparto_proporcional_por_acumulado_y_el_ultimo_mes_entero() -> None:
+    """Desde F-159: proporcional al plan NETO acumulado, por acumulado; el último
+    mes del perfil lleva lo repartido hasta él = el pendiente entero."""
     texto = _devengo()
-    assert "ROUND(d.pendiente * pr.importe_mes / d.total_perfil, 2) AS parte" in texto
+    assert "ROUND(d.pendiente * en.peso_acumulado / d.total_perfil, 2) END AS hasta" in texto
     assert (
-        "ROW_NUMBER() OVER (PARTITION BY pr.obra_id, pr.concepto, pr.partida_id "
-        "ORDER BY pr.anio_mes DESC) AS desde_el_final"
+        "ROW_NUMBER() OVER (PARTITION BY a.obra_id, a.concepto, a.partida_id "
+        "ORDER BY a.anio_mes DESC) AS desde_el_final"
     ) in texto
-    assert (
-        "CASE WHEN r.desde_el_final = 1 THEN r.pendiente - (r.suma_partes - r.parte) "
-        "ELSE r.parte END"
-    ) in texto
+    assert "CASE WHEN en.desde_el_final = 1 THEN d.pendiente ELSE" in texto
+    assert "r.hasta - COALESCE(LAG(r.hasta) OVER w, 0) AS importe" in texto
 
 
 def test_f140_r14_el_perfil_son_los_meses_con_plan_tras_el_cierre() -> None:

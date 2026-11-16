@@ -82,7 +82,12 @@ objetos:
       obra_id:
         significado: Identificador de la obra en Sigrid (`con.ide`). Estable entre builds.
         agregacion: no_sumable
-      codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
+      codigo_obra: >-
+        Codigo de obra tal y como se teclea en Sigrid. **No es unico entre
+        empresas** (F-162): el mismo codigo puede ser la obra de Ruesma y la de
+        una UTE o de Porsan, cada una con su `obra_id`. Se agrega y se filtra
+        por `obra_id`; sin empresa en la pregunta, la del codigo con
+        `es_por_defecto` en `stg.obras` (cruzando por `obra_id`).
       nombre_obra: Nombre legible de la obra, de `con.res`.
       anio_mes:
         significado: >-
@@ -835,10 +840,16 @@ objetos:
       de coste, tipo y clase, todas las fechas del ciclo de vida, el plazo, y los
       presupuestos inicial, vigente y aprobado con los modificados. Es la vista
       que contesta "de que va esta obra y en que estado esta".
+
+      **Una fila por FICHA, de todas las empresas (F-162): el codigo no es
+      unico** (634 fichas para 585 codigos el 2026-11-11; la 0721 esta en
+      Ruesma y en Porsan). Sin empresa en la pregunta, la ficha del codigo es
+      la de `es_por_defecto` (`R-EMPRESA-POR-DEFECTO`); una ficha concreta, por
+      `clave_obra`.
     grano: >-
-      Una fila por `obra_id`, del universo de seguimiento. Cuando una obra tiene
-      varios contratos, las fechas se agregan: la mas antigua para los inicios y
-      la mas reciente para los finales.
+      Una fila por `obra_id` (por ficha), del universo de seguimiento. Cuando una
+      obra tiene varios contratos, las fechas se agregan: la mas antigua para los
+      inicios y la mas reciente para los finales.
     clave_negocio: [obra_id]
     paso_etl: build_cierre
     refresco: nocturno
@@ -846,7 +857,9 @@ objetos:
       obra_id:
         significado: Identificador de la obra en Sigrid.
         agregacion: no_sumable
-      codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
+      codigo_obra: >-
+        Codigo de obra tal y como se teclea en Sigrid. No es unico entre
+        empresas: se busca con `empresa_id` o por `clave_obra`.
       nombre_obra: Nombre legible de la obra.
       cliente_ide:
         significado: >-
@@ -1003,6 +1016,17 @@ objetos:
         unidad: EUR
         agregacion: ultimo_valor
         nulo_significa: La obra no tiene ningun cierre con version master.
+      empresa_id:
+        significado: La empresa de la ficha (`con.emp`; 1 = Construcciones Ruesma), de `stg.obras`. F-162.
+        agregacion: no_sumable
+      clave_obra:
+        significado: Clave legible y unica de la ficha, `<empresa>-<codigo>` (`28-0721`), de `stg.obras`. F-162.
+        agregacion: no_sumable
+      es_por_defecto:
+        significado: >-
+          Cierto en una ficha por codigo: la que se lee si la pregunta no dice
+          empresa (la de Ruesma si existe). La de `stg.obras`. F-162.
+        agregacion: no_sumable
     relaciones:
       - de: obra_id
         a: cierre.fact_cierre_mensual.obra_id

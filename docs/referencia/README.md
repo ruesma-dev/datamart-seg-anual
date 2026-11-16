@@ -40,6 +40,7 @@ Convención del puntero: mismo nombre `NN_tema.md`, título terminado en
 | `04_azure_inventario_dev.md` | Inventario de la suscripción Azure «Ruesma» tomado con `az` (solo lectura) el 2026-08-08: resource groups, red, almacenamiento, secretos y bases de datos, contrastado con el diseño de acens. **Versión redactada**: sin IDs de suscripción/tenant, sin IPs ni rangos de red, sin valores de secretos. |
 | `05_caso_obrfasamb_version_duplicada.md` | Caso de datos del sistema origen: versiones master guardadas dos veces en `obrfasamb` (obras 0694 y 0697), que el ETL duplica en `stg.plan_mensual`. Con receta SQL para replicarlo. Motivó la enmienda de R13 en F-019 y la feature F-022. |
 | `06_correos_coeficientes_iva_caja.md` | Dos correos de Juan Romero (Control de Costes, 26 y 27-10-2026) sobre la caja proyectada: los coeficientes de venta están por contrato y cada partida tiene el suyo; en venta se trabaja sin coeficientes; IVA: en general ISP, 21 % en bastantes obras, el 10 % es raro, la ficha de la obra es fiable y hay tipos mezclados (mejoras a propietarios). Motivó el rediseño de F-150. **Versión redactada**: sin correos, teléfonos ni pie legal. |
+| `07_glosario_incurrido.md` | Definición de «incurrido / coste incurrido» de Juan Romero (Control de Costes, 11-11-2026): qué es, sinónimos, cuándo y cómo, las trampas (manda la factura, el albarán de n facturado en n+1 cuenta en n, las PREV cuentan, el centro de coste de la línea prevalece sobre la obra) y el término derivado «almacén». Es la fuente de F-054. |
 
 ## Formato
 

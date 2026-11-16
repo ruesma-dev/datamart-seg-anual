@@ -40,6 +40,12 @@ RAIZ = Path(__file__).resolve().parents[1]
 DIR_SQL = RAIZ / "etl_sigrid" / "infrastructure" / "postgres" / "sql"
 RUTA_CP = DIR_SQL / "mart" / "06_cp_tipologia.sql"
 
+#: F-161 (D11) movió el catálogo y su vista a su propio fichero, delante de
+#: `02_build_fact.sql`, que también lo lee. Lo que aquí se fija de esos dos
+#: objetos se busca allí.
+RUTA_CATALOGO = DIR_SQL / "mart" / "01b_master_versiones.sql"
+DEL_CATALOGO = ("master_versiones_tipadas", "v_master_versiones_tipadas")
+
 #: El fichero que la feature retira. Se nombra a proposito: si alguien lo
 #: resucita, las dos copias divergen y el build ejecuta la que este en la lista.
 RUTA_VIEJA = DIR_SQL / "mart" / "06_views_cp_tipologia.sql"
@@ -49,6 +55,14 @@ RUTA_VIEJA = DIR_SQL / "mart" / "06_views_cp_tipologia.sql"
 def _sql() -> str:
     assert RUTA_CP.exists(), f"SQL no encontrado: {RUTA_CP}"
     return RUTA_CP.read_text(encoding="utf-8")
+
+
+@cache
+def _sql_de(objeto: str) -> str:
+    """El fichero que crea `objeto`: el catálogo vive en `01b` desde F-161."""
+    if objeto in DEL_CATALOGO:
+        return RUTA_CATALOGO.read_text(encoding="utf-8")
+    return _sql()
 
 
 def _sin_comentarios(texto: str) -> str:
@@ -72,7 +86,7 @@ def _ejecutable() -> str:
 @cache
 def _cuerpo(objeto: str) -> str:
     """El cuerpo del `CREATE ... mart.<objeto> AS`, compactado."""
-    cuerpo = cuerpo_de_vista(_sql(), "mart", objeto)
+    cuerpo = cuerpo_de_vista(_sql_de(objeto), "mart", objeto)
     assert cuerpo is not None, f"no se encontro el CREATE de mart.{objeto}"
     return _compacto(cuerpo)
 
@@ -86,6 +100,9 @@ def _cuerpo(objeto: str) -> str:
 #: hecho final.
 TABLAS = ("master_versiones_tipadas", "master_vigente_anual", "fact_cp_tipologia")
 
+#: Las que siguen en `06_cp_tipologia.sql` tras F-161.
+TABLAS_DE_06 = ("master_vigente_anual", "fact_cp_tipologia")
+
 #: Cada vista, con la tabla de la que pasa a leer. Los nombres de las vistas
 #: NO cambian: es lo que permite que el `.pbix` del humano no se toque.
 VISTA_SOBRE_TABLA = (
@@ -98,7 +115,7 @@ VISTA_SOBRE_TABLA = (
 @pytest.mark.parametrize("tabla", TABLAS)
 def test_f078_r1_las_tres_tablas_se_crean_como_tabla(tabla: str) -> None:
     """El hecho y sus dos helpers dejan de ser vistas: son TABLAS."""
-    assert f"CREATE TABLE mart.{tabla} AS" in _ejecutable(), (
+    assert f"CREATE TABLE mart.{tabla} AS" in _compacto(_sql_de(tabla)), (
         f"mart.{tabla} no se materializa: seguiria recalculandose en cada consulta"
     )
 
@@ -106,7 +123,7 @@ def test_f078_r1_las_tres_tablas_se_crean_como_tabla(tabla: str) -> None:
 @pytest.mark.parametrize("tabla", TABLAS)
 def test_f078_r1_cada_tabla_se_dropea_antes_de_crearse(tabla: str) -> None:
     """La nocturna reconstruye: sin el DROP, el segundo build revienta."""
-    assert f"DROP TABLE IF EXISTS mart.{tabla} CASCADE;" in _ejecutable()
+    assert f"DROP TABLE IF EXISTS mart.{tabla} CASCADE;" in _compacto(_sql_de(tabla))
 
 
 @pytest.mark.parametrize("vista", [v for v, _ in VISTA_SOBRE_TABLA])
@@ -115,26 +132,31 @@ def test_f078_r1_cada_vista_se_dropea_antes_de_recrearse(vista: str) -> None:
     `DROP TABLE` de la noche siguiente se las lleva por delante con CASCADE y
     nadie las recrea: es exactamente la averia que `03_agg_categoria.sql` le
     hizo a `cierre.v_pbi_planif_vs_real` y que R-FRESCURA documenta."""
-    assert f"DROP VIEW IF EXISTS mart.{vista} CASCADE;" in _ejecutable()
+    assert f"DROP VIEW IF EXISTS mart.{vista} CASCADE;" in _compacto(_sql_de(vista))
 
 
 def test_f078_r1_las_tablas_se_construyen_en_orden_de_dependencia() -> None:
     """`master_vigente_anual` lee de `master_versiones_tipadas` y el hecho lee de
     la vigente: construirlas al reves deja el build en un error de objeto
     inexistente la primera noche."""
-    posiciones = [_ejecutable().index(f"CREATE TABLE mart.{t} AS") for t in TABLAS]
+    posiciones = [_ejecutable().index(f"CREATE TABLE mart.{t} AS") for t in TABLAS_DE_06]
 
     assert posiciones == sorted(posiciones), (
-        f"las tablas no se crean en orden de dependencia: {TABLAS}"
+        f"las tablas no se crean en orden de dependencia: {TABLAS_DE_06}"
     )
+    # F-161: el catálogo se construye antes, en un sub-paso anterior.
+    from etl_sigrid.application.steps.build_mart_step import SUB_PASOS
+
+    ficheros = [s.sql_file for s in SUB_PASOS]
+    assert ficheros.index(RUTA_CATALOGO.name) < ficheros.index(RUTA_CP.name)
 
 
 def test_f078_r1_los_drop_van_antes_que_los_create() -> None:
     """Todo el bloque de limpieza, delante. Un DROP intercalado se llevaria por
     delante una tabla ya construida en esta misma ejecucion."""
     texto = _ejecutable()
-    ultimo_drop = max(texto.rindex(f"DROP TABLE IF EXISTS mart.{t}") for t in TABLAS)
-    primer_create = min(texto.index(f"CREATE TABLE mart.{t} AS") for t in TABLAS)
+    ultimo_drop = max(texto.rindex(f"DROP TABLE IF EXISTS mart.{t}") for t in TABLAS_DE_06)
+    primer_create = min(texto.index(f"CREATE TABLE mart.{t} AS") for t in TABLAS_DE_06)
 
     assert ultimo_drop < primer_create
 
@@ -382,6 +404,11 @@ COLUMNAS = {
 
 #: Cada tabla proyecta exactamente lo mismo que su vista: la vista es un
 #: `SELECT` de columnas desnudas y nada mas.
+#: F-161 (R8): la vista del catálogo conserva sus ocho columnas EN SU ORDEN y
+#: añade nueve detrás. Lo fija entero `tests/test_f161_sql.py`; aquí se exige
+#: que las ocho de siempre sigan siendo el prefijo.
+CON_COLUMNAS_DETRAS = {"v_master_versiones_tipadas", "master_versiones_tipadas"}
+
 COLUMNAS_DE_TABLA = {
     "master_versiones_tipadas": COLUMNAS["v_master_versiones_tipadas"],
     "master_vigente_anual": COLUMNAS["v_master_vigente_anual"],
@@ -393,7 +420,9 @@ COLUMNAS_DE_TABLA = {
 def test_f078_r4_las_vistas_proyectan_exactamente_lo_de_siempre(vista: str) -> None:
     """Ni una columna de menos (Power Query se queda sin campo) ni una de mas
     (aparece sola en el modelo del humano)."""
-    proyectadas = columnas_proyectadas(cuerpo_de_vista(_sql(), "mart", vista))
+    proyectadas = columnas_proyectadas(cuerpo_de_vista(_sql_de(vista), "mart", vista))
+    if vista in CON_COLUMNAS_DETRAS:
+        proyectadas = proyectadas[: len(COLUMNAS[vista])]
 
     assert proyectadas == COLUMNAS[vista], (
         f"mart.{vista} cambio de columnas: el .pbix del humano deja de cargar"
@@ -402,7 +431,9 @@ def test_f078_r4_las_vistas_proyectan_exactamente_lo_de_siempre(vista: str) -> N
 
 @pytest.mark.parametrize("tabla", sorted(COLUMNAS_DE_TABLA))
 def test_f078_r4_cada_tabla_proyecta_lo_que_su_vista_publica(tabla: str) -> None:
-    proyectadas = columnas_proyectadas(cuerpo_de_vista(_sql(), "mart", tabla))
+    proyectadas = columnas_proyectadas(cuerpo_de_vista(_sql_de(tabla), "mart", tabla))
+    if tabla in CON_COLUMNAS_DETRAS:
+        proyectadas = proyectadas[: len(COLUMNAS_DE_TABLA[tabla])]
 
     assert proyectadas == COLUMNAS_DE_TABLA[tabla]
 

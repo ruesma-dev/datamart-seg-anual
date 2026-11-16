@@ -22,6 +22,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+
 from harness.alcance import Alcance
 from harness.mutacion import (
     BASE_ROTA,
@@ -74,12 +75,12 @@ class EjecutorFalso:
     def identidad(self) -> tuple[str, str]:
         return (self.raiz, "falso")
 
-    def ejecutar(self, timeout_s: int) -> str:  # noqa: ARG002
+    def ejecutar(self, timeout_s: int) -> str:
         if self._veredictos:
             return self._veredictos.pop(0)
         return self.veredicto_por_defecto
 
-    def linea_base(self, timeout_s: int) -> ResultadoSuite:  # noqa: ARG002
+    def linea_base(self, timeout_s: int) -> ResultadoSuite:
         self.corridas_base += 1
         if self._bases:
             return self._bases.pop(0)
@@ -217,15 +218,22 @@ def test_un_mutante_sobre_base_rota_no_cuenta_como_muerto(arbol: Path) -> None:
     assert informe.aviso_base is not None
 
 
-def test_si_la_base_sigue_verde_el_mutante_si_esta_muerto(arbol: Path) -> None:
-    """Un mutante puede reventar la recolección: eso es una muerte legítima."""
+def test_si_la_base_sigue_verde_el_mutante_queda_indeterminado(arbol: Path) -> None:
+    """Un mutante puede reventar la recolección con la base verde.
+
+    Hasta F-023 eso era «una muerte legítima». Cambiado A PROPÓSITO (design §6
+    de F-023): muere solo lo que un test caza (código 1), y un mutante que
+    rompe la importación no lo caza ningún test. Queda `indeterminado`, sin
+    invalidar la campaña.
+    """
     ejecutor = EjecutorFalso(
         bases=[ResultadoSuite(codigo=PYTEST_OK)] * 3, veredictos=[INDETERMINADO]
     )
 
     informe = ejecutar_campania(_alcance(), ejecutor, raiz=str(arbol))
 
-    assert informe.muertos == 1
+    assert informe.muertos == 0
+    assert len(informe.indeterminados) == 1
     assert informe.base_rota == []
     assert informe.fiable
 
@@ -244,11 +252,15 @@ def test_la_base_rota_al_cerrar_invalida_la_campania_entera(arbol: Path) -> None
 
 
 def test_el_ejecutor_traduce_los_codigos_de_pytest_uno_a_uno() -> None:
-    """Solo el 1 —«han fallado tests»— significa que el mutante pudo morir."""
+    """Solo el 1 —«han fallado tests»— significa que el mutante pudo morir.
+
+    El 5 pasa de SUPERVIVIENTE a INDETERMINADO A PROPÓSITO (F-023, R2): «no se
+    recogió ningún test» no dice que nadie compruebe la línea.
+    """
     ejecutor = EjecutorPytest()
     traducciones = {
         PYTEST_OK: SUPERVIVIENTE,
-        PYTEST_SIN_TESTS: SUPERVIVIENTE,
+        PYTEST_SIN_TESTS: INDETERMINADO,
         PYTEST_FALLOS: MUERTO,
         2: INDETERMINADO,  # recolección interrumpida
         3: INDETERMINADO,  # error interno de pytest

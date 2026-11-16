@@ -39,6 +39,30 @@ from tests.test_f006_formato import _dicc, _ficha, _regla
 #: fórmula de R17. Solo baja (trinquete: R19 falla si sobra más de
 #: `HOLGURA_TRINQUETE`). Historia, de la más reciente a la más antigua:
 #:
+#: * 37.356 · 2026-11-13, F-161 (diccionario v77), SUBIDO con motivo: el
+#:   catalogo completo de versiones master (D5-D14 del humano). Reglas 8.376
+#:   (`R-VERSION-MASTER` dice que solo rigen las de `tiene_reparto` y donde esta
+#:   el ultimo cierre), enrutado 18.918 (cuatro fichas recomendadas nuevas,
+#:   dos preguntas cortas cada una: `mart.v_master_version_partida` y
+#:   `mart.master_importe_mensual` enrutan «cuanto es la version V» y «ultimo
+#:   cierre frente a la temporal»; `stg.master_versiones` y `stg.v_master_lineas`
+#:   son consultables por la regla de F-079), bloques 10.062 sin cambio.
+#: * 37.042 · 2026-11-09, F-040 (diccionario v75), SUBIDO con motivo: el lado
+#:   de ingresos, dos esquemas nuevos. Reglas 8.464 (+660: las nuevas
+#:   `R-VENTAS-TRES-CIFRAS` y `R-VENTAS-RESTRINGIDA`, bloqueantes, con resumen,
+#:   y `ventas` en `R-PERFILES`, que se sirve entera, y en `R-FRESCURA`),
+#:   enrutado 18.516 (+1.337: catorce fichas recomendadas nuevas, once de
+#:   `ventas` y tres de `ventas_restringida`, una o dos preguntas cada una: sin
+#:   ellas «cuales son los diez mayores clientes» o «que certificaciones estan
+#:   sin cobrar» no llegan a ningun objeto), bloques 10.062 (+792: las dos
+#:   entradas de `esquemas`). Mismo orden que el alta de postventa (F-156).
+#: * 34.253 · 2026-11-06, F-157 (diccionario v73 en el arbol), SUBIDO con
+#:   motivo: la fase 0 repartida en el tiempo. Enrutado 17.179 (+197: dos
+#:   fichas recomendadas nuevas de `stg`, `plan_mensual_fase0` con dos preguntas
+#:   y `v_plan_mensual_fase0_cobertura` con una, ya acortadas: sin ellas «como
+#:   reparte por meses la venta de hoy de la obra X» no llega a la tabla y el
+#:   agente la busca en `stg.plan_mensual`); reglas 7.804 y bloques 9.270 sin
+#:   cambio (`R-IMPORTE-MES` gana un objeto en su `ambito`, que no se sirve).
 #: * 34.056 · 2026-11-05, F-156 review pasada 1 (v71 en el arbol), SUBIDO con
 #:   motivo: la mascara de postventa es heuristica y la regla lo tiene que
 #:   decir. Reglas 7.804 (+16: `R-POSTVENTA-RESTRINGIDA` deja de prometer «sin
@@ -83,7 +107,7 @@ from tests.test_f006_formato import _dicc, _ficha, _regla
 #:   todas las preguntas): 78.057.
 #: * 29.787 · 2026-10-22, F-147 T5: PROVISIONAL, la medida de T2 sobre la v58
 #:   (sin resúmenes todavía: reglas 2.233, enrutado 13.886, bloques 13.668).
-PRESUPUESTO_MAX = 34_056
+PRESUPUESTO_MAX = 37_356
 
 
 def _medir(dicc) -> PresupuestoContexto:

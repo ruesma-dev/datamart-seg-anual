@@ -60,6 +60,8 @@ STEPS_POR_COMANDO = {
     "build-tesoreria": ("BuildTesoreriaStep", "build_tesoreria", "build_aux"),
     # F-156: el noveno, postventa, con el mismo `stage`.
     "build-postventa": ("BuildPostventaStep", "build_postventa", "build_aux"),
+    # F-040: el décimo, ventas, con el mismo `stage`.
+    "build-ventas": ("BuildVentasStep", "build_ventas", "build_aux"),
     # F-097: los descompuestos, con su propia ingesta. `ingest-descompuestos`
     # declara `stage = ingest`, como la ingesta de `raw`; el build, `build_aux`.
     "ingest-descompuestos": ("IngestDescompuestosStep", "ingest_descompuestos", "ingest"),

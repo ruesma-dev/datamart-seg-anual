@@ -320,6 +320,8 @@ def test_f118_r28_sello_incluye_las_funciones_de_stg() -> None:
         "00_functions.sql",
         "06_presupuesto.sql",
         "08_plan_mensual.sql",
+        # F-157 (R16): la fase 0 repartida entra al final.
+        "09_plan_mensual_fase0.sql",
     )
     for nombre in FICHEROS_DEL_SELLO:
         assert Path(DIRECTORIO_SQL_STG / nombre).is_file()

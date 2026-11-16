@@ -787,7 +787,62 @@
 # `importe_pendiente` y nunca lo supera en un mes; `devengo_pendiente_contrato_mes`
 # dice que su fila sin contrato solo es negativa por un mes negativo del plan.
 # Errata de postventa («la mascara es heuristica»). Sin objetos ni columnas nuevas.
-version: 72
+# version 73 (F-157, 2026-11-06): LA FASE 0 REPARTIDA EN EL TIEMPO. Nacen
+# `stg.plan_mensual_fase0` (el presupuesto vivo de hoy, coste 3 y venta 7,
+# repartido por meses con el `planif` del jefe de obra y la regla del master) y
+# `stg.v_plan_mensual_fase0_cobertura` (cuanto de la fase 0 esta repartido);
+# `R-IMPORTE-MES` alcanza la tabla nueva y la ficha de `stg.plan_mensual` deja de
+# decir que guarda la fase 0. Sin regla nueva.
+#
+# version 74 (F-159, 2026-11-07): HOTFIX 2, EL MES NEGATIVO DEL PLAN. El
+# pendiente de cada partida se reparte en sus meses POR ACUMULADO sobre el plan
+# NETO acumulado de V: un mes negativo (estorno de un 0 intermedio del `planif`)
+# se absorbe en los anteriores en vez de amplificarse (1-0710, 07-11: -19,4 M
+# en un mes). Cambian las fichas de `importe_pendiente` de
+# `tesoreria.devengo_pendiente_obra_mes` (nunca negativo) y de
+# `tesoreria.devengo_pendiente_contrato_mes` (ninguna fila negativa). Sin
+# objetos, columnas ni reglas nuevos.
+#
+# version 75 (F-040, 2026-11-09): EL LADO DE INGRESOS. Esquemas `ventas`
+# (clientes con su nombre, facturas de venta con lineas y recargos,
+# certificaciones con los suyos, el enlace certificacion -> factura, su
+# cobertura y tres vistas: el cobro por factura, el seguimiento de cada
+# certificacion y el contraste por obra) y `ventas_restringida` (lo personal
+# del cliente, D2/D6 del humano: solo perfil total). Reglas nuevas
+# `R-VENTAS-TRES-CIFRAS` y `R-VENTAS-RESTRINGIDA`; `R-PERFILES` alcanza los dos
+# esquemas y `R-FRESCURA` el paso `build_ventas`. Siete tablas nuevas en `raw`
+# (`cli`, `cer`, `cerpro`, `cerrec`, `cerprodes`, `dvfpro`, `dvfrec`) y `dvf` a
+# 35 columnas.
+#
+# version 76 (F-162, 2026-11-11): EL SEGUIMIENTO LLEVA TODAS LAS FICHAS, CADA
+# UNA CON SU EMPRESA. `stg.obras` deja de elegir una ficha por codigo (la 0721
+# salia por la copia vacia de Porsan): una fila por ficha de todas las empresas
+# (634 fichas, 585 codigos) con `empresa_id`, `clave_obra` y `es_por_defecto`
+# (la de Ruesma si existe; si no, deciden los datos). `maestro.obras`,
+# `mart.v_pbi_dim_obra` y `cierre.v_pbi_cierre_cabecera` publican la marca.
+# `R-EMPRESA-POR-DEFECTO` alcanza a `stg`, `mart` y `cierre` y dice como leer una
+# obra sin empresa; `R-UNIVERSO-OBRA` ya no deduplica; `R-CODIGO-POR-EMPRESA`
+# alcanza a las dos vistas. Las preguntas de «la obra X» llevan la regla.
+#
+# version 77 (F-161, 2026-11-13): EL CATALOGO DE VERSIONES MASTER ESTA COMPLETO.
+# `mart.master_versiones_tipadas` y su vista tienen todas las versiones con
+# lineas, con o sin reparto en el tiempo, y nueve columnas nuevas detras
+# (`tiene_reparto`, `reparto`, lineas e importes, cabecera y ancla). Fichas
+# nuevas: `stg.master_versiones`, `stg.v_master_lineas`,
+# `mart.v_master_version_partida` (el coste de una version por partida) y
+# `mart.master_importe_mensual` (el ultimo cierre al lado de la temporal, sin
+# reescalar). `R-VERSION-MASTER` alcanza a los cuatro y dice que solo las de
+# `tiene_reparto` rigen; P18 reconoce la version sin reparto. La ficha de
+# `stg.plan_mensual` ya no niega la version 0 de los master.
+#
+# version 78 (F-163, 2026-11-15): LA RECONSTRUCCION COMPLETA SOLO EN FIN DE
+# SEMANA. Las obras congeladas se rehacen enteras la noche del sabado, o la del
+# domingo si la del sabado no quedo registrada; entre semana nunca, aunque
+# pasen 7 dias (la completa del domingo 2026-11-15 murio por el techo de 7 h
+# del job). Cambia el texto de `stg` (tema de la ventana y `presupuesto`), de
+# `_meta.v_frescura_obra` (motivo `completa`, `firma_divergente`) y la consulta
+# de obras vivas de este fichero. Ningun objeto ni columna nuevos.
+version: 78
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -815,23 +870,24 @@ reglas:
   # las reglas al acortarlas o fundirlas esta en la ficha de su objeto.
 
   - codigo: R-FRESCURA
-    titulo: Nueve esquemas pueden quedarse atras sin tumbar la noche
+    titulo: Diez esquemas pueden quedarse atras sin tumbar la noche
     severidad: bloqueante
-    ambito: [cierre, compras, compras_restringida, maestro, retenciones, personal, contabilidad, contabilidad_restringida, tesoreria, tesoreria_restringida, descompuestos, postventa, postventa_restringida]
+    ambito: [cierre, compras, compras_restringida, maestro, retenciones, personal, contabilidad, contabilidad_restringida, tesoreria, tesoreria_restringida, descompuestos, postventa, postventa_restringida, ventas, ventas_restringida]
     resumen: >-
-      Cita la fecha del dato en toda respuesta de cierre, compras, maestro,
-      retenciones, personal, contabilidad, tesorería, descompuestos o
-      postventa: cada uno se construye aparte y puede ir un día atrás. Fecha: «ESTADO POR
-      ESQUEMA» o `_meta.v_frescura`.
+      Cita la fecha en toda respuesta de cierre, compras, maestro,
+      retenciones, personal, contabilidad, tesorería, descompuestos, postventa
+      o ventas: cada uno se construye aparte y puede ir un día atrás. Fecha:
+      «ESTADO POR ESQUEMA» o `_meta.v_frescura`.
     regla: >-
-      Estos nueve esquemas (trece con `contabilidad_restringida`,
-      `tesoreria_restringida`, `compras_restringida` y
-      `postventa_restringida`, que construyen el mismo `build_contabilidad`,
-      `build_tesoreria`, `build_compras` y `build_postventa`) SI se construyen cada noche dentro de
-      `run-all`, y los nueve registran paso, asi que su fecha de build siempre es
+      Estos diez esquemas (catorce con `contabilidad_restringida`,
+      `tesoreria_restringida`, `compras_restringida`, `postventa_restringida`
+      y `ventas_restringida`, que construyen el mismo `build_contabilidad`,
+      `build_tesoreria`, `build_compras`, `build_postventa` y `build_ventas`)
+      SI se construyen cada noche dentro de
+      `run-all`, y los diez registran paso, asi que su fecha de build siempre es
       consultable. Lo que no cambia es que su paso NO es dependencia de ningun
       otro: si `build_cierre`, `build_compras`, `build_maestros`,
-      `build_retenciones`, `build_personal`, `build_contabilidad`,
+      `build_retenciones`, `build_ventas`, `build_personal`, `build_contabilidad`,
       `build_tesoreria`, `build_postventa` o `build_descompuestos` falla (o su ingesta
       `ingest_descompuestos`, que lo salta), la noche continua y termina, y ese
       esquema se queda con el dato de una noche anterior mientras `raw`, `stg` y
@@ -839,8 +895,9 @@ reglas:
       de build: `SELECT * FROM _meta.v_frescura WHERE paso = 'build_cierre'` (o
       `build_compras`, `build_maestros`, `build_retenciones`, `build_personal`,
       `build_contabilidad`, `build_tesoreria`, `build_postventa`,
-      `build_descompuestos`). `postventa.v_coste_obra` lee `compras` al
-      consultar: vale tambien la frescura de `build_compras`.
+      `build_ventas`, `build_descompuestos`). `postventa.v_coste_obra` lee
+      `compras` al consultar: vale tambien la frescura de `build_compras`; las
+      tres vistas de `ventas` leen `tesoreria`: vale la de `build_tesoreria`.
       `compras.vencimientos` es una vista de `tesoreria.efectos`: su frescura
       es la de `build_tesoreria`. Que el pipeline sea uno solo NO significa que
       todo el datamart tenga la misma frescura.
@@ -849,7 +906,7 @@ reglas:
       llaman —con el mismo nombre que tienen en `_meta.v_frescura.paso`, que es
       donde se consulta su frescura— `ingest_raw`, `load_excel_aux`,
       `build_stg`, `build_mart`, `build_maestros`, `build_tesoreria`,
-      `build_compras`, `build_retenciones`, `build_personal`,
+      `build_compras`, `build_retenciones`, `build_ventas`, `build_personal`,
       `build_contabilidad`, `build_postventa`, `ingest_descompuestos`,
       `build_descompuestos`, `build_cierre`, `publicar_diccionario` y
       `apply_grants`. Hasta el 2026-08-28 cuatro de
@@ -860,8 +917,9 @@ reglas:
       dentro de la nocturna y con la misma propiedad, y esta vez a proposito:
       un fallo del SQL de personal no puede dejar al `mart` sin construir.
       `contabilidad` (F-056, 2026-09-26), `descompuestos` (F-097,
-      2026-09-28), `tesoreria` (F-037, 2026-10-13) y `postventa` (F-156,
-      2026-11-04), igual. Dar un dato de cualquiera de los nueve sin fecha es dar una respuesta vieja con aplomo.
+      2026-09-28), `tesoreria` (F-037, 2026-10-13), `postventa` (F-156,
+      2026-11-04) y `ventas` (F-040, 2026-11-09), igual. Dar un dato de
+      cualquiera de los diez sin fecha es dar una respuesta vieja con aplomo.
 
   - codigo: R-IMPORTE-MES
     titulo: importe_mes no se suma entre meses; importe_origen ya es acumulado
@@ -873,6 +931,7 @@ reglas:
       - mart.v_pbi_fact_categoria
       - mart.v_fact_periodificado
       - stg.plan_mensual
+      - stg.plan_mensual_fase0
       - cierre.fact_cierre_mensual
       - cierre.v_pbi_cierre_resumen
       - cierre.v_pbi_cierre_indirectos_detalle
@@ -949,13 +1008,16 @@ reglas:
     regla: >-
       `stg.obras` es el universo del SEGUIMIENTO: excluye codigos
       administrativos (0001-0005, CM, CP, GG, VAR, POSTV*, BD*, GGD, GINT, OT),
-      excluye codigos con cinco o mas digitos seguidos y deduplica por el
-      mecanismo de Sigrid `conext.cod = '15'`. `maestro.obras` NO filtra nada:
-      es superconjunto, con una fila por FICHA (una por empresa y codigo, F-102).
+      excluye codigos con cinco o mas digitos seguidos y, desde F-162, tiene
+      una fila por ficha de todas las empresas (634 fichas, 585 codigos el
+      2026-11-11): difiere de `maestro.obras` solo en esos filtros de codigo.
+      `maestro.obras` NO filtra nada: es superconjunto, con una fila por FICHA
+      (una por empresa y codigo, F-102). Contar obras por codigo es contar
+      `es_por_defecto`, y decirlo.
       Toda respuesta que cuente obras debe decir cual usa. `compras` y
       `retenciones` tampoco filtran por `stg.obras` y pueden traer obras
-      administrativas que el seguimiento excluye. Que ficha elige `stg.obras`
-      cuando un codigo tiene varias lo dice su ficha.
+      administrativas que el seguimiento excluye. Cual es la ficha por defecto
+      de un codigo con varias lo dice su ficha.
     motivo: >-
       Los filtros estan en `sql/stg/03_obras.sql`; `sql/maestro/01_obras.sql` no
       tiene ninguno. Contar en una o en otra da cifras distintas a proposito, y
@@ -968,6 +1030,8 @@ reglas:
       - maestro.obras
       - maestro.v_obra_fichas
       - stg.obras
+      - mart.v_pbi_dim_obra
+      - cierre.v_pbi_cierre_cabecera
       - personal.partes_lineas
       - personal.partes
       - personal.recursos
@@ -1019,28 +1083,28 @@ reglas:
   - codigo: R-EMPRESA-POR-DEFECTO
     titulo: Sin empresa en la pregunta, es Construcciones Ruesma (empresa_id = 1), y se dice
     severidad: bloqueante
-    ambito: [maestro, compras, compras_restringida, retenciones, personal, contabilidad, contabilidad_restringida, tesoreria, tesoreria_restringida]
+    ambito: [maestro, compras, compras_restringida, retenciones, personal, contabilidad, contabilidad_restringida, tesoreria, tesoreria_restringida, stg, mart, cierre]
     resumen: >-
-      Sin empresa en la pregunta, filtra `empresa_id = 1` (Construcciones
-      Ruesma) y dilo. Sin columna de empresa, llega por `obra_id` →
-      `maestro.obras`; si tampoco hay obra, avisa de que la cifra mezcla todas.
-      Nunca sumes empresas sin decirlo.
+      Sin empresa en la pregunta: una obra, en su ficha `es_por_defecto` (la de
+      Ruesma si existe); lo demas, `empresa_id = 1`. Dilo. El mismo codigo puede
+      ser la obra en varias empresas: nunca sumes sus fichas sin decirlo.
     regla: >-
-      Es un CRITERIO GENERAL: si la pregunta no indica empresa, se entiende
-      Construcciones Ruesma, `empresa_id = 1`, y la respuesta lo dice («he
-      supuesto Construcciones Ruesma, `empresa_id = 1`, porque la pregunta no
-      indica empresa»). NO se aplica si la pregunta pide otra empresa (Porsan es
-      la 28), varias, el grupo o una UTE: entonces se filtra por las que pide y,
-      si son varias, se dice si van por separado o sumadas. Nunca se suman
-      empresas sin decirlo. Donde filtrar se decide OBJETO A OBJETO, y cada
-      ficha dice su caso: con columna de empresa (`empresa_id`, o
-      `maestro.centros_coste.empresa`), por ella; con solo `obra_id`, cruzando
-      con `maestro.obras` (su `empresa_id`, o `clave_obra` que empieza por `1-`:
-      `R-CODIGO-POR-EMPRESA`), y las filas sin obra quedan fuera y se cuentan; sin empresa ni
-      obra, el objeto mezcla las 38 empresas: la respuesta lo dice y NO dice
-      «he supuesto Construcciones Ruesma» (si la ficha da un camino comprobado
-      para filtrarlo, se usa ese). `stg`, `mart`, `cierre` y `descompuestos` no
-      tienen empresa: manda `R-UNIVERSO-OBRA`.
+      Es un CRITERIO GENERAL: sin empresa en la pregunta se entiende
+      Construcciones Ruesma, `empresa_id = 1`, y la respuesta lo dice («he supuesto
+      Construcciones Ruesma, `empresa_id = 1`»). NO se aplica si pide otra empresa,
+      varias, el grupo o una UTE: se filtra por las que pide. Nunca se suman empresas
+      sin decirlo. Donde filtrar se decide OBJETO A OBJETO y cada ficha dice su caso:
+      con columna de empresa (`empresa_id`, `maestro.centros_coste.empresa`), por
+      ella; con solo `obra_id`, cruzando con `maestro.obras` (`empresa_id`, o
+      `clave_obra` que empieza por `1-`: `R-CODIGO-POR-EMPRESA`), y las filas sin obra
+      quedan fuera y se cuentan; sin empresa ni obra, mezcla las 38 empresas: la
+      respuesta lo dice y NO dice «he supuesto Construcciones Ruesma» (salvo camino
+      comprobado en su ficha). UNA OBRA puede estar en varias empresas con el mismo
+      codigo: `stg`, `mart` y `cierre` tienen una fila por ficha, con su empresa y
+      `es_por_defecto` por `obra_id` → `stg.obras` (`R-UNIVERSO-OBRA`). Sin empresa,
+      la obra es su ficha `es_por_defecto`; si esa ficha esta sin datos y otra del
+      codigo los tiene, se avisa. Agregados sin obra: `empresa_id = 1`. Nunca se
+      suman fichas de empresas distintas sin decirlo.
     motivo: >-
       Orden del humano del 2026-10-18, pedida primero en la sesion de
       `mcp-bbdd` («si no se dice nada es construcciones ruesma») y confirmada
@@ -1051,7 +1115,12 @@ reglas:
       sin decirlo. Que la IA lo diga es sugerencia de `mcp-bbdd`: el usuario ve
       el supuesto y lo corrige. `empresa_id = 1` es 'CONSTRUCCIONES RUESMA' en
       `maestro.obras.nombre_empresa` (Azure, 2026-10-18). El inventario de que
-      objeto tiene empresa, obra o ninguna vive en cada ficha desde F-147.
+      objeto tiene empresa, obra o ninguna vive en cada ficha desde F-147. La
+      ficha por defecto es orden del humano del 2026-11-11 (F-162): «al
+      preguntar la IA, hay que decirle que puede ser el mismo proyecto en ambas
+      empresas y que por defecto coja este»; «en caso de duda, Construcciones
+      Ruesma por delante, salvo que se diga lo contrario; los datos deciden
+      antes que la duda».
 
   - codigo: R-SALDO-CONTABLE
     titulo: El saldo contable no se suma con los cierres ni las aperturas
@@ -1101,6 +1170,8 @@ reglas:
       - personal
       - compras_restringida
       - postventa_restringida
+      - ventas
+      - ventas_restringida
       - compras.documento_alarmas
       - compras.vencimientos
       - compras.v_facturas_pago
@@ -1120,17 +1191,17 @@ reglas:
       el consumo salvo `raw` y `*_restringida`; el RESTRINGIDO
       (administrativos), lo del estandar MENOS el esquema `contabilidad` entero
       (`contabilidad.mayor`, `contabilidad.saldos_cuenta_mes`; tampoco el mayor
-      analitico), `tesoreria` y `personal`. SI lee `retenciones` y `compras`.
+      analitico), `tesoreria` y `personal`, y tampoco `ventas`. SI
+      lee `retenciones` y `compras`.
       «restringida» = reservada al perfil total: los `*_restringida` son del
-      perfil TOTAL y NO del perfil restringido (`postventa_restringida`,
-      tambien del POSTVENTA). «permission denied» no se
+      perfil TOTAL y NO del perfil restringido. «permission denied» no se
       rodea: ni el mayor desde `retenciones.apuntes_contables`, ni personas
       desde los logins de `compras`, ni la cartera desde
       `compras.vencimientos`; responde que el perfil no lo incluye.
     motivo: >-
-      Humano: F-135, F-037, F-138, F-141, F-146 (2026-10-21), F-156. Se
-      sirve entera: el MCP no filtra el diccionario por perfil. Lo que falta,
-      en cada ficha.
+      Humano: F-135, F-037, F-138, F-141, F-146 (2026-10-21), F-156, F-040
+      (D2/D6). Se sirve entera: el MCP no filtra el diccionario por perfil. Lo
+      que falta, en cada ficha.
 
   - codigo: R-TESORERIA-ESTADO
     titulo: En la cartera de cobros y pagos BAJA no se suma, y fecha real vacia no es pendiente
@@ -1198,6 +1269,59 @@ reglas:
       no filtra el diccionario por perfil: sin esta regla el agente mezclaria
       el texto enmascarado con el integro o buscaria a las personas por otro
       camino.
+
+  - codigo: R-VENTAS-TRES-CIFRAS
+    titulo: Certificado, facturado y cobrado son tres cifras; no se suman ni se restan sin decirlo
+    severidad: bloqueante
+    ambito: [ventas]
+    resumen: >-
+      Certificado, facturado y cobrado son tres cifras: no las sumes ni restes
+      sin decirlo. A cuenta (sin recargos) no es la base (con coeficientes). Lo
+      cobrado por certificación no se suma si `factura_compartida`.
+    regla: >-
+      En `ventas` hay tres cifras que NO son la misma: lo certificado
+      (`ventas.certificaciones`, solo las que `cuenta`), lo facturado
+      (`ventas.facturas`, `base` sin IVA) y lo cobrado
+      (`ventas.v_factura_cobro`, REALIZADO). Restarlas es una medida que hay
+      que nombrar («certificado sin facturar», «facturado sin cobrar»), nunca
+      un total. En la certificacion, el importe a cuenta (`importe_a_cuenta`,
+      las lineas SIN recargos) no es la `base` (cabecera, con los
+      coeficientes en el 85 %): no se mezclan. El enlace certificacion ->
+      factura es N:M: si `factura_compartida` es verdadero, sumar lo facturado
+      o lo cobrado por certificacion cuenta dos veces la misma factura. Lo
+      cobrado por un agrupado `AGR` no se atribuye a ninguna factura hasta
+      F-104: dilo si pesa en la respuesta (`ventas.cobertura_enlace`).
+    motivo: >-
+      Medido el 2026-11-06/07 en solo lectura: 268 facturas son de dos
+      certificaciones y 71 certificaciones tienen dos facturas; la base de la
+      certificacion lleva los coeficientes en el 85 % y el a cuenta no; y
+      `cer.idefac` esta a 0 en las 6.308, asi que el unico enlace es
+      `cerprodes`. Sin la regla, «cuanto falta por cobrar de lo certificado»
+      sale restando cifras de granos distintos.
+
+  - codigo: R-VENTAS-RESTRINGIDA
+    titulo: Lo personal del cliente solo en ventas_restringida; el nombre es publico
+    severidad: bloqueante
+    ambito: [ventas, ventas_restringida]
+    resumen: >-
+      Responde con `ventas`: el nombre del cliente es público, pero el NIF de
+      la persona física, direcciones, teléfonos, correos y la cabecera de la
+      factura solo están en `ventas_restringida` (perfil total).
+    regla: >-
+      El nombre del cliente es publico en `ventas`, tambien el de la persona
+      fisica. Su NIF (`cif` NULL en `ventas.clientes` y `ventas.facturas`), las
+      direcciones, los telefonos y el correo del cliente, el nombre y el CIF de
+      la cabecera de cada factura y la descripcion de las lineas de las
+      facturas a persona fisica solo estan en `ventas_restringida`, que lee el
+      perfil total. «permission denied» no se rodea, y nunca se cruza por
+      nombre con otro esquema para sacar un NIF o una direccion. Un `cif` NULL
+      de persona fisica no es un cliente sin CIF.
+    motivo: >-
+      Decisiones D2 y D6 del humano, chat del 2026-11-07 (F-040): «los diez
+      mayores clientes» se pregunta por nombre, pero 572 clientes son personas
+      fisicas (arrendamientos, compraventas) y en 3.635 facturas la cabecera
+      lleva un NIF de persona. El MCP no filtra el diccionario por perfil: sin
+      la regla, el agente buscaria el NIF por otro camino.
 
   - codigo: R-CAJA-HIPOTESIS
     titulo: No hay caja proyectada; pasar devengo a caja exige declarar todas las hipotesis
@@ -1360,7 +1484,7 @@ reglas:
     regla: >-
       Antes de escribir cualquier consulta contra `raw`, seis cosas.
 
-      **1. `ide` es la clave de las 93 tablas.** Se llama igual en todas, es el
+      **1. `ide` es la clave de las 100 tablas.** Se llama igual en todas, es el
       indice primario y es unico. Un campo que acaba en `ide` —`conide`,
       `entide`, `obride`— es una referencia a el.
 
@@ -1373,10 +1497,10 @@ reglas:
       alta— **y es de donde el datamart los toma para esas diez**. Pero **no
       asumas que un campo esta en `con` solo porque exista alli**: hay tablas
       cuyos campos propios el ETL lee **sin pasar por `con`**, y estas son, con
-      el campo exacto: `apu` (`apu.fec`, `apu.res`); `auxala` (`auxala.cod`, `auxala.res`); `auxban` (`auxban.res`); `auxcob` (`auxcob.cod`, `auxcob.res`); `auxefc` (`auxefc.res`); `auxefp` (`auxefp.res`); `auxemp` (`auxemp.res`); `auxgra` (`auxgra.cod`, `auxgra.res`); `auxhor` (`auxhor.cod`, `auxhor.res`); `auxrestip` (`auxrestip.res`); `auxmun` (`auxmun.res`); `auxnap` (`auxnap.res`); `auxobramb` (`auxobramb.cod`, `auxobramb.res`); `auxobrcla` (`auxobrcla.res`); `auxobrtip` (`auxobrtip.res`); `auxofc` (`auxofc.cod`, `auxofc.res`); `auxpag` (`auxpag.cod`, `auxpag.res`); `auxpro` (`auxpro.res`); `auxpronat` (`auxpronat.cod`, `auxpronat.res`); `auxrcp` (`auxrcp.cod`, `auxrcp.res`); `auxtrcp` (`auxtrcp.cod`, `auxtrcp.res`); `conest` (`conest.cod`, `conest.res`); `conext` (`conext.cod`); `confir` (`confir.cod`, `confir.fec`); `ctrpro` (`ctrpro.res`); `dcapro` (`dcapro.res`); `dcfpro` (`dcfpro.res`); `dcopro` (`dcopro.res`); `dncpro` (`dncpro.fec`, `dncpro.res`); `gra` (`gra.cod`, `gra.fec`, `gra.res`); `obrfas` (`obrfas.res`); `obrfasamb` (`obrfasamb.fec`, `obrfasamb.res`); `hmores` (`hmores.fec`); `log` (`log.cod`, `log.fec`); `obrctr` (`obrctr.cod`, `obrctr.res`); `obrparpar` (`obrparpar.cod`, `obrparpar.res`); `prmtpl` (`prmtpl.cod`, `prmtpl.res`); `prv` (`prv.cif`, `prv.raz`); `rac` (`rac.fec`, `rac.res`); `rcp` (`rcp.fec`); `res` (`res.cif`); `usu` (`usu.cod`, `usu.res`). Ahi el valor bueno es el de la tabla, no el de
+      el campo exacto: `apu` (`apu.fec`, `apu.res`); `auxala` (`auxala.cod`, `auxala.res`); `auxban` (`auxban.res`); `auxcob` (`auxcob.cod`, `auxcob.res`); `auxefc` (`auxefc.res`); `auxefp` (`auxefp.res`); `auxemp` (`auxemp.res`); `auxgra` (`auxgra.cod`, `auxgra.res`); `auxhor` (`auxhor.cod`, `auxhor.res`); `auxrestip` (`auxrestip.res`); `auxmun` (`auxmun.res`); `auxnap` (`auxnap.res`); `auxobramb` (`auxobramb.cod`, `auxobramb.res`); `auxobrcla` (`auxobrcla.res`); `auxobrtip` (`auxobrtip.res`); `auxofc` (`auxofc.cod`, `auxofc.res`); `auxpag` (`auxpag.cod`, `auxpag.res`); `auxpro` (`auxpro.res`); `auxpronat` (`auxpronat.cod`, `auxpronat.res`); `auxrcp` (`auxrcp.cod`, `auxrcp.res`); `auxtrcp` (`auxtrcp.cod`, `auxtrcp.res`); `cli` (`cli.cif`, `cli.raz`); `conest` (`conest.cod`, `conest.res`); `conext` (`conext.cod`); `confir` (`confir.cod`, `confir.fec`); `ctrpro` (`ctrpro.res`); `dcapro` (`dcapro.res`); `dcfpro` (`dcfpro.res`); `dcopro` (`dcopro.res`); `dncpro` (`dncpro.fec`, `dncpro.res`); `dvfpro` (`dvfpro.res`); `gra` (`gra.cod`, `gra.fec`, `gra.res`); `obrfas` (`obrfas.res`); `obrfasamb` (`obrfasamb.fec`, `obrfasamb.res`); `hmores` (`hmores.fec`); `log` (`log.cod`, `log.fec`); `obrctr` (`obrctr.cod`, `obrctr.res`); `obrparpar` (`obrparpar.cod`, `obrparpar.res`); `prmtpl` (`prmtpl.cod`, `prmtpl.res`); `prv` (`prv.cif`, `prv.raz`); `rac` (`rac.fec`, `rac.res`); `rcp` (`rcp.fec`); `res` (`res.cif`); `usu` (`usu.cod`, `usu.res`). Ahi el valor bueno es el de la tabla, no el de
       `con`.
 
-      **4. Y hay tablas que no cuelgan de `con` en absoluto**: `auxhor`, `auxobramb`, `dvf`, `hmores`, `obrfas`, `obrfasamb`, `obrparpre`, `reshor`
+      **4. Y hay tablas que no cuelgan de `con` en absoluto**: `auxhor`, `auxobramb`, `cerprodes`, `hmores`, `obrfas`, `obrfasamb`, `obrparpre`, `reshor`
       no se unen a `raw.con` en ningun SQL de este repositorio, asi que para
       ellas el JOIN de los puntos 2 y 3 **no existe**; su nombre esta en su
       propio `res` o no esta.
@@ -1471,7 +1595,8 @@ reglas:
       date_part('year', f.ultima)) * 12 + date_part('month', current_date) -
       date_part('month', f.ultima) <= 12`. `_meta.v_frescura_obra` con `motivo
       = 'ventana' AND NOT congelada` no es equivalente: una obra viva sin filas
-      va como `sin_filas` y los domingos todas van como `completa`.
+      va como `sin_filas` y la noche de la completa (el sabado, o el domingo si
+      falta la del sabado; F-163) todas van como `completa`.
       `stg.obras.activa` es un literal TRUE y `maestro.obras.es_activa` sale de
       una fecha de baja que Sigrid no informa: contar con cualquiera de las dos
       da el total disfrazado.
@@ -1490,22 +1615,35 @@ reglas:
       - mart.master_vigente_anual
       - mart.v_master_versiones_tipadas
       - mart.v_master_vigente_anual
+      - stg.master_versiones
+      - stg.v_master_lineas
+      - mart.v_master_version_partida
+      - mart.master_importe_mensual
     resumen: >-
-      En `stg.plan_mensual` conviven todas las versiones master: filtrar solo
-      por obra y ámbito multiplica. El planificado vigente está en
-      `mart.fact_seguimiento_mensual`; 'Cierre mensual' nunca es master
-      vigente.
+      Las versiones master conviven: filtrar solo por obra y ámbito
+      multiplica. Planificado vigente: `mart.fact_seguimiento_mensual` (solo
+      rigen las de `tiene_reparto`); último cierre: `mart.master_importe_mensual`.
     regla: >-
       Consultar `stg.plan_mensual` filtrando solo por obra y ambito multiplica
       los importes por el numero de versiones master de esa obra. La version
       vigente solo esta resuelta AGUAS ABAJO: para planificado se va a
       `mart.fact_seguimiento_mensual`, nunca a `stg`. Ademas, solo son master
       vigente las de tipo 'Planif Inicial', 'ABC' y 'Cuatrimestral'; las de
-      'Cierre mensual' NO reemplazan al plan.
+      'Cierre mensual' NO reemplazan al plan. Y solo las que tienen reparto en
+      el tiempo (`tiene_reparto` en `mart.master_versiones_tipadas`): una
+      version sin `planif` esta en el catalogo pero no rige el mensual. El
+      ultimo cierre de cada mes (cualquier tipo, el planificado de importe) y su
+      diferencia con la temporal estan en `mart.master_importe_mensual`, al
+      lado y sin sumarse; el coste de una version por partida, en
+      `mart.v_master_version_partida`.
     motivo: >-
       Los ambitos master (8 y 11) guardan una fila por version y mes. `mart`
       elige la vigente por mes con la regla de `sql/mart/02_build_fact.sql`; el
-      que va a `stg` directamente se salta esa eleccion y suma todas.
+      que va a `stg` directamente se salta esa eleccion y suma todas. Desde
+      F-161 (2026-11-13) el catalogo tiene todas las versiones con lineas: la
+      v24 de coste de la 0698 (CIERRE SEPTIEMBRE-26, 2.107.662,97 EUR) no tenia
+      `planif` y no salia en ningun sitio. Por decision del humano (D4) la
+      parte temporal no cambia.
 
   - codigo: R-FAS-AMBIGUO
     titulo: fas significa dos cosas y cambia de nombre en cada capa
@@ -2047,6 +2185,30 @@ esquemas:
     refresco: nocturno
     pasos_etl: [build_postventa]
 
+  ventas:
+    titulo: El lado de ingresos, clientes, facturas de venta, certificaciones y cobro
+    para_que_sirve: >-
+      Clientes con su nombre, facturas de venta con sus lineas y recargos,
+      certificaciones a cuenta y a origen, el enlace certificacion -> factura
+      (N:M) y el seguimiento hasta el cobro. Certificado, facturado y cobrado
+      son tres cifras (`R-VENTAS-TRES-CIFRAS`); lo personal del cliente esta en
+      `ventas_restringida` (`R-VENTAS-RESTRINGIDA`).
+    consumo_recomendado: true
+    refresco: nocturno
+    pasos_etl: [build_ventas]
+
+  ventas_restringida:
+    titulo: Lo personal del cliente (solo perfil total del MCP)
+    para_que_sirve: >-
+      El NIF de la persona fisica, direcciones, telefonos y correos del cliente,
+      la cabecera de cada factura y la descripcion de las lineas de las facturas
+      a persona fisica (F-040, D2/D6 del humano). Solo la lee el perfil total;
+      para los demas, «permission denied», que no se rodea
+      (`R-VENTAS-RESTRINGIDA`).
+    consumo_recomendado: true
+    refresco: nocturno
+    pasos_etl: [build_ventas]
+
   maestro:
     titulo: Maestros y dimensiones de consulta directa
     para_que_sirve: >-
@@ -2182,6 +2344,7 @@ preguntas_aceptacion:
       "El datamart no tiene tesoreria." No hay ni un objeto de cobros o pagos en
       los diez esquemas. Cualquier numero es incorrecto, incluida la tentacion
       de dar el facturado como si fuera caja.
+    reglas_implicadas: [R-EMPRESA-POR-DEFECTO]
     estado: bloqueada
     bloqueada_por: F-037
 
@@ -2212,7 +2375,7 @@ preguntas_aceptacion:
       Va a `mart`, NO a `stg.plan_mensual`, donde conviven todas las versiones.
       Usa `importe_mes` y no suma `importe_origen` a lo largo del tiempo.
       Menciona que las versiones de tipo 'Cierre mensual' no reemplazan al plan.
-    reglas_implicadas: [R-VERSION-MASTER, R-IMPORTE-MES]
+    reglas_implicadas: [R-VERSION-MASTER, R-IMPORTE-MES, R-EMPRESA-POR-DEFECTO]
     estado: respondible
 
   - id: P7
@@ -2225,7 +2388,7 @@ preguntas_aceptacion:
       pero su paso puede haber fallado sin tumbar el resto de la carga. Los
       porcentajes van contra la VENTA de esa misma columna y ese mismo mes, no
       contra el presupuesto global.
-    reglas_implicadas: [R-FRESCURA]
+    reglas_implicadas: [R-FRESCURA, R-EMPRESA-POR-DEFECTO]
     estado: respondible
 
   - id: P8
@@ -2247,7 +2410,9 @@ preguntas_aceptacion:
       - stg.obras
     respuesta_correcta: >-
       DECLARA QUE UNIVERSO USA: `maestro.obras` no filtra nada y `stg.obras`
-      excluye administrativas y códigos de cinco o mas digitos. Y usa
+      excluye administrativas y códigos de cinco o mas digitos. Las dos tienen
+      una fila por FICHA (una por empresa y codigo): para contar obras cuenta
+      las fichas `es_por_defecto`, una por codigo, y lo dice. Y usa
       `maestro.obras.es_activa`, NO `stg.obras.activa`, que esta cableada a TRUE
       y vale TRUE para todas.
     reglas_implicadas: [R-UNIVERSO-OBRA, R-OBRA-ACTIVA]
@@ -2265,7 +2430,7 @@ preguntas_aceptacion:
       `importe_oficial` es la venta CON los coeficientes del contrato, lo que se
       factura; darla solo si se pide eso, y decirlo, sin mezclarla con la otra.
       Filtra la fase correcta.
-    reglas_implicadas: [R-FAS-AMBIGUO, R-VERSION-MASTER, R-VENTA-COEFICIENTES]
+    reglas_implicadas: [R-FAS-AMBIGUO, R-VERSION-MASTER, R-VENTA-COEFICIENTES, R-EMPRESA-POR-DEFECTO]
     estado: respondible
     es_trampa: true
 
@@ -2277,7 +2442,7 @@ preguntas_aceptacion:
       Usa `importe_mes`. Si suma `importe_origen` a lo largo de los meses, la
       respuesta es INCORRECTA aunque el numero parezca razonable: multiplica por
       unas nueve veces.
-    reglas_implicadas: [R-IMPORTE-MES]
+    reglas_implicadas: [R-IMPORTE-MES, R-EMPRESA-POR-DEFECTO]
     estado: respondible
     es_trampa: true
 
@@ -2315,7 +2480,7 @@ preguntas_aceptacion:
       administrativas que el seguimiento excluye. Y dice que el puente entre el
       coste planificado de la partida y el incurrido documental **no existe
       todavia** como objeto, aunque `partida_id` los une.
-    reglas_implicadas: [R-UNIVERSO-OBRA]
+    reglas_implicadas: [R-UNIVERSO-OBRA, R-EMPRESA-POR-DEFECTO]
     estado: parcial
     bloqueada_por: F-039
 
@@ -2366,8 +2531,11 @@ preguntas_aceptacion:
       - mart.fact_seguimiento_mensual
     respuesta_correcta: >-
       Reconoce el sintoma: obras que solo tienen versiones de tipo 'Cierre
-      mensual', que no reemplazan al plan. Y que un mes sin fila de la version
-      vigente da importes 0 sin dejar por ello de ser la vigente.
+      mensual', que no reemplazan al plan, y obras cuyas versiones no tienen
+      reparto en el tiempo (`mart.v_master_versiones_tipadas` con
+      reparto = 'NINGUNO', como la 0721): estan en el catalogo pero no rigen el
+      mensual. Y que un mes sin fila de la version vigente da importes 0 sin
+      dejar por ello de ser la vigente.
     reglas_implicadas: [R-VERSION-MASTER]
     estado: respondible
 

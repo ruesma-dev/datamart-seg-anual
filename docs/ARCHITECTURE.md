@@ -22,8 +22,33 @@ obras. Microservicio único; se despliega como job programado en Azure.
 
 `raw` → `stg` → `mart` (+ `cierre` para cierres mensuales y planif vs real).
 Módulos adicionales: `compras`, `maestro`, `retenciones`, `personal`,
-`contabilidad`, `tesoreria`, `descompuestos`, `postventa`, `auxiliar`. SQL numerado `NN_nombre.sql` y
+`contabilidad`, `tesoreria`, `descompuestos`, `postventa`, `ventas`, `auxiliar`. SQL numerado `NN_nombre.sql` y
 ejecutado en orden dentro de cada capa.
+
+**`ventas` (F-040, fase 1, 2026-11-09) es el lado de ingresos**, construido
+por `build_ventas` (`sql/ventas/`, ocho ficheros) desde siete tablas nuevas de
+`raw` y `dvf` ampliada: los clientes (`cli`, `con` 4) con su nombre, las
+facturas de venta (`dvf`, `con` 11) con sus líneas y recargos, las
+certificaciones de obra (`cer`, `con` 54; `obrcer` está vacía) con los suyos, el
+enlace certificación -> factura (`ventas.certificacion_factura`, de
+`cerprodes` con `docdestip` = 11: `cer.idefac` y `feccob` están a 0 y no
+sirven; es N:M), su cobertura por noche (`ventas.cobertura_enlace`) y tres
+vistas que leen `tesoreria` al consultar: el cobro por factura, el seguimiento
+de cada certificación hasta el cobro y el contraste por obra (solo las de la
+receta de la caja; el completo es de F-160). Los recargos se reparten en cuatro
+columnas por una sola función, `ventas.fn_clase_recargo`, que es el único punto
+de la decisión D4 (garantía = clases 4 y 5, provisional; el `RETESP` aparte).
+Mismo patrón de DOS esquemas: **`ventas_restringida`** guarda lo personal del
+cliente —el NIF de la persona física, direcciones, teléfonos, correo, la
+cabecera de cada factura y la descripción de las líneas a persona física—
+(D2/D6 del humano, 2026-11-07) y solo la lee el perfil total; el NOMBRE del
+cliente es público en `ventas`. Una guarda (`07_guardas.sql`) tumba el paso si
+`ventas` publica una columna personal o si los recuentos, la base o el reparto
+de recargos no cuadran con `raw`. Reglas `R-VENTAS-TRES-CIFRAS` y
+`R-VENTAS-RESTRINGIDA`. **Frontera con F-104**: la conciliación de la retención
+de cliente por documento y lo cobrado por un agrupado `AGR` (que aquí no se
+atribuye a ninguna factura) son de F-104; `sql/retenciones/` y
+`sql/tesoreria/` no cambian (un test sobre el diff lo vigila).
 
 **`postventa` (F-156, 2026-11-04) es la postventa de las viviendas
 entregadas**, construida por `build_postventa` desde trece tablas nuevas de `raw`
@@ -177,7 +202,8 @@ ingredientes SIEMPRE en el mismo orden y con el dato del contrato:
   publica aparte y no se cobra. IVA y retención del hueco, por el peso de cada
   contrato.
 - Ingesta: `iva` entera y `dvf` con la lista blanca `include_columns` (9 de sus
-  151 columnas): 80 tablas (93 desde F-156, postventa).
+  151 columnas): 80 tablas (93 desde F-156, postventa; 100 desde F-040, con
+  `dvf` a 35 columnas).
 - **Los albaranes netos por proveedor** (N11, 29-10): `09_albaranes_pendientes.sql`,
   el último sub-paso, publica `tesoreria.albaranes_pendientes_neto`: lo pendiente
   de facturar de las obras de la receta NETO por (obra, proveedor), con lo
@@ -237,10 +263,41 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
 - Ámbitos: amb=3 Coste Real, amb=7 Venta Real, amb=8 Master Coste,
   amb=11 Master Venta.
 - Master (amb 8/11): `fas` = número de VERSIÓN; planif explosionada.
-- Reales (amb 3/7): `fas` = MES; fas=0 = Previsto (foto viva),
-  fas=1..N cierres mensuales; planif NO explosionada;
-  importe del mes = diferencia con el mes anterior de la serie de la partida
-  (ver «La serie real es densa», F-118).
+- Reales (amb 3/7): `fas` = MES; fas=1..N cierres mensuales (su `planif` no se
+  explota); importe del mes = diferencia con el mes anterior de la serie de la
+  partida (ver «La serie real es densa», F-118).
+- **La fase 0 (fas=0) es el presupuesto vivo de hoy** de coste y venta: lo que
+  la obra cuesta y vende a día de hoy, que el jefe de obra va evolucionando sin
+  historia. Su total está en `stg.presupuesto` (`fase_num = 0`) y, desde F-157,
+  su reparto en el tiempo (la pantalla «Planificación en el tiempo (por
+  partidas)») en **`stg.plan_mensual_fase0`**: el `planif` de cada partida
+  anclado en el `plafec` de la fase 0, con la regla del master en una sola copia
+  (`stg.fn_explotar_planif`, con su oráculo `domain/planif.py`), y lo que queda
+  sin repartir en `stg.v_plan_mensual_fase0_cobertura`. Va en tabla propia y no
+  en `stg.plan_mensual` porque `mart` publica todo el ámbito 3/7 de esa tabla
+  como Coste/Venta Real sin mirar `version`: la fase 0 NO se suma con los
+  cierres (fases 1 a N) ni con la planificación del master, se compara con
+  ellos. La construye el sub-paso `build_plan_mensual_fase0` de `build_stg`,
+  acotado a las obras del plan y de una pasada; nadie fuera de `stg` la lee.
+- **EL CATÁLOGO DE VERSIONES MASTER ESTÁ COMPLETO (F-161).** `stg.plan_mensual`
+  solo tiene las líneas con reparto (`planif`), así que una versión entera sin
+  él (la v24 de coste de la 0698, «CIERRE SEPTIEMBRE-26», 2.107.662,97 €) no
+  salía en ningún sitio. El sub-paso `build_master_versiones` de `build_stg`
+  (`10_master_versiones.sql`, el último, entero y fuera del sello) construye
+  **`stg.master_versiones`**: una fila por versión (ámbitos 8 y 11) de toda
+  versión >= 1 con líneas en `stg.presupuesto` y de toda versión con reparto,
+  con o sin cabecera, y con `tiene_reparto`, `reparto` (NINGUNO / COMPLETO /
+  PARCIAL) y sus importes. La marca por línea es la vista
+  **`stg.v_master_lineas`** (la línea tiene reparto si deja filas en
+  `plan_mensual`). En `mart`, `01b_master_versiones.sql` va entre `01_ddl` y
+  `02_build_fact` y publica el ÚNICO catálogo, `mart.master_versiones_tipadas`
+  (la cascada del tipo vive solo ahí), el coste por versión y partida
+  **`mart.v_master_version_partida`** y **`mart.master_importe_mensual`**: por
+  obra, ámbito y mes hasta el del build, el último cierre de cualquier tipo (el
+  planificado de importe) al lado de la versión temporal y su diferencia, sin
+  reescalar. **La parte temporal no cambia** (decisión del humano, D4): `02`,
+  la vigencia anual de `06` y la Cuatrimestral de `retenciones/05_fin_obra.sql`
+  filtran `tiene_reparto` y ven las mismas versiones que antes.
 - **EL MES DE UN CIERRE REAL LO DA SU TEXTO (F-051, absorbida en F-118).** El
   mes de cada fila real de `stg.plan_mensual` es `stg.fn_mes_de_fase`: manda el
   texto de la fase (`obrfas.res`, «Agosto 2026»), aunque discrepe de las fechas
@@ -380,10 +437,17 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
   empresa 1 → `conext` cod 15 → cierres → `tiemod` → `ide` DESC, nunca «`ide`
   menor») y la publica en `maestro.obras` como referencia
   (`obra_principal_id`), que no sirve para agregar hechos de otras empresas.
-  Regla dura `R-CODIGO-POR-EMPRESA`. **`stg.obras` NO la usa**: sigue eligiendo
-  una ficha por código como hasta hoy y difiere en 0581, 0606, 0671 y 0720;
-  pasar el seguimiento a la ficha de Ruesma y traer las demás empresas como
-  obras propias es **F-106**.
+  Regla dura `R-CODIGO-POR-EMPRESA`. **`stg.obras` NO la usa**: desde **F-162**
+  (2026-11-11) lleva una fila por ficha de TODAS las empresas, sin desempate
+  (634 fichas para 585 códigos), con `empresa_id`, `clave_obra` y
+  `es_por_defecto` al final. `es_por_defecto` marca una ficha por código, la que
+  se lee si la pregunta no dice empresa: la de la empresa 1 si existe; si no, la
+  de más líneas de presupuesto, después `tiemod` y después `ide`; `conext` 15 no
+  interviene (`etl_sigrid/domain/ficha_obra.py`, regla `R-EMPRESA-POR-DEFECTO`).
+  `mart`, `cierre`, `tesoreria`, `retenciones` y `personal` van por `obra_id`:
+  cada ficha con lo suyo, sin consolidar. `maestro.obras`, `mart.v_pbi_dim_obra`
+  y `cierre.v_pbi_cierre_cabecera` publican la marca. Recursos, partes y compras
+  de otras empresas siguen en **F-106**.
 - `obr.ide = con.ide` (obra hereda de concepto). El nombre legible está en
   `con.res`. `con.nom` NO existe.
 - En `raw.obrfas` el campo de fase se llama `fasnum`; en `raw.obrparpre` se
@@ -651,9 +715,9 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
   Azure. Hoy **lee y valida, no carga** a `aux.*`: las tablas destino y el
   esquema de los libros no están definidos todavía.
 
-### Qué se copia de Sigrid: 93 tablas, y qué NO está ahí (F-066, F-074, F-080, F-102, F-107, F-095, F-085, F-090, F-138, F-140, F-150, F-156)
+### Qué se copia de Sigrid: 100 tablas, y qué NO está ahí (F-066, F-074, F-080, F-102, F-107, F-095, F-085, F-090, F-138, F-140, F-150, F-156, F-040)
 
-`config/tables_sigrid.yaml` declara **93 tablas**: eran 31, F-066 las dejó en 56
+`config/tables_sigrid.yaml` declara **100 tablas**: eran 31, F-066 las dejó en 56
 el 2026-09-06, F-074 sumó nueve más el 2026-09-09, F-080 otras tres el
 2026-09-11 —`auxnap`, `auxban` y `rpa`, el bloque de pago del efecto y las
 remesas—, F-102 una el 2026-09-23 —`auxemp`, las 38 empresas del grupo, que da
@@ -697,6 +761,14 @@ más dos recortes con lista blanca: `log` (solo los 659 cierres de la aplicació
 `postventa-incidencias`, sin `res` ni `err`) y `per` (solo `ide`, `nom`, `tel`,
 `tel2` y `ele` de las 362 personas que cita postventa: ni DNI ni credenciales).
 El `where` de `rcg` y `gra` pasa a traer también los gráficos de 707, 708 y 47.
+F-040 suma siete el 2026-11-09, las del **lado de ingresos** (~60.000 filas,
++10 a 20 s de lectura): `cli` (clientes, 20 columnas por lista blanca: 13 de
+negocio y 7 de contacto, sin cuentas bancarias, contraseñas ni correos de
+facturación), `cer` y `cerpro` (certificaciones y sus líneas, por lista
+blanca), `cerrec` y `dvfrec` (recargos, sin `tex`), `cerprodes` (el enlace
+certificación -> factura, entera) y `dvfpro` (líneas de factura de venta, por
+lista blanca); y `dvf` pasa de 9 a **35 columnas**, con el CIF, el nombre y las
+nueve direcciones de la cabecera, que solo publica `ventas_restringida`.
 Las 25 que entraron el primer día vienen en tres grupos, y ninguna se supuso: todo lo
 que sigue se midió contra Sigrid ese día por `sigrid-api` en solo lectura.
 
@@ -825,6 +897,11 @@ vuelva a buscarlo:
   vacías, como otras 17 candidatas que por eso no se ingieren.
 - **La penalización del contrato no existe como campo**, y la actividad del
   proveedor no es `act` (vacía) sino `conact` → `auxpronat`.
+- **La certificación no enlaza con su factura en la cabecera** (F-040,
+  2026-11-06): `obrcer` está vacía, y `cer.idefac` y `cer.feccob` están a 0 en
+  las 6.308 certificaciones. El enlace es `cerprodes` (los destinos de cada
+  línea de certificación), y es N:M. Y `cli` no clasifica al cliente: `taride`
+  en 2 y `secide` en 0.
 
 `python main.py check-raw-recuentos` compara, tabla a tabla y con el mismo
 filtro, el `COUNT(*)` de Sigrid con el de `raw`. Es de solo lectura, va fuera de
@@ -1040,7 +1117,8 @@ actividad en los últimos doce meses. Esto no fue una mejora de rendimiento: fue
 la reparación de una avería.
 
 Desde F-025, `06_presupuesto.sql` y `08_plan_mensual.sql` se construyen **solo
-para las obras vivas**. Lo importante no es cuáles, sino **cómo se escribe**.
+para las obras vivas** (y desde F-157 también `09_plan_mensual_fase0.sql`, con su
+propio marcador y la tercera tabla acotada). Lo importante no es cuáles, sino **cómo se escribe**.
 
 #### El borrado se DERIVA de lo que se escribe (y esto cambia una invariante)
 
@@ -1079,8 +1157,12 @@ puro (`domain/ventana.py`): cambiarlo no toca código.
 
 Por encima hay tres mecanismos que **solo añaden** obras, nunca quitan:
 
-- **Reconstrucción completa** (domingos, por antigüedad registrada desde
-  `run-all`, no por un cron nuevo: un cron aparte es lo que se olvida).
+- **Reconstrucción completa** (la noche del sábado, o la del domingo si la del
+  sábado no quedó registrada; entre semana **nunca**, aunque pasen 7 días: F-163,
+  2026-11-15, porque una completa de más de 7 h en laborable se come la noche
+  siguiente. Se decide desde `run-all` con el registro delante, no por un cron
+  nuevo: un cron aparte es lo que se olvida. Los 7 días sin completa solo los
+  denuncia `check-ventana`).
 - **Sello del SQL**: si `06`/`08` cambian, esa noche entran **todas**. Sin esto,
   un arreglo como el de F-052 solo alcanzaría a las 40 vivas y las otras 880
   seguirían publicando lo de antes, **en silencio**.
@@ -1126,7 +1208,7 @@ Se arregló en F-025, y `check-ventana` nació con la regla puesta.
 #### Cuatro ajustes, y la ventana nace apagada
 
 `PG_VENTANA_ACTIVA` (**false** por defecto), `PG_VENTANA_MESES` (12),
-`PG_VENTANA_DIA_COMPLETA` (6 = domingo) y `PG_VENTANA_RESCATE` (off). Mientras
+`PG_VENTANA_DIA_COMPLETA` (6 = domingo, el último día de la ventana: sábado y domingo) y `PG_VENTANA_RESCATE` (off). Mientras
 esté apagada, el contenido publicado es exactamente el de hoy; lo que **no**
 vuelve es el `TRUNCATE`, porque borrar y reescribir todas las obras deja el
 mismo resultado y además sobrevive a un tramo que falle.
@@ -1412,13 +1494,14 @@ ya dentro, F-056 el sexto, `build_contabilidad`, F-097 el séptimo,
 F-037 el octavo, `build_tesoreria`, delante de `build_compras` (su
 `compras.vencimientos` es una vista de `tesoreria.efectos`; sin `depends_on`),
 y F-156 el noveno, `build_postventa`, tras `build_contabilidad` (solo depende
-de `ingest_raw`; nadie depende de él).
-Los dieciséis pasos de hoy, en orden:
+de `ingest_raw`; nadie depende de él), y F-040 el décimo, `build_ventas`, tras
+`build_retenciones` (igual: solo `ingest_raw`, y nadie depende de él).
+Los diecisiete pasos de hoy, en orden:
 
 ```
 ingest_raw → load_excel_aux → build_stg → build_mart
            → build_maestros → build_tesoreria → build_compras → build_retenciones
-           → build_personal → build_contabilidad → build_postventa
+           → build_ventas → build_personal → build_contabilidad → build_postventa
            → ingest_descompuestos → build_descompuestos → build_cierre
            → publicar_diccionario → apply_grants
 ```

@@ -306,8 +306,8 @@ def test_f025_r26_un_sello_viejo_se_denuncia(cli) -> None:
 
 
 def test_f025_r26_una_completa_vencida_se_denuncia(cli) -> None:
-    """El domingo no corrió y el «hasta 6 días» que el humano aceptó ha dejado
-    de ser cierto. Sin esto, las 880 obras podrían quedarse congeladas
+    """Siete días o más sin completa: el fin de semana no corrió y el «hasta 6
+    días» que el humano aceptó ha dejado de ser cierto. Sin esto, las 880 obras podrían quedarse congeladas
     indefinidamente sin que nada chirriara."""
     pg = PgSoloLectura(
         filas={"censo": [(920,)]},

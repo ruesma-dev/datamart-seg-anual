@@ -673,10 +673,12 @@ def test_f073_r25_no_toca_los_ficheros_del_sello(fichero: str, esperado: str) ->
     )
 
 
-def test_f073_r26_no_toca_el_desempate_de_stg_obras() -> None:
-    """El `rn = 1` de `03_obras.sql` es de F-053."""
-    texto = _sql(DIRECTORIO_SQL / "stg" / "03_obras.sql")
-    assert "rn = 1" in texto, "el desempate de F-053 sigue donde estaba (R26)"
+# RETIRADO CON F-162 (2026-11-11), a proposito y con este motivo:
+# `test_f073_r26_no_toca_el_desempate_de_stg_obras` exigia el `rn = 1` de
+# `stg/03_obras.sql` para que F-073 no tocase un desempate que era de F-053.
+# F-162 absorbe F-053 y, por orden del humano, `stg.obras` deja de desempatar:
+# lleva todas las fichas con `es_por_defecto`. Lo vigila
+# `tests/test_f162_fichas_por_empresa.py` (R1-R7).
 
 
 @pytest.mark.parametrize(

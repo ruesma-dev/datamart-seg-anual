@@ -21,6 +21,10 @@
 -- además en `presupuesto_inicial_venta_con_coeficientes` y
 -- `presupuesto_vigente_venta_con_coeficientes`, al final. Nunca se restan entre
 -- sí ni con las otras: `modificados_aprobados` sigue siendo sin coeficientes.
+--
+-- F-162 (2026-11-11): `stg.obras` tiene una fila por FICHA de obra de todas las
+-- empresas, así que esta cabecera también (634 el 2026-11-11). El código no es
+-- único: al final van `empresa_id`, `clave_obra` y `es_por_defecto`.
 -- =========================================================================
 
 DROP VIEW IF EXISTS cierre.v_pbi_cierre_cabecera CASCADE;
@@ -179,7 +183,12 @@ SELECT
      - COALESCE(vi.presupuesto_inicial_venta, 0))::NUMERIC(18,2) AS modificados_aprobados,
     -- F-118: el mismo presupuesto CON coeficientes, aparte (lo que se factura).
     vi.presupuesto_inicial_venta_con_coeficientes,
-    vv.presupuesto_vigente_venta_con_coeficientes
+    vv.presupuesto_vigente_venta_con_coeficientes,
+    -- F-162: la empresa de la ficha, su clave y si es la ficha por defecto de su
+    -- código. AL FINAL, como las de F-118.
+    o.empresa_id,
+    o.clave_obra,
+    o.es_por_defecto
 FROM stg.obras o
 LEFT JOIN raw.obr   obr ON obr.ide   = o.obra_id
 LEFT JOIN raw.con   cli ON cli.ide   = obr.entide
@@ -199,4 +208,5 @@ COMMENT ON VIEW cierre.v_pbi_cierre_cabecera IS
 'mes con master del cierre cuando obrctr y obr están vacíos. Cliente y técnico '
 'salen de con.res via FK. Tanda 3.1: centro de coste, tipo y clase de obra ahora '
 'muestran texto via JOIN con cen/auxobrtip/auxobrcla. Presupuesto aprobado = inicial. '
-'Presupuestos de venta SIN coeficientes; con coeficientes, en sus columnas _con_coeficientes (F-118).';
+'Presupuestos de venta SIN coeficientes; con coeficientes, en sus columnas _con_coeficientes (F-118). '
+'Una fila por ficha de obra (F-162): el codigo no es unico entre empresas; empresa_id, clave_obra y es_por_defecto al final.';

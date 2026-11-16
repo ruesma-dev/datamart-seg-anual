@@ -9,25 +9,360 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-11-06 · F-104 · `spec_ready` · spec escrita · rama `feature/F-104-retenciones-cliente`
+## 2026-11-16 · Ventas primero · F-104 `spec_ready` (spec del 06-11, aprobada el 07-11) · se revalida contra `main`
+
+- Orden del humano: «vamos con las 5 que quedan de ventas, ponlas en las primeras prioridades».
+  F-104 (1), F-160 (2), F-099 (3), F-076 (4), F-119 (5); el resto del backlog baja 5 puestos.
+- F-104 en su rama `feature/F-104-retenciones-cliente`, en el checkout principal (el worktree viejo
+  se retiró limpio), con `main` dentro. Su spec (registro del 06-11, abajo en la historia de git:
+  90484ea) se escribió antes de F-040, F-162 y F-161: el spec-author la revalida antes del implementer.
+- **Fuera de este repo:** la IA NO ve `ventas`, `ventas_restringida` ni `postventa`: no están en la
+  lista blanca de `mcp-bbdd` (su F-034, `pending`).
+
+## 2026-11-16 · F-163 `done` y DESPLEGADA · sin feature activa
+
+- F-163 cerrada con el OK del humano a la PARADA 2. Resumen en `progress/history.md`.
+- **Desplegada el 2026-11-16 (humano)**, comprobado por el líder en solo lectura a las 09:29 UTC: imagen
+  `r20261116-1018` (construida tras el merge 406968f), `replicaTimeout` 50.400, `replicaRetryLimit` 1,
+  `PG_VENTANA_ACTIVA=true`, cron `0 0 * * *`. Diccionario v78 publicado por el líder a petición del
+  humano (09:32 UTC, 320 objetos, 2.742 columnas, 24 reglas) y `mcp-bbdd` reiniciado (revisión
+  `--0000023`, Healthy). `azure-apps` 6b9866a quita las marcas SIN DESPLEGAR de F-163 y F-161 (push
+  del humano). **Vigilar:** la completa del sábado 2026-11-21 (primera con el techo de 14 h).
+- El texto de abajo sobre el despliegue queda como registro de lo que se pidió.
+- **Despliegue:** imagen nueva (`infra/70_build_image.ps1` + `infra/85_update_job.ps1 -Tag <nuevo>`),
+  y el techo, que `85` NO aplica: `az containerapp job update -g rg-datamart-seg-dev -n
+  caj-datamart-seg-dev --replica-timeout 50400`. Comprobar con `az containerapp job show` (imagen,
+  `replicaTimeout` 50400, `PG_VENTANA_ACTIVA=true`). Diccionario v78: lo publica la nocturna con su
+  imagen; reiniciar `mcp-bbdd` después. Vuelta atrás: `85_update_job.ps1 -Tag r20261115-1004` y
+  `--replica-timeout 25200`.
+- Tras desplegar: el líder quita las marcas «SIN DESPLEGAR» de F-163 en `azure-apps` (commit aparte).
+- **Riesgo abierto (O1 del reviewer):** `infra/env/dev.json` dice `ventanaActiva: "false"` y el job
+  vivo tiene `true`, puesto a mano. Recrear el job con `80_create_job.ps1` apagaría la ventana.
+  Propuesta de feature aparte, sin alta todavía.
+- **Nocturna del 2026-11-16** (primera con `r20261115-1004`, F-161): `Succeeded` 00:00-05:08 UTC,
+  todos los pasos en SUCCESS; `build_stg` + `build_mart` 9.110 s (media previa ~10.050 s);
+  diccionario v77 publicado por la nocturna a las 05:05 (superado por la v78).
+
+## 2026-11-15 · F-163 (completa solo en fin de semana, techo 14 h) · F-161 desplegada y verificada
+
+- **F-163** dada de alta en `todo` (rama `feature/F-163-completa-fin-de-semana`, 1c42f7d) tras el OK
+  del humano a la PARADA 1; D1 (a) y D2 (a), las recomendadas. Motivo: la nocturna del domingo
+  2026-11-15 (completa) acabó `Failed` por `DeadlineExceeded` a las 07:00 UTC con todos los pasos en
+  SUCCESS hasta las 06:58 (`build_stg.reconstruccion_completa` registrada a las 03:28).
+- **F-163 en curso (implementer, 2026-11-15).** T1 `toca_reconstruccion_completa`: sábado; domingo solo
+  sin la del sábado; entre semana nunca; `None` cualquier día. **Decisión:** `PG_VENTANA_DIA_COMPLETA`
+  pasa a ser el ÚLTIMO día de la ventana (víspera = día principal), el job no la fija y rige el defecto 6
+  (sábado + domingo) sin tocar su entorno. Ciclo 1 (CHANGES_REQUESTED) corregido: ver el informe. T2 techo 50.400 s y `VENTANA_REANUDACION` 15 h. T3 textos y
+  diccionario v78 (sin objetos nuevos: 320 objetos, 2742 columnas y 157 de consumo, los de v77).
+  T4 `azure-apps` (commit aparte, sin push). Informe: `progress/impl_F-163.md`.
+- **F-161, despliegue VERIFICADO (2026-11-15).** Imagen `r20261115-1004` en el job (vuelta atrás:
+  `r20261112-1745`). Huellas ANTES a las 09:16 UTC; job puntual sin ingesta `swc0pcf`, `Succeeded`
+  09:09-12:55 UTC. DESPUÉS, todo en solo lectura:
+  - `comparar-huellas` (`mart`, 35.934 celdas, 355 obras): 0 cambios; ámbitos 8 y 11, 0.
+  - `compare-fingerprints` (`retenciones`, `tesoreria`, 11 vistas, 206 métricas): equivalentes.
+  - `check-cp-tipologia` (con `--timeout 5400`; con el defecto de 1.800 s se corta): 1.761 filas, 0 diferencias.
+  - R11 `sql_comparacion_catalogo()`: 0 filas. R13: 0698 v24 = 776 líneas, 2.107.662,97 €, NINGUNO.
+  - R15: la 0721 con versión de importe v1 y sin temporal. R16: 0 discrepancias en 3.761 celdas
+    (302 sin fila en `master_importe_mensual`, todas meses futuros 2026-12..2028-07, D9).
+  - §5.2: entran 727 versiones de coste y 731 de venta sin reparto (722/726 el día 13).
+  - **Pendiente del humano:** publicar el diccionario v77 y reiniciar `mcp-bbdd` (paso 5).
+
+## 2026-11-14 · F-161 `done` · DESPLIEGUE (lo lanza el humano)
+
+- F-161 cerrada con el OK del humano al resumen final (2026-11-14). Resumen en `progress/history.md`.
+- **Despliegue (design §8):** paso 0 ANTES con el mismo `raw` (líder, solo lectura), imagen
+  nueva + `85_update_job.ps1`, job puntual SIN ingesta (`stage && build-mart && build-cierre &&
+  build-tesoreria && build-retenciones && apply-grants`), huellas sin diferencias, `check-cp-tipologia`
+  0, la 0698 v24 = 776 filas y 2.107.662,97 €, diccionario v77 con su imagen y reinicio de `mcp-bbdd`.
+  Si sale cualquier diferencia: vuelta atrás a la imagen anterior del job.
+- **Diccionario v77 (en `main`, SIN PUBLICAR):** 320 objetos, 2742 columnas y 157 de consumo. Se publica con su imagen (paso 5).
+- **Abierto, sin bloquear:** O1 (`retenciones/05_fin_obra.sql:162`, 0 casos hoy) y los dos huecos de
+  test de la campaña (`master_versiones.py:88` y `:97`).
+
+## 2026-11-13 · Arnés 1.10.1 integrado en `main` · F-161 con la spec lista (`spec_ready`)
+
+- **Arnés:** de la 1.7.7 a la 1.10.1, en la rama `chore/arnes-1.10.0`. Informe en `progress/impl_arnes_1.10.0.md`.
+  - El hotfix 1.10.1 (F-074 de arnes-base) corrigió los tests R6 y R7.
+  - La puerta con `.env` sobre `258a0ba` da exit 0, con 13.075 passed. Tardó 1 h 30.
+  - El espejo `dev` lo adelanta el líder (R1).
+
+## 2026-11-12 · F-162 · `done` (cerrada por el humano) · F-053 absorbida · VIGILAR la nocturna del 13
+
+- **Cerrada el 2026-11-12** por decisión del humano, sin esperar a la nocturna. Resumen en `history.md`.
+- **Vigilancia al empezar la próxima sesión** (ya no es condición de cierre). La nocturna del 2026-11-13 tiene que cumplir tres cosas:
+  - llevar la imagen `r20261112-1745`;
+  - acabar en SUCCESS `build_stg`, `build_mart`, `build_maestros` y `build_cierre`;
+  - dar KO en `check-cobertura` solo por la 0726.
+  - Si falla: vuelta atrás a `r20261112-0941` y reabrir F-162.
+- **Siguiente:** arnés 1.10.0 (rama `chore/arnes-1.10.0`) y después F-161 (spec-author).
+
+### Registro del despliegue (antes del cierre)
+
+- Reviewer APROBADO (`progress/review_F-162.md`). Puerta en verde sobre `fd4439d`: 11.179 passed. Mutación oficial: 20/20 muertos (`progress/mutacion_F-162.md`).
+- T12, T13 y T15 hechas. Lo medido ANTES y el `EXPLAIN` (9 ms, +0 s) están en `progress/impl_F-162.md` §T13.
+- **T14, desplegado el 2026-11-12.**
+  - Imagen `r20261112-0941` y job puntual `t3ux7xk` (09:28 a 13:00 UTC, Succeeded).
+  - `stg.obras`: 635 fichas, 586 por defecto y 0721 = `1-0721`* y `28-0721`.
+  - Huellas: `cierre` OK; `mart` solo en 0252, 0517, 0606 y 0721 (8 y 11 solo la 0606); `dimension` y `plan_obra` solo con la etiqueta de las fichas nuevas (también la `28-0680`).
+  - Tesorería de control: 0. `check-unicidad`: 0 claves rotas.
+  - Diccionario v76 publicado a las 14:41 UTC y MCP reiniciado.
+- **El despliegue destapó la 0517.** `check-cobertura` daba KO porque su master (versiones 15 y 16) no tiene `tex`. Vuelve a las excepciones solo para los ámbitos 8 y 11, con F-117 y decisión del humano (`2c02911`, delta APROBADO). La 0726 da KO desde antes de F-162 y queda apuntada en F-117, sin excepción.
+- **Imagen `r20261112-1745` en el job desde el 2026-11-12 (17:45)**, con `2c02911`. La vuelta atrás es `r20261112-0941`. `main` y `dev` están subidos.
+- **(Superado por el cierre de arriba)** Al empezar la próxima sesión, mirar la nocturna del 2026-11-13. La ejecución tiene que llevar la imagen `r20261112-1745`; `build_stg`, `build_mart`, `build_maestros` y `build_cierre` tienen que acabar en SUCCESS; y `check-cobertura` solo puede dar KO por la 0726.
+  - Si sale así: F-162 a `done` (con su entrada en `history.md`), F-053 cerrada como absorbida y adelante con F-161.
+  - Pendiente del humano: Power BI (D3).
+
+### 2026-11-11 · implementada (T1-T11), pendiente del review · rama `feature/F-162-obra-duplicada-ruesma`
+
+implementer, PARADA 1 confirmada («ok a d1 a d5»). Informe: `progress/impl_F-162.md`.
+- **Hecho:** `stg.obras` con una fila por ficha y `empresa_id`, `clave_obra` y `es_por_defecto`. El criterio de `es_por_defecto` en el seguimiento vive en `etl_sigrid/domain/ficha_obra.py` y en `03_obras.sql` (Ruesma, luego líneas de `obrparpre`, `tiemod` e `ide`, sin `conext` 15). Fuera del seguimiento, `maestro.obras.es_por_defecto` vale `es_ficha_principal`, que sí usa `conext` 15; hoy coinciden en las 925 fichas. Lo llevan `maestro.obras`, `mart.v_pbi_dim_obra` (con `obra_label`, D3) y `cierre.v_pbi_cierre_cabecera`. Los seis `inspect-*` y `find-obra` aceptan clave o código y avisan cuando hay varias fichas.
+- **Diccionario v76:** 316 objetos, 2664 columnas y 153 de consumo. R-EMPRESA-POR-DEFECTO aplica D4.
+- **Guardas retiradas, con su motivo:** f102 r7/r18 y f073 r26. Fuera también las 4 excepciones de F-053 (`EXCEPCIONES_MAX` 19). F-053 se propone absorbida y F-106 queda enmendada, sin cambiar sus estados.
+- **Desviación:** `dudosas` usa `count(*) FILTER (empresa 1) <> 1` para que el SQL coincida con el oráculo cuando hay 0 o 2 fichas de Ruesma. Está justificada en el informe.
+- **MANUAL (líder o humano):** sandbox T12 con DSN, `EXPLAIN` de solo lectura en Azure, medición T13, despliegue T14, la campaña oficial de mutación, `check-cobertura` y el push de azure-apps (`f2cd5eb`).
+
+## 2026-11-11 · F-162 · spec REHECHA (modelo por empresa), pendiente de la PARADA 1
+
+spec-author, rama `feature/F-162-obra-duplicada-ruesma` (desde `17b41ec`): `specs/F-162-obra-duplicada-ruesma/`. El humano rechazó «elegir una ficha por código»: el seguimiento lleva TODAS las fichas, cada una con su empresa, y la IA usa `es_por_defecto` cuando la pregunta no dice empresa. El primer planteamiento queda en el commit `b1345e8` como historia.
+- **Medido en Azure** (solo lectura, 16:30-16:45 UTC): `stg.obras` pasa de 585 a 634 fichas (585 códigos). Entran 49 fichas, de las que 4 tienen plan: 12-0252, 25-0517, 1-0606 y 1-0721 (+152.785 filas, el 0,47 %). Ninguna ficha de hoy pierde filas.
+- **Las demás:** 18.521 líneas de partes pasan a `en_seguimiento`. Los 49 códigos con varias fichas tienen todos la de Ruesma, así que hoy `es_por_defecto` coincide con `es_ficha_principal`.
+- **Barrido:** ningún SQL agrupa ni cruza por `codigo_obra` sin `obra_id`. Solo saldrían duplicados en seis comandos `inspect-*` de `main.py`, en Power BI y en la IA (design §4).
+- **Caen a propósito:** las guardas `test_f102_r7` y `test_f102_r18`, la `test_f073_r26` y las 4 excepciones de cobertura de F-053 (`EXCEPCIONES_MAX` pasa de 23 a 19).
+- **Coste:** de +0 s a +48 s en `03_obras.sql`, según el plan, y unos +40 s en `mart` y `cierre`.
+- **Decisiones para la PARADA 1** (design §8):
+  - **D1:** qué vale `maestro.obras.es_por_defecto` fuera del seguimiento: `es_ficha_principal` o NULL.
+  - **D2:** `conext` 15 queda fuera del criterio, razonado.
+  - **D3:** el filtro por defecto de Power BI. Recomendado: sin filtro y con `obra_label` por `clave_obra`. Un filtro `es_por_defecto` dejaría sin datos la 0581, la 0606 y la 0671, que hoy se ven por la ficha de su UTE.
+  - **D4:** en `mart`/`cierre`, una pregunta agregada sin empresa usa `empresa_id = 1` o `es_por_defecto`.
+  - **D5:** se propone no llevar la empresa a las tablas de hechos.
+- **Se proponen:** cerrar F-053 como absorbida y enmendar F-106 con el texto de design §8.
+- **Aviso:** la 0721 seguirá sin master hasta F-161, porque no tiene `planif`.
+
+## 2026-11-11 · NADA EN CURSO · leer esto primero
+
+- **F-040, `done` el 2026-11-11:** primera nocturna sin fallos. El resumen está en `history.md`, y debajo quedan el registro del despliegue y del ciclo 2.
+- **Incidencias de Control de Costes del 10-11 y el 11-11:** propuesta pendiente de la PARADA 1 del humano.
+  - **0698:** versiones sin reparto temporal (`planif`) que se caen del catálogo. Ver `progress/explore_0698_v24_coste.md`.
+  - **0721:** `stg.obras` elige la ficha vacía de PORSAN (empresa 28) en vez de la de Ruesma. Ver `progress/explore_0721_obra_duplicada.md`.
+- **F-054 (glosario):** ha llegado la definición de «incurrido» de Juan, que aún no está guardada.
+- **Siguiente:** F-104, salvo que el humano ordene otra cosa.
+
+## 2026-11-10 · F-040 · APPROVED, en `main` y desplegada (ya `done`)
+
+Líder, 2026-11-10:
+- **Review, pasada 3:** APPROVED (`e10f465`).
+- **Puerta del líder con `.env` sobre `fcfd86f`:** `init.sh` exit 0, con 11077 passed y 2473 skipped.
+- **Sandbox de F-040 con DSN:** 2352 passed, y la `PUERTA COBERTURA` da el 100 % (160/160).
+- **Mutación sobre `fcfd86f`:** 61 mutantes, 58 muertos y 3 supervivientes de `build_ventas_step.py`, que el humano aceptó por escrito (`progress/mutacion_F-040.md`).
+- **Merge a `main`:** hecho.
+- **Para pasar a `done` falta lo siguiente:**
+  - Desplegar la imagen.
+  - Aplicar `02_roles.sql` y la lista blanca de `mcp-bbdd`.
+  - Hacer el push de `azure-apps`, con los commits `882abce`, `76e722c` y `0f5ae73`.
+  - Medir la primera noche en Azure.
+- **Observaciones del reviewer (O1, O3, O4 y O5):** las decide el humano; no bloquean.
+- **Paso 0 del despliegue** (líder, 2026-11-10 10:28 UTC, solo lectura):
+  - **Antes del despliegue:** `main` = `be8a111`; imagen del job `r20261108-0945` (la vuelta atrás).
+  - **Esquemas en el job:** el job NO fija `PG_CONSUMPTION_SCHEMAS`, `PG_VETOED_SCHEMAS` ni `PG_RESTRICTED_SCHEMAS`, así que manda `config/settings.py`.
+  - **`retenciones.movimientos` CLIENTE**, la referencia de R34: VIVA 2.212 / 22.406.732,96; LIQUIDADA 42 / 322.851,50; total 2.254 / 22.729.584,46.
+  - **Esquemas de destino:** `ventas` y `ventas_restringida` aún no existen.
+- **Pasos 1 a 6 del despliegue, hechos el 2026-11-10** (comprobados por el líder con lecturas):
+  - **Paso 1, imagen:** job en `r20261110-1310`.
+  - **Paso 2, `02_roles.sql`:** `COMMIT`, logins sin cambios y permisos por perfil como se esperaba.
+  - **Paso 3, ingesta:** las 8 tablas, iguales que en Sigrid. El «NO CONFORME» de `check-raw-recuentos` es la deriva diurna de las tablas de la nocturna, no un corte.
+  - **Paso 4, build y permisos:** `build_ventas` SUCCESS en 15,2 s (28.764 filas). `apply_grants` SUCCESS, con las cuatro verificaciones ok.
+  - **Paso 5, permisos por login** (`has_table_privilege` sobre los logins reales):
+    - Estándar: lee `ventas` y no `ventas_restringida`.
+    - Total: lee las dos.
+    - Restringido y postventa: no leen ninguna.
+  - **Paso 6, cifras:**
+    - `ventas`: facturas 15.737, certificaciones 6.312, clientes 1.210 (572 personas físicas) y líneas 29.282.
+    - `ventas_restringida`: `factura_lineas_persona` 6.538.
+    - `cobertura_enlace`: `FACTURA_CLIENTE` 15.735 de 15.737.
+    - `retenciones.movimientos` CLIENTE, igual que en el paso 0 (R34 ok).
+- **Paso 7:** diccionario v75 publicado el 2026-11-10 a las 19:58 UTC (316 objetos, 2.654 columnas).
+  - `check-declarados`: 316 de 316.
+  - `check-unicidad`: 141 claves sin contradicción, 0 rotas y 1 sin comprobar por timeout de 300 s. Probablemente es `stg.plan_mensual`, como en cierres anteriores; falta confirmarlo.
+- **Paso 8 (T17):** el humano decide el 2026-11-10 meterlo «todo en f34» de `mcp-bbdd`.
+  - Pliego en `specs/F-040-ingresos/pliego_mcp_bbdd.md` (P4: lista blanca de `ventas` y `ventas_restringida`).
+  - Aviso enviado a la sesión `mcp`.
+  - No bloquea el `done` de F-040.
+- **Falta para el `done`:** la nocturna del 11-11 (`timings`, la ingesta nueva y `build_ventas`), el espejo `dev` y el push de `azure-apps`. Las dos últimas las hace el humano.
+
+## 2026-11-10 · F-040 · implementer: ciclo 2 (H2 a y b del humano) hecho · rama `feature/F-040-ingresos`
+
+Implementer, ciclo 2 (aprobado por el humano el 2026-11-10). R2-a `9ea7e7e`: el prefijo de país se quita solo si queda un
+NIF de persona (dominio y `ventas.fn_cif_normalizado`; cubre cif, código, líneas y guarda R24). R2-b `118776a`: la factura
+sin cliente en `raw.cli` es de persona física; cuarto eslabón `FACTURA_CLIENTE` en `cobertura_enlace`, que cuenta sin tumbar.
+Spec enmendada (R6, R7, R20, R23), `azure-apps` `0f5ae73` (local). Suite entera sin `-x`: 112 failed (los CLI de entorno),
+10965 passed. Alcance de mutación: 61 mutantes (eran 58). Diccionario sin cambio de recuentos. Informe § 8.
+
+
+Implementer, ciclo 1 (`progress/review_F-040.md`, CHANGES_REQUESTED). H1 `3ca7aea`: `codigo_cliente` a NULL
+en persona física o con forma de NIF; íntegro en `ventas_restringida.clientes_contacto` (columna
+nueva: el diccionario pasa a 2654 columnas); guarda R24 ampliada; `azure-apps` `76e722c` (local).
+H2: el informe § 2.7 ya no dice «fail-closed», sino qué casos NO son persona física, con tres
+propuestas para el humano (no aplicadas, cambian R6). H3 `96b3630`: frontera 0 < cobrado < 1 en
+dominio y sandbox. O2 `d7f4fb1`: solo fichas y un comentario. F-040 con la sandbox: 2319 passed. Los
+cinco supervivientes de `build_ventas_step.py`, justificados en el informe § 7, para
+`progress/mutacion_F-040.md`. PG de pruebas (`scratchpad/pgdata`, 55440) PARADO al terminar
+(`pg_ctl stop`: «servidor detenido»). Pendiente del líder: la puerta con `.env` y la mutación.
+
+Ciclo 1 · base roja: los 9 tests de otras features que vio la mutación del líder, arreglados (B1-B8,
+`055033f`..`9d148c8`). La suite entera sin `-x` da 112 failed y TODOS son de entorno: los CLI sin `.env`. Con
+`SIGRID_API_*` ficticios, esos 17 ficheros dan 705 passed (informe § 7). Diccionario: 316 objetos, 2654 columnas, 153 de consumo.
+
+Pasada 1:
+
+Implementer. T1-T15 con un commit cada una (`0e12304`..`549111c`) y T16, el informe
+`progress/impl_F-040.md`. T17 y T18 son MANUALES del humano y están preparadas (design § 9, runbook
+§ 15). T19: `init.sh` en este worktree sale rojo solo por la falta de `.env` (el líder pasa la puerta
+completa en una copia con `.env`). Cobertura de las líneas cambiadas medida aparte: 100 % (148/148). Desviaciones justificadas, en el informe § «Desviaciones»:
+diccionario v75; diecisiete pasos; presupuesto de F-147 a 37.042 con su motivo; fichas de `raw` ya en
+T3; una sandbox Postgres local extra (`tests/test_f040_sandbox.py`, salta sin DSN). `azure-apps`: commit
+local `882abce`, sin push. Pendiente del líder: la puerta con `.env` y la campaña de mutación (aquí
+aborta, ver el informe).
+Diccionario del árbol hoy: **v75, 316 objetos, 2654 columnas, 153 de consumo**.
+Líder (09-11, 17:20 UTC): la primera puerta con `.env` sobre `6392b0d` salió ROJA solo en
+`test_f006_los_recuentos_de_current_son_los_de_hoy` (este fichero no decía los recuentos de la v75);
+corregido aquí y relanzada la puerta.
+
+## 2026-11-09 · F-040 · `in_progress` · PARADA 1 confirmada, implementer lanzado · rama `feature/F-040-ingresos`
+
+Líder. El humano confirma la propuesta («si») y con ella aprueba la spec revisada del 07-11.
+`main` 534a0bf traído a la rama: conflictos solo en `BACKLOG.md` (regenerado), `features.json`
+(F-159 de `main` + F-160 de la rama; F-040 a `in_progress`) y este fichero. Diccionario: **v75**
+(`main` ya en v74 por F-159; la spec decía v74). `run-all` pasa a diecisiete pasos. Implementer en
+este worktree con T1-T16 de `specs/F-040-ingresos/tasks.md`; T17-T18 MANUALES del humano; T19 (la
+puerta completa con `.env`) la pasa el líder. Tarea en curso y desviaciones: aquí y en
+`progress/impl_F-040.md`.
+
+## 2026-11-08 · CIERRE DE SESIÓN (líder) · leer esto primero
+
+**Nada `in_progress`.** Cerradas en esta tanda (todas desplegadas y medidas en Azure, ver
+`history.md`): F-156 postventa, F-157 fase 0 repartida en el tiempo, F-158 y F-159 hotfix del
+reparto del devengo. Imagen del job **r20261108-0945**, diccionario **v74**, MCP reiniciado (v74).
+`main` 534a0bf / `dev` 74328f3 (push pendiente del humano si no lo hizo).
+
+**Nocturna del 09-11 COMPROBADA (líder, 2026-11-09, solo lectura):** la primera con F-159 en la
+imagen. Lote `20261109T000032Z-e8c578`, 157 pasos SUCCESS, una sola réplica, fin 05:12 UTC;
+`build_tesoreria` SUCCESS (03:15-03:26, 592.660 filas) y 0 negativos en
+`tesoreria.devengo_pendiente_contrato_mes` (5.212 filas) y `devengo_pendiente_obra_mes` (643).
+F-159 queda verificada en producción. R31 de F-148, cerrada (ver su sección).
+
+**Siguiente feature: F-040** (ventas, certificaciones, clientes y cobro; prioridad 2, crítico).
+Spec REVISADA con las decisiones del humano del 07-11 en `.claude/worktrees/agent-a110c4068b1c41df8`,
+rama `feature/F-040-ingresos` (4c3f58e, con `main` 93fc38c dentro; hay que traer `main` 534a0bf):
+D1, D3, D5 = A; D4 = A provisional (RETESP aparte, en un único punto de decisión, a la espera de
+Juan); D6: CIF, nombre y direcciones de `dvf` a `ventas_restringida` (esquema nuevo, solo perfil
+total, pasos MANUAL con `02_roles.sql`); D2: el NOMBRE del cliente es público también en personas
+físicas, su NIF, direcciones y texto de líneas solo en `ventas_restringida`; fase 2 como F-160.
+**Pendiente:** enseñar al humano el resumen de la spec revisada y su visto bueno ANTES de lanzar el
+implementer (lo pidió: «antes de implementar la 40 y 104 guardamos y cerramos sesión»).
+
+**Después: F-104** (retención de cliente). Spec APROBADA (lo recomendado en D1-D8; D6 = 0686,
+cuenta 4308001634, 1,68 M€) en `.claude/worktrees/agent-a9d9a8269385473d8`, rama
+`feature/F-104-retenciones-cliente`. Orden del humano: F-040 y luego F-104.
+
+**Correo a Juan Romero** en Borradores de Outlook (el humano lo envía): RETESP en venta (decide
+la D4 de F-040), la contabilidad como cifra que manda en la retención de cliente y los descuadres
+(0686, LEVITT, MK MADRID II, ARCHER, SABINA, UNEXUM, PRORED).
+
+**Fuera de este repo:** `mcp-bbdd` F-034 (pliego del perfil postventa, sin empezar) y F-033 (sello
+de Signaturit en `abrir_adjunto`). Aviso de `arnes-base` 1.8.0 recibido (solo informativo; antes de
+actualizar, pasar lo afinado de `harness/rigor.json` a `rigor.local.json`).
+
+**Observaciones abiertas:** el tramo 61 de `build_plan_mensual` tardó 22 min el 07-11 (los demás
+1-5); `coeficiente_venta` negativo no tiene guarda en la venta con coeficientes (observación 3 de
+`review_F-159.md`, previa); propuesta repetida de los reviewers: `--tests` en `harness.mutacion`
+para correr la campaña sin `.env`.
+
+**Entorno:** los worktrees de subagente no tienen `.env` (prohibido copiarlo): su `init.sh` sale
+rojo solo en `test_f006_t26`. La puerta completa la pasa el líder en una copia con `.env` (worktree
+`wt_main` en el scratchpad de la sesión anterior; si no existe, crear uno detached). Con el equipo
+encendido tarda 35-105 min.
+
+## 2026-11-07 · F-040 · `spec_ready` · spec revisada tras la PARADA 1 · rama `feature/F-040-ingresos`
+
+Spec-author, en su worktree; `main` (`93fc38c`) traído a la rama (merge `94f2a07`: conflictos en
+`BACKLOG.md`, regenerado, y en este fichero; `features.json` queda con F-157 `in_progress` y F-040
+`spec_ready`). Sin código. Recogidas las decisiones del humano: D1, D3, D5 = A; D4 = A provisional
+(`CLASES_GARANTIA = (4, 5)` en el dominio, único punto de decisión; el `RETESP` en su columna); D2 y
+D6 modificadas: nombre del cliente público para todos, CIF público solo de personas jurídicas, y lo
+personal (NIF de persona, direcciones, teléfono, correo, cabecera `entcif`/`entres`/`dir*` y textos
+de línea de personas) solo en el esquema nuevo **`ventas_restringida`** (perfil total, patrón F-138,
+pasos MANUAL con `02_roles.sql` en design § 9 y runbook § 15 nueva). Fase 2 creada como **F-160**
+(`pending`, prioridad 4 provisional; F-159 estaba reservado por la rama de un hotfix). Medido en
+Sigrid, solo lectura, 09:38-09:45 UTC: `progress/spec_F-040.md` § 8. Tamaños: requirements 148/150,
+design 247/250 (columnas y mapa de tests en `design_detalle.md`).
+**Decisiones abiertas para el humano** (propuesta del spec-author, cámbiese si no vale):
+(1) columnas de contacto de `cli`: `dir1`, `dir2`, `dircpo`, `dir`, `tel`, `tel2`, `ele`; fuera
+`fax`, `web`, `dirtex` (observaciones), duplicados «limpios» y municipio/provincia/país por id;
+(2) en `dvf` entran también las tres `dircon*`, vacías hoy, por ser «las `dir*`»; (3)
+`ventas.facturas` lleva el nombre ACTUAL del cliente (`cli.raz`), y el de la cabecera (`entres`,
+distinto en 571 facturas) va solo a la restringida, como dice D6; (4) id F-160 y su prioridad.
+Pendiente del líder: el correo a Juan Romero sobre el `RETESP` (D4).
+`bash harness/init.sh` en el worktree: ROJO solo por entorno, como el 06-11 (sin `.env`, que no se
+copia: `[KO] Falta .env` y `test_f006_t26_cli_dry_run_no_toca_la_base`; 256 passed antes de parar);
+tamaño y rama en verde. El diff es solo documentación y `features.json`.
+
+## 2026-11-06 · F-040 · `spec_ready` · spec escrita · rama `feature/F-040-ingresos`
 
 Spec-author, en su worktree desde `main` `da6c36f`; sin código, va a la PARADA 1. Spec en
-`specs/F-104-retenciones-cliente/`; mediciones en solo lectura (Azure, 08:55-09:45 UTC) en
-`progress/spec_F-104.md`. Hallazgo: los 1.956 efectos «vivos» con baja (19,93 M) **están
-agrupados** (en `cob` el original queda en `est 1` con `fecbaj` = fecha del AGR; 90,4 % casan con
-un AGR de su cuenta ese día) y el AGR/DIV lleva `retide = 0`, así que `movimientos` lo pierde. Lo
-vivo: 10,50 M en efectos de las cuentas 43x8 frente a 15,49 M de su contabilidad. La «retención de
-1,68 M€ de F-150» se identifica como ESPACIO PROMOCIÓN VIII (0686): facturas sin efecto de retención.
-Decisiones para el humano (design.md §7): **D1** estado por la precedencia de F-094 (A, recomendada);
-**D2** meter AGR/DIV de las cuentas de retención con `origen_retencion` (A); **D3** cuentas por
-prefijo 43x8 `tip 17`, provisional hasta `cli.cueretide` de F-040 (A); **D4** manda la
-contabilidad (A); **D5** obra del saldo contable fuera; **D6** confirmar la identificación del
-1,68 M; **D7** la caja de F-150 no suma la retención sin efecto (fuera); **D8** lista de descuadres
-a Administración. F-104 puede ir sin F-040.
-`bash harness/init.sh` en el worktree: **ROJO solo por entorno**, como en F-158: falta `.env` (no
-versionado, no se copia) → `[KO] Falta .env` y `test_f006_t26_cli_dry_run_no_toca_la_base` falla
-(1 failed, 256 passed, 15 min). Puerta de tamaño en verde (97/150, 188/250). El diff es solo
-documentación y `features.json`: la puerta completa se pasa desde el checkout principal.
+`specs/F-040-ingresos/` (138/150 y 207/250 líneas); mediciones en solo lectura (Sigrid y Azure,
+08:52-10:40 UTC) en `progress/spec_F-040.md`. Hallazgos que cambian el plan del backlog: `obrcer`
+está VACÍA; `cer.idefac` y `cer.feccob` a 0 en las 6.308 certificaciones; el enlace
+certificación → factura es `cerprodes` (4.106 certificaciones, 98 % de las emitidas) y factura →
+cobro es `cob.conide` (93 % de los efectos); `cerpro` no baja a partida (5 de 6.362); 571 clientes
+con NIF de persona (solo 26 marcados). Ventana: +10-20 s de lectura, < 1 %.
+Decisiones para el humano: **D1** partir en dos fases, fase 2 = contraste completo y conceptos
+fuera de coeficiente como feature nueva (recomendada A); **D2** personas físicas enmascaradas en
+`ventas`, sin esquema restringido nuevo (A); **D3** esquema `ventas`; **D4** garantía = clases 4 y
+5 con el `RETESP` aparte (A); **D5** `ventas` para estándar y total, no restringido ni postventa
+(A); **D6** `dvf` en lista blanca de 24 columnas. Frontera con F-104 (en paralelo): F-040 no toca
+`sql/retenciones` ni `sql/tesoreria`; F-104 se queda el estado, el CIF y el cuadre de la
+retención de cliente y necesita `raw.cli`, `raw.dvfrec` y `ventas.facturas`.
+`bash harness/init.sh` en el worktree: **ROJO por entorno, no por la spec**: sin `.env` (no se
+copia, regla dura) → `[KO] Falta .env` y `test_f006_t26_cli_dry_run_no_toca_la_base` falla al
+validar `SigridApiSettings` (256 passed antes de parar, como en F-158). Tamaño 138/150 y 207/250
+en verde. El diff es solo documentación y `features.json`: la puerta completa, desde el checkout
+principal con `.env` tras fusionar.
+
+## 2026-11-06 · F-157 · `in_progress` · implementando · rama `feature/F-157-planificacion-fase0`
+
+Implementer, en el worktree del agente. Spec aprobada por el humano (la A en D1 a D8). `main`
+(`da6c36f`: F-156 y F-158 en `done`, diccionario v72) traído a la rama; en F-157 el diccionario
+pasa a la **v73** (no a la 72 de la spec). Corrección del humano a la redacción: la fase 0 ES el
+presupuesto vivo de hoy (coste y venta reales de hoy); no se dice que «no es real». Tarea en
+curso y desviaciones: se anotan aquí y en `progress/impl_F-157.md`.
+**T1-T11 hechas** (un commit por tarea, `21672ad`..), pendiente de review. Desviaciones, todas
+justificadas en el informe: R18 sin test de `git diff` (sería permanente; el 08 lo fija F-073), la
+puerta de disco no se extrae a un helper (no tocar F-019), el oráculo redondea a 6 decimales, filtro
+de `plafec` inválido en el 09, ficha de `stg.fn_explotar_planif` + F-079 + enmienda de F-006 (290
+objetos) y `PRESUPUESTO_MAX` 34.253 con motivo. Mutación manual (21 mutantes, 1 equivalente).
+Diccionario del árbol hoy: **v73, 290 objetos, 2485 columnas, 139 de consumo**.
+`init.sh` del worktree: ROJO solo por el `.env` (test_f006_t26). Quedan T12 (MANUAL, sábado) y la
+puerta completa en una copia con `.env`.
+
+## 2026-11-05 · F-157 · `pending` · spec escrita, a la espera de la PARADA 1 · rama `feature/F-157-planificacion-fase0`
+
+Spec-author. Spec en `specs/F-157-planificacion-fase0/`, medida en Azure en solo lectura
+(`progress/spec_F-157.md`). Sin código. **No implementar hasta cerrar F-156.** Hallazgos: la fase
+0 con `plafec` está en 144 obras de coste y 139 de venta; ~1,25 M filas a publicar (103 s de
+SELECT); el 97 % de las partidas planificadas acaba en el 100 % con la regla del master; sin
+reparto, ~110 M€ de coste y ~51 M€ de venta; la 0726 da 83 partidas y 312 filas (2026-10 a
+2028-07) con ≤ 0,03 € de redondeo por partida. `mart` lee el ámbito 3/7 de `plan_mensual` sin
+filtrar `version`: por eso la recomendación es una tabla propia. Decisiones para el humano
+(recomendada en negrita en `requirements.md`): D1 tabla propia `stg.plan_mensual_fase0`; D2
+función `stg.fn_explotar_planif` solo para la tabla nueva; D3 vista de cobertura; D4 redondeo
+del master; D5 desplegar en SÁBADO (el sello fuerza una noche completa: +~100 min si no es
+domingo); D6 solo ámbitos 3 y 7; D7 sin regla dura nueva; D8 `mart` no se toca. Queda además
+para Control de Costes: el cuadre con la pantalla de Sigrid (no está documentada en ningún
+sitio) en la 0726 y en una obra con `plamed = 2`.
+`bash harness/init.sh` en el worktree del spec-author: ROJO por entorno, no por la spec (falta
+`.env` en el worktree y no se copia: `test_f006_t26_cli_dry_run_no_toca_la_base` cae en
+`SigridApiSettings` sin `base_url`); 256 tests pasados antes del corte y tamaños dentro de tope
+(requirements 132/150, design 250/250). Hay que repasarlo en el checkout principal.
 
 ## 2026-11-05 · F-158 · implementado (T1-T5), pendiente de review · rama `feature/F-158-hotfix-devengo-negativo`
 
@@ -730,6 +1065,13 @@ del puesto tiene que estar en el firewall del Postgres). Ninguno de estos pasos 
   paso repetido), 0 FAILED en `ingest_raw%`, todo SUCCESS; terminó a las 04:28. 4.846 páginas:
   `http_s` máx 3,5, `pg_connect_s` máx 0,056, `copy_s` máx 0,5, 0 reintentos, ningún hueco de más
   de 100 s. `conexiones_abiertas` = 385. **Racha: 2 de 7.**
+- **CERRADA el 2026-11-09 (líder), cumplida en sustancia.** Leído en Azure (`_meta.etl_runs` y
+  Log Analytics, solo lectura): 16 noches seguidas, del 25-10 al 09-11, con 0 FAILED en
+  `ingest_raw%`, ninguna ingesta repetida, `pg_connect_s` máx 0,081 y 0 huecos > 100 s de conexión o
+  `copy_s`; cuatro huecos de `http_s` (~134 s) atribuibles a `sigrid-api` (D6). Segunda réplica el
+  31-10 (`build_compras`, `oferta_id` duplicado en `comparativos`) y el 04, 05, 07 y 08-11
+  (`build_tesoreria` R50, corregido por F-159): fallos de build, no de conexión. Resumen en
+  `history.md`, sección de F-148.
 
 ## 2026-10-24 · F-148 · CERRADA (`done`, orden del humano) · R31 MANUAL pendiente: 7 noches desde la del 25-10
 

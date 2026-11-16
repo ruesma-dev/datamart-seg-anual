@@ -676,6 +676,8 @@ def test_f006_r20_pipeline_publicar_va_entre_build_mart_y_apply_grants() -> None
         "build_tesoreria",
         "build_compras",
         "build_retenciones",
+        # F-040: el decimo, ventas. Nadie depende de el.
+        "build_ventas",
         "build_personal",
         "build_contabilidad",
         # F-156: el noveno, postventa. Nadie depende de el.

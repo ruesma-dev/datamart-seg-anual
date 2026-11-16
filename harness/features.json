@@ -225,7 +225,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 57,
+      "priority": 62,
       "branch": "feature/F-017-cierre-costes-indirectos"
     },
     {
@@ -237,7 +237,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 61,
+      "priority": 66,
       "branch": "feature/F-018-validacion-cierre-mensual"
     },
     {
@@ -249,7 +249,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 67,
+      "priority": 72,
       "branch": "feature/F-002-plan-vigente"
     },
     {
@@ -268,7 +268,7 @@
       ],
       "status": "pending",
       "sdd": false,
-      "priority": 69,
+      "priority": 74,
       "branch": "feature/F-012-auditoria-costes-azure"
     },
     {
@@ -293,7 +293,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 70,
+      "priority": 75,
       "branch": "feature/F-013-carga-excels-aux"
     },
     {
@@ -305,7 +305,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 71,
+      "priority": 76,
       "branch": "feature/F-010-carga-excels-auxiliares"
     },
     {
@@ -317,7 +317,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 72,
+      "priority": 77,
       "branch": "feature/F-007-disparo-manual-web"
     },
     {
@@ -330,7 +330,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 58,
+      "priority": 63,
       "branch": "feature/F-022-desempate-obrfasamb"
     },
     {
@@ -380,7 +380,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 62,
+      "priority": 67,
       "branch": "feature/F-028-puerta-stg-distingue-fallo"
     },
     {
@@ -404,7 +404,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 52,
+      "priority": 57,
       "branch": "feature/F-029-mutacion-fiable"
     },
     {
@@ -421,7 +421,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 59,
+      "priority": 64,
       "branch": "feature/F-030-reglas-negocio-compartidas"
     },
     {
@@ -439,7 +439,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 54,
+      "priority": 59,
       "branch": "feature/F-031-alerta-no-se-resuelve"
     },
     {
@@ -456,7 +456,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 73,
+      "priority": 78,
       "branch": "feature/F-032-limpieza-secretos-y-puesto"
     },
     {
@@ -473,7 +473,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 63,
+      "priority": 68,
       "branch": "feature/F-033-azure-apps-al-dia"
     },
     {
@@ -490,7 +490,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 65,
+      "priority": 70,
       "branch": "feature/F-026-rbac-propagacion"
     },
     {
@@ -546,7 +546,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 26,
+      "priority": 31,
       "branch": "feature/F-036-oficios"
     },
     {
@@ -602,7 +602,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 46,
+      "priority": 51,
       "branch": "feature/F-039-vistas-puente"
     },
     {
@@ -614,15 +614,16 @@
         "Publicado el DOCUMENTO de certificación a cliente por obra: número, mes, a origen / a cuenta y estado, con su ficha (petición de Juan Romero, 2026-10-27)",
         "Publicadas las facturas de venta, cabecera (`dvf`) y líneas (`dvfpro`), con su IVA y sus retenciones; `retenciones.v_src_lineas_venta` deja de estar vacía y la retención de garantía de venta sale informada",
         "Se puede seguir una certificación hasta su cobro: certificación -> factura de venta -> efecto de cobro (`tesoreria.efectos`), con la cobertura del enlace medida y declarada",
-        "Contraste por obra de la venta producida con coeficientes frente a lo certificado a origen (sugerencia de Juan Romero, 27-10: el ámbito certificación «no es referente para la fase 0, pero sí arroja datos buenos en la certificación fase n»), y los conceptos certificados FUERA del coeficiente (revisión de precios, contradictorios) identificados",
+        "Contraste por obra de la venta producida con coeficientes frente a lo certificado a origen para las 22 obras de la receta (sugerencia de Juan Romero, 27-10: el ámbito certificación «no es referente para la fase 0, pero sí arroja datos buenos en la certificación fase n»); el contraste de todas las obras y los conceptos certificados FUERA del coeficiente pasan a F-160 (D1 = A del humano, 2026-11-07)",
+        "Lo personal del cliente (NIF de persona física, direcciones, teléfono, correo, cabecera de la factura y descripción de las líneas de personas físicas) solo en el esquema nuevo `ventas_restringida`, que lee solo el perfil total; el nombre del cliente y el CIF de las personas jurídicas, públicos en `ventas` (D2 y D6 del humano, 2026-11-07)",
         "La spec estima el impacto en la ventana nocturna antes de comprometerse"
       ],
-      "status": "pending",
+      "status": "done",
       "sdd": true,
       "rigor": "critico",
       "priority": 2,
       "branch": "feature/F-040-ingresos",
-      "notes": "2026-10-27: prioridad 46 -> 5 por orden del humano, tras el correo de Juan Romero; criterios de aceptación ampliados con sus tres peticiones. 2026-10-27: prioridad 5 -> 2 por orden del humano (tras F-150 van F-040 y F-104). 2026-10-27: añadido el contraste venta con coeficientes frente a certificado y los conceptos fuera de coeficiente (revisión de precios), que F-150 deja fuera y declara como aviso. Medido: el IVA del contrato (`obrctr.ivaide`) coincide con el de `cer` y `dvf` por `ctride` en todos los contratos."
+      "notes": "2026-11-09: spec APROBADA por el humano tras la PARADA 1 del líder («si»); in_progress, implementer lanzado. Diccionario: v74 -> v75 (main ya en v74 por F-159). 2026-11-07: PARADA 1 resuelta por el humano: D1, D3 y D5 = A (fase 2 en F-160); D4 = A provisional (garantía = clases 4 y 5, `RETESP` aparte; el líder pregunta a Juan Romero y el cambio es una constante del dominio); D6 modificada (entcif, entres y dir* de dvf, y el contacto de cli, se ingieren y van solo a `ventas_restringida`); D2 modificada (nombre público también para personas físicas; su NIF, direcciones, teléfono, correo y textos de línea, solo en `ventas_restringida`). Spec revisada por el spec-author. 2026-11-06: spec escrita (specs/F-040-ingresos/, mediciones en progress/spec_F-040.md); propone fase 1 aquí y fase 2 (contraste completo y conceptos fuera de coeficiente) como feature nueva (D1). 2026-10-27: prioridad 46 -> 5 por orden del humano, tras el correo de Juan Romero; criterios de aceptación ampliados con sus tres peticiones. 2026-10-27: prioridad 5 -> 2 por orden del humano (tras F-150 van F-040 y F-104). 2026-10-27: añadido el contraste venta con coeficientes frente a certificado y los conceptos fuera de coeficiente (revisión de precios), que F-150 deja fuera y declara como aviso. Medido: el IVA del contrato (`obrctr.ivaide`) coincide con el de `cer` y `dvf` por `ctride` en todos los contratos."
     },
     {
       "id": "F-041",
@@ -639,7 +640,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "critico",
-      "priority": 43,
+      "priority": 48,
       "branch": "feature/F-041-mutacion-fiable"
     },
     {
@@ -672,7 +673,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 44,
+      "priority": 49,
       "branch": "feature/F-043-secreto-versionado"
     },
     {
@@ -704,7 +705,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 45,
+      "priority": 50,
       "branch": "feature/F-046-contraste-desgloses"
     },
     {
@@ -735,7 +736,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 48,
+      "priority": 53,
       "branch": "feature/F-048-guardian-secretos-poroso"
     },
     {
@@ -751,7 +752,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 50,
+      "priority": 55,
       "branch": "feature/F-049-sello-pendiente-mutacion"
     },
     {
@@ -767,7 +768,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 55,
+      "priority": 60,
       "branch": "feature/F-050-fases-duplicadas-sigrid"
     },
     {
@@ -800,11 +801,14 @@
         "check-cobertura (F-052) deja de declarar estas obras como excepcion aceptada: o pasa a exigirlas, o la excepcion queda documentada como definitiva con su motivo",
         "Si la causa de fondo es dato mal metido en Sigrid, llevada a quien lo administra: no se toca desde aqui"
       ],
-      "status": "pending",
+      "status": "done",
       "sdd": true,
       "rigor": "critico",
       "priority": 53,
-      "branch": "feature/F-053-desempate-obras-duplicadas"
+      "branch": "feature/F-053-desempate-obras-duplicadas",
+      "notes": "2026-11-11: absorbida por F-162 (PARADA 1 del humano, «ok a d1 a d5», design §8). F-162 no elige ficha: `stg.obras` lleva TODAS las fichas de todas las empresas, cada una con lo suyo, y marca `es_por_defecto` (Ruesma por delante; si no, deciden los datos). La 0517, la 0252, la 0720 y la 0606 publican cada ficha con sus datos y la eleccion de negocio de la 0606 deja de hacer falta. Las cuatro excepciones de cobertura salen (`EXCEPCIONES_MAX` 19). Propuesta: cerrarla como absorbida cuando F-162 este APPROVED y desplegada; el estado lo cambia el lider, no el implementer. 2026-11-12: CERRADA como absorbida por F-162 (done, desplegada). No tiene entrega propia.",
+      "ok_humano": "2026-11-12",
+      "fecha_cierre": "2026-11-12"
     },
     {
       "id": "F-054",
@@ -822,9 +826,9 @@
       "status": "pending",
       "sdd": true,
       "rigor": "documental",
-      "priority": 6,
+      "priority": 11,
       "branch": "feature/F-054-conocimiento-de-negocio",
-      "notes": "2026-10-27: prioridad 4 -> 5 por orden del humano (tras F-150 van F-040 y F-104)."
+      "notes": "2026-10-27: prioridad 4 -> 5 por orden del humano (tras F-150 van F-040 y F-104). 2026-11-11: llega la primera definición de Negocio, «incurrido / coste incurrido», de Juan Romero, más el término derivado «almacén». Fuente literal en `docs/referencia/07_glosario_incurrido.md`. Antes de publicarla, contrastar cada trampa con lo que calcula el datamart. 2026-11-11: el humano confirma el sinónimo: «a la planificación temporal la llamamos también VALORADA»."
     },
     {
       "id": "F-055",
@@ -841,7 +845,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 23,
+      "priority": 28,
       "branch": "feature/F-055-mundo-proveedor"
     },
     {
@@ -891,7 +895,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 47,
+      "priority": 52,
       "branch": "feature/F-058-estados-financieros"
     },
     {
@@ -904,7 +908,7 @@
         "Resuelto y escrito como se identifica al mismo tercero entre empresas distintas, que tienen subcuentas distintas",
         "Documentado en el diccionario que significa 'posicion' y 'pendiente' aqui, para que el MCP no lo confunda con lo que publica compras"
       ],
-      "priority": 56,
+      "priority": 61,
       "rigor": "estandar",
       "branch": "feature/F-060-posicion-terceros",
       "status": "pending",
@@ -921,7 +925,7 @@
         "Contrastado contra el coste de personal que hoy publica el seguimiento, con las diferencias explicadas",
         "Publicados los movimientos y el saldo de las cuentas analiticas de contrapartida de los recursos (peticion de Juan Romero del 24-09), con lo que queda por repartir a obra, y medido y declarado si el asiento de nominas entra o no en esas cuentas"
       ],
-      "priority": 60,
+      "priority": 65,
       "rigor": "critico",
       "branch": "feature/F-061-coste-personal-obra",
       "status": "pending",
@@ -937,7 +941,7 @@
         "Validado por Administracion contra al menos una declaracion real ya presentada",
         "Documentado que este objeto NO sustituye a la declaracion oficial y para que sirve exactamente"
       ],
-      "priority": 64,
+      "priority": 69,
       "rigor": "estandar",
       "branch": "feature/F-062-impuestos",
       "status": "pending",
@@ -953,7 +957,7 @@
         "Contrastado contra el total que la analitica reparte como GENERALES, con la diferencia cuantificada por ano Y EXPLICADA: que parte es gasto no repartido, que parte es diferencia de criterio y que parte no cuadra",
         "NO se cambia el criterio de reparto en esta feature. Si la diferencia sugiere que deberia cambiarse, se lleva a Negocio como propuesta con el numero delante"
       ],
-      "priority": 66,
+      "priority": 71,
       "rigor": "critico",
       "branch": "feature/F-063-generales-reparto",
       "status": "pending",
@@ -970,7 +974,7 @@
         "Distinguidos los apuntes manuales de los generados por documento, con su volumen",
         "El aviso que se pasa a F-058 dice que parte del gasto NO DEBE atribuirse a obra por ser estructura, y que parte falta por error"
       ],
-      "priority": 68,
+      "priority": 73,
       "rigor": "estandar",
       "branch": "feature/F-064-control-interno-contable",
       "status": "pending",
@@ -990,7 +994,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 41,
+      "priority": 46,
       "branch": "feature/F-065-creditos-cpu-tras-la-ventana"
     },
     {
@@ -1066,7 +1070,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 42,
+      "priority": 47,
       "branch": "feature/F-069-mejoras-arnes-review-f066"
     },
     {
@@ -1084,7 +1088,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 34,
+      "priority": 39,
       "branch": "feature/F-070-auditoria-calidad-diccionario"
     },
     {
@@ -1160,7 +1164,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 39,
+      "priority": 44,
       "branch": "feature/F-075-alcance-de-las-puertas"
     },
     {
@@ -1177,11 +1181,12 @@
         "Queda escrita la diferencia entre ejecutado, certificado y facturado, con las cuentas contables que la sostienen (434, 4301, 439, 438)",
         "Nada de lo que hoy publica el seguimiento cambia de valor: los cuatro ambitos actuales siguen dando lo mismo"
       ],
-      "status": "pending",
+      "status": "todo",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 33,
-      "branch": "feature/F-076-ambitos-certificacion"
+      "priority": 4,
+      "branch": "feature/F-076-ambitos-certificacion",
+      "notes": "2026-11-16: COMPROMETIDA por el humano («vamos con las 5 que quedan de ventas, ponlas en las primeras prioridades»): prioridad 33 -> 4; el resto del backlog baja 5 puestos."
     },
     {
       "id": "F-077",
@@ -1195,7 +1200,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 36,
+      "priority": 41,
       "branch": "feature/F-077-flag-reconstruir-todo-sin-test"
     },
     {
@@ -1292,7 +1297,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 37,
+      "priority": 42,
       "branch": "feature/F-082-supervivientes-f025"
     },
     {
@@ -1373,7 +1378,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "critico",
-      "priority": 35,
+      "priority": 40,
       "branch": "feature/F-087-rol-propio-de-power-bi"
     },
     {
@@ -1392,7 +1397,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 38,
+      "priority": 43,
       "branch": "feature/F-088-guardian-de-recuentos-y-la-guarda-que-falta"
     },
     {
@@ -1411,7 +1416,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 31,
+      "priority": 36,
       "branch": "feature/F-089-el-mcp-cachea-el-diccionario"
     },
     {
@@ -1450,7 +1455,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 32,
+      "priority": 37,
       "branch": "feature/F-091-factura-asiento"
     },
     {
@@ -1473,7 +1478,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 11,
+      "priority": 16,
       "branch": "feature/F-092-productos-y-centro-de-coste"
     },
     {
@@ -1490,7 +1495,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 30,
+      "priority": 35,
       "branch": "feature/F-093-obra-de-cabecera"
     },
     {
@@ -1538,7 +1543,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 24,
+      "priority": 29,
       "branch": "feature/F-096-plan-mensual-sin-tope"
     },
     {
@@ -1570,7 +1575,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 27,
+      "priority": 32,
       "branch": "feature/F-098-fases-por-ambito-y-controles"
     },
     {
@@ -1583,12 +1588,12 @@
         "Publicado que partidas cuelgan de cada expediente, y comprobado que importe_oficial de stg.presupuesto se reproduce aplicando los coeficientes de su expediente, con las diferencias declaradas",
         "Se puede responder, para una obra, con que coeficientes deberia certificarse cada unidad"
       ],
-      "status": "pending",
+      "status": "todo",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 29,
+      "priority": 3,
       "branch": "feature/F-099-expedientes-obra",
-      "notes": "2026-10-27: la parte de coeficientes por partida pasa a F-150 si el humano confirma su rediseño."
+      "notes": "2026-10-27: la parte de coeficientes por partida pasa a F-150 si el humano confirma su rediseño. 2026-11-16: COMPROMETIDA por el humano («vamos con las 5 que quedan de ventas, ponlas en las primeras prioridades»): prioridad 29 -> 3; el resto del backlog baja 5 puestos."
     },
     {
       "id": "F-101",
@@ -1637,9 +1642,10 @@
       "status": "spec_ready",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 3,
+      "priority": 1,
       "branch": "feature/F-104-retenciones-cliente",
-      "notes": "2026-10-27: prioridad 21 -> 3 por orden del humano (tras F-150 van F-040 y F-104). 2026-11-06: spec escrita en specs/F-104-retenciones-cliente/ (mediciones en progress/spec_F-104.md); decisiones D1-D8 para el humano en design.md §7."
+      "notes": "2026-10-27: prioridad 21 -> 3 por orden del humano (tras F-150 van F-040 y F-104). 2026-11-16: COMPROMETIDA por el humano («vamos con las 5 que quedan de ventas, ponlas en las primeras prioridades»): prioridad 3 -> 1; el resto del backlog baja 5 puestos. Spec escrita el 2026-11-06 en su rama (specs/F-104-retenciones-cliente/) y aprobada por el humano el 2026-11-07 (lo recomendado en D1-D8; D6 = 0686). Se revalida contra main antes del implementer: desde entonces entraron F-040, F-162 y F-161.",
+      "spec_aprobada": "2026-11-07"
     },
     {
       "id": "F-105",
@@ -1655,15 +1661,15 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 28,
+      "priority": 33,
       "branch": "feature/F-105-log-sigrid-usuarios"
     },
     {
       "id": "F-106",
       "title": "Traer al seguimiento las demas empresas (UTE, Porsan...): cada obra desde la perspectiva de SU empresa, sin consolidar",
-      "description": "Decidido por el humano el 2026-09-23, prioridad 3, detras del hotfix F-102. MODELO DE NEGOCIO, en palabras del humano: «las obras son por empresa. La UTE es una cosa y Ruesma otra. En la UTE hay una info y en Ruesma unos suplidos (a la UTE), no estamos consolidando. El codigo igual representa que es la misma obra, pero desde la perspectiva de diferentes empresas. Lo mismo con Porsan. Ahora mismo estamos trayendo cosas de Ruesma, no de las demas empresas; despues traeremos las demas». HOY: `stg.obras` elige UNA ficha por codigo con un ranking (conext 15 -> tiemod, F-053) que mezcla empresas: para 0581 y 0606 elige la ficha de la UTE (27 y 31), para 0720 la copia vacia de Porsan (28), y 0252 y 0517 pierden sus datos de UTE (7.564 y 72.737 filas de plan). Medido por el spec-author de F-102 el 2026-09-23. F-102 publica los identificadores (`empresa_id`, `nombre_empresa`, `clave_obra` = '<empresa>-<codigo>', `clave_recurso`, `es_ficha_principal` = empresa 1) pero NO toca la eleccion de `stg.obras`, para no perder datos. QUE HACER: (1) el seguimiento de Ruesma (`stg`, `mart`, `cierre`) pasa a leer SOLO la ficha de la empresa 1, con la clave `obra_id`/`clave_obra`; (2) las demas empresas (UTE, Porsan, 12, 14, 18, 25, 27, 31...) se traen como obras PROPIAS, cada una con su perspectiva, SIN CONSOLIDAR y sin mezclarse con Ruesma; decidir con el humano donde viven (mismo `mart` con dimension empresa, o esquema aparte) y como las ve Power BI; (3) lo mismo para RECURSOS y partes (correo de Juan Romero del 23-09: el codigo de recurso es unico por empresa; 26.426 lineas de parte y 3,23 M EUR imputadas a recursos de otras empresas) y para compras (83.375 lineas y 31,17 M EUR de las 8 fichas UTE). RIESGO: cambia el `obra_id` de obras visibles en Power BI (0581, 0606, 0671, 0720) y el universo de `R-UNIVERSO-OBRA`; hay que contrastar la huella con `huella-obras --propuesta` como en F-042.",
+      "description": "Decidido por el humano el 2026-09-23, prioridad 3, detras del hotfix F-102. MODELO DE NEGOCIO, en palabras del humano: «las obras son por empresa. La UTE es una cosa y Ruesma otra. En la UTE hay una info y en Ruesma unos suplidos (a la UTE), no estamos consolidando. El codigo igual representa que es la misma obra, pero desde la perspectiva de diferentes empresas. Lo mismo con Porsan. Ahora mismo estamos trayendo cosas de Ruesma, no de las demas empresas; despues traeremos las demas». HOY: `stg.obras` elige UNA ficha por codigo con un ranking (conext 15 -> tiemod, F-053) que mezcla empresas: para 0581 y 0606 elige la ficha de la UTE (27 y 31), para 0720 la copia vacia de Porsan (28), y 0252 y 0517 pierden sus datos de UTE (7.564 y 72.737 filas de plan). Medido por el spec-author de F-102 el 2026-09-23. F-102 publica los identificadores (`empresa_id`, `nombre_empresa`, `clave_obra` = '<empresa>-<codigo>', `clave_recurso`, `es_ficha_principal` = empresa 1) pero NO toca la eleccion de `stg.obras`, para no perder datos. QUE HACER: (1) ENMENDADO POR F-162 (2026-11-11): «El seguimiento (`stg`, `mart`, `cierre`) lleva desde F-162 todas las fichas de todas las empresas, cada una por su `obra_id`, con `empresa_id`, `clave_obra` y `es_por_defecto`. F-106 queda para RECURSOS, PARTES y COMPRAS de otras empresas: atribuirlos a la obra de SU empresa sin consolidar, y decidir con el humano como los ve Power BI.» (2) las demas empresas (UTE, Porsan, 12, 14, 18, 25, 27, 31...) se traen como obras PROPIAS, cada una con su perspectiva, SIN CONSOLIDAR y sin mezclarse con Ruesma; decidir con el humano donde viven (mismo `mart` con dimension empresa, o esquema aparte) y como las ve Power BI; (3) lo mismo para RECURSOS y partes (correo de Juan Romero del 23-09: el codigo de recurso es unico por empresa; 26.426 lineas de parte y 3,23 M EUR imputadas a recursos de otras empresas) y para compras (83.375 lineas y 31,17 M EUR de las 8 fichas UTE). RIESGO (ya NO aplica desde F-162: ningun `obra_id` publicado cambia): cambia el `obra_id` de obras visibles en Power BI (0581, 0606, 0671, 0720) y el universo de `R-UNIVERSO-OBRA`; hay que contrastar la huella con `huella-obras --propuesta` como en F-042.",
       "acceptance": [
-        "El seguimiento de Ruesma lee solo fichas de la empresa 1 y lo que cambia frente a hoy (obras, filas e importes) esta medido y aceptado por el humano",
+        "ENMENDADO POR F-162: el seguimiento (`stg`, `mart`, `cierre`) ya lleva todas las fichas de todas las empresas por su `obra_id`, con `empresa_id`, `clave_obra` y `es_por_defecto`; F-106 no lo rehace (criterio original: «El seguimiento de Ruesma lee solo fichas de la empresa 1 y lo que cambia frente a hoy (obras, filas e importes) esta medido y aceptado por el humano»)",
         "Las obras de las demas empresas se publican como obras propias, identificadas por `obra_id`/`clave_obra`, sin consolidar con Ruesma, en el sitio que decida el humano",
         "Recursos, partes y compras de otras empresas quedan atribuidos a la obra de SU empresa",
         "Diccionario, reglas duras y `azure-apps/datamart_seg_anual.md` explican el modelo por empresa en el mismo trabajo"
@@ -1671,8 +1677,9 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 21,
-      "branch": "feature/F-106-obras-por-empresa"
+      "priority": 26,
+      "branch": "feature/F-106-obras-por-empresa",
+      "notes": "2026-11-11: enmendada por F-162 (design §8, PARADA 1 del humano): su punto (1) lo entrega F-162; F-106 queda para recursos, partes y compras de otras empresas, incluidos los cinco comandos de main.py que aún filtran por codigo_obra sobre vistas de compras y retenciones (inspect-contrato-consumo, proveedores-obra, albaranes-sin-facturar, retenciones y retenciones-vencidas). Estado sin cambiar."
     },
     {
       "id": "F-107",
@@ -1752,7 +1759,7 @@
       "status": "spec_ready",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 18,
+      "priority": 23,
       "branch": "feature/F-111-nombres-partida-por-ancestro"
     },
     {
@@ -1800,7 +1807,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 20,
+      "priority": 25,
       "branch": "feature/F-114-avisos-mcp-rescatados"
     },
     {
@@ -1812,13 +1819,14 @@
         "Si es por diseno: queda documentado en el diccionario que una obra sin version master vigente no publica en los ambitos master, para que la proxima vez no haya que investigarlo otra vez",
         "Si es un agujero: arreglado, y verificado con las cuatro huellas antes/despues de F-052 con `--obras-esperadas` acotado a estas obras",
         "Medido cuantas obras MAS estan en la misma situacion: las cuatro salieron de un veredicto de un dia concreto, no de un censo",
-        "Retiradas de `config/cobertura_excepciones.yaml` las ocho excepciones marcadas `feature: F-117` y bajado EXCEPCIONES_MAX de 23 a 15 en tests/test_f052_cobertura.py. El trinquete SOLO BAJA",
+        "Retiradas de `config/cobertura_excepciones.yaml` las excepciones marcadas `feature: F-117` (diez desde el 2026-11-12, con las dos de la 0517) y bajado EXCEPCIONES_MAX en esa misma cantidad en tests/test_f052_cobertura.py (de 21 a 11 hoy). El trinquete SOLO BAJA",
         "`python main.py check-cobertura --timeout 900` sigue saliendo en codigo 0"
       ],
+      "notes": "2026-11-12: dos casos nuevos de la misma pregunta, medidos tras el despliegue de F-162. (1) 0517, ficha 25-0517 (1088657): publica sus reales desde F-162 pero no su master, porque sus versiones 15 y 16 tienen `tex` vacío (\"Sin clasificar\", sin master vigente). Vuelve a cobertura_excepciones.yaml acotada a los ámbitos 8 y 11, con F-117 (EXCEPCIONES_MAX 19 -> 21, decisión del humano). (2) 0726, ficha 2817778: su master es \"INICIAL JO\", con INICIAL y sin VALORADA, así que tampoco se clasifica. Daba KO en check-cobertura ya antes de F-162 y queda sin excepción, a propósito, para que siga sonando.",
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 76,
+      "priority": 81,
       "branch": "feature/F-117-obras-ciegas-en-master"
     },
     {
@@ -1847,11 +1855,12 @@
         "Medida en solo lectura la fuente de lo contratado y contrastada contra la cartera que Negocio ya maneja",
         "Publicada la cartera por obra y mes y el total, con ficha en el diccionario y sin mezclar empresas"
       ],
-      "status": "pending",
+      "status": "todo",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 40,
-      "branch": "feature/F-119-cartera-de-obra"
+      "priority": 5,
+      "branch": "feature/F-119-cartera-de-obra",
+      "notes": "2026-11-16: COMPROMETIDA por el humano («vamos con las 5 que quedan de ventas, ponlas en las primeras prioridades»): prioridad 40 -> 5; el resto del backlog baja 5 puestos."
     },
     {
       "id": "F-115",
@@ -1865,7 +1874,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 74,
+      "priority": 79,
       "branch": "feature/F-115-tiemod-inexistente"
     },
     {
@@ -1880,7 +1889,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 75,
+      "priority": 80,
       "branch": "feature/F-116-ingesta-descompuestos-error-por-version"
     },
     {
@@ -1913,7 +1922,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 19,
+      "priority": 24,
       "branch": "feature/F-121-recurso-principal-auxiliar"
     },
     {
@@ -1928,7 +1937,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 25,
+      "priority": 30,
       "branch": "feature/F-122-lineas-sin-rendimiento"
     },
     {
@@ -1966,7 +1975,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 12,
+      "priority": 17,
       "branch": "feature/F-126-analitica-lineas-compra"
     },
     {
@@ -1987,7 +1996,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 10,
+      "priority": 15,
       "branch": "feature/F-127-mayor-analitico"
     },
     {
@@ -2027,7 +2036,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 9,
+      "priority": 14,
       "branch": "feature/F-129-objetivo-contra-oferta-referencia"
     },
     {
@@ -2043,7 +2052,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 14,
+      "priority": 19,
       "branch": "feature/F-130-condiciones-y-texto-oferta"
     },
     {
@@ -2059,7 +2068,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 13,
+      "priority": 18,
       "branch": "feature/F-131-cantidades-dpc"
     },
     {
@@ -2095,7 +2104,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 16,
+      "priority": 21,
       "branch": "feature/F-133-procesos-albaranes"
     },
     {
@@ -2114,7 +2123,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 17,
+      "priority": 22,
       "branch": "feature/F-134-empleado-alta-documento"
     },
     {
@@ -2167,7 +2176,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 15,
+      "priority": 20,
       "branch": "feature/F-137-ordenes-infra-patrones-buenos"
     },
     {
@@ -2273,7 +2282,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 78,
+      "priority": 83,
       "branch": "feature/F-143-tipo-contrato-compra"
     },
     {
@@ -2415,7 +2424,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 5,
+      "priority": 10,
       "branch": "feature/F-151-funcion-caja-proyectada",
       "notes": "2026-10-26: registrada por orden del humano. Depende de F-150. 2026-10-27: prioridad 2 -> 4 por orden del humano (tras F-150 van F-040 y F-104)."
     },
@@ -2431,7 +2440,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 7,
+      "priority": 12,
       "branch": "feature/F-152-forma-pago-ficha-proveedor",
       "notes": "2026-10-27: registrada por orden del humano a partir del correo de Juan Romero, en la prioridad 6, justo detrás de F-040."
     },
@@ -2460,7 +2469,7 @@
         "Spec SDD con los ingredientes que se publican y las hipótesis de la caja de estructura, sin mezclar con la receta de obra de F-150",
         "Fichas en el diccionario de lo que se publique; `bash harness/init.sh` en verde"
       ],
-      "priority": 8,
+      "priority": 13,
       "status": "pending",
       "sdd": true
     },
@@ -2511,12 +2520,12 @@
         "Los cierres reales y los master de `stg.plan_mensual` no cambian (mismas filas y mismos importes antes y después), y `cierre/` sigue cruzando solo las fases reales",
         "Ficha del diccionario con el objeto, la regla de que la fase 0 es planificación viva (no master ni cierre) y un ejemplo de pregunta; tests y `bash harness/init.sh` en verde"
       ],
-      "status": "pending",
+      "status": "done",
       "sdd": true,
       "rigor": "estandar",
       "priority": 1,
       "branch": "feature/F-157-planificacion-fase0",
-      "notes": "2026-11-05: anotada por el líder a petición del humano («añádelo a la feature como siguiente»): prioridad 1, la siguiente tras cerrar F-156."
+      "notes": "2026-11-07: APROBADA (`progress/review_F-157.md`), merge `main` 93fc38c, desplegada (imagen r20261106-1848), primera noche completa el 07-11 y diccionario v73. 2026-11-06: PARADA 1 resuelta por el humano (la A en D1 a D8); en implementación en la rama, diccionario v73 tras la v72 de F-158. 2026-11-05: anotada por el líder a petición del humano («añádelo a la feature como siguiente»): prioridad 1, la siguiente tras cerrar F-156."
     },
     {
       "id": "F-158",
@@ -2535,6 +2544,105 @@
       "priority": 0,
       "branch": "feature/F-158-hotfix-devengo-negativo",
       "notes": "2026-11-06: APROBADA (`progress/review_F-158.md`), merge `main` 3d72d06, desplegada (imagen r20261106-0813, `build-tesoreria` 357 s, 0 negativos), diccionario v72. 2026-11-05: HOTFIX pedido por el líder; spec escrita por el spec-author en su worktree desde `main` (fbf43dd), sin código. Diagnóstico y alternativas en `progress/spec_F-158.md`; pendiente de la PARADA 1."
+    },
+    {
+      "id": "F-159",
+      "title": "Hotfix 2: un mes negativo del plan de V se amplifica en el reparto del devengo y tumba build_tesoreria (guarda R50)",
+      "description": "La nocturna del 2026-11-07 (imagen r20261106-1848, ya con F-158) falló dos veces en `build_tesoreria` (04:52 y 06:30 UTC): «el coste por contrato no cuadra con la obra-mes en 0 obras o tiene 1 importes negativos», la guarda R50 de `sql/tesoreria/07_devengo_pendiente.sql`. `tesoreria` sigue con la construcción del 06-11 08:38. Causa medida en solo lectura el 07-11 (`progress/spec_F-159.md`): el paso 5 reparte el pendiente de cada partida en proporción a su plan de V con pesos CON SIGNO. La versión «PLANIFICACION CUATRIMESTRAL OCT-26» de 1-0710 (V13, creada en Sigrid el 06-11) trae en la partida 404326 (03.02.11) un 0 intermedio en el `planif` (99,994 % / 0 / 100 %) que `stg` convierte, con razón, en -1.079,94 en 2026-11 y +1.080,00 en 2026-12: `total_perfil` 0,06 y noviembre recibe -19.438.920,00 (1-0710/2026-11/CD sin contrato: -18.791.769,87). Es la clase de la D2 de F-158 (mes negativo del plan) en su forma amplificada; la observación 3 de su review (último mes negativo por redondeo) no salta hoy pero está latente. Arreglo recomendado (A): perfil = envolvente del plan NETO acumulado (un mes negativo se absorbe en los anteriores) y reparto por acumulado, con su espejo en el dominio; medido: 0 negativos y 0 descuadres. Relajar R50 publicaría -18,8 M€: descartado.",
+      "acceptance": [
+        "Spec SDD aprobada por el humano (PARADA 1) con las decisiones D1-D6 de `progress/spec_F-159.md`",
+        "Cada (partida, mes) del reparto del pendiente está en [0, pendiente de la partida] y la partida suma su pendiente al céntimo con perfiles con signo; test de regresión con el caso real de 1-0710 (partida 404326) en RED antes y en verde después, sin red ni BBDD",
+        "El personal sigue por acumulado (F-158) y en [0, mes]; el paso 5 bis y las condiciones de R14, R50 y R58 no cambian; una guarda nueva nombra la partida y el mes de un reparto negativo",
+        "Fichas del diccionario actualizadas y v74; `bash harness/init.sh` en verde",
+        "Despliegue MANUAL del humano con los pasos de `specs/F-159-hotfix-devengo-negativo-2/design.md` §6: reproducción en solo lectura, imagen, job, `build-tesoreria` suelto, `apply-grants`, 0 negativos en `devengo_pendiente_contrato_mes` y `devengo_pendiente_obra_mes`, y vuelta atrás"
+      ],
+      "status": "done",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 0,
+      "branch": "feature/F-159-hotfix-devengo-negativo-2",
+      "notes": "2026-11-08: APROBADA (`progress/review_F-159.md`), merge `main` 0ea9d38, desplegada (imagen r20261108-0945, `build-tesoreria` SUCCESS, 0 negativos en coste y venta), diccionario v74. Lo de antes (pendiente de la PARADA 1) queda superado. 2026-11-07: HOTFIX pedido por el líder; spec escrita por el spec-author en su worktree desde `main` (93fc38c), sin código. Diagnóstico y alternativas en `progress/spec_F-159.md`; pendiente de la PARADA 1."
+    },
+    {
+      "id": "F-160",
+      "title": "Ventas fase 2: contraste producido / certificado de todas las obras y los conceptos certificados fuera de coeficiente",
+      "description": "Nace de la D1 = A de F-040 (decisión del humano, 2026-11-07): F-040 publica certificaciones, facturas de venta, clientes y el enlace hasta el cobro, y deja el contraste de la venta producida con coeficientes frente a lo certificado SOLO para las 22 obras de la receta de caja (`ventas.v_contraste_certificado_obra`, que lee `tesoreria.devengo_corte_obra`). Esta fase lo extiende a TODAS las obras y separa los conceptos certificados FUERA del coeficiente (revisión de precios, contradictorios, órdenes de cambio). MEDIDO por F-040 el 2026-11-06 (`progress/spec_F-040.md` §§ 2-3): Sigrid NO los marca: `obrcer` (con `cerrev`) está VACÍA; `cerpro.paride` solo en 5 de 6.362 líneas, así que la certificación no baja a partida y el contraste solo puede ser por obra o contrato; los recargos `COEF_RECGG`/`COEF_RECBI`/`COEF_DESADJ` (clase 0) están en 1.286 de 6.308 certificaciones (en la mayoría de los CONTRATO PRINCIPAL el coeficiente va dentro del precio); 36 líneas dicen «revisión»/«contradictorio» (1,88 M€); los contratos lo insinúan por nombre («ORDENES DE CAMBIO», «PARTIDAS SIN COEFICIENTES», «MEDICIONES NO ACREDITADAS», «CONTRATO SIN PEM»). Hace falta el CRITERIO de Juan Romero (Control de Costes) antes de escribir la spec: cómo se reconoce un concepto fuera de coeficiente y contra qué producción se contrasta cada obra. Depende de F-040 en `done`. RELACIONADA con F-076 (los ámbitos de seguimiento 5 `VEN` «CERTIFICACION» y 13 `CER_PEC`, que llegan a `stg.presupuesto` y no al seguimiento): la spec debe decidir si el contraste lee esos ámbitos, los documentos `cer` de F-040 o los dos.",
+      "acceptance": [
+        "Definida en detalle por specs/F-160-*/ (sdd=true), con el criterio de Juan Romero por escrito",
+        "Contraste producido con coeficientes / certificado a origen / facturado para todas las obras con certificaciones, no solo las de la receta, con la cobertura medida",
+        "Los conceptos certificados fuera de coeficiente identificados según ese criterio, con su importe por obra y contrato y la parte que no se sabe clasificar declarada"
+      ],
+      "status": "todo",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 2,
+      "branch": "feature/F-160-ventas-contraste-fase2",
+      "notes": "2026-11-07: creada por el spec-author de F-040 al recoger la D1 = A del humano. Id F-160 porque F-159 ya está reservado por la rama `feature/F-159-hotfix-devengo-negativo-2`. Prioridad 4 provisional (detrás de F-040 y F-104): la fija el humano. 2026-11-16: COMPROMETIDA por el humano («vamos con las 5 que quedan de ventas, ponlas en las primeras prioridades»): prioridad 4 -> 2; el resto del backlog baja 5 puestos."
+    },
+    {
+      "id": "F-161",
+      "title": "Versiones del máster y coste sin planificación temporal: catálogo desde las cabeceras, coste por versión y partida y vigencia temporal frente a vigencia de importe",
+      "description": "Incidencia de Control de Costes (Juan, 2026-11-10): la v24 de coste de la 0698 (CIERRE SEPTIEMBRE-26, 776 líneas, 2.107.662,97 €) no aparece en `mart.v_master_versiones_tipadas`. Ninguna de sus líneas trae `obrparpre.planif`, el reparto temporal, y el catálogo (`mart/06_cp_tipologia.sql:117`, y su copia en `mart/02_build_fact.sql:55`) se deduce de `stg.plan_mensual`, que descarta las líneas sin `planif` (`stg/08_plan_mensual.sql:224`). Diagnóstico en `progress/explore_0698_v24_coste.md`: 49 versiones enteras sin reparto, y además 304 M€ de coste (en 1.716 versiones) y 195 M€ de venta sin mes dentro de versiones que sí tienen reparto. CRITERIO DEL HUMANO (2026-11-11): no siempre tiene que haber planificación temporal, y eso no quiere decir que no haya que coger y analizar el coste. «Una cosa es el último planificado temporal y otra el último planificado a nivel de importe total, y pueden divergir.» ALCANCE PROPUESTO: (1) el catálogo, desde las cabeceras (`obrfasamb` con líneas en `stg.presupuesto`), con `importe_total`, `importe_con_reparto`, `importe_sin_reparto` y `reparto` (COMPLETO, PARCIAL o NINGUNO); (2) una vista del coste por versión y partida que no dependa del reparto; (3) dos vigencias explícitas: la última versión de importe y la última con reparto temporal, y cómo se combinan en el seguimiento mensual (decisión de Negocio en la spec); (4) un solo catálogo para `fact_seguimiento_mensual` y `06_cp_tipologia`; (5) la ficha del diccionario corregida. Las cifras vigentes de hoy no cambian salvo por decisión explícita, y se comprueba con la huella de `master_vigente_anual`, `fact_cp_tipologia`, `fin_obra` y `devengo_*`.",
+      "acceptance": [
+        "Spec SDD aprobada por el humano, con la decisión sobre las dos vigencias (importe y temporal)",
+        "La v24 de coste de la 0698 y las demás versiones sin reparto aparecen en el catálogo con su importe y `reparto` = NINGUNO",
+        "El coste de cualquier versión se consulta por partida tenga o no reparto",
+        "Huella antes/después de los consumidores del catálogo: idéntica salvo los cambios decididos y documentados",
+        "Fichas y reglas del diccionario al día; `bash harness/init.sh` en verde"
+      ],
+      "status": "done",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 1,
+      "branch": "feature/F-161-versiones-sin-reparto",
+      "notes": "2026-11-11: alta por el líder tras el sí del humano. Va detrás de F-162 y delante de F-104. 2026-11-11, DECISIÓN DEL HUMANO (D1): «los cierres mensuales son planificación de importe, como cierre; es el último. Así como el coste fase 0 (en ámbito coste) es el vivo. Lo que pasa es que hay cierres o masters que tienen planificación temporal (los cuatrimestrales y ABC principalmente) y otros que no, como los cierres intermedios». Hay TRES referencias: (1) el VIVO, el coste de la fase 0 (ya publicado: `stg.plan_mensual_fase0`, F-157); (2) el ÚLTIMO CIERRE, que es la última versión del máster de cualquier tipo y da el planificado de IMPORTE total; (3) el ÚLTIMO PLANIFICADO TEMPORAL, la última versión con planificación temporal, sobre todo cuatrimestrales y ABC, que da el reparto en el tiempo. Quedan abiertas para la spec: (a) si el planificado temporal se elige por TIPO (Planif inicial, ABC y Cuatrimestral, como hoy) o por TENER `planif`; la v21-v23 de la 0698 son cierres que sí traen `planif`, probablemente heredado de la cuatrimestral; (b) cómo enseña el seguimiento mensual la diferencia entre el importe del último cierre y el de la temporal: las dos por separado con su diferencia, que es lo que recomienda el líder, o reescalado. 2026-11-11, DECISIONES DEL HUMANO D2 y D3. D2: la última versión TEMPORAL es la última que traiga reparto en los meses (por tener `planif`, NO por tipo): «en principio se hereda de la cuatrimestral, pero por si acaso, la última temporal es la última con reparto». Ya en `stg` hay que saber qué líneas y qué versiones traen reparto y cuáles no, con una marca por línea y un resumen por versión. En la 0698 hoy, la temporal es la v23 (cierre de agosto) y la de importe es la v24. D3: el seguimiento mensual enseña las dos POR SEPARADO, el mensual con el reparto de la temporal y, al lado, el total del último cierre y la diferencia, sin reescalar. VOCABULARIO: a la planificación temporal en Ruesma la llaman también «VALORADA» (va al glosario de F-054). Abierta para la spec: con D2, la vigencia temporal deja de elegirse por tipo (Planif inicial, ABC y Cuatrimestral), y hay que medir cuántas obras cambian de versión temporal vigente, con la huella antes/después de `master_vigente_anual`, `fact_seguimiento_mensual`, `fact_cp_tipologia`, `fin_obra` y `devengo_*`. 2026-11-11, D2 REVOCADA POR EL HUMANO: «la parte temporal no quiero que cambie. Solo que te traigas también el coste sin planificación de máster coste cuando no haya temporal». La vigencia temporal, el seguimiento mensual y todo lo que cuelga de ellos (`master_vigente_anual`, `fact_seguimiento_mensual`, `fact_cp_tipologia`, `fin_obra` y `devengo_*`) se quedan EXACTAMENTE como hoy: huella idéntica antes y después, como criterio de aceptación. El ALCANCE queda en ADITIVO: (1) el catálogo completo, con las versiones sin reparto y sus importes con y sin reparto; (2) el coste de cada versión del máster por partida, tenga o no planificación temporal; (3) el planificado de IMPORTE, que es el último cierre (D1), publicado aparte y al lado de lo temporal, con su diferencia (D3). Se mantiene la marca de reparto por línea y versión en `stg`, porque solo informa. Vale como D4. 2026-11-13: COMPROMETIDA por el humano (todo; el init.sh de este repositorio, arnés 1.7.7, no admite ese estado y se anota aquí) y SPEC ESCRITA por el spec-author: `specs/F-161-versiones-sin-reparto/`, informe `progress/spec_F-161.md`. Estado `spec_ready`, pendiente de la PARADA 1 con las decisiones D5-D14 (design §10): universo del catálogo, versión 0, qué es una línea con reparto, qué versiones cuentan para el último cierre, grano mensual de `mart.master_importe_mensual`, la diferencia, un solo catálogo leído por `02_build_fact.sql`, la marca por línea como vista, cabeceras duplicadas y ámbitos de la vista por partida. 2026-11-13: resumen de la spec APROBADO por el humano («hecho»), todas las recomendaciones (D5-D14 en (a); D10 además (b) como columna). in_progress; implementer lanzado. 2026-11-13: implementer terminado (progress/impl_F-161.md); T10 de azure-apps hecho por el líder (commit local d6bb377, sin push). in_review: reviewer principal. 2026-11-13: review principal pasada 1 CHANGES_REQUESTED (progress/review_F-161.md): la sandbox no tiene ninguna Cuatrimestral sin reparto, así que R10/R16 no muerden. Ciclo 1 de 2: vuelve al implementer. 2026-11-13: ciclo 1 corregido (8d02b31, dff7418): sandbox 20 passed y las 4 mutaciones del filtro tiene_reparto en rojo. in_review: review pasada 2. 2026-11-13: review pasada 2 APPROVED (2ebe20f); campaña informativa 16/20 (2 equivalentes, 2 huecos sin matar). human_review. 2026-11-14: OK del humano («haz commit y merge»): done. El despliegue (design §8) lo lanza el humano.",
+      "spec_aprobada": "2026-11-13",
+      "ok_humano": "2026-11-14",
+      "fecha_cierre": "2026-11-14"
+    },
+    {
+      "id": "F-162",
+      "title": "El seguimiento lleva TODAS las fichas de obra, cada una con su empresa, y marca la ficha por defecto de cada código (0721 en Ruesma y en PORSAN)",
+      "description": "Incidencia de Control de Costes (Elena y Juan, 2026-11-11): la 0721 no trae presupuesto porque `stg/03_obras.sql` deja UNA ficha por código y elige la vacía de PORSAN (empresa 28, ide 2855829) en vez de la de Construcciones Ruesma (1-0721, ide 2759553, 9.165 líneas). Diagnóstico en `progress/explore_0721_obra_duplicada.md`. MODELO DEL HUMANO (2026-11-11, sustituye al primer planteamiento de «elegir una ficha»): «Debes leer los proyectos en ambas empresas. No tener que elegir: cada uno con su propia empresa, sin cruces entre empresas. Lo que pasa es que, al preguntar la IA, hay que decirle (quizás en el MCP) que puede ser el mismo proyecto en ambas empresas y que por defecto coja este. Ruesma debe tener la obra 0721 y PORSAN también.» Es el modelo de F-106 aplicado al SEGUIMIENTO. QUÉ HACE: (1) `stg.obras` deja de desempatar y lleva todas las fichas de obra real de todas las empresas (mismos filtros de códigos), con `empresa_id`, `clave_obra` y `es_por_defecto` al final; todo lo que cuelga (`mart`, `cierre`, `tesoreria`, `retenciones`, `personal`) va por `obra_id`, sin cruces ni consolidación. (2) `es_por_defecto` (también en `maestro.obras`): la ficha de la empresa 1 si existe; si solo hay una, esa; si hay varias sin la de Ruesma, la de más líneas de presupuesto, después `tiemod` y después `ide` (criterio del humano: «en caso de duda, Construcciones Ruesma por delante, salvo que se diga lo contrario; los datos deciden antes que la duda»); `conext` 15 no interviene. (3) La IA lo aprende por el diccionario (`R-EMPRESA-POR-DEFECTO`, `R-UNIVERSO-OBRA`, `R-CODIGO-POR-EMPRESA`); `mcp-bbdd` no cambia. (4) Absorbe F-053; F-106 se queda con recursos, partes y compras. MEDIDO por el spec-author el 2026-11-11: 585 -> 634 fichas (585 códigos); entran 49 fichas, 4 con plan (12-0252, 25-0517, 1-0606, 1-0721; +152.785 filas de plan, 0,47 %); ninguna ficha de hoy pierde una fila; 18.521 líneas de partes pasan a `en_seguimiento`.",
+      "acceptance": [
+        "Spec SDD aprobada por el humano (PARADA 1), con las decisiones D1-D5 de `design.md` §8 resueltas",
+        "`stg.obras` con una fila por ficha (634 el 2026-11-11), `empresa_id`, `clave_obra` y `es_por_defecto` (uno por código), con test de la 0721 en dos empresas en RED antes y en verde después, y el criterio por defecto fijado por un oráculo puro y un sandbox",
+        "Huella antes y después sobre el mismo raw: lo de hoy no cambia y solo ganan datos 1-0721, 12-0252, 25-0517 y 1-0606",
+        "Ningún SQL ni comando agrega ni cruza por `codigo_obra` sin `obra_id`; las vistas de Power BI y `maestro.obras` distinguen las fichas de un código",
+        "`R-EMPRESA-POR-DEFECTO`, `R-UNIVERSO-OBRA`, `R-CODIGO-POR-EMPRESA`, fichas y preguntas de aceptación enmendadas, dentro del presupuesto de F-147",
+        "Excepciones de cobertura de F-053 retiradas (`EXCEPCIONES_MAX` 19); F-053 cerrada como absorbida y F-106 enmendada",
+        "`bash harness/init.sh` en verde y despliegue con sus pasos y su vuelta atrás"
+      ],
+      "status": "done",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 0,
+      "branch": "feature/F-162-obra-duplicada-ruesma",
+      "notes": "2026-11-11: alta por el líder tras el sí del humano; spec-author lanzado. Mismo día: el humano rechaza «elegir una ficha» y fija el modelo por empresa; spec rehecha. 2026-11-11, PARADA 1 CONFIRMADA por el humano («ok a d1 a d5»), con las recomendaciones de design §8: D1, `maestro.obras.es_por_defecto` con el MISMO criterio en todas las fichas; D2, `conext` 15 fuera del criterio; D3, Power BI sin filtro, con `obra_label` = `clave_obra · nombre` (cambia el texto de las 585 obras de hoy); D4, los agregados sin empresa en `mart`/`cierre` usan `empresa_id` = 1; D5, la empresa no va a los hechos: se cruza por `obra_id` con `maestro.obras`. Implementer lanzado. 2026-11-12: CERRADA (done) por decisión del humano («si f162 está desplegada ciérrala»): reviewer APPROVED (y delta 2c02911 APPROVED), mutación 20/20, desplegada con la imagen r20261112-1745. La comprobación de la nocturna del 2026-11-13 queda como vigilancia en progress/current.md, no como condición de cierre.",
+      "spec_aprobada": "2026-11-11",
+      "ok_humano": "2026-11-12",
+      "fecha_cierre": "2026-11-12"
+    },
+    {
+      "id": "F-163",
+      "title": "La reconstrucción completa solo en las noches del fin de semana y techo del job de 14 h",
+      "description": "La nocturna del 2026-11-15 (domingo, reconstrucción completa de F-025) terminó Failed por DeadlineExceeded a las 07:00 UTC: el techo del job (replicaTimeout 25.200 s, 7 h) cortó las comprobaciones finales con todos los pasos en SUCCESS. Criterio del humano (2026-11-15): «las completas solo pueden hacer la noche del viernes al sábado o del sábado al domingo; si no, tendremos fallos en cascada» y «ponle límite 14h». QUÉ HACE: (1) `toca_reconstruccion_completa` (`etl_sigrid/domain/ventana.py`) solo dispara en las ejecuciones de sábado y domingo a las 00:00 UTC; entre semana nunca, aunque pasen 7 días. `DIAS_MAXIMOS_SIN_COMPLETA` (7) queda solo como umbral de la alerta «completa vencida» de `check-ventana`. (2) `VENTANA_REANUDACION` (F-148) de 8 h a 15 h, mayor que el techo. (3) `infra/env/dev.json` `replicaTimeoutSeconds` 25.200 -> 50.400 (14 h). (4) Tests de F-025 y F-148, diccionario (`stg.yaml`, `_meta.yaml`, versión), comentario de `infra/97_create_alert_ventana.ps1` y `azure-apps/datamart_seg_anual.md` en commit aparte.",
+      "acceptance": [
+        "PARADA 1 confirmada por el humano (sin spec), con D1 y D2",
+        "La completa dispara el sábado; el domingo solo si la del sábado no quedó registrada; ningún día laborable dispara, ni con 7 o más días sin completa; sin ninguna completa registrada dispara esa misma noche",
+        "`check-ventana` sigue avisando de «completa vencida» a los 7 días",
+        "`VENTANA_REANUDACION` = 15 h y mayor que `replicaTimeoutSeconds` de `infra/env/dev.json` (50.400)",
+        "Diccionario y documentos al día (incluido azure-apps en commit aparte); `bash harness/init.sh` en verde",
+        "Despliegue: imagen nueva y `az containerapp job update --replica-timeout 50400`, lanzados por el humano"
+      ],
+      "status": "done",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 0,
+      "branch": "feature/F-163-completa-fin-de-semana",
+      "notes": "2026-11-15: alta por el líder tras el OK del humano a la PARADA 1 («ok»). El humano no eligió entre opciones: se toman las recomendadas. D1 (a): la completa la hace la noche del viernes al sábado (ejecución del sábado 00:00 UTC) y la del domingo solo si la del sábado no quedó registrada. D2 (a): sin ninguna completa registrada (instalación nueva), se hace esa misma noche, sea el día que sea. D3: techo 14 h (50.400 s) y ventana de reanudación 15 h. Va detrás del cierre del despliegue de F-161 (job puntual caj-datamart-seg-dev-swc0pcf en curso). 2026-11-15: despliegue de F-161 verificado (current.md). in_progress; implementer lanzado. 2026-11-15: implementer terminado (progress/impl_F-163.md; puerta en verde, 13.253 passed; azure-apps 006b293 sin push). Desviación a revisar: PG_VENTANA_DIA_COMPLETA pasa a ser el ÚLTIMO día de la ventana (el 6 desplegado da sábado y domingo). in_review: reviewer principal. 2026-11-15: review pasada 1 CHANGES_REQUESTED (progress/review_F-163.md): el detalle publicado «reconstruccion completa semanal (domingo)», restos de «domingo» en comentarios y settings, y marca SIN DESPLEGAR en azure-apps. Ciclo 1 de 2: vuelve al implementer. 2026-11-15: ciclo 1 corregido (4a33ed8, 3cf0239, 8370864; azure-apps 0511029 sin push); puerta en verde, 13.255 passed. in_review: review pasada 2. 2026-11-15: review pasada 2 APPROVED (puerta sin caché en verde sobre f75357d, 13.255 passed). Pasada de campaña informativa del implementer. 2026-11-15: campaña informativa (progress/mutacion_F-163.md): 11 evaluados, 10 muertos, 1 superviviente (ventana.py:660, days=1 -> 2; lo mataría una completa del viernes seguida de un domingo), 0 timeouts. human_review: PARADA 2. 2026-11-16: OK del humano a la PARADA 2 («ok a f163, desplegamos. haz commit y merge»): done. El despliegue (imagen nueva, --replica-timeout 50400, MCP) lo lanza el humano.",
+      "ok_humano": "2026-11-16",
+      "fecha_cierre": "2026-11-16"
     }
   ]
 }

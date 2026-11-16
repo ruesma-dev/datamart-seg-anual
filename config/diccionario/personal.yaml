@@ -353,7 +353,10 @@ objetos:
       **No se filtra el universo de obra**: se marca en `en_seguimiento`. Medido:
       523 obras del seguimiento (318.892 lineas, 1.226.158,60 h, 93,24 M EUR =
       94,9 % del euro), 12 obras administrativas (10.373 lineas, 4,93 M EUR) y
-      1.373 lineas sin obra.
+      1.373 lineas sin obra. Desde F-162 (2026-11-11) `stg.obras` lleva todas las
+      fichas de todas las empresas, y 18.521 lineas mas (3.429.850,04 EUR) de
+      las 49 fichas que entran pasan a `en_seguimiento`: los partes de Porsan,
+      a su propia ficha. Cada linea sigue en la obra de SU empresa.
 
       **Defectos de calidad medidos en origen, que se publican sin corregir**:
       5 lineas con la fecha a cero, una con fecha del ano **3103**, 6 con el ano
@@ -405,7 +408,9 @@ objetos:
         significado: >-
           Si la obra de la linea entra en el universo del seguimiento. Es una
           MARCA y no un filtro: las lineas de obras administrativas se publican
-          igual. Cierto en 318.892 lineas, de 523 obras.
+          igual. Cierto en 318.892 lineas, de 523 obras, hasta F-162; desde
+          F-162, que trae al seguimiento todas las fichas de cada codigo, 18.521
+          lineas mas (medido el 2026-11-11, a confirmar tras el despliegue).
         agregacion: no_sumable
       partida_id:
         significado: >-

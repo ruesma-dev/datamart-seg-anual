@@ -110,17 +110,42 @@ def test_en_la_maquina_de_la_medicion_el_default_baja_de_16_a_4(
 # --- R9: el límite de una máquina no se cablea en un arnés que viaja --------
 
 
-def test_rigor_json_no_declara_la_clave_workers() -> None:
-    bloque = json.loads(RUTA_RIGOR.read_text(encoding="utf-8"))["mutacion"]
+#: Configuración INYECTADA para los tests de `workers` (F-038): válida para
+#: `cargar_rigor` y sin la clave `mutacion.workers`.
+RIGOR_SIN_WORKERS = {
+    "nivel_por_defecto": "estandar",
+    "mutacion": {"timeout_por_mutante_s": 120},
+    "niveles": {"estandar": {"fase_red": True, "cobertura": True, "mutacion": True}},
+}
 
-    assert "workers" not in bloque, (
-        "declarar 'mutacion.workers' cablearía el límite de ESTA máquina en un "
-        "arnés que se instala en cinco proyectos (decisión del 2026-08-20)"
-    )
+
+def test_el_rigor_json_del_proyecto_declara_workers_legible_o_no_lo_declara() -> None:
+    """FORMA, no valor (F-038).
+
+    Hasta F-038 este test exigía que el `rigor.json` NO declarase `workers`
+    (decisión del 2026-08-20: no cablear el límite de una máquina en un arnés
+    que viaja). Pero el fichero es del proyecto, y un proyecto que la declara
+    hace algo legítimo: `test_tampoco_se_recorta_lo_declarado_en_rigor_json`.
+    Lo que no puede pasar es que la declare de forma que el lector la descarte
+    en silencio y la campaña corra con otro número sin avisar.
+    """
+    rigor = cargar_rigor(RUTA_RIGOR)
+    bloque = rigor.get("mutacion", {})
+
+    if "workers" in bloque:
+        assert workers_mutacion(rigor) == bloque["workers"], (
+            "'mutacion.workers' está declarada pero no se puede leer: la "
+            "campaña la ignoraría y usaría el default sin decirlo"
+        )
+    else:
+        assert workers_mutacion(rigor) is None
 
 
-def test_sin_la_clave_workers_manda_el_default_por_nucleos() -> None:
-    assert workers_mutacion(cargar_rigor(RUTA_RIGOR)) is None
+def test_sin_la_clave_workers_manda_el_default_por_nucleos(tmp_path: Path) -> None:
+    config = tmp_path / "rigor.json"
+    config.write_text(json.dumps(RIGOR_SIN_WORKERS), encoding="utf-8")
+
+    assert workers_mutacion(cargar_rigor(config)) is None
     assert resolver_workers(None, None) == workers_por_defecto()
 
 
@@ -377,7 +402,8 @@ def test_una_base_que_expira_aborta_nombrando_workers_y_holgura(
 
     mensaje = str(error.value)
     assert "3 worker" in mensaje, "el mensaje tiene que nombrar los workers en juego"
-    assert str(timeout_de_linea_base(120)) in mensaje, "…y el timeout concedido"
+    # F-019 (R20): el reloj de la base crece con los workers en juego.
+    assert str(timeout_de_linea_base(120, 3)) in mensaje, "…y el timeout concedido"
     assert "timeout_por_mutante_s" in mensaje
     assert "--workers" in mensaje
 

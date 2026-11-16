@@ -281,6 +281,25 @@ infraestructura.
 > postventa y total), 18 objetos sobre los 269 que había con las 13 tablas
 > nuevas de `raw`. Regla dura nueva `R-POSTVENTA-RESTRINGIDA`. El inventario
 > pasa a **287 objetos**.
+>
+> **Enmienda del 2026-11-06 (F-157, la fase 0 repartida).** Entran
+> `stg.plan_mensual_fase0` (el presupuesto vivo de hoy repartido en el tiempo)
+> y `stg.v_plan_mensual_fase0_cobertura`, de consumo, y la funcion auxiliar
+> `stg.fn_explotar_planif`. Sin regla nueva. El inventario pasa a **290 objetos**.
+>
+> **Enmienda del 2026-11-09 (F-040, el lado de ingresos).** Entran las 7
+> tablas nuevas de `raw` (`cli`, `cer`, `cerpro`, `cerrec`, `cerprodes`,
+> `dvfpro`, `dvfrec`) y los esquemas `ventas` (clientes, facturas de venta,
+> sus lineas y recargos, certificaciones y sus recargos, el enlace
+> certificacion -> factura, su cobertura, tres vistas del cobro y cinco
+> funciones locales) y `ventas_restringida` (lo personal del cliente: tres
+> tablas, solo perfil total). Reglas duras nuevas `R-VENTAS-TRES-CIFRAS` y
+> `R-VENTAS-RESTRINGIDA`. El inventario pasa a **316 objetos**.
+>
+> **Enmienda del 2026-11-13 (F-161, el catalogo completo de versiones
+> master).** Entran `stg.master_versiones`, `stg.v_master_lineas`,
+> `mart.v_master_version_partida` y `mart.master_importe_mensual`. Sin regla
+> nueva (`R-VERSION-MASTER` los alcanza). El inventario pasa a **320 objetos**.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,

@@ -46,10 +46,10 @@ def test_f138_r22_vetada_al_estandar_y_del_autorizado() -> None:
     )
 
     assert DEFAULT_VETOED_SCHEMAS == (
-        "contabilidad_restringida,tesoreria_restringida,compras_restringida,postventa_restringida,raw"  # + F-156
+        "contabilidad_restringida,tesoreria_restringida,compras_restringida,postventa_restringida,ventas_restringida,raw"  # + F-156, F-040
     )
     assert DEFAULT_RESTRICTED_SCHEMAS == (
-        "contabilidad_restringida,tesoreria_restringida,compras_restringida,postventa_restringida"
+        "contabilidad_restringida,tesoreria_restringida,compras_restringida,postventa_restringida,ventas_restringida"
     )
     assert RESTR not in DEFAULT_CONSUMPTION_SCHEMAS.split(","), "nunca en el consumo"
     assert DEFAULT_TOTAL_VETOED_SCHEMAS == "raw", "el total SÍ lee compras_restringida"
@@ -87,7 +87,8 @@ def test_f138_r22_es_un_esquema_del_datamart() -> None:
     from etl_sigrid.domain import diccionario
 
     assert RESTR in diccionario.ESQUEMAS_DEL_DATAMART
-    assert len(diccionario.ESQUEMAS_DEL_DATAMART) == 18  # F-156: + postventa y postventa_restringida
+    # F-156: + postventa y postventa_restringida; F-040: + ventas y ventas_restringida
+    assert len(diccionario.ESQUEMAS_DEL_DATAMART) == 20
     assert list(diccionario.ESQUEMAS_DEL_DATAMART) == sorted(diccionario.ESQUEMAS_DEL_DATAMART)
     texto = (RAIZ / "etl_sigrid" / "domain" / "diccionario.py").read_text(encoding="utf-8")
     assert "F-138" in texto.split("ESQUEMAS_DEL_DATAMART = (")[0]
@@ -181,7 +182,7 @@ def test_f138_r23_el_autorizado_la_recibe() -> None:
 
 def test_f138_r23_las_comprobaciones_finales_la_miran() -> None:
     final = _roles_sql().split("\nCOMMIT;", 1)[1]
-    vetados = "('contabilidad_restringida', 'tesoreria_restringida', 'compras_restringida', 'postventa_restringida', 'raw')"
+    vetados = "('contabilidad_restringida', 'tesoreria_restringida', 'compras_restringida', 'postventa_restringida', 'ventas_restringida', 'raw')"
     assert f"WHERE grantee = 'mcp_sigrid_dm_ro'\n  AND table_schema IN {vetados}" in final
     assert f"WHERE nspname IN {vetados}" in final
     assert "'tesoreria', 'tesoreria_restringida', 'compras_restringida'," in final, (  # F-156 sigue

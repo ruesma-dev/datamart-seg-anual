@@ -59,9 +59,12 @@ COMMENT ON FUNCTION maestro.fn_fecha(INTEGER) IS
 -- depender de `stg`, y no se dropea nunca (patron de `maestro.centros_coste`,
 -- que `retenciones` lee desde F-094). Sus columnas nuevas, solo AL FINAL.
 --
--- `stg.obras` NO la usa (F-102, R7): sigue eligiendo como hasta hoy y difiere de
--- esta marca en 0581, 0606, 0671 y 0720. Pasar el seguimiento a la ficha de
--- Ruesma, y traer las demas empresas como obras propias, es F-106.
+-- `stg.obras` NO la usa (F-102, R7). Desde F-162 (2026-11-11) no elige: lleva una
+-- fila por ficha de todas las empresas y marca la suya, `es_por_defecto` (la de
+-- Ruesma si existe; si no, deciden los datos: lineas de presupuesto, `tiemod`,
+-- `ide`; sin `conext` 15). `maestro.obras.es_por_defecto` publica esa marca y,
+-- fuera del seguimiento, esta. Hoy coinciden en todas las fichas. Recursos,
+-- partes y compras de otras empresas siguen en F-106.
 --
 -- LOS CIERRES SE CUENTAN ANTES DE UNIR: agregar `raw.obrfas` por obra y unirlo
 -- da el mismo numero que una subconsulta por ficha, y en solo lectura tarda 22

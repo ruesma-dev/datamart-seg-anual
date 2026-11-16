@@ -23,7 +23,8 @@ Operación del datamart en Azure (F-005, ver docs/runbook_postgres_azure.md):
                                         build-cierre, build-compras,
                                         build-maestros, build-retenciones,
                                         build-personal, build-contabilidad,
-                                        build-tesoreria, build-postventa o
+                                        build-tesoreria, build-postventa,
+                                        build-ventas o
                                         build-descompuestos sueltos: recrean
                                         tablas y vistas con
                                         DROP + CREATE y un DROP se lleva los
@@ -113,6 +114,7 @@ from etl_sigrid.application.steps.build_mart_step import BuildMartStep
 from etl_sigrid.application.steps.build_personal_step import BuildPersonalStep
 from etl_sigrid.application.steps.build_postventa_step import BuildPostventaStep
 from etl_sigrid.application.steps.build_retenciones_step import BuildRetencionesStep
+from etl_sigrid.application.steps.build_ventas_step import BuildVentasStep
 from etl_sigrid.application.steps.build_stg_step import (
     BuildStgStep,
     sello_vigente_del_repositorio,
@@ -203,7 +205,8 @@ CAP_DOCUMENTADO_SIGRID_API = 1_000
 #: de ella sale el sufijo del `batch_id` que les permite reanudar.
 VARIABLE_EJECUCION_JOB = "CONTAINER_APP_JOB_EXECUTION_NAME"
 
-#: F-148, R25. Los build que recrean vistas con DROP + CREATE (once desde F-156):
+#: F-148, R25. Los build que recrean vistas con DROP + CREATE (once desde F-156,
+#: doce desde F-040):
 #: tras cada uno, `run-all` devuelve los permisos completos sin esperar al
 #: `apply_grants` final, que sigue siendo el que decide.
 PASOS_CON_PERMISOS = (
@@ -213,6 +216,7 @@ PASOS_CON_PERMISOS = (
     "build_tesoreria",
     "build_compras",
     "build_retenciones",
+    "build_ventas",
     "build_personal",
     "build_contabilidad",
     "build_postventa",
@@ -542,7 +546,8 @@ def load_aux() -> None:
     is_flag=True,
     default=False,
     help="Ignora la ventana y rehace TODAS las obras esta vez (F-025). Es lo "
-         "que hace sola la noche del domingo; este flag sirve para forzarlo a "
+         "que hace sola la noche del sabado (o la del domingo si falta la del "
+         "sabado, F-163); este flag sirve para forzarlo a "
          "mano. Cuesta lo que costaba la nocturna entera.",
 )
 def stage(sin_puerta: bool, reconstruir_todo: bool) -> None:
@@ -630,7 +635,8 @@ def build_pipeline_steps(
     (`build_contabilidad`), F-097 el séptimo (`build_descompuestos`, con su
     propia ingesta `ingest_descompuestos` delante) y F-037 el octavo
     (`build_tesoreria`): ocho build de negocio, quince pasos. F-156 suma el
-    noveno (`build_postventa`): dieciséis pasos. El
+    noveno (`build_postventa`): dieciséis pasos. F-040 suma el décimo
+    (`build_ventas`, el lado de ingresos): diecisiete pasos. El
     orden dentro de la lista es legible, pero lo que lo GARANTIZA es el
     `depends_on` de cada paso, que es lo que obedece el orden topológico.
 
@@ -666,6 +672,13 @@ def build_pipeline_steps(
         BuildTesoreriaStep(settings),
         BuildComprasStep(settings),
         BuildRetencionesStep(settings),
+        # F-040: el lado de ingresos (clientes, facturas de venta,
+        # certificaciones, su enlace y el seguimiento hasta el cobro) y lo
+        # personal del cliente en `ventas_restringida`: el DECIMO build de
+        # negocio. Sus tablas solo leen `raw` (`depends_on` = `ingest_raw`); sus
+        # vistas leen `tesoreria` al consultar. Nadie depende de el: si falla,
+        # la noche continua y R-FRESCURA avisa.
+        BuildVentasStep(settings),
         # F-057: `personal` entra como QUINTO build de negocio. Lee `stg.obras`
         # para la marca `en_seguimiento`, y eso lo declara su `depends_on`; la
         # posición aquí es legibilidad. Nadie depende de él a propósito: si
@@ -722,8 +735,9 @@ def build_pipeline_steps(
     is_flag=True,
     default=False,
     help="Ignora la ventana de negocio y rehace TODAS las obras (F-025). No "
-         "hace falta programarlo: la noche del domingo se dispara sola por "
-         "antiguedad registrada. Esta bandera es para forzarla a mano.",
+         "hace falta programarlo: se dispara sola la noche del sabado (o la del "
+         "domingo si falta la del sabado, F-163). Esta bandera es para "
+         "forzarla a mano.",
 )
 def run_all(full_refresh: bool, reconstruir_todo: bool) -> None:
     """
@@ -955,7 +969,8 @@ def apply_grants() -> None:
     `run-all` ya lo ejecuta como último paso de la noche. A mano hace falta
     tras lanzar `build-cierre`, `build-compras`, `build-maestros`,
     `build-retenciones`, `build-personal`, `build-contabilidad`,
-    `build-tesoreria`, `build-postventa` o `build-descompuestos` SUELTOS: esos
+    `build-tesoreria`, `build-postventa`, `build-ventas` o
+    `build-descompuestos` SUELTOS: esos
     comandos recrean
     tablas y vistas con
     DROP + CREATE y un DROP se lleva los GRANT concedidos.
@@ -1788,7 +1803,7 @@ def _guardian_de_cobertura(pg: PostgresClient):
     "reconstruir_todo",
     is_flag=True,
     default=False,
-    help="Simula la noche del domingo: la reconstruccion completa.",
+    help="Simula la noche del sabado: la reconstruccion completa.",
 )
 @click.option(
     "--detalle",
@@ -1913,13 +1928,16 @@ def check_ventana_cmd(timeout: int, dry_run: bool) -> None:
 
       * FIRMA DIVERGENTE   la obra congelada ha cambiado en Sigrid. No se
                            rescata -contradiria la decision del humano- pero se
-                           NOMBRA, y el domingo la pone al dia.
+                           NOMBRA, y la completa del fin de semana la pone al dia.
       * CONGELADA SIN FILAS no deberia poder pasar (R18 la reconstruiria). Si
                            pasa, la obra esta ausente del datamart.
       * SELLO NO VIGENTE   se quedo con una version anterior del SQL, porque
                            la noche en que cambio murio a mitad.
-      * COMPLETA VENCIDA   el domingo no corrio y el "hasta 6 dias" que el
-                           humano acepto ha dejado de ser cierto.
+      * COMPLETA VENCIDA   7 dias o mas sin completa: el fin de semana no
+                           corrio y el "hasta 6 dias" que el humano acepto ha
+                           dejado de ser cierto. Desde F-163 la completa NO
+                           entra entre semana: espera al sabado o se fuerza a
+                           mano con --reconstruir-todo.
 
     UN VERDE SOBRE CERO OBRAS ES UN KO. Si `_meta.obra_build` esta vacia no hay
     nada que comprobar, y decir OK seria confundir "no hay nada malo" con "no he
@@ -4167,13 +4185,53 @@ def reset_cierre() -> None:
     )
 
 
+def _obra_de_stg(cur, codigo_o_clave: str) -> tuple[int, str | None, str | None]:
+    """Resuelve una obra de `stg.obras` por su código o por su `clave_obra` (F-162).
+
+    Desde F-162 `stg.obras` tiene una fila por FICHA: el mismo código está en
+    varias empresas (la 0721 en Ruesma y en PORSAN) y un `fetchone` por código
+    cogería una cualquiera. Con un código se toma la ficha `es_por_defecto` y se
+    avisa de las demás; con una clave (`28-0721`), esa ficha. Si no hay ninguna,
+    sale con código 2. Devuelve `(obra_id, nombre_obra, clave_obra)`.
+    """
+    cur.execute(
+        "SELECT obra_id, nombre_obra, clave_obra, es_por_defecto, codigo_obra"
+        "  FROM stg.obras WHERE clave_obra = %s OR codigo_obra = %s",
+        (codigo_o_clave, codigo_o_clave),
+    )
+    filas = cur.fetchall()
+    por_clave = [f for f in filas if f[2] == codigo_o_clave]
+    elegidas = por_clave or [f for f in filas if f[4] == codigo_o_clave and f[3]]
+    if not elegidas:
+        click.secho(
+            f"No existe obra '{codigo_o_clave}' en stg.obras (ni como codigo ni como "
+            f"clave_obra, p. ej. '28-0721')",
+            fg="red", err=True,
+        )
+        sys.exit(2)
+    obra_id, nombre, clave = elegidas[0][:3]
+    otras = sorted(f[2] or "?" for f in filas if f[4] == codigo_o_clave and f[0] != obra_id)
+    if not por_clave and otras:
+        click.secho(
+            f"obra '{codigo_o_clave}': uso la ficha por defecto {clave}; el codigo "
+            f"tiene tambien {', '.join(otras)} (pasa la clave_obra para verla)",
+            fg="yellow", err=True,
+        )
+    return obra_id, nombre, clave
+
+
 @cli.command("find-obra")
 @click.option("--codigo", "codigo", type=str, default=None,
               help="codigo_obra a buscar (p.ej. '0664'). Si se omite, lista todas.")
 @click.option("--nombre", "nombre", type=str, default=None,
               help="filtra por nombre_obra (LIKE %nombre%).")
 def find_obra(codigo: str | None, nombre: str | None) -> None:
-    """Busca obras en stg.obras por codigo_obra o nombre_obra."""
+    """Busca obras en stg.obras por codigo_obra o nombre_obra.
+
+    Desde F-162 hay una fila por FICHA: el mismo código puede salir en varias
+    empresas, cada una con su `empresa_id`, su `clave_obra` y la marca de la
+    ficha por defecto (`es_por_defecto`, con «*»).
+    """
     pg = _get_pg()
     where: list[str] = []
     params: dict = {}
@@ -4186,10 +4244,10 @@ def find_obra(codigo: str | None, nombre: str | None) -> None:
     where_sql = ("WHERE " + " AND ".join(where)) if where else ""
 
     sql = f"""
-        SELECT obra_id, codigo_obra, nombre_obra
+        SELECT obra_id, codigo_obra, nombre_obra, empresa_id, clave_obra, es_por_defecto
           FROM stg.obras
         {where_sql}
-         ORDER BY codigo_obra NULLS LAST, obra_id
+         ORDER BY codigo_obra NULLS LAST, es_por_defecto DESC, obra_id
     """
     with pg.connection() as conn, conn.cursor() as cur:
         cur.execute(sql, params)
@@ -4200,10 +4258,16 @@ def find_obra(codigo: str | None, nombre: str | None) -> None:
         return
 
     click.secho(f"=== Obras encontradas ({len(rows)}) ===\n", fg="cyan", bold=True)
-    click.echo(f"  {'obra_id':>12}  {'codigo':<10}  {'nombre'}")
-    click.echo("  " + "-" * 90)
-    for obra_id, cod, nom in rows:
-        click.echo(f"  {obra_id:>12}  {(cod or ''):<10}  {(nom or '')[:80]}")
+    click.echo(f"  {'obra_id':>12}  {'codigo':<10}  {'emp':>4}  {'clave_obra':<14}  {'nombre'}")
+    click.echo("  " + "-" * 110)
+    for obra_id, cod, nom, empresa_id, clave_obra, es_por_defecto in rows:
+        marca = "*" if es_por_defecto else " "
+        emp = "" if empresa_id is None else str(empresa_id)
+        click.echo(
+            f"  {obra_id:>12}  {(cod or ''):<10}  {emp:>4}  {(clave_obra or ''):<13}{marca}  "
+            f"{(nom or '')[:80]}"
+        )
+    click.echo("  (* = es_por_defecto: la ficha que se lee si no se dice empresa)")
     click.echo("")
 
 
@@ -4221,16 +4285,7 @@ def list_master_cierre(codigo_obra: str | None, obra_id: int | None) -> None:
     pg = _get_pg()
     if codigo_obra and obra_id is None:
         with pg.connection() as conn, conn.cursor() as cur:
-            cur.execute(
-                "SELECT obra_id FROM stg.obras WHERE codigo_obra = %s",
-                (codigo_obra,),
-            )
-            row = cur.fetchone()
-            if not row:
-                click.secho(f"No existe obra con codigo='{codigo_obra}'",
-                            fg="red", err=True)
-                sys.exit(2)
-            obra_id = row[0]
+            obra_id, _nom, _clave = _obra_de_stg(cur, codigo_obra)
     if obra_id is None:
         click.secho("Debes pasar --obra o --codigo.", fg="red", err=True)
         sys.exit(2)
@@ -4298,17 +4353,9 @@ def inspect_cierre(
 
     if codigo_obra:
         with pg.connection() as conn, conn.cursor() as cur:
-            cur.execute(
-                "SELECT obra_id, nombre_obra FROM stg.obras WHERE codigo_obra = %s",
-                (codigo_obra,),
-            )
-            row = cur.fetchone()
-        if not row:
-            click.secho(f"No existe obra '{codigo_obra}'", fg="red", err=True)
-            sys.exit(2)
-        obra_id, _nom = row
+            obra_id, _nom, _clave = _obra_de_stg(cur, codigo_obra)
         click.secho(
-            f"obra '{codigo_obra}' → obra_id={obra_id} ({_nom})",
+            f"obra '{codigo_obra}' → {_clave}, obra_id={obra_id} ({_nom})",
             fg="white", dim=True,
         )
 
@@ -4477,17 +4524,9 @@ def inspect_indirectos_detalle(
 
     if codigo_obra:
         with pg.connection() as conn, conn.cursor() as cur:
-            cur.execute(
-                "SELECT obra_id, nombre_obra FROM stg.obras WHERE codigo_obra = %s",
-                (codigo_obra,),
-            )
-            row = cur.fetchone()
-        if not row:
-            click.secho(f"No existe obra '{codigo_obra}'", fg="red", err=True)
-            sys.exit(2)
-        obra_id, _nom = row
+            obra_id, _nom, _clave = _obra_de_stg(cur, codigo_obra)
         click.secho(
-            f"obra '{codigo_obra}' → obra_id={obra_id} ({_nom})",
+            f"obra '{codigo_obra}' → {_clave}, obra_id={obra_id} ({_nom})",
             fg="white", dim=True,
         )
 
@@ -4734,17 +4773,9 @@ def inspect_generales_detalle(
 
     if codigo_obra:
         with pg.connection() as conn, conn.cursor() as cur:
-            cur.execute(
-                "SELECT obra_id, nombre_obra FROM stg.obras WHERE codigo_obra = %s",
-                (codigo_obra,),
-            )
-            row = cur.fetchone()
-        if not row:
-            click.secho(f"No existe obra '{codigo_obra}'", fg="red", err=True)
-            sys.exit(2)
-        obra_id, _nom = row
+            obra_id, _nom, _clave = _obra_de_stg(cur, codigo_obra)
         click.secho(
-            f"obra '{codigo_obra}' → obra_id={obra_id} ({_nom})",
+            f"obra '{codigo_obra}' → {_clave}, obra_id={obra_id} ({_nom})",
             fg="white", dim=True,
         )
 
@@ -4829,15 +4860,7 @@ def inspect_cabecera(obra_id: int | None, codigo_obra: str | None) -> None:
 
     if codigo_obra:
         with pg.connection() as conn, conn.cursor() as cur:
-            cur.execute(
-                "SELECT obra_id FROM stg.obras WHERE codigo_obra = %s",
-                (codigo_obra,),
-            )
-            row = cur.fetchone()
-        if not row:
-            click.secho(f"No existe obra '{codigo_obra}'", fg="red", err=True)
-            sys.exit(2)
-        obra_id = row[0]
+            obra_id, _nom, _clave = _obra_de_stg(cur, codigo_obra)
 
     sql = """
     SELECT
@@ -4960,16 +4983,8 @@ def inspect_planif_vs_real(
     # Resolver obra_id desde código si toca
     if codigo_obra:
         with pg.connection() as conn, conn.cursor() as cur:
-            cur.execute(
-                "SELECT obra_id, nombre_obra FROM stg.obras WHERE codigo_obra = %s",
-                (codigo_obra,),
-            )
-            row = cur.fetchone()
-        if not row:
-            click.secho(f"No existe obra '{codigo_obra}'", fg="red", err=True)
-            sys.exit(2)
-        obra_id, nombre = row
-        click.echo(f"obra '{codigo_obra}' → obra_id={obra_id} ({nombre})")
+            obra_id, nombre, _clave = _obra_de_stg(cur, codigo_obra)
+        click.echo(f"obra '{codigo_obra}' → {_clave}, obra_id={obra_id} ({nombre})")
 
     # Resolver mes si no se ha pasado
     if not anio_mes:
@@ -5509,6 +5524,45 @@ def build_postventa() -> None:
     pg = _get_pg()
     ejecucion = _arrancar_ejecucion(pg)
     _ejecutar_paso(BuildPostventaStep(settings), pg, ejecucion)
+
+
+# =============================================================================
+# MÓDULO VENTAS (F-040, fase 1): clientes, facturas, certificaciones y cobro
+# =============================================================================
+@cli.command("build-ventas")
+def build_ventas() -> None:
+    """
+    Construye los schemas ventas y ventas_restringida desde raw.*.
+
+    Ejecuta en orden los SQL de sql/ventas:
+      00_setup.sql            schemas y funciones (fecha, CIF, persona, recargo)
+      01_clientes.sql         clientes (el CIF de la persona física a NULL)
+      02_facturas.sql         facturas de venta, sus líneas y sus recargos
+      03_certificaciones.sql  certificaciones y sus recargos
+      04_enlace.sql           certificación -> factura y la cobertura del enlace
+      05_vistas.sql           cobro por factura, seguimiento y contraste por obra
+      06_restringida.sql      ventas_restringida: lo personal del cliente
+      07_guardas.sql          la guarda: recuentos, base, recargos y nada personal
+
+    Requiere haber ingerido cli, cer, cerpro, cerrec, cerprodes, dvfpro, dvfrec
+    y dvf con sus 35 columnas (F-040). Tras lanzarlo suelto, `apply-grants`.
+    No publica el diccionario.
+
+    LO QUE HAY QUE SABER ANTES DE CONSULTAR LO QUE ESTO CONSTRUYE:
+
+      * Certificado, facturado y cobrado son tres cifras que no se suman ni se
+        restan sin declararlo (R-VENTAS-TRES-CIFRAS).
+      * El enlace certificación -> factura es N:M: no sumar lo cobrado entre
+        certificaciones si `factura_compartida`.
+      * Lo personal del cliente (NIF de la persona física, direcciones,
+        teléfonos, correos, la cabecera de la factura) SOLO está en
+        `ventas_restringida`, que lee el perfil total (R-VENTAS-RESTRINGIDA).
+      * La garantía es provisional (D4): clases 4 y 5; el RETESP, aparte.
+    """
+    settings = get_settings()
+    pg = _get_pg()
+    ejecucion = _arrancar_ejecucion(pg)
+    _ejecutar_paso(BuildVentasStep(settings), pg, ejecucion)
 
 
 # =============================================================================

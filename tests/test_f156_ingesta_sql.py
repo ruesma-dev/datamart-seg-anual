@@ -179,8 +179,9 @@ def test_f156_r4_compras_sigue_con_sus_cinco_familias() -> None:
 
 
 def test_f156_r5_el_censo_pasa_a_93() -> None:
-    assert len(_tablas()) == 93
-    assert len(_lista_tablas()) == 93, "tabla declarada dos veces"
+    # F-040: +7 del lado de ingresos
+    assert len(_tablas()) == 100
+    assert len(_lista_tablas()) == 100, "tabla declarada dos veces"
 
 
 def test_f156_r4_gra_sigue_detras_de_rcg() -> None:

@@ -413,3 +413,95 @@ $$;
 
 COMMENT ON FUNCTION stg.fn_mes_de_fase(DATE, TEXT, DATE, DATE) IS
 'F-118: mes de una fase real. Manda el texto (stg.fn_parse_mes_texto); si no se lee, el mes de la fecha fin, luego el de la de inicio y por último el ano/mes archivado. Es el anio_mes de las filas reales de stg.plan_mensual.';
+
+
+-- ---------------------------------------------------------------------------
+-- fn_explotar_planif (F-157)
+--
+-- La explosión de UN `planif` (texto de `raw.obrparpre` con el % ACUMULADO de
+-- cada mes separado por `|`) en sus posiciones con valor: `posicion_mes`
+-- (1 = el mes de `plafec`), `pct_acumulado` efectivo y `pct_mes`.
+--
+-- Esta es la regla del master de `08_plan_mensual.sql` (CTE `master_explosion`
+-- a `master_con_pct_mes`); si cambia allí, cambia aquí: lo vigilan
+-- `tests/test_f157_sql.py` (mismos literales) y `tests/test_f157_sandbox.py`
+-- (mismo resultado). Las ventanas son las mismas sin `presupuesto_id`: la
+-- función recibe un único `planif`, así que ninguna cruza partidas. La rama
+-- master del 08 NO la usa (F-157 D2: no se tocan los masters).
+--
+-- No filtra: el descarte del master (pre-arranque sin movimiento y acumulados
+-- > 250 %) lo aplica quien la llama (`09_plan_mensual_fase0.sql`), para que la
+-- sandbox pueda comparar todas las posiciones con el oráculo
+-- `etl_sigrid/domain/planif.py`.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION stg.fn_explotar_planif(p_planif TEXT)
+RETURNS TABLE (posicion_mes INTEGER, pct_acumulado NUMERIC(18,6), pct_mes NUMERIC(18,6))
+LANGUAGE sql IMMUTABLE PARALLEL SAFE
+AS $$
+WITH master_explosion AS (
+    SELECT
+        u.position::INTEGER AS posicion_mes,
+        CASE
+            WHEN u.valor ~ '^-?\d+([.,]\d+)?$'
+                THEN replace(u.valor, ',', '.')::NUMERIC(18,6)
+            ELSE NULL
+        END AS pct_acumulado_raw
+    FROM unnest(string_to_array(p_planif, '|'))
+        WITH ORDINALITY AS u(valor, position)
+    WHERE u.valor IS NOT NULL AND length(trim(u.valor)) > 0
+),
+master_con_metricas AS (
+    SELECT
+        *,
+        CASE WHEN pct_acumulado_raw > 0 THEN pct_acumulado_raw ELSE NULL END
+            AS pct_positivo,
+        MAX(pct_acumulado_raw) OVER (
+            ORDER BY posicion_mes
+            ROWS BETWEEN 1 FOLLOWING AND UNBOUNDED FOLLOWING
+        ) AS max_posterior
+    FROM master_explosion
+),
+master_con_grupos AS (
+    SELECT
+        *,
+        COUNT(pct_positivo) OVER (
+            ORDER BY posicion_mes
+            ROWS UNBOUNDED PRECEDING
+        ) AS grupo_positivo
+    FROM master_con_metricas
+),
+master_con_ultimo_positivo AS (
+    SELECT
+        *,
+        MAX(pct_positivo) OVER (
+            PARTITION BY grupo_positivo
+        ) AS ultimo_positivo
+    FROM master_con_grupos
+),
+master_pct_efectivo AS (
+    SELECT
+        posicion_mes,
+        CASE
+            WHEN pct_acumulado_raw IS NOT NULL AND pct_acumulado_raw > 0
+                THEN pct_acumulado_raw                  -- literal positivo
+            WHEN COALESCE(max_posterior, 0) > 0
+                THEN 0                                   -- 0 INTERMEDIO (hay positivo después) -> 0 literal (estorno)
+            WHEN ultimo_positivo IS NOT NULL
+                THEN ultimo_positivo                     -- 0 FINAL tras un positivo -> arrastra (partida cerrada)
+            ELSE 0                                       -- 0 de pre-arranque (sin positivo previo)
+        END AS pct_acumulado
+    FROM master_con_ultimo_positivo
+)
+SELECT
+    posicion_mes,
+    pct_acumulado::NUMERIC(18,6),
+    (pct_acumulado - COALESCE(
+        LAG(pct_acumulado) OVER (ORDER BY posicion_mes),
+        0
+    ))::NUMERIC(18,6) AS pct_mes
+FROM master_pct_efectivo
+ORDER BY posicion_mes
+$$;
+
+COMMENT ON FUNCTION stg.fn_explotar_planif(TEXT) IS
+'F-157: explota un planif (% acumulado por mes separado por |) con la regla del master de 08_plan_mensual.sql: positivo literal; 0 con un positivo después = 0 (estorno); 0 final = el último positivo; sin positivo antes = 0. Devuelve posicion_mes, pct_acumulado y pct_mes de cada posición con valor, sin filtrar. La usa 09_plan_mensual_fase0.sql.';

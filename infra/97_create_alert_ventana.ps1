@@ -18,7 +18,9 @@
 # una obra congelada cuya FIRMA DEL ORIGEN ha cambiado -se movio en Sigrid-,
 # una obra congelada SIN FILAS construidas, una obra con un SELLO DEL SQL que
 # ya no es el vigente -le falta el ultimo arreglo- y la RECONSTRUCCION COMPLETA
-# VENCIDA, que es el domingo que no corrio.
+# VENCIDA (7 dias o mas sin completa), que es el fin de semana que no corrio:
+# desde F-163 (2026-11-15) la completa solo entra el sabado, o el domingo si
+# falta la del sabado; entre semana nunca, aunque este vencida.
 #
 # SIN ESTA REGLA EL GUARDIAN ES MUDO, y es el precio declarado de DA-5. Se
 # decidio que `check-ventana` AVISE Y NO BLOQUEE: la nocturna termina en verde

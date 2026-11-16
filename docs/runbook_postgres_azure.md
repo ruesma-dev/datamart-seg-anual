@@ -1037,3 +1037,83 @@ perfiles postventa y total (D9). Su feature y su despliegue son de `mcp-bbdd`.
   objects» (probado en un PostgreSQL 16 desechable el 2026-11-05, F-156) y, en
   un `-c` con varias sentencias, no se aplica ninguna. Los esquemas los retira
   la vuelta atrás de `design.md` § 12.
+
+## 15. Alta de `ventas_restringida` (F-040)
+
+Misma sesión y mismas reglas que la §13 (PowerShell 5.1, de día, fuera de
+00:00-05:00 UTC, sin imprimir nunca un valor); aquí solo lo que cambia. **No hay
+login ni grupo nuevos ni contraseña que tocar**: se lanza `02_roles.sql` SIN
+ninguna variable `*_PWD` en el entorno y los cinco logins salen SIN CAMBIOS.
+Crea los esquemas `ventas` y `ventas_restringida` (punto 4), concede `ventas`
+al estándar (punto 5), veta `ventas_restringida` al estándar y se la da al
+autorizado (punto 5 ter); el total la lee por pertenencia. El perfil restringido
+y el de postventa no leen ninguna de las dos: sus bucles vetan todo lo que no
+está en su lista. Va DESPUÉS de desplegar la imagen con F-040 y ANTES de su
+primer `build-ventas` (pasos 2 y 5 de los MANUAL de
+`specs/F-040-ingresos/design.md` § 9): sin el veto, la ventana hasta la
+nocturna dejaría lo personal del cliente sin proteger.
+
+### P0-P1 · Puerta y variables
+
+Las de la §13 (P0 y P1), con el job ya en la imagen que lleva F-040. Antes de
+seguir, comprobar que NO queda ninguna contraseña en el entorno:
+
+```powershell
+Get-ChildItem Env: | Where-Object { $_.Name -like "*_PWD" } | Select-Object Name
+```
+
+Esperado: ninguna fila (solo nombres; nunca se imprime un valor).
+
+### P2 · La base
+
+```powershell
+psql -X -v ON_ERROR_STOP=1 -f $roles $dsn
+```
+
+Esperado: los cinco logins SIN CAMBIOS; `COMMIT`; los nueve roles con
+`rolsuper = f`; los veinte esquemas, `ventas` y `ventas_restringida` con dueño
+`sigrid_dm_etl`; cero filas del estándar en las vetadas y `lee = f` en las seis
+(`ventas_restringida` incluida); el total con `ventas = t` y
+`ventas_restringida = t`; el restringido y el postventa con `ventas = f` y
+`ventas_restringida = f`.
+
+### P3 · Negativa y positiva con los logins reales
+
+Tras el primer `build-ventas` y `apply-grants` (paso 4 de `design.md` § 9).
+
+```powershell
+$dsnE = "host=$pgh dbname=sigrid_dm user=mcp_sigrid_dm_ro sslmode=require"
+$env:PGPASSWORD = az keyvault secret show --vault-name $kvMcp --name pg-password @q
+psql -X -c "SELECT 1 FROM ventas_restringida.clientes_contacto LIMIT 1" $dsnE
+psql -X -c "SELECT 1 FROM ventas.clientes LIMIT 1" $dsnE
+$dsnT = "host=$pgh dbname=sigrid_dm user=mcp_sigrid_dm_total sslmode=require"
+$env:PGPASSWORD = az keyvault secret show --vault-name $kvMcp --name pg-password-total @q
+psql -X -c "SELECT 1 FROM ventas_restringida.clientes_contacto LIMIT 1" $dsnT
+psql -X -c "SELECT 1 FROM ventas.clientes LIMIT 1" $dsnT
+$dsnR = "host=$pgh dbname=sigrid_dm user=mcp_sigrid_dm_restringido sslmode=require"
+$env:PGPASSWORD = az keyvault secret show --vault-name $kvMcp --name pg-password-restringido @q
+psql -X -c "SELECT 1 FROM ventas_restringida.clientes_contacto LIMIT 1" $dsnR
+psql -X -c "SELECT 1 FROM ventas.clientes LIMIT 1" $dsnR
+Remove-Item Env:PGPASSWORD
+```
+
+Esperado: estándar, `permission denied for schema ventas_restringida` y una
+fila en `ventas.clientes`; total, una fila en las dos; restringido,
+`permission denied` en las dos. Y en la fila de `apply-grants` de
+`_meta.etl_runs`: `verificacion`, `verificacion_total`,
+`verificacion_restringido` y `verificacion_postventa` a `ok`.
+
+### P4 · El contrato a `mcp-bbdd`
+
+`ventas` a la lista blanca del estándar y del total, `ventas_restringida` solo
+a la del total, en el `config.yaml` de `mcp-bbdd`, y reinicio del MCP (cachea el
+diccionario hasta reiniciar). Su cambio y su despliegue son de `mcp-bbdd`.
+
+### Vuelta atrás
+
+- **P2 falla**: `02_roles.sql` es reejecutable; lo que va dentro del `BEGIN` se
+  deshace solo. Se corrige y se repite P2.
+- **Hay que retirar los esquemas**: la vuelta atrás de `design.md` § 9 (imagen
+  anterior y, como `sigrid_dm_etl`, `DROP SCHEMA IF EXISTS ventas_restringida
+  CASCADE; DROP SCHEMA IF EXISTS ventas CASCADE;`). El veto de `02_roles.sql`
+  puede quedarse: está guardado por `to_regnamespace`.

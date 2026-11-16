@@ -16,8 +16,19 @@
 -- clave técnica. Las seis columnas de F-102 salen de `maestro.v_obra_fichas`
 -- (`00_setup.sql`), que decide cuál es la ficha de Ruesma de cada código
 -- (`es_ficha_principal`) y la publica como referencia (`obra_principal_id`):
--- NO sirve para agregar hechos de otras empresas. `stg.obras` no la usa y
--- difiere de ella en 0581, 0606, 0671 y 0720; eso lo resuelve F-106.
+-- NO sirve para agregar hechos de otras empresas.
+--
+-- LA FICHA POR DEFECTO (F-162, 2026-11-11): desde F-162 `stg.obras` lleva una
+-- fila por ficha de todas las empresas y marca en `es_por_defecto` la que se lee
+-- cuando la pregunta no dice empresa (la de Ruesma si existe; si no, deciden las
+-- líneas de presupuesto, `tiemod` e `ide`: `etl_sigrid/domain/ficha_obra.py`).
+-- Aquí se publica la MISMA marca como última columna: la de `stg.obras` para las
+-- fichas del seguimiento y, fuera de él (códigos administrativos y de cinco o
+-- más dígitos, que `stg.obras` excluye), `es_ficha_principal` (D1). Hoy las dos
+-- coinciden en las 925 fichas: solo difieren si un código con varias fichas no
+-- tiene la de Ruesma. No se calcula aquí ni en `maestro.v_obra_fichas`: contar
+-- líneas de `raw.obrparpre` en una vista que `compras` lee en cada consulta
+-- costaría 48 s cada vez.
 --
 -- LA CABECERA DE ANTES ERA FALSA (corregida por F-073): daba por hecho que en
 -- Sigrid una obra carece de emplazamiento propio. Lo tiene, y vive en
@@ -65,6 +76,7 @@
 --   SELECT * FROM maestro.obras WHERE codigo_obra = '0404' AND empresa_id = 1;
 --   SELECT * FROM maestro.obras WHERE clave_obra = '27-0581';
 --   SELECT municipio, COUNT(*) FROM maestro.obras WHERE es_ficha_principal GROUP BY municipio;
+--   SELECT * FROM maestro.obras WHERE codigo_obra = '0721' AND es_por_defecto;
 
 CREATE OR REPLACE VIEW maestro.obras AS
 SELECT
@@ -102,7 +114,10 @@ SELECT
     vf.clave_obra                  AS clave_obra,
     vf.num_fichas_codigo           AS num_fichas_codigo,
     vf.es_ficha_principal          AS es_ficha_principal,
-    vf.obra_principal_id           AS obra_principal_id
+    vf.obra_principal_id           AS obra_principal_id,
+    -- F-162, AL FINAL por la misma razon: la ficha por defecto de su codigo.
+    -- La de `stg.obras` en el seguimiento; fuera de el, la de Ruesma (D1).
+    COALESCE(so.es_por_defecto, vf.es_ficha_principal) AS es_por_defecto
 FROM      raw.obr o
 JOIN      raw.con c   ON c.ide   = o.ide                 -- la obra ES un `con`
 LEFT JOIN raw.con cli ON cli.ide = o.entide              -- el cliente también es un `con`
@@ -116,6 +131,7 @@ LEFT JOIN LATERAL (
     LIMIT  1
 ) es ON TRUE
 LEFT JOIN maestro.v_obra_fichas vf ON vf.obra_id = c.ide
+LEFT JOIN stg.obras so ON so.obra_id = c.ide             -- una fila por ficha (F-162): no multiplica
 LEFT JOIN LATERAL (
     SELECT ae.res AS nombre_empresa
     FROM   raw.auxemp ae
@@ -125,4 +141,4 @@ LEFT JOIN LATERAL (
 ) em ON TRUE;
 
 COMMENT ON VIEW maestro.obras IS
-'Maestro de obras (922 filas el 2026-09-23, una por FICHA): codigo, nombre, estado con su nombre traducido (tipo de documento 42), fechas de alta y baja, cliente, direccion con el mismo vocabulario que maestro.proveedores, municipio y provincia, las marcas tiene_presupuesto / tiene_seguimiento y, desde F-102, la empresa de la ficha (empresa_id, nombre_empresa) y su clave legible clave_obra = empresa-codigo. LA OBRA ES DE UNA EMPRESA: el mismo codigo es la misma obra vista desde cada empresa y no se consolida, asi que por codigo_obra se cruza siempre con empresa_id o por clave_obra. es_ficha_principal marca la ficha de Ruesma de cada codigo; obra_principal_id es referencia y no sirve para agregar hechos de otras empresas. Direccion: dir1 en 310 de las 846 fichas principales (2026-09-23), escasa en las obras antiguas; las 103 fichas de la empresa 28 no traen ni direccion ni cliente. tiene_seguimiento se mide en stg.plan_mensual y es superconjunto del hecho publicado.';
+'Maestro de obras (922 filas el 2026-09-23, una por FICHA): codigo, nombre, estado con su nombre traducido (tipo de documento 42), fechas de alta y baja, cliente, direccion con el mismo vocabulario que maestro.proveedores, municipio y provincia, las marcas tiene_presupuesto / tiene_seguimiento y, desde F-102, la empresa de la ficha (empresa_id, nombre_empresa) y su clave legible clave_obra = empresa-codigo. LA OBRA ES DE UNA EMPRESA: el mismo codigo es la misma obra vista desde cada empresa y no se consolida, asi que por codigo_obra se cruza siempre con empresa_id o por clave_obra. es_ficha_principal marca la ficha de Ruesma de cada codigo; obra_principal_id es referencia y no sirve para agregar hechos de otras empresas. Desde F-162, es_por_defecto marca la ficha por defecto de cada codigo (la de stg.obras en el seguimiento; fuera de el, la de Ruesma). Direccion: dir1 en 310 de las 846 fichas principales (2026-09-23), escasa en las obras antiguas; las 103 fichas de la empresa 28 no traen ni direccion ni cliente. tiene_seguimiento se mide en stg.plan_mensual y es superconjunto del hecho publicado.';

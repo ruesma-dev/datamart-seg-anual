@@ -32,9 +32,10 @@ from collections.abc import Iterable, Sequence, Set
 from datetime import timedelta
 
 #: Hasta dónde se busca un lote que adoptar. Una réplica no vive más que el
-#: `replicaTimeout` del job (7 h): una ventana de 8 h cubre la primera réplica
-#: entera y no alcanza a la noche anterior.
-VENTANA_REANUDACION = timedelta(hours=8)
+#: `replicaTimeout` del job (14 h desde F-163, 2026-11-15; antes 7 h): una
+#: ventana de 15 h cubre la primera réplica entera y no alcanza a la noche
+#: anterior (la nocturna arranca cada 24 h). Si sube el techo, sube esto.
+VENTANA_REANUDACION = timedelta(hours=15)
 
 #: Pasos que se ejecutan aunque el lote ya los tenga en `SUCCESS`.
 PASOS_NUNCA_OMITIBLES = frozenset({"apply_grants"})

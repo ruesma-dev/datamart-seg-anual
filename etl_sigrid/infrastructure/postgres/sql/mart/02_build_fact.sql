@@ -31,9 +31,14 @@
 --   - Resultado: V11 es vigente para febrero 2026, no V6 CUAT OCT-25.
 --
 -- Pasos:
---   1) `versiones_master`: catálogo (obra × ámbito × versión × fec_creacion
---      × fec_efectiva × descripción) de TODAS las versiones del master
---      para amb 8 y 11.
+--   1) `versiones_tipadas`: el catálogo de versiones con su tipo. Desde F-161
+--      NO se deduce aquí de plan_mensual: se lee de `mart.master_versiones_tipadas`,
+--      el ÚNICO catálogo, que construye `01b_master_versiones.sql` en el
+--      sub-paso anterior (D11). Ese catálogo tiene TODAS las versiones con
+--      líneas; aquí solo entran las que tienen reparto (`tiene_reparto`) y las
+--      dos fechas, que son exactamente las que entraban antes (D4, R11). La
+--      cascada del tipo (ABC > Planif Inicial > Cuatrimestral > Cierre
+--      mensual > Sin clasificar) y sus textos de ejemplo están en `01b`.
 --   2) `meses_objetivo`: el conjunto de meses para los que tenemos algún
 --      dato en plan_mensual (reales o master). Sobre estos meses se proyecta
 --      el planificado.
@@ -42,7 +47,8 @@
 --   4) `master_proyectado`: LEFT JOIN entre versión vigente y plan_mensual
 --      por (obra, partida, ámbito, versión, mes). Si no hay fila → 0.
 --      Trae también can_origen / importe_origen / etc. cuando existen.
---   5) Etiqueta `tipo_master` (Inicial / ABC / Cuatrimestral / Otra).
+--   5) `tipo_master` viene del catálogo (Planif Inicial / ABC / Cuatrimestral /
+--      Cierre mensual / Sin clasificar).
 --   6) UNION ALL: 2 escenarios reales (directo) + 2 escenarios planif
 --      (a partir de master_proyectado).
 
@@ -50,74 +56,20 @@ TRUNCATE TABLE mart.fact_seguimiento_mensual;
 
 WITH
 -- =========================================================================
--- 1) Catálogo de versiones del master por (obra, ámbito)
+-- 1) Catálogo de versiones del master por (obra, ámbito), con su tipo.
+--    Lo construye `01b_master_versiones.sql` (F-161, D11). Solo las versiones
+--    con reparto y con las dos fechas rigen el mensual (R10, D4): las demás
+--    (sin `planif`, como la v24 de coste de la 0698) se publican en el
+--    catálogo y en `mart.master_importe_mensual`, pero no aquí.
 -- =========================================================================
-versiones_master AS (
-    SELECT DISTINCT
-        obra_id,
-        ambito_id,
-        version,
-        version_fec_creacion,
-        version_fec_efectiva,
-        version_descripcion,
-        version_tex
-    FROM stg.plan_mensual
-    WHERE ambito_id IN (8, 11)
-      AND version_fec_creacion IS NOT NULL
-      AND version_fec_efectiva IS NOT NULL
-),
--- =========================================================================
--- 1b) Tipo de master derivado del texto libre `tex` (obrfasamb.tex)
---
--- El JO escribe en `tex` el propósito de la versión. Los textos reales
--- observados en Ruesma:
---   "CIERRE INICIAL_ESTUDIO"            → fase v0, descartada (plafec=0)
---   "CIERRE INICIAL_OBRA"               → fase v1, descartada (plafec=0)
---   "PLANIFICACION VALORADA INICIAL"    → Planif Inicial (al arranque)
---   "PLANIFICACION VALORADA OCT-25"     → Cuatrimestral
---   "CIERRE DICIEMBRE-25/ ABC"          → ABC (puede ir combinado con cierre)
---   "CIERRE ENERO-26"                   → Revisión / cierre mensual
---   "PLANIFICACION CUATRIMESTRAL FEB-26"→ Cuatrimestral
---   "CIERRE FEBRERO-26"                 → Revisión
---
--- Reglas de matching sobre `tex` (en orden de prioridad).
--- Los textos observados en Ruesma siguen estos patrones:
---   - "PLANIFICACION VALORADA INICIAL"       → Planif Inicial
---   - "PLANIFICACION VALORADA OCT-25"        → Cuatrimestral (formato JO de Oct/Feb/Jun)
---   - "PLANIFICACION CUATRIMESTRAL FEB-26"   → Cuatrimestral (formato explícito)
---   - "CIERRE DICIEMBRE-25/ ABC"             → ABC (puede combinar con cierre)
---   - "CIERRE ENERO-26"                      → Cierre mensual (revisión)
---   - "" o NULL                              → Sin clasificar
---
--- Prioridad estricta — la primera que matchea gana:
---   1. ABC                  → contiene "ABC"
---   2. Planif Inicial       → contiene "INICIAL" Y contiene "VALORADA"
---   3. Cuatrimestral        → contiene "CUATRIM" O contiene "VALORADA"
---                             (PLANIFICACION VALORADA OCT-25 = cuatrimestral
---                              de octubre; el JO no siempre escribe la palabra
---                              "CUATRIMESTRAL")
---   4. Cierre mensual       → contiene "CIERRE" (sin ABC)
---   5. Sin clasificar       → resto
 versiones_tipadas AS (
     SELECT
         obra_id, ambito_id, version, version_fec_creacion, version_fec_efectiva,
-        version_descripcion, version_tex,
-        CASE
-            WHEN version_tex IS NULL OR length(trim(version_tex)) = 0
-                THEN 'Sin clasificar'
-            WHEN UPPER(version_tex) LIKE '%ABC%'
-                THEN 'ABC'
-            WHEN UPPER(version_tex) LIKE '%INICIAL%'
-             AND UPPER(version_tex) LIKE '%VALORADA%'
-                THEN 'Planif Inicial'
-            WHEN UPPER(version_tex) LIKE '%CUATRIM%'
-              OR UPPER(version_tex) LIKE '%VALORADA%'
-                THEN 'Cuatrimestral'
-            WHEN UPPER(version_tex) LIKE '%CIERRE%'
-                THEN 'Cierre mensual'
-            ELSE 'Sin clasificar'
-        END AS tipo_master
-    FROM versiones_master
+        version_descripcion, version_tex, tipo_master
+    FROM mart.master_versiones_tipadas
+    WHERE tiene_reparto
+      AND version_fec_creacion IS NOT NULL
+      AND version_fec_efectiva IS NOT NULL
 ),
 -- =========================================================================
 -- 2) Universo de meses con datos por (obra, partida, ámbito).

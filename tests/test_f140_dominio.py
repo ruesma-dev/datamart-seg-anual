@@ -132,13 +132,14 @@ def test_f140_r14_proporcional_al_perfil() -> None:
     assert reparto == [(ENE, D("25.00"), False), (FEB, D("75.00"), False)]
 
 
-def test_f140_r14_el_ultimo_mes_absorbe_el_redondeo() -> None:
-    """100 / 3 no divide exacto: 33,33 + 33,33 + 33,34."""
+def test_f140_r14_el_redondeo_va_por_acumulado() -> None:
+    """100 / 3 no divide exacto. Desde F-159, por acumulado: hasta enero 33,33,
+    hasta febrero 66,67 y hasta marzo 100 -> 33,33 + 33,34 + 33,33."""
     reparto = repartir_pendiente(
         D("100"), [(ENE, D("1")), (FEB, D("1")), (MAR, D("1"))], PRIMERO
     )
     assert reparto == [
-        (ENE, D("33.33"), False), (FEB, D("33.33"), False), (MAR, D("33.34"), False)
+        (ENE, D("33.33"), False), (FEB, D("33.34"), False), (MAR, D("33.33"), False)
     ]
 
 
@@ -157,7 +158,7 @@ def test_f140_r14_el_ultimo_es_el_mes_mas_tardio_aunque_venga_desordenado() -> N
         D("100"), [(MAR, D("1")), (ENE, D("1")), (FEB, D("1"))], PRIMERO
     )
     assert reparto == [
-        (ENE, D("33.33"), False), (FEB, D("33.33"), False), (MAR, D("33.34"), False)
+        (ENE, D("33.33"), False), (FEB, D("33.34"), False), (MAR, D("33.33"), False)
     ]
 
 

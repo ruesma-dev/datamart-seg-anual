@@ -169,7 +169,12 @@ def test_f034_r4_el_operador_declarado_es_comparacion():
     """R4: van etiquetados como `comparacion` y `clave_de_mutante` los distingue."""
     mutantes = _mutantes(FUENTE_IS)
 
-    assert [mutante.operador for mutante in mutantes] == ["comparacion"]
+    # F-026 (R9): la guarda da además el mutante de `veracidad` (`if not x:`),
+    # que no sustituye al de `comparacion`: el `is` → `is not` sigue aquí.
+    assert sorted(mutante.operador for mutante in mutantes) == ["comparacion", "veracidad"]
+    assert [m.mutado for m in mutantes if m.operador == "comparacion"] == [
+        "if x is not None:"
+    ]
 
     dos = _de_operador(FUENTE_DOS_IS, "comparacion")
     claves = {

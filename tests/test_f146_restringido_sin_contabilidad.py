@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import re
 import subprocess
+from harness.tiempos import escalar_timeout
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -32,7 +33,7 @@ LOGIN = "mcp_sigrid_dm_restringido"
 DUENO = "sigrid_dm_etl"
 CONTABILIDAD = "contabilidad"
 #: lo que el perfil restringido no lee de la lista de consumo (F-141 y F-146)
-VETADOS_AL_PERFIL = ("personal", "contabilidad", "tesoreria")
+VETADOS_AL_PERFIL = ("personal", "contabilidad", "tesoreria", "ventas")  # + F-040 (R27)
 #: lo que hoy hay en `contabilidad` y una tabla que naciera mañana
 TABLAS_CONTABILIDAD = (
     "contabilidad.plan_cuentas", "contabilidad.mayor", "contabilidad.saldos_cuenta_mes",
@@ -367,7 +368,7 @@ def _global_de_main() -> str | None:
     try:
         r = subprocess.run(
             ["git", "show", "main:config/diccionario/00_global.yaml"],
-            cwd=RAIZ, capture_output=True, text=True, encoding="utf-8", timeout=30,
+            cwd=RAIZ, capture_output=True, text=True, encoding="utf-8", timeout=escalar_timeout(30),
         )
     except (OSError, subprocess.SubprocessError):
         return None

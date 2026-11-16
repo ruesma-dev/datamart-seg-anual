@@ -50,6 +50,9 @@ REGLAS_TRAS_F147 = {
     "R-CAJA-HIPOTESIS",
     # F-156 (2026-11-04), la de los datos personales de postventa.
     "R-POSTVENTA-RESTRINGIDA",
+    # F-040 (2026-11-09): certificado, facturado y cobrado no se suman, y los
+    # datos personales del cliente solo en ventas_restringida.
+    "R-VENTAS-TRES-CIFRAS", "R-VENTAS-RESTRINGIDA",
 }
 
 #: Los ocho códigos que F-147 retira (R8). Se escriben partidos para que este

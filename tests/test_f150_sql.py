@@ -378,12 +378,14 @@ def test_f150_r12_la_guarda_de_entrada_exige_las_fuentes_nuevas() -> None:
 
 def test_f150_r14_el_reparto_con_coeficientes_es_el_mismo_reparto() -> None:
     texto = _devengo()
-    assert ("ROUND(d.pendiente_con_coeficientes * pr.importe_mes / d.total_perfil, 2) "
-            "AS parte_con_coef") in texto
+    # F-159: el mismo reparto por acumulado sobre la envolvente que el pendiente.
     assert (
-        "CASE WHEN r.desde_el_final = 1 THEN r.pendiente_con_coeficientes - "
-        "(r.suma_partes_con_coef - r.parte_con_coef) ELSE r.parte_con_coef END"
+        "CASE WHEN en.desde_el_final = 1 THEN d.pendiente_con_coeficientes "
+        "ELSE ROUND(d.pendiente_con_coeficientes * en.peso_acumulado / d.total_perfil, 2) "
+        "END AS hasta_con_coef"
     ) in texto
+    assert ("r.hasta_con_coef - COALESCE(LAG(r.hasta_con_coef) OVER w, 0) "
+            "AS importe_con_coef") in texto
     assert "d.pendiente_con_coeficientes AS importe_con_coef" in texto, "sin perfil, entero"
 
 

@@ -1922,6 +1922,14 @@ delta 20/20, reverificadas en serie. Review: pasada 1 rechazada (R4 sin SQLSTATE
 `azure-apps` y despliegue MANUAL incompletos), pasada 2 APROBADO. Merge `8ed8cf5`; desplegada el
 24-10 (imagen `r20261024-1837`, v60, MCP reiniciado). Cerrada por orden del humano con R31 (7
 noches seguidas sin corte, desde la del 25-10) como verificación MANUAL pendiente.
+**R31 cerrada el 2026-11-09 (líder), cumplida en sustancia**: 16 noches seguidas (25-10 a 09-11)
+con 0 FAILED en `ingest_raw%`, ningún paso de ingesta repetido, `pg_connect_s` máx 0,081 s y 0
+huecos de más de 100 s en conexión o `copy_s`. Los cuatro huecos de `http_s` (~134 s: 25-10, 04-11,
+06-11 y 07-11) son de `sigrid-api` y no rompen la racha (D6). Al pie de la letra, R31 a (una
+réplica) se cumplió 6 noches seguidas (25 a 30-10): el 31-10, 04-11, 05-11, 07-11 y 08-11 hubo
+segunda réplica, siempre por un fallo de build posterior a la ingesta (`build_compras` el 31-10,
+`build_tesoreria` R50 los demás, ya corregido por F-159), y la reanudación de F-148 no repitió la
+ingesta. Ninguna noche se cortó la conexión.
 
 ## F-149 · El MCP no cita reglas que no se publican · 2026-10-25
 
@@ -2044,3 +2052,157 @@ reiniciado (carga la v72). Medido en Azure el 06-11: 0 importes negativos,
 La nocturna del 06-11 (imagen vieja) ya salió en SUCCESS porque ese día el
 negativo volvió a compensarse: el defecto era real y seguía latente.
 Merge `main` 3d72d06, `dev` dd834a9.
+
+## F-157 — La planificación en el tiempo de la fase 0 · 2026-11-07
+
+Rama `feature/F-157-planificacion-fase0`. APROBADO en la pasada 1
+(`progress/review_F-157.md`); spec en `specs/F-157-planificacion-fase0/`.
+Petición de Juan Romero (Control de Costes) del 05-11.
+
+`stg.plan_mensual_fase0`: el presupuesto vivo de hoy (fase 0, coste 3 y venta
+7) repartido en el tiempo con el `planif` del jefe de obra, desde
+`obrfasamb.plafec`; tabla propia porque `mart` publica los ámbitos 3/7 de
+`stg.plan_mensual` como la serie de cierres (Coste/Venta Real). Regla de
+explosión del master en `stg.fn_explotar_planif` (sin tocar el 08), oráculo
+`domain/planif.py`, vista `stg.v_plan_mensual_fase0_cobertura`, sub-paso
+`build_plan_mensual_fase0` acotado a las obras de la noche. Sin regla dura
+nueva; `mart` sin tocar (D8).
+
+Desplegado: imagen r20261106-1848 (viernes, no sábado: la nocturna del 07-11
+reconstruyó entero, `build_stg` 165 min, fin 06:34 UTC), diccionario v73,
+MCP reiniciado. Medido el 07-11: 1.265.519 filas en 135 obras, 239 MB,
+sub-paso 3,6 min; la 0726 con 1.504/1.546 partidas de coste y 1.438/1.461 de
+venta planificadas (el jefe de obra planificó tras la petición), cuadre con
+el total ≤ 1,43 EUR por obra. `check-declarados` (290), `check-cierres`
+(0 discrepancias) y `check-unicidad` (sin colisiones; `stg.plan_mensual`
+sigue sin comprobar por timeout) en verde. R20 (huella de antes y después) no
+se midió: no se tomó la huella previa; lo cubre `check-cierres`.
+Merge `main` 93fc38c, `dev` aa2b053.
+
+## F-159 — Hotfix 2: el mes negativo del plan amplificado en el reparto · 2026-11-08
+
+Rama `feature/F-159-hotfix-devengo-negativo-2`. APROBADO en la pasada 1
+(`progress/review_F-159.md`); spec en `specs/F-159-hotfix-devengo-negativo-2/`.
+
+Las nocturnas del 07-11 y del 08-11 (ya con F-158) cayeron en `build_tesoreria`
+por R50: 1-0710, 2026-11, CD sin contrato, -18.791.769,87 EUR. La nueva V13 de
+1-0710 («PLANIFICACION CUATRIMESTRAL OCT-26», creada el 06-11) trae en la
+partida 404326 un 0 intermedio (estorno legítimo): tras el cierre, -1.079,94 en
+noviembre y +1.080,00 en diciembre. El paso 5 repartía con pesos CON SIGNO y
+total 0,06: amplificaba x18.000. Ahora el perfil es la ENVOLVENTE NETA
+(`W'(m) = max(0, min_{k>=m} W(k))`) y el reparto va por ACUMULADO: cada mes en
+[0, p] y suma exacta, en coste y en venta (la venta no tenía R50). Cierra
+también el borde del último mes (observación 3 de la review de F-158). Guarda
+nueva en el paso 5 con obra, partida y mes, y R50 nombra su primera fila.
+
+Desplegado: imagen r20261108-0945, `build-tesoreria` SUCCESS en 308 s,
+`apply-grants` con las cuatro verificaciones ok, diccionario v74, MCP
+reiniciado (carga la v74). Medido en Azure el 08-11: 0 importes negativos en
+el coste por contrato y en la obra-mes (coste y venta), 0 meses con personal
+mayor que el pendiente; 1-0710 por mes entre 144.728,18 y 1.605.544,59 EUR de
+coste (pendiente 5,42 M) y entre 135.477,47 y 1.021.781,17 de venta (4,51 M).
+La reproducción previa en solo lectura (paso 0 bis) no se hizo: el propio
+`build-tesoreria` era la prueba, sin riesgo (un fallo deja `tesoreria` como
+estaba). Merge `main` 0ea9d38, `dev` 2a15b31.
+
+## F-040 — Ventas, fase 1: clientes, facturas, certificaciones y cobro · 2026-11-11
+
+Rama `feature/F-040-ingresos`. Spec en `specs/F-040-ingresos/` (R1-R34). Rigor `critico`.
+APROBADO en la pasada 3 (`progress/review_F-040.md`).
+- **Pasada 1:** CHANGES_REQUESTED por H1-H3.
+- **Pasada 2:** aprobada tras corregir H1-H3 y la base roja B1-B9, sin relajar ningún test.
+- **Ciclo 2:** H2 a y b, que el humano aprobó el 2026-11-10.
+
+**Qué publica.** `build_ventas` es el paso 17 de `run-all` y construye dos esquemas:
+- `ventas`, que leen el estándar y el total: clientes, facturas con sus líneas y recargos, certificaciones con los suyos, el enlace certificación → factura, `cobertura_enlace` (cuatro eslabones) y tres vistas de seguimiento hasta el cobro.
+- `ventas_restringida`, solo para el total: `clientes_contacto`, `factura_cabecera` y `factura_lineas_persona`.
+
+Además entran siete tablas de `raw` (`cli`, `cer`, `cerpro`, `cerrec`, `cerprodes`, `dvfpro`, `dvfrec`) y `dvf` pasa a 35 columnas.
+
+**Privacidad** (decisiones del humano):
+- El CIF de una persona jurídica es público.
+- El NIF de una persona física, el código de cliente con forma de NIF y el texto de sus líneas van solo a la restringida.
+- El prefijo de país de dos letras se quita solo si lo que queda es un NIF de persona.
+- Una factura cuyo cliente no está en `raw.cli` se trata como de persona física.
+
+**Verificado:**
+- Puerta del líder con `.env` sobre `fcfd86f`: `init.sh` exit 0, 11.077 passed.
+- Sandbox SQL: 2.352 passed. Cobertura de las líneas cambiadas: 100 % (160/160).
+- Mutación: 61 mutantes, 58 muertos y 3 supervivientes de log en `build_ventas_step.py`, aceptados por escrito por el humano (`progress/mutacion_F-040.md`).
+
+**Despliegue en Azure el 2026-11-10** (pasos 0-8 de design § 9, comprobados por el líder con lecturas):
+- Imagen `r20261110-1310`. La de vuelta atrás es `r20261108-0945`.
+- `02_roles.sql` y `apply-grants` con sus cuatro verificaciones ok. Permisos por login: el estándar lee `ventas` y no la restringida; el total lee las dos; el restringido y el de postventa no leen ninguna.
+- Cifras: 15.737 facturas, 6.312 certificaciones y 1.210 clientes (572 personas físicas). `retenciones.movimientos` CLIENTE queda idéntico al de la víspera (R34).
+- Diccionario v75.
+
+**Primera nocturna** (`20261111T000022Z-b97406`): 166 pasos sin fallos. `build_ventas` 5,8 s; las ocho tablas ingeridas, entre 0,4 y 2,3 s cada una.
+
+**Fuera, pendiente:**
+- `mcp-bbdd`: la lista blanca va en su F-034 (pliego `specs/F-040-ingresos/pliego_mcp_bbdd.md`; aviso enviado a la sesión `mcp`).
+- Observaciones O1, O3, O4 y O5 del reviewer, que decide el humano.
+- `CLASES_GARANTIA` sigue provisional (D4), a la espera de Control de Costes.
+
+## F-162 — Todas las fichas de obra, cada una con su empresa, y la ficha por defecto · `done` (2026-11-12)
+
+Rama `feature/F-162-obra-duplicada-ruesma`. Spec en `specs/F-162-obra-duplicada-ruesma/`. Rigor `estandar`.
+Detonante: la 0721 salía con la ficha vacía de PORSAN (empresa 28) en lugar de la de Ruesma (`progress/explore_0721_obra_duplicada.md`).
+
+**Qué cambia.** `stg.obras` deja de elegir una ficha por código: lleva TODAS (de 585 a 635), con `empresa_id`, `clave_obra` y `es_por_defecto`.
+- Criterio de `es_por_defecto`: Ruesma primero; si no, deciden los datos (líneas de `obrparpre`, `tiemod`, `ide`), sin `conext` 15. Vive en `etl_sigrid/domain/ficha_obra.py` y en `03_obras.sql`.
+- Lo publican `maestro.obras`, `mart.v_pbi_dim_obra` (con `obra_label` = `clave_obra · nombre`) y `cierre.v_pbi_cierre_cabecera`. Los seis `inspect-*` y `find-obra` aceptan la clave o el código.
+- Decisiones del humano (PARADA 1, «ok a d1 a d5»):
+  - D1: un solo criterio en todas las fichas.
+  - D2: `conext` 15 queda fuera.
+  - D3: Power BI sin filtro.
+  - D4: los agregados sin empresa usan `empresa_id = 1`.
+  - D5: la empresa no va a los hechos.
+- Diccionario v76 (R-EMPRESA-POR-DEFECTO).
+
+**Verificado:**
+- Review APPROVED (`progress/review_F-162.md`), y también el delta `2c02911`.
+- Puerta en verde: 11.179 passed sobre `fd4439d`; 11.209 passed sobre `911657c`.
+- Mutación: 20/20 muertos (`progress/mutacion_F-162.md`). El `EXPLAIN` da 9 ms (+0 s).
+
+**Despliegue (2026-11-12):**
+- Job puntual `t3ux7xk` con la imagen `r20261112-0941`. Huellas: `cierre` OK y `mart` cambia solo en 0252, 0517, 0606 y 0721. Tesorería de control 0 y `check-unicidad` 0.
+- Destapó la 0517 sin `tex` en su master, que vuelve a las excepciones de cobertura solo para 8 y 11 (F-117).
+- Imagen final `r20261112-1745`; la de vuelta atrás es `r20261112-0941`.
+
+**Cierre:** decisión del humano el 2026-11-12, sin esperar a la nocturna del 13. Esa nocturna queda como vigilancia en `current.md`. **F-053** se cierra con ella, absorbida.
+
+**Fuera, pendiente:** Power BI (D3), del humano. La 0721 sigue sin master hasta F-161 porque no tiene `planif`.
+
+## F-161 — Versiones del máster sin planificación temporal: catálogo completo, coste por partida e importe frente a temporal · `done` (2026-11-14)
+
+**Qué cambia.** Incidencia de Control de Costes (2026-11-10): la v24 de coste de la 0698 (2.107.662,97 €) no salía en el catálogo porque no trae `planif`.
+- `stg.master_versiones` (catálogo COMPLETO, con `reparto` NINGUNO/COMPLETO/PARCIAL) y `stg.v_master_lineas` (marca por línea).
+- `mart/01b_master_versiones.sql`: un solo catálogo `mart.master_versiones_tipadas`, `mart.v_master_version_partida` (coste de cualquier versión por partida) y `mart.master_importe_mensual` (último cierre de importe al lado de la temporal, sin sumar ni reescalar).
+- La parte temporal NO cambia (D4 del humano): `02`, `06` y `retenciones/05_fin_obra` filtran `tiene_reparto`.
+- Decisiones: D1-D4 del humano (2026-11-11); D5-D14 en (a) y D10 también (b), aprobadas el 2026-11-13. Diccionario v77.
+
+**Verificado:**
+- Review: pasada 1 CHANGES_REQUESTED (la sandbox no tenía una Cuatrimestral sin reparto); pasada 2 APPROVED (`2ebe20f`).
+- Puerta con `.env` en `2ebe20f`: 13.220 passed, cobertura 100 % (59/59).
+- Mutación informativa (`progress/mutacion_F-161.md`): 20 mutantes, 16 muertos; supervivientes :94 y :104 equivalentes, :88 y :97 huecos de test sin matar.
+
+**Ecosistema:** `azure-apps/datamart_seg_anual.md`, commit `d6bb377`.
+
+**Fuera, pendiente:** despliegue (design §8, en `current.md`), O1 (`05_fin_obra:162`, 0 casos), los dos huecos de test, la obra 1338614 fuera de `stg.obras` y las 61 líneas de la 0698 v23 con `planif` que no dan mes.
+
+## F-163 — La reconstrucción completa solo en las noches del fin de semana y techo del job de 14 h · `done` (2026-11-16)
+
+**Qué cambia.** La nocturna del domingo 2026-11-15 (completa) se cortó por `DeadlineExceeded` a las 7 h. Criterio del humano: completas solo el fin de semana, techo 14 h.
+- `toca_reconstruccion_completa`: el sábado; el domingo solo si la del sábado no quedó registrada; de lunes a viernes nunca (aunque pasen 7+ días); sin ninguna registrada, esa noche (D1 (a), D2 (a)).
+- `DIAS_MAXIMOS_SIN_COMPLETA` (7) queda solo como umbral de la alerta de `check-ventana`.
+- `PG_VENTANA_DIA_COMPLETA` pasa a ser el ÚLTIMO día de la ventana (la completa va la víspera); el job no la fija y rige el defecto 6.
+- `replicaTimeoutSeconds` 25.200 -> 50.400 (`infra/env/dev.json`) y `VENTANA_REANUDACION` 8 h -> 15 h.
+- El `detalle` publicado de la completa ya no nombra un día. Diccionario v78 (solo texto).
+
+**Verificado:**
+- Review: pasada 1 CHANGES_REQUESTED (detalle «(domingo)» publicado, restos de domingo, marca SIN DESPLEGAR); pasada 2 APPROVED con `ARNES_SIN_CACHE=1` sobre `f75357d`: 13.255 passed, cobertura 100 % (18/18).
+- Mutación informativa (`progress/mutacion_F-163.md`): 11 mutantes, 10 muertos, 1 superviviente (`ventana.py:660`, completa forzada un viernes y sábado fallido), 0 timeouts.
+
+**Ecosistema:** `azure-apps/datamart_seg_anual.md`, commits `006b293` y `0511029` (subidos por el humano el 2026-11-15).
+
+**Fuera, pendiente:** despliegue (en `current.md`), O1 (`ventanaActiva` de `dev.json` frente al job vivo), el superviviente de mutación, la nocturna fallida del 2026-11-07.

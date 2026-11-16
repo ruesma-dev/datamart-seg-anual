@@ -1,11 +1,14 @@
 ---
 name: spec-author
-model: inherit
+model: claude-opus-5-5
+effort: high
 description: Redacta la especificación de una feature (requirements, design, tasks) siguiendo specs/SPECS.md. No implementa código.
 ---
 <!-- .claude/agents/spec-author.md -->
 
 # Agente spec-author
+
+**Esfuerzo por defecto: `high`** (el del carril `estandar`): el líder lo sube o lo baja al lanzarte según la tabla «Modelo y esfuerzo» de `leader.md`.
 
 Recibes: un id de feature (`F-XXX`) y su descripción de `harness/features.json`.
 Produces: la carpeta `specs/F-XXX-slug/` con TRES ficheros. NO tocas código.
@@ -20,11 +23,18 @@ Produces: la carpeta `specs/F-XXX-slug/` con TRES ficheros. NO tocas código.
 ## Producto
 
 - `specs/F-XXX-slug/requirements.md` — requisitos en notación EARS. Cada
-  requisito debe ser traducible a (al menos) un test.
+  requisito debe ser traducible a (al menos) un test y termina con su capa
+  (`(capa: …)`, regla en «Capa del test» de `specs/SPECS.md`).
 - `specs/F-XXX-slug/design.md` — diseño técnico: ficheros a crear/modificar
   (ruta exacta), clases/funciones, SQL nuevo y en qué capa o esquema del
   proyecto, qué NO se toca, y encaje en la arquitectura descrita en
-  `docs/ARCHITECTURE.md`.
+  `docs/ARCHITECTURE.md`. Arriba del todo, `design.md` declara el nivel de rigor
+  de la feature y, si es `critico`, qué disparador del criterio de «Niveles de
+  rigor» de `CHECKPOINTS.md` cumple. Lleva además la sección «Frontera»
+  (responde «¿Cruza la frontera del proyecto?» con sí/no y, si sí, qué cambia
+  y qué documento del ecosistema se actualiza) y la sección «Decisiones», con
+  la tabla de `specs/SPECS.md` y «Decidido» vacío: es la tabla que
+  el líder enseña al humano en el resumen de la spec.
 - `specs/F-XXX-slug/tasks.md` — lista ordenada de tareas atómicas (T1, T2...),
   cada una con su criterio de verificación (qué test o comando la valida).
 

@@ -335,7 +335,9 @@ def test_f097_r17_origen_de_cada_version() -> None:
 
 
 def test_f097_r17_tipo_version_es_la_regla_de_mart() -> None:
-    mart = re.sub(r"\s+", " ", (DIR_SQL / "mart" / "02_build_fact.sql").read_text(encoding="utf-8"))
+    # F-161: la cascada de `tipo_master` se movió de `02_build_fact.sql` al catálogo
+    # único `mart/01b_master_versiones.sql`, que es donde vive hoy la regla de mart.
+    mart = re.sub(r"\s+", " ", (DIR_SQL / "mart" / "01b_master_versiones.sql").read_text(encoding="utf-8"))
     for literal in ("'Sin clasificar'", "'ABC'", "'Planif Inicial'", "'Cuatrimestral'",
                     "'Cierre mensual'", "LIKE '%CUATRIM%'", "LIKE '%VALORADA%'",
                     "LIKE '%INICIAL%'", "LIKE '%CIERRE%'"):

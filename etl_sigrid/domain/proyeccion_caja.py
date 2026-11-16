@@ -25,9 +25,10 @@ con esa gramática NO se interpreta: falla cerrado (R8).
 su mes - ejecutado real en el intervalo [mes de V, último cierre]). Lo
 ejecutado de más es `sobre_ejecutado` y no resta a otras partidas.
 
-**El reparto en el tiempo** (R14, D19-A): el pendiente de la partida, en
-proporción al plan de V de cada mes posterior al cierre; el último mes del
-perfil absorbe el redondeo. Sin perfil, todo al primer mes pendiente, marcado
+**El reparto en el tiempo** (R14, D19-A; F-159): el pendiente de la partida,
+por ACUMULADO sobre el plan NETO acumulado de V de los meses posteriores al
+cierre (un mes negativo se absorbe en los anteriores); el último mes del perfil
+cierra el pendiente exacto. Sin perfil, todo al primer mes pendiente, marcado
 como retraso.
 
 **F-150, la receta** (R1, R7, R9, R22, R25): cada hipótesis dice en qué paso de
@@ -132,15 +133,35 @@ def repartir_pendiente(
     perfil: Sequence[tuple[date, Decimal]],
     primer_mes: date,
 ) -> list[tuple[date, Decimal, bool]]:
-    """Reparte el pendiente de una partida en sus meses (R14, D19-A).
+    """Reparte el pendiente de una partida en sus meses (R14, D19-A; F-159).
 
-    `perfil` es el plan de V en cada mes posterior al último cierre. Los meses
-    a cero no son perfil (la cola a cero no es plan, criterio de F-110). Si el
-    perfil queda vacío o su suma no es positiva, todo va a `primer_mes` con
-    `es_retraso` cierto: es lo planificado y no ejecutado que la versión ya no
-    sitúa en ningún mes futuro. Si no, cada mes recibe `pendiente * plan_mes /
-    plan_total` redondeado al céntimo y el ÚLTIMO mes, el resto: la suma
-    iguala el pendiente exactamente. Sin pendiente, no hay reparto.
+    `perfil` es el plan de V en cada mes posterior al último cierre, CON SIGNO.
+    Los meses a cero no son perfil (la cola a cero no es plan, criterio de
+    F-110). Si el perfil queda vacío o su suma no es positiva, todo va a
+    `primer_mes` con `es_retraso` cierto: es lo planificado y no ejecutado que
+    la versión ya no sitúa en ningún mes futuro. Sin pendiente, no hay reparto.
+
+    Si no, por ACUMULADO sobre la ENVOLVENTE del plan neto (F-159, D1-A, D2):
+    con `W(i)` el plan acumulado hasta el mes `i` y `total` = `W(último)`, el
+    peso acumulado es `W'(i) = max(0, min(W[i:]))`; lo repartido hasta `i` es
+    `A(i) = ROUND(pendiente x W'(i) / total, 2)` (multiplicar antes de dividir,
+    como el SQL), salvo el último mes, que es el pendiente entero; y cada mes
+    recibe `A(i) - A(i-1)`, con `A(-1)` = 0.
+
+    Por qué: un mes negativo del plan (el estorno de un 0 intermedio del
+    `planif`, legítimo en `stg`) con pesos con signo se AMPLIFICABA. La partida
+    404326 de 1-0710 (V13, 07-11) tenía -1.079,94 en 2026-11 y +1.080,00 en
+    2026-12: `total` 0,06 y noviembre recibía -19.438.920,00 (R50 en rojo). Con
+    la envolvente, lo estornado después se descuenta de los meses anteriores:
+    0,00 y 1.080,00. No solo los meses positivos (la alternativa P): eso
+    cuenta lo anulado como actividad y pone pendiente en el mes que luego se
+    estorna.
+
+    Garantía (R3): con `pendiente` ≥ 0 al céntimo, `W'` no decrece y acaba en
+    `total`, así que `W'/total` está en [0, 1] y no decrece; `ROUND` es
+    monótono: cada mes queda en [0, pendiente] y la suma es el pendiente exacta
+    (telescópica). Sin meses negativos, cada mes salvo el último está a ≤ 0,01
+    del reparto proporcional de antes (R4).
 
     Devuelve `[(mes, importe, es_retraso)]` en orden de mes.
     """
@@ -150,13 +171,23 @@ def repartir_pendiente(
     total = sum((plan for _mes, plan in meses), _CERO)
     if not meses or total <= 0:
         return [(primer_mes, pendiente, True)]
+    acumulados: list[Decimal] = []
+    suma = _CERO
+    for _mes, plan in meses:
+        suma += plan
+        acumulados.append(suma)
+    envolvente: list[Decimal] = [_CERO] * len(meses)
+    minimo = total
+    for i in range(len(meses) - 1, -1, -1):
+        minimo = min(minimo, acumulados[i])
+        envolvente[i] = max(_CERO, minimo)
     reparto: list[tuple[date, Decimal, bool]] = []
-    acumulado = _CERO
-    for mes, plan in meses[:-1]:
-        importe = _redondear(pendiente * plan / total)
-        acumulado += importe
-        reparto.append((mes, importe, False))
-    reparto.append((meses[-1][0], pendiente - acumulado, False))
+    anterior = _CERO
+    ultimo = len(meses) - 1
+    for i, (mes, _plan) in enumerate(meses):
+        hasta = pendiente if i == ultimo else _redondear(pendiente * envolvente[i] / total)
+        reparto.append((mes, hasta - anterior, False))
+        anterior = hasta
     return reparto
 
 

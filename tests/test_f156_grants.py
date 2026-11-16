@@ -29,9 +29,9 @@ DUENO = "sigrid_dm_etl"
 ESQUEMAS_R = ["mart", "cierre", "compras", "maestro", "retenciones", "descompuestos", "postventa",
               "stg", "aux", "_meta"]
 ESQUEMAS_PV = [*ESQUEMAS_R, "postventa_restringida"]
-CONSUMO = [*ESQUEMAS_R, "contabilidad", "tesoreria", "personal"]
+CONSUMO = [*ESQUEMAS_R, "contabilidad", "tesoreria", "personal", "ventas"]  # + F-040
 RESTRINGIDOS = ["contabilidad_restringida", "tesoreria_restringida", "compras_restringida",
-                "postventa_restringida"]
+                "postventa_restringida", "ventas_restringida"]  # + F-040
 VETADOS = [*RESTRINGIDOS, "raw"]
 EXCEPCIONES = ("compras.vencimientos", "compras.v_facturas_pago", "compras.v_control_forma_pago")
 
@@ -147,7 +147,8 @@ def test_f156_r29_propios_del_perfil_son_los_restringidos_de_postventa() -> None
 
 CATALOGO = [*CONSUMO, *VETADOS, "public", "pg_catalog", "information_schema", "pg_toast"]
 AJENOS_PV = sorted({"contabilidad", "tesoreria", "personal", "raw", "contabilidad_restringida",
-                    "tesoreria_restringida", "compras_restringida"})
+                    "tesoreria_restringida", "compras_restringida",
+                    "ventas", "ventas_restringida"})  # + F-040
 AJENOS_R = sorted([*AJENOS_PV, "postventa_restringida"])
 FILAS_HOY = [(v, "tesoreria.efectos") for v in EXCEPCIONES]
 

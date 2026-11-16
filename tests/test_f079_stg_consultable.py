@@ -64,6 +64,10 @@ GRUPO_B_FUNCIONES = (
     # llaman desde `08_plan_mensual.sql`; `cierre.fn_mes_de_fase` las envuelve.
     "stg.fn_parse_mes_texto",
     "stg.fn_mes_de_fase",
+    # F-157 (2026-11-06): la regla del master para leer un `planif`, en una sola
+    # copia. Se llama desde `09_plan_mensual_fase0.sql`, y
+    # `stg.plan_mensual_fase0` ya publica su resultado en sus columnas de %.
+    "stg.fn_explotar_planif",
     "cierre.fn_mes_de_version_master",
     "compras.fn_tipo_documento",
     "compras.fn_serie",
@@ -185,6 +189,16 @@ GRUPO_G_F156 = {
     "postventa.fn_momento": "funcion auxiliar del build",
     "postventa.fn_obra_de_partida": "funcion auxiliar del build",
     "postventa.partida_obra_origen": "ya aplicada en postventa.v_coste_obra",
+}
+
+#: F-040 (2026-11-09): las cinco funciones locales de `ventas`, como las de
+#: `postventa`: las usan las tablas del build y las vistas, que ya las aplican.
+GRUPO_H_F040 = {
+    "ventas.fn_cif_normalizado": "funcion auxiliar del build",
+    "ventas.fn_cif_valido": "funcion auxiliar del build",
+    "ventas.fn_clase_recargo": "funcion auxiliar del build",
+    "ventas.fn_es_persona_fisica": "funcion auxiliar del build",
+    "ventas.fn_fecha": "funcion auxiliar del build",
 }
 
 
@@ -466,7 +480,7 @@ def test_f079_r3_el_inventario_de_lo_que_no_se_toca_esta_completo() -> None:
 
     inventario = (
         set(GRUPO_B_FUNCIONES) | set(GRUPO_C) | set(GRUPO_D_F095) | set(GRUPO_E_F097)
-        | set(GRUPO_F_F140) | set(GRUPO_G_F156)
+        | set(GRUPO_F_F140) | set(GRUPO_G_F156) | set(GRUPO_H_F040)
     )
     assert fuera == inventario, (
         f"sin inventariar: {sorted(fuera - inventario)}; "
