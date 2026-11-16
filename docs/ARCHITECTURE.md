@@ -69,7 +69,18 @@ enmascarado (`fn_enmascarar`, mismos patrones que `domain/postventa.py`). La
 lee el **perfil postventa** (abajo) y el total. Regla dura
 `R-POSTVENTA-RESTRINGIDA`. Lo que toca a `mcp-bbdd` (login nuevo y
 `abrir_adjunto` de `REPARACION`) va en su pliego:
-`specs/F-156-postventa/pliego_mcp_bbdd.md`.
+`specs/F-156-postventa/pliego_mcp_bbdd.md`. **Desde F-164 (2026-11-16) la
+`familia` de los adjuntos es una lista abierta**, no la del documento: solo
+PV001 en incidencia, PV006 en unidad y PV004 en tarea conservan su familia, y
+aun ellas van a `REPARACION` si el nombre o la descripción dicen FIRMA/FIRMADO/
+FIRMAS o el nombre lleva el código de una incidencia; todo lo demás (los partes
+de 2021-2023 sin clase, PV002 en una unidad, cualquier clase nueva) es
+`REPARACION`. La regla vive una vez en `domain/postventa.py`
+(`familia_publicada`) y un test compara sus literales con el `CASE` de
+`06_adjuntos.sql`. La familia de antes se publica en `familia_documento`. Los 8
+adjuntos de unidad (707) movidos no tienen fila de origen en
+`postventa_restringida.contactos_incidencia` (huérfanos: postventa y total los
+abren con aviso). `mcp-bbdd` no cambia: decide por la familia.
 
 **`personal` (F-057, 2026-09-18) es el único esquema con datos personales**
 —nombre, NIF y DNI, publicados con autorización expresa del responsable del

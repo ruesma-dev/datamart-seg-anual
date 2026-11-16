@@ -139,6 +139,7 @@ def test_f164_r13_azure_apps_describe_la_regla() -> None:
     inicio = texto.index("### La postventa:")
     seccion = texto[inicio: texto.index("### ", inicio + 5)]
     for clave in ("F-164", "familia_documento", "PV001", "PV006", "PV004", "707",
-                  "huerfan", "SIN DESPLEGAR"):
+                  "SIN DESPLEGAR"):
         assert clave in seccion, clave
+    assert re.search(r"hu[eé]rfan", seccion), "los huérfanos de 707"
     assert "`mcp-bbdd` no cambia" in seccion
