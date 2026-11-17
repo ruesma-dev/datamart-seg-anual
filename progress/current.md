@@ -9,6 +9,65 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-16 · F-164 · ciclo 2 del implementer (tras CHANGES_REQUESTED) · rama `feature/F-164-partes-firmados-restringidos`
+
+- Spec aprobada (D1 c, D2-D5 a). T1-T6 y T12 `[x]`; T7 (campaña) tras el APPROVED; T8-T11 MANUAL.
+- Decisión: `familia_publicada(None, ...)` da REPARACION (R4 manda: «ningún NULL abre»); un tipo que no
+  es de postventa sigue dando `None`, como `familia_adjunto`.
+- Desviación menor del design §4 (justificada en `progress/impl_F-164.md`): el `CASE` de `familia` va en
+  el `SELECT` final sobre las columnas ya publicadas de la CTE (`b.nombre_fichero`, `b.descripcion`,
+  `b.clase_grafico_id`), envolviendo `b.familia_documento` sin duplicar su expresión.
+- Diccionario v79 en la rama, SIN PUBLICAR: 320 objetos, 2743 columnas (+1, `familia_documento`) y 157
+  de consumo.
+- **Puerta del líder (T12), en verde sobre `4e5ef33`:** 13525 passed, 2532 skipped, 2 h 12 min,
+  `PUERTA COBERTURA` 24/24, `ENTORNO LISTO`. azure-apps `f61570b` ya está en `origin/main` (lo subió
+  un humano el 2026-11-16).
+- **Ciclo 2 (review H1, H2, H4):** test del `CASE` entero en `tests/test_f164_sql.py` (mata M1-M4 a
+  mano); `_texto_senal` sin `strip` (H4); papeleo. La puerta completa la vuelve a pasar el líder.
+
+### MANUAL pendientes (T8-T11), con su comando
+
+Desde el checkout con `.env`. El script de huella vive en el scratchpad de la sesión:
+`f164_huella.py` (fuera del repositorio; el líder tiene la ruta)
+(abajo, `<huella>`).
+
+- **T8 · Huella ANTES** (líder, solo lectura, el día del despliegue y tras la nocturna):
+  `.venv/Scripts/python.exe <huella> antes` → `f164_huella_antes.csv` (`adjunto_id, familia, md5`);
+  anotar en `impl_F-164.md` el recuento por familia y la imagen del job:
+  `az containerapp job show -n caj-datamart-seg-dev -g rg-datamart-seg-dev --query "properties.template.containers[0].image" -o tsv`.
+- **T9 · Despliegue** (humano): merge (`dev`, y `main` preguntando);
+  `powershell -NoProfile -File infra/70_build_image.ps1` (anotar el tag nuevo);
+  `powershell -NoProfile -File infra/85_update_job.ps1 -Tag <nuevo>`; comprobar la imagen con el mismo
+  `az containerapp job show`. Ejecución puntual SIN ingesta (memoria «job puntual sin ingesta, con
+  --yaml»): `job show --query properties.template` → cambiar solo `command`/`args` a `sh -c "python
+  main.py build-postventa && python main.py apply-grants && python main.py publicar-diccionario"` →
+  `az containerapp job start -n caj-datamart-seg-dev -g rg-datamart-seg-dev --yaml <fichero>`, hasta
+  `Succeeded`. No solapar con la nocturna de las 00:00 UTC.
+- **T10 · Huella DESPUÉS y R14-R15** (líder, solo lectura): `.venv/Scripts/python.exe <huella> despues`
+  → mismo `adjunto_id`, md5 iguales, `familia_documento` = familia de antes, solo INCIDENCIA/UNIDAD →
+  REPARACION (≈ 3.349) y 0 filas en la consulta de R15.
+- **T11 · R16** (humano o sesión `mcp`): reiniciar `mcp-bbdd` (cachea el diccionario); abrir un 708 y
+  un 707 movidos con los 4 perfiles: `PERMISO_DENEGADO` con estándar y restringido, abiertos con
+  postventa y total (el 707 con aviso de huérfano); avisar a la sesión `mcp` (DH10, los 8 de 707).
+- **Vuelta atrás:** `powershell -NoProfile -File infra/85_update_job.ps1 -Tag r20261116-1018` y la
+  misma ejecución puntual (o la nocturna): vuelve la regla de F-156 y su diccionario.
+
+## 2026-11-16 · F-164 · spec escrita (spec-author) · rama `feature/F-164-partes-firmados-restringidos`
+
+- Spec en `specs/F-164-partes-firmados-restringidos/`; mediciones (Azure, solo lectura, 09:55-10:15
+  UTC, 16.088 enlaces) en `progress/spec_F-164.md`. Ningún código de producción tocado.
+- **Hallazgo que cambia el tamaño del problema:** los partes de 2021-2023 (antes de la convención
+  PV002 de 2024) cuelgan de la incidencia SIN clase de gráfico: 3.338 ficheros 708 sin clase, 3.182
+  subidos a ± 3 días de la resolución, muchos con nombre genérico. El texto «parte firmado» ve 7; el
+  texto ampliado, 1.680 de ellos.
+- **Propuesta (D1 c):** lista abierta (PV001 en incidencia, PV006 en unidad, PV004 en tarea) sin señal
+  de firma o código de incidencia; todo lo demás, REPARACION. Cambian 3.349 enlaces (3.341 de 708 y 8
+  de 707), ninguno sale de REPARACION y los 7 caen dentro.
+- **Decisiones abiertas para el humano** (`design.md` §9): D1 criterio (rec. c); D2 destino REPARACION
+  (rec. a: una familia nueva exige cambiar `mcp-bbdd`); D3 columna `familia_documento` (rec. a); D4
+  aceptar los 8 de 707 como huérfanos en el MCP (rec. a); D5 dejar abiertos los 32 PDF de PV001 del
+  alta (rec. a).
+
 ## 2026-11-16 · F-163 `done` y DESPLEGADA · sin feature activa
 
 - F-163 cerrada con el OK del humano a la PARADA 2. Resumen en `progress/history.md`.

@@ -842,7 +842,15 @@
 # del job). Cambia el texto de `stg` (tema de la ventana y `presupuesto`), de
 # `_meta.v_frescura_obra` (motivo `completa`, `firma_divergente`) y la consulta
 # de obras vivas de este fichero. Ningun objeto ni columna nuevos.
-version: 78
+#
+# version 79 (F-164, 2026-11-16): LOS PARTES FIRMADOS DE POSTVENTA, SIEMPRE EN
+# REPARACION. La `familia` de `postventa.documento_adjuntos` deja de ser la del
+# documento: solo PV001 en incidencia, PV006 en unidad y PV004 en tarea quedan
+# abiertas, y aun ellas van a REPARACION con FIRMA o el codigo de la incidencia
+# en el texto; los partes de 2021-2023 (sin clase) entran. Columna nueva
+# `familia_documento` (la de F-156). Cambian la ficha, `R-POSTVENTA-RESTRINGIDA`,
+# `postventa_restringida.contactos_incidencia` (los huerfanos de 707) y `raw.auxgra`.
+version: 79
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -1260,8 +1268,12 @@ reglas:
       `postventa_restringida`, que leen el perfil postventa y el total; ni el
       estandar ni el restringido. Las dos tablas nunca se suman ni se unen
       para contar: son las mismas incidencias y unidades. Los adjuntos
-      REPARACION (partes firmados con DNI manuscrito) solo los abren el perfil
-      postventa y el total; «permission denied» no se rodea.
+      REPARACION (parte firmado o posible parte, con DNI manuscrito) solo los
+      abren el perfil postventa y el total; «permission denied» no se rodea.
+      Desde F-164 son REPARACION los que reconoce la regla de la ficha de
+      `postventa.documento_adjuntos` (lista abierta de PV001, PV006 y PV004 y
+      senales de firma y de codigo de incidencia), no solo PV002: la familia
+      por documento esta en `familia_documento`.
     motivo: >-
       Decision del humano, «d1 ok», chat del 2026-11-03 (F-156, D1 = A y D9):
       los datos de los clientes de postventa se traen, pero en un esquema
