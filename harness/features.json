@@ -2655,7 +2655,7 @@
         "Diccionario (`postventa.yaml` y la regla `R-POSTVENTA-RESTRINGIDA`) y `azure-apps` al día; `bash harness/init.sh` en verde",
         "Desplegado y verificado en Azure; aviso a la sesión `mcp` de `mcp-bbdd`"
       ],
-      "status": "in_review",
+      "status": "human_review",
       "sdd": true,
       "rigor": "critico",
       "priority": 1,
