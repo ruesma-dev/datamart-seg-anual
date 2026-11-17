@@ -3,13 +3,11 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **152 features**, 72 abiertas y 80 terminadas. Por columna: 1 en Review, 0 en Blocked, 0 en In progress, 2 en Spec aprobada, 4 en To do, 65 en Backlog y 80 en Done.
+Resumen: **152 features**, 71 abiertas y 81 terminadas. Por columna: 0 en Review, 0 en Blocked, 0 en In progress, 2 en Spec aprobada, 4 en To do, 65 en Backlog y 81 en Done.
 
 ## Review
 
-| # | Feature | La tiene | Prioridad | Rigor | Rama |
-|---|---|---|---|---|---|
-| F-164 | Los partes firmados de postventa (con el DNI manuscrito del cliente) van siempre a la familia restringida, cuelguen de donde cuelguen en Sigrid | humano | 1 | critico | `feature/F-164-partes-firmados-restringidos` |
+_Nada esperando revisión._
 
 ## Blocked
 
@@ -109,6 +107,7 @@ _Ninguna feature en implementación._
 
 | # | Feature | Cierre | OK humano | Prioridad | Rigor |
 |---|---|---|---|---|---|
+| F-164 | Los partes firmados de postventa (con el DNI manuscrito del cliente) van siempre a la familia restringida, cuelguen de donde cuelguen en Sigrid | 2026-11-17 | 2026-11-17 | 1 | critico |
 | F-163 | La reconstrucción completa solo en las noches del fin de semana y techo del job de 14 h | 2026-11-16 | 2026-11-16 | 0 | estandar |
 | F-161 | Versiones del máster y coste sin planificación temporal: catálogo desde las cabeceras, coste por versión y partida y vigencia temporal frente a vigencia de importe | 2026-11-14 | 2026-11-14 | 1 | estandar |
 | F-162 | El seguimiento lleva TODAS las fichas de obra, cada una con su empresa, y marca la ficha por defecto de cada código (0721 en Ruesma y en PORSAN) | 2026-11-12 | 2026-11-12 | 0 | estandar |
@@ -191,12 +190,6 @@ _Ninguna feature en implementación._
 | F-142 | Que cualquier IA pueda leer los adjuntos: `abrir_adjunto` devuelve el contenido CONVERTIDO (texto por página, o imagen si es un escaneo) de PDF y ofimática, también Word 97 y Excel antiguos, y el original a petición | sin fecha | sin anotar | 74 | estandar |
 
 ## Detalle
-
-### F-164 · Los partes firmados de postventa (con el DNI manuscrito del cliente) van siempre a la familia restringida, cuelguen de donde cuelguen en Sigrid
-
-estado **en revisión humana** · spec aprobada el 2026-11-16 · prioridad 1 · rigor `critico` · SDD sí · rama `feature/F-164-partes-firmados-restringidos`
-
-Pedida desde `mcp-bbdd` (su F-034, decisión DH10) y confirmada por el humano en esta sesión el 2026-11-16 con prioridad 1. `postventa.documento_adjuntos` (F-156) asigna la `familia` (INCIDENCIA, REPARACION, UNIDAD, TAREA) por el documento del que cuelga el fichero en Sigrid, y `mcp-bbdd` decide quién abre cada adjunto por esa familia: REPARACION solo la abren los perfiles postventa y total; las otras, cualquier perfil, incluido el restringido. MEDIDO por el líder el 2026-11-16 (Azure, solo lectura): de 3.952 ficheros cuyo `nombre_fichero` o `descripcion` dice «parte firmado», 3.945 están en REPARACION y 7 NO: 4 en INCIDENCIA (tipo 708; 3 sin clase de gráfico y 1 en PV001 «Fotos de incidencias») y 3 en UNIDAD (tipo 707, PV002 «Fotos Reparaciones»). Ninguna `clase_grafico` contiene «PARTE» ni «FIRMA»: la marca solo vive en el texto libre, así que 7 es una cota inferior. El humano ACEPTA el riesgo temporal (F-034 se despliega ya) y pide que el datamart lo arregle: un parte firmado cae SIEMPRE en una familia que solo lean postventa y total, con independencia de dónde lo colgó el usuario, INCLUIDOS los que no lo digan en el nombre. En `mcp-bbdd` no hay que cambiar nada (su regla va por familia). Al desplegar, avisar a la sesión `mcp` para cerrar su nota de riesgo.
 
 ### F-104 · La retencion de CLIENTE no esta saneada: 22,16 M EUR «vivos» de los que 19,93 M tienen fecha de baja, y la contabilidad dice 13,81 M
 
@@ -623,6 +616,12 @@ RENUMERADA el 2026-09-29 al integrar main en la rama de F-052: se ficho como F-0
 estado **pendiente** · prioridad 84 · rigor `estandar` · SDD sí · rama `feature/F-143-tipo-contrato-compra`
 
 Nace el 2026-10-17 de la decisión D5 = A del humano en F-128: F-128 no ingiere catálogos nuevos y «el tipo de contrato de compra (cocide) pasa al backlog como feature aparte». QUÉ ES: `cocide` («Tipo de contrato de compra», índice a `auxobrcoc`, «Obras: Tipos de contratos compra») está en `ctr`, `dca`, `dcf` (y en `com`, `dco`, `dcp`, `defpli`, según `azure-apps/sigrid_tablas.md`). LO MEDIDO EL 2026-10-17 en `raw` (Azure, solo lectura): `ctr.cocide` informado en 14.453 de 19.137 contratos (75,5 %, 19 valores distintos); `dcf.cocide` en 15.726 facturas (9,4 %); `dca.cocide` en 37.157 albaranes (11,8 %); el catálogo tiene ~20 valores. La columna ya se ingiere en las tres tablas; el catálogo `auxobrcoc` NO se ingiere y ningún SQL del datamart usa `cocide` hoy. HAY QUE: ingerir `auxobrcoc` (catálogo pequeño, refresco completo) y publicar el tipo de contrato (id y nombre) AL FINAL de `compras.contratos` y, si la spec lo justifica, de `compras.albaranes` y `compras.facturas` (en F-128 están inventariados como CATALOGO_NO_INGERIDO). La spec decide si en el documento se publica o se hereda del contrato.
+
+### F-164 · Los partes firmados de postventa (con el DNI manuscrito del cliente) van siempre a la familia restringida, cuelguen de donde cuelguen en Sigrid
+
+estado **terminada** · cerrada el 2026-11-17 · spec aprobada el 2026-11-16 · OK del humano el 2026-11-17 · prioridad 1 · rigor `critico` · SDD sí · rama `feature/F-164-partes-firmados-restringidos`
+
+Pedida desde `mcp-bbdd` (su F-034, decisión DH10) y confirmada por el humano en esta sesión el 2026-11-16 con prioridad 1. `postventa.documento_adjuntos` (F-156) asigna la `familia` (INCIDENCIA, REPARACION, UNIDAD, TAREA) por el documento del que cuelga el fichero en Sigrid, y `mcp-bbdd` decide quién abre cada adjunto por esa familia: REPARACION solo la abren los perfiles postventa y total; las otras, cualquier perfil, incluido el restringido. MEDIDO por el líder el 2026-11-16 (Azure, solo lectura): de 3.952 ficheros cuyo `nombre_fichero` o `descripcion` dice «parte firmado», 3.945 están en REPARACION y 7 NO: 4 en INCIDENCIA (tipo 708; 3 sin clase de gráfico y 1 en PV001 «Fotos de incidencias») y 3 en UNIDAD (tipo 707, PV002 «Fotos Reparaciones»). Ninguna `clase_grafico` contiene «PARTE» ni «FIRMA»: la marca solo vive en el texto libre, así que 7 es una cota inferior. El humano ACEPTA el riesgo temporal (F-034 se despliega ya) y pide que el datamart lo arregle: un parte firmado cae SIEMPRE en una familia que solo lean postventa y total, con independencia de dónde lo colgó el usuario, INCLUIDOS los que no lo digan en el nombre. En `mcp-bbdd` no hay que cambiar nada (su regla va por familia). Al desplegar, avisar a la sesión `mcp` para cerrar su nota de riesgo.
 
 ### F-163 · La reconstrucción completa solo en las noches del fin de semana y techo del job de 14 h
 

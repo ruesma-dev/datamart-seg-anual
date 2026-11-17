@@ -184,17 +184,16 @@ Commits: `d8b99e9` (H1), `e5ac228` (H4), `3c95df4` (SIM300 de ruff), y el de H2 
 
 - **T7, campaña de mutación**: hecha (2026-11-17, HEAD `0311c39`): 10/10 muertos, reverificados en
   serie; detalle en `progress/mutacion_F-164.md`, sección «Análisis (implementer)».
-- **T8 / T10, huella antes y después** (líder, solo lectura): preparado, NO ejecutado,
-  `<scratchpad>/f164_huella.py antes` (el día del despliegue, tras la nocturna) y `… despues` tras la
-  ejecución puntual; escribe `f164_huella_{antes,despues}.csv` (solo `adjunto_id`, familias y md5) y
-  saca R14 (mismo conjunto, md5 iguales, `familia_documento` = familia de antes, cambios por pareja) y
-  R15 (consulta con los literales del dominio; esperado 0).
-- **T9, despliegue** (humano): merge, `infra/70_build_image.ps1`, `infra/85_update_job.ps1 -Tag
-  <nuevo>`, ejecución puntual sin ingesta `build-postventa && apply-grants && publicar-diccionario`;
-  vuelta atrás `85_update_job.ps1 -Tag r20261116-1018`.
+- **T8 / T10, huella antes y después**: hechas el 2026-11-17 (líder, solo lectura): 3.349 a
+  REPARACION (3.341 de INCIDENCIA y 8 de UNIDAD), mismo conjunto de 16.116, md5 iguales,
+  `familia_documento` = familia de antes, R15 = 0.
+- **T9, despliegue**: hecho el 2026-11-17 por el humano: imagen `r20261117-1556`, ejecución puntual
+  `Succeeded`, diccionario v79; vuelta atrás `85_update_job.ps1 -Tag r20261116-1018`.
 - **T11 / R16** (humano o sesión `mcp`): reiniciar `mcp-bbdd`, abrir un 708 y un 707 movidos con los
   cuatro perfiles, avisar para cerrar DH10 y de los 8 huérfanos de 707.
-- **T12**: hecha (puerta del líder en verde sobre `4e5ef33`); tras el ciclo 2, la repasa el líder.
+- **T12**: hecha (puerta del líder en verde sobre `4e5ef33` y sobre `99d7f13`, cobertura 24/24). La
+  puerta del 2026-11-17 cayó solo en `test_f164_r13` (azure-apps ya no dice «SIN DESPLEGAR»; corregido
+  en `2d6bdca`, los 39 ficheros que leen azure-apps en verde); el humano cierra sin repetirla.
 
 ## Evidencias
 
