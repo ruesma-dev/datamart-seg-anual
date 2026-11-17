@@ -826,7 +826,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "documental",
-      "priority": 13,
+      "priority": 14,
       "branch": "feature/F-054-conocimiento-de-negocio",
       "notes": "2026-10-27: prioridad 4 -> 5 por orden del humano (tras F-150 van F-040 y F-104). 2026-11-11: llega la primera definición de Negocio, «incurrido / coste incurrido», de Juan Romero, más el término derivado «almacén». Fuente literal en `docs/referencia/07_glosario_incurrido.md`. Antes de publicarla, contrastar cada trampa con lo que calcula el datamart. 2026-11-11: el humano confirma el sinónimo: «a la planificación temporal la llamamos también VALORADA»."
     },
@@ -1993,11 +1993,12 @@
         "El perfil restringido (F-141) no lee ningún objeto del mayor analítico: excluido en su lista y comprobado en el catálogo con `has_*_privilege`",
         "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
       ],
-      "status": "pending",
+      "status": "todo",
       "sdd": true,
       "rigor": "critico",
-      "priority": 17,
-      "branch": "feature/F-127-mayor-analitico"
+      "priority": 8,
+      "branch": "feature/F-127-mayor-analitico",
+      "notes": "2026-11-17: el humano la compromete («añade en todo el mayor analítico»): pasa de pending a todo, prioridad 8, detrás de la última comprometida (F-119); las pending de la 8 a la 16 bajan un puesto."
     },
     {
       "id": "F-128",
@@ -2036,7 +2037,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 16,
+      "priority": 17,
       "branch": "feature/F-129-objetivo-contra-oferta-referencia"
     },
     {
@@ -2424,7 +2425,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 12,
+      "priority": 13,
       "branch": "feature/F-151-funcion-caja-proyectada",
       "notes": "2026-10-26: registrada por orden del humano. Depende de F-150. 2026-10-27: prioridad 2 -> 4 por orden del humano (tras F-150 van F-040 y F-104)."
     },
@@ -2440,7 +2441,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 14,
+      "priority": 15,
       "branch": "feature/F-152-forma-pago-ficha-proveedor",
       "notes": "2026-10-27: registrada por orden del humano a partir del correo de Juan Romero, en la prioridad 6, justo detrás de F-040."
     },
@@ -2469,7 +2470,7 @@
         "Spec SDD con los ingredientes que se publican y las hipótesis de la caja de estructura, sin mezclar con la receta de obra de F-150",
         "Fichas en el diccionario de lo que se publique; `bash harness/init.sh` en verde"
       ],
-      "priority": 15,
+      "priority": 16,
       "status": "pending",
       "sdd": true
     },
