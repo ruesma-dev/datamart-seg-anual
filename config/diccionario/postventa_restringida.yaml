@@ -39,7 +39,10 @@ objetos:
       reclamante en 16.832 y contacto en 2.758 el 2026-11-03. Es tambien la
       tabla de origen de los adjuntos `REPARACION` de
       `postventa.documento_adjuntos` (los partes firmados, con DNI
-      manuscrito): quien no la lee no los abre.
+      manuscrito): quien no la lee no los abre. Desde F-164 tambien son
+      REPARACION 8 ficheros de unidad (707) cuyo `documento_id` es la unidad,
+      sin fila en esta tabla: son huerfanos (postventa y total los abren con
+      el aviso de huerfano; el resto, permiso denegado).
     grano: >-
       Una fila por incidencia, identificada por `incidencia_id`, clave
       primaria declarada.
