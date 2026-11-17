@@ -2655,13 +2655,15 @@
         "Diccionario (`postventa.yaml` y la regla `R-POSTVENTA-RESTRINGIDA`) y `azure-apps` al día; `bash harness/init.sh` en verde",
         "Desplegado y verificado en Azure; aviso a la sesión `mcp` de `mcp-bbdd`"
       ],
-      "status": "human_review",
+      "status": "done",
       "sdd": true,
       "rigor": "critico",
       "priority": 1,
       "branch": "feature/F-164-partes-firmados-restringidos",
-      "notes": "2026-11-16: alta por el líder tras el «1» del humano (prioridad 1, delante de las cinco de ventas, que pasan a 2-6; el resto del backlog baja 1). Rigor `critico` por el disparador de seguridad y datos personales (DNI manuscrito expuesto a perfiles sin permiso). Spec-author lanzado. 2026-11-16: spec escrita (d9ab6c1; progress/spec_F-164.md). El problema real son ~3.349 ficheros, no 7: los partes de 2021-2023 cuelgan de la incidencia sin clase de gráfico (3.338 del tipo 708). Decisiones D1-D5 para el humano (design §9). spec_ready: resumen de la spec al humano. 2026-11-16: resumen de la spec APROBADO por el humano («ok a todo»): D1 (c) lista abierta (PV001 en incidencia, PV006 en unidad, PV004 en tarea) + señales de texto, D2 (a) REPARACION, D3 (a) columna familia_documento, D4 (a) los 8 de unidad huérfanos para el MCP, D5 (a) los 32 PDF de PV001 abiertos. Va ANTES que F-104 por orden del humano. Aviso a la sesión mcp: el riesgo son ~3.349 ficheros, no 7. in_progress; implementer lanzado.",
-      "spec_aprobada": "2026-11-16"
+      "notes": "2026-11-16: alta por el líder tras el «1» del humano (prioridad 1, delante de las cinco de ventas, que pasan a 2-6; el resto del backlog baja 1). Rigor `critico` por el disparador de seguridad y datos personales (DNI manuscrito expuesto a perfiles sin permiso). Spec-author lanzado. 2026-11-16: spec escrita (d9ab6c1; progress/spec_F-164.md). El problema real son ~3.349 ficheros, no 7: los partes de 2021-2023 cuelgan de la incidencia sin clase de gráfico (3.338 del tipo 708). Decisiones D1-D5 para el humano (design §9). spec_ready: resumen de la spec al humano. 2026-11-16: resumen de la spec APROBADO por el humano («ok a todo»): D1 (c) lista abierta (PV001 en incidencia, PV006 en unidad, PV004 en tarea) + señales de texto, D2 (a) REPARACION, D3 (a) columna familia_documento, D4 (a) los 8 de unidad huérfanos para el MCP, D5 (a) los 32 PDF de PV001 abiertos. Va ANTES que F-104 por orden del humano. Aviso a la sesión mcp: el riesgo son ~3.349 ficheros, no 7. in_progress; implementer lanzado. 2026-11-17: desplegada (imagen r20261117-1556, ejecución puntual Succeeded, diccionario v79) y verificada (T10: 3.349 a REPARACION, mismo conjunto de 16.116, md5 iguales, R15 = 0). Cerrada (done) por decisión del humano («apruébalo y punto») sin repetir la puerta: la última puerta completa (HEAD 99d7f13) salió verde con cobertura 24/24; la del 17-11 cayó solo en test_f164_r13 porque azure-apps ya no dice «SIN DESPLEGAR» (test corregido en 2d6bdca y los 39 ficheros que leen azure-apps en verde, 2.635 passed); su PUERTA COBERTURA en rojo es efecto del pytest cortado al 95 %. Desde 99d7f13 no cambia código de producción. Queda T11 (reiniciar mcp-bbdd y probar los 4 perfiles).",
+      "spec_aprobada": "2026-11-16",
+      "ok_humano": "2026-11-17",
+      "fecha_cierre": "2026-11-17"
     },
     {
       "id": "F-165",

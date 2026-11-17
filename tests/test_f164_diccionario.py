@@ -138,8 +138,9 @@ def test_f164_r13_azure_apps_describe_la_regla() -> None:
     texto = _plano(ruta.read_text(encoding="utf-8"))
     inicio = texto.index("### La postventa:")
     seccion = texto[inicio: texto.index("### ", inicio + 5)]
+    # Desplegada el 2026-11-17 (T9-T10): el documento ya no dice «SIN DESPLEGAR».
     for clave in ("F-164", "familia_documento", "PV001", "PV006", "PV004", "707",
-                  "SIN DESPLEGAR"):
+                  "desplegada el 2026-11-17"):
         assert clave in seccion, clave
     assert re.search(r"hu[eé]rfan", seccion), "los huérfanos de 707"
     assert "`mcp-bbdd` no cambia" in seccion
