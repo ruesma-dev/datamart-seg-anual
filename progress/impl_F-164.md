@@ -182,8 +182,8 @@ Commits: `d8b99e9` (H1), `e5ac228` (H4), `3c95df4` (SIM300 de ruff), y el de H2 
 
 ## Pendiente (MANUAL y fuera de esta pasada)
 
-- **T7, campaña de mutación** (`critico`): en la pasada de campaña, tras el APPROVED.
-  `python -m harness.mutacion --feature F-164`; las líneas cambiadas de `domain/postventa.py`.
+- **T7, campaña de mutación**: hecha (2026-11-17, HEAD `0311c39`): 10/10 muertos, reverificados en
+  serie; detalle en `progress/mutacion_F-164.md`, sección «Análisis (implementer)».
 - **T8 / T10, huella antes y después** (líder, solo lectura): preparado, NO ejecutado,
   `<scratchpad>/f164_huella.py antes` (el día del despliegue, tras la nocturna) y `… despues` tras la
   ejecución puntual; escribe `f164_huella_{antes,despues}.csv` (solo `adjunto_id`, familias y md5) y
@@ -203,6 +203,6 @@ Commits: `d8b99e9` (H1), `e5ac228` (H4), `3c95df4` (SIM300 de ruff), y el de H2 
 | Tests ejecutados (suite) | Puerta del líder tras el ciclo 2 (2026-11-16, HEAD 99d7f13): 13526 passed, 2532 skipped en 1 h 32 min, `PUERTA COBERTURA` 24/24, `ENTORNO LISTO`. Antes, sobre 4e5ef33: 13525 passed |
 | Tests de F-164 | dominio 250, SQL 10 (ciclo 2: +1, el `CASE` entero), diccionario 11 (R13 azure-apps no `skip`: está al lado), sandbox 6 con DSN (6 `skip` sin él, en la puerta) |
 | Cobertura de líneas cambiadas | `PUERTA COBERTURA: 100.0% de 24 líneas cambiadas cubiertas (24/24, umbral 90% del nivel critico)` (puerta del líder) |
-| Mutantes generados / supervivientes | No en esta pasada: T7, pasada de campaña tras el APPROVED (nivel `critico`, exigida) |
+| Mutantes generados / supervivientes | 15 generados, 10 evaluados (uno por línea), **10 muertos, 0 supervivientes, 0 timeouts** sobre `0311c39`, en 17065 s con 3 workers; los 10 reverificados EN SERIE, todos muertos (`progress/mutacion_F-164.md`) |
 | Tiempo de la suite | 1 h 32 min (puerta del líder sobre `99d7f13`); 2 h 12 min sobre `4e5ef33` |
 | Capa e2e | N/A (sin interfaz de navegador; ver línea `CAPA E2E` de la puerta) |
