@@ -12,7 +12,8 @@
 ## 2026-11-17 · F-164 `done` y DESPLEGADA · sin feature activa
 
 - Desplegada el 2026-11-17: imagen `r20261117-1556` en el job, ejecución puntual sin ingesta
-  `Succeeded` (build-postventa, apply-grants y publicar-diccionario), diccionario v79 publicado.
+  `Succeeded` (build-postventa, apply-grants y publicar-diccionario), diccionario v79 publicado
+  (320 objetos, 2743 columnas y 157 de consumo: una columna más que v78, `familia_documento`).
 - T8/T10 (huella antes y después, solo lectura): 3.349 ficheros a REPARACION (3.341 de INCIDENCIA y 8
   de UNIDAD), mismo conjunto de 16.116, md5 iguales, `familia_documento` = familia de antes, R15 = 0.
 - Cerrada por decisión del humano sin repetir la puerta (detalle en `impl_F-164.md` y en `history.md`).
