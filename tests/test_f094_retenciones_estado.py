@@ -130,14 +130,17 @@ def test_f094_el_ancho_de_estado_cabe() -> None:
 # ===========================================================================
 
 
-def test_f094_cliente_conserva_el_estado_por_fecrea() -> None:
-    """En `cob` el patrón NO es el de `pag`: los ~19,9 M€ con `fecbaj <> 0` están
-    en estado 1 (Pendiente), no en 14 (Agrupado), y el criterio de `pag` deja
-    2,12 M€ frente a 13,81 M€ de su contabilidad. Se corrige en una feature
-    propia; hasta entonces el estado de CLIENTE no cambia."""
+def test_f094_cliente_usa_la_ficha_del_efecto_desde_f104() -> None:
+    """F-094 dejó CLIENTE con el estado por `fecrea` porque en `cob` los ~19,9 M€
+    con `fecbaj <> 0` están en estado 1, no en 14. F-104 (2026-11-18) midió el
+    mecanismo —el original agrupado queda en `est 1` con `fecbaj` = fecha del
+    AGR— y le aplica la MISMA precedencia que a PROVEEDOR; el detalle lo fija
+    `tests/test_f104_retenciones_cliente.py`. Aquí queda lo de F-094: CLIENTE une
+    la ficha de su propio efecto y su estado ya no sale solo de `fecrea`."""
     _, cliente = _mitades()
     case = _case_estado(cliente)
-    assert case == "CASE WHEN COALESCE(c.fecrea, 0) = 0 THEN 'VIVA' ELSE 'LIQUIDADA' END"
+    assert case != "CASE WHEN COALESCE(c.fecrea, 0) = 0 THEN 'VIVA' ELSE 'LIQUIDADA' END"
+    assert "efe.fecbaj" in case and "efe.est" in case
     assert re.search(r"LEFT JOIN raw\.con efe ON efe\.ide = c\.ide\b", cliente)
 
 

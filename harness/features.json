@@ -1639,7 +1639,7 @@
         "Conciliadas las tres cifras (22,16 M publicado, 13,81 M contable, ~2,2 M saneado) o declarada por escrito la parte que no se puede conciliar y por que",
         "El orden de magnitud de cliente deja de estar SIN VERIFICAR en el diccionario, con su fuente medida"
       ],
-      "status": "spec_ready",
+      "status": "blocked",
       "sdd": true,
       "rigor": "estandar",
       "priority": 2,
