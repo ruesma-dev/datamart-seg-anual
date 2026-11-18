@@ -9,6 +9,10 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-18 · F-104 DESBLOQUEADA (líder) · `main` llevado a `dev` con el OK del humano
+
+- `main` en fast-forward a `dev` (los tres commits de papeleo ya no se miden como de F-104); F-104 vuelve a `spec_ready` y se relanza el implementer.
+
 ## 2026-11-18 · F-104 `blocked` (implementer, ANTES de escribir código) · init.sh en rojo
 
 - `bash harness/init.sh` (precondición 1 del implementer) sale en ROJO con 2 KO, ninguno de código
