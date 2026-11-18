@@ -9,6 +9,25 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-18 · F-104 `blocked` (implementer, ANTES de escribir código) · init.sh en rojo
+
+- `bash harness/init.sh` (precondición 1 del implementer) sale en ROJO con 2 KO, ninguno de código
+  (pytest `-x` paró en el primero: 1 failed, 143 passed en 1 min 19 s):
+  1. `tests/test_base_de_la_puerta.py::test_en_este_repositorio_la_base_no_esta_rezagada`;
+  2. PUERTA COBERTURA: «la base «main» se ha quedado por detrás: de los commits que se medirían
+     desde su merge-base con feature/F-104-retenciones-cliente, 3 de los 9 ya están en «dev» y no
+     son de esta rama».
+- **Causa**: `4faa4d2` («F-104: trae dev») metió en la rama tres commits que están en `dev` y NO en
+  `main` (`git log main..dev`: `82b2ba1`/`04c8cc5` F-127 a todo, `8a7cd73`/`16ad177` T11 de F-164,
+  `e022b6d`/`97aaa46` recuentos de v79 de `current.md`). `RAMA_BASE=main` en `harness/init.sh`, así
+  que la puerta mediría como de F-104 lo que es de `dev`. Mismo caso que F-148 (2026-10-23, abajo).
+- **Arreglo propuesto (líder; no lo hace el implementer):** llevar `dev` a `main`
+  (`git checkout main && git merge --no-ff dev`, el merge a `main` se PREGUNTA al humano) y volver a
+  pasar la puerta en la rama; o, si no se quiere tocar `main`, reubicar la rama sin el merge de `dev`
+  (pierde el arreglo de `test_f006` de `e022b6d`, que habría que traer de otra forma). Después,
+  `status` de F-104 de vuelta a `spec_ready` (o `in_progress`) y relanzar el implementer.
+- Nada escrito: ni código, ni tests, ni Azure, ni Sigrid. Solo este bloqueo y `features.json`.
+
 ## 2026-11-18 · F-104 `spec_ready` · al implementer
 
 - La spec está aprobada (D12 a, `6493af2`) y esperaba a F-164, ya `done`. `dev` traído a la rama
