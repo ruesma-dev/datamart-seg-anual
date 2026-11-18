@@ -675,9 +675,34 @@ objetos:
       abre quien lee `postventa`; las REPARACION solo el perfil postventa y
       el total (D9 de F-156). Las FILAS del indice si las ven todos.
 
-      **DNI MANUSCRITO**: la familia REPARACION (clase de grafico PV002
-      «Fotos Reparaciones», 4.427) es casi siempre el PARTE FIRMADO por el
-      cliente (3.874 se llaman asi), con su DNI escrito a mano dentro.
+      **DNI MANUSCRITO: REPARACION = parte firmado o posible parte (F-164)**.
+      El parte firmado por el cliente lleva su DNI escrito a mano dentro. Desde
+      F-164 la `familia` NO es la del documento: solo tres parejas (tipo,
+      clase de grafico) quedan abiertas, PV001 «Fotos de incidencias» en una
+      incidencia (708), PV006 «Ficha de inmueble» en una unidad (707) y PV004
+      «Informes» en una tarea (47), y aun en ellas el fichero va a REPARACION
+      si el nombre o la descripcion dicen FIRMA, FIRMADO o FIRMAS, o si el
+      nombre lleva el codigo de la incidencia (`RS24.11-0123` y variantes).
+      Todo lo demas es REPARACION: PV002 «Fotos Reparaciones» (la convencion
+      de Posventa desde 2024), los partes de 2021-2023, que cuelgan de la
+      incidencia sin clase de grafico (3.338 ficheros de 708 sin clase el
+      2026-11-16, muchos con nombre generico), PV002 colgado de una unidad y
+      cualquier clase que aparezca en Sigrid. Con el dato del 2026-11-16,
+      3.349 enlaces pasaron de INCIDENCIA o UNIDAD a REPARACION; la familia de
+      antes sigue en `familia_documento`. Hay falsos positivos aceptados
+      (imagenes, videos y correos sin clase): se restringen igual.
+
+      **LO QUE LA REGLA NO VE**: el contenido del fichero (el datamart no
+      tiene el binario); un parte fotografiado o escaneado con nombre generico
+      DENTRO de PV001 (cota medida: 33 o menos) o colgado como ficha PV006 o
+      informe PV004 sin texto de firma.
+
+      **ADJUNTOS DE UNIDAD EN REPARACION, HUERFANOS**: los 8 ficheros de
+      unidad (707) movidos a REPARACION tienen como `documento_id` la UNIDAD,
+      que no tiene fila en `postventa_restringida.contactos_incidencia`. Los
+      perfiles postventa y total los abren con el aviso de huerfano; el resto
+      recibe permiso denegado, como con cualquier REPARACION.
+
       `subido_por` es el LOGIN de quien subio el fichero. **`nombre_fichero` y
       `descripcion` van SIN mascara**: los pone quien sube el fichero y pueden
       llevar el nombre del cliente.
@@ -692,7 +717,17 @@ objetos:
         significado: Identificador del enlace (`rcg.ide`), lo que pide `abrir_adjunto`.
         agregacion: clave_sustituta
       familia:
-        significado: De que cuelga el fichero; decide quien puede abrirlo.
+        significado: >-
+          Decide quien puede abrir el fichero (F-164): la familia del documento
+          solo si es foto de incidencia (PV001), ficha de inmueble (PV006) o
+          informe de tarea (PV004) sin FIRMA ni codigo de incidencia; si no,
+          REPARACION.
+        valores: [INCIDENCIA, REPARACION, UNIDAD, TAREA]
+      familia_documento:
+        significado: >-
+          De que documento cuelga el fichero, la familia de F-156 (707 UNIDAD,
+          47 TAREA, 708 con PV002 REPARACION, el resto de 708 INCIDENCIA). Es
+          traza: quien abre el fichero lo decide `familia`.
         valores: [INCIDENCIA, REPARACION, UNIDAD, TAREA]
       documento_id:
         significado: Documento de Sigrid del que cuelga el fichero.
@@ -735,7 +770,9 @@ objetos:
       clase_grafico_id:
         significado: Clase de grafico de Sigrid (`gratipide`).
         agregacion: no_sumable
-        nulo_significa: Sin clase de grafico (3.343 enlaces de incidencias).
+        nulo_significa: >-
+          Sin clase de grafico (3.343 enlaces de incidencias): desde F-164 su
+          `familia` es REPARACION.
       clase_grafico_codigo:
         significado: Codigo de la clase de grafico (PV001, PV002, PV004, PV006).
       clase_grafico:

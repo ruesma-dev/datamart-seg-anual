@@ -9,6 +9,13 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-18 · F-104 `spec_ready` · al implementer
+
+- La spec está aprobada (D12 a, `6493af2`) y esperaba a F-164, ya `done`. `dev` traído a la rama
+  `feature/F-104-retenciones-cliente` el 2026-11-18 (F-164, la T11, F-127 a `todo`). Puerta en `dev` en
+  verde salvo `test_f006_los_recuentos_de_current_son_los_de_hoy` (recuentos de v79 que faltaban
+  desde F-164), arreglado en `chore/current-recuentos-v79`.
+
 ## 2026-11-16 · Ventas primero · F-104 `spec_ready` (spec del 06-11, aprobada el 07-11) · se revalida contra `main`
 
 - Orden del humano: «vamos con las 5 que quedan de ventas, ponlas en las primeras prioridades».
@@ -16,8 +23,8 @@
 - F-104 en su rama `feature/F-104-retenciones-cliente`, en el checkout principal (el worktree viejo
   se retiró limpio), con `main` dentro. Su spec (registro del 06-11, abajo en la historia de git:
   90484ea) se escribió antes de F-040, F-162 y F-161: el spec-author la revalida antes del implementer.
-- **Fuera de este repo:** la IA NO ve `ventas`, `ventas_restringida` ni `postventa`: no están en la
-  lista blanca de `mcp-bbdd` (su F-034, `pending`).
+- **Fuera de este repo:** desde el 2026-11-18 la IA SÍ ve `ventas`, `ventas_restringida` y `postventa`
+  (F-034 de `mcp-bbdd` desplegada, revisión `--0000025`).
 - **Revalidación de la spec (spec-author, 2026-11-16): REQUIERE PARADA 1.** Informe en
   `progress/spec_F-104.md` («Revalidación 2026-11-16»); spec marcada `[rev. 16-11]`, tabla en
   `design.md` §9. Para el humano: **D3 se reabre** (recomendado: unión `cli.cueretide` ∪ 43x8,
@@ -31,6 +38,20 @@
   `06b`). **Nueva PARADA 1 por D12**: ESPACIO, LEVITT y MK llevan la retención como RETESP
   (clase 1), que `ventas.facturas` no cuenta como garantía; recomendado (a) conciliar los recargos
   que van a una cuenta de retención (`dvfrec.cueide`). `progress/spec_F-104.md` §12-§13 (corrige §10).
+
+## 2026-11-17 · F-164 `done` y DESPLEGADA · sin feature activa
+
+- Desplegada el 2026-11-17: imagen `r20261117-1556` en el job, ejecución puntual sin ingesta
+  `Succeeded` (build-postventa, apply-grants y publicar-diccionario), diccionario v79 publicado
+  (320 objetos, 2743 columnas y 157 de consumo: una columna más que v78, `familia_documento`).
+- T8/T10 (huella antes y después, solo lectura): 3.349 ficheros a REPARACION (3.341 de INCIDENCIA y 8
+  de UNIDAD), mismo conjunto de 16.116, md5 iguales, `familia_documento` = familia de antes, R15 = 0.
+- Cerrada por decisión del humano sin repetir la puerta (detalle en `impl_F-164.md` y en `history.md`).
+- **T11 / R16 hecha el 2026-11-18:** con `mcp-bbdd` F-034 desplegada (revisión `--0000025`) y el
+  perfil total, un 708 movido (adjunto 93904) y un 707 movido (164823, con aviso de huérfano) se
+  abren. Las pruebas con postventa, estándar y restringido quedan para los usuarios (cierre del
+  humano). DH10 cerrada.
+- Siguiente: F-104 (spec aprobada) y después F-165 (versión vigente del master, prioridad 3).
 
 ## 2026-11-16 · F-163 `done` y DESPLEGADA · sin feature activa
 

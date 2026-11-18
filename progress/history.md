@@ -2206,3 +2206,19 @@ Detonante: la 0721 salía con la ficha vacía de PORSAN (empresa 28) en lugar de
 **Ecosistema:** `azure-apps/datamart_seg_anual.md`, commits `006b293` y `0511029` (subidos por el humano el 2026-11-15).
 
 **Fuera, pendiente:** despliegue (en `current.md`), O1 (`ventanaActiva` de `dev.json` frente al job vivo), el superviviente de mutación, la nocturna fallida del 2026-11-07.
+
+## F-164 — Los partes firmados de postventa van siempre a la familia restringida · `done` (2026-11-17)
+
+**Qué cambia.** `postventa.documento_adjuntos.familia` pasa a REPARACION para todo fichero que es un parte firmado (con el DNI manuscrito del cliente), cuelgue de donde cuelgue en Sigrid; `mcp-bbdd` decide por familia y no cambia.
+- La regla vive en `etl_sigrid/domain/postventa.py` (`familia_publicada`, señales en el nombre, la descripción y la clase de gráfico) y el `CASE` de `06_adjuntos.sql` es el del dominio, con un test que lo compara entero.
+- Columna nueva `familia_documento`: la familia del documento del que cuelga, la de antes. Diccionario v79.
+
+**Verificado:**
+- Review: pasada 1 RECHAZADO (H1-H4), pasada 2 APROBADO y pasada de evidencias APROBADO.
+- Puerta del líder en verde sobre `99d7f13`: 13.526 passed, cobertura 24/24. Mutación (rigor crítico): 10/10 muertos, reverificados en serie (`progress/mutacion_F-164.md`).
+- Despliegue 2026-11-17 (imagen `r20261117-1556`, v79): 3.349 ficheros a REPARACION, mismo conjunto de 16.116, md5 iguales, R15 = 0.
+- Cerrada por decisión del humano sin repetir la puerta del 17-11, que solo cayó en `test_f164_r13` por quitar «SIN DESPLEGAR» de azure-apps (corregido en `2d6bdca`).
+
+**Ecosistema:** `azure-apps/datamart_seg_anual.md`, commits `f61570b` y `bd41a9e` (este, por subir).
+
+**Fuera, pendiente:** T11/R16 (reiniciar `mcp-bbdd` y probar los 4 perfiles; avisar a la sesión `mcp` de DH10 y los 8 huérfanos de 707).

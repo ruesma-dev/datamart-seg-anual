@@ -430,12 +430,15 @@ def test_f156_r19_extension_y_clase_iguales_que_compras() -> None:
 
 
 def test_f156_r20_familia_con_los_literales_del_dominio() -> None:
+    # F-164 (D3): la expresión de F-156 sigue intacta, pero se publica como
+    # `familia_documento`; `familia` la envuelve con la lista abierta y las
+    # señales de parte firmado (lo vigila `tests/test_f164_sql.py`).
     create = _create("06_adjuntos.sql", "postventa.documento_adjuntos")
     esperado = (
         f"CASE WHEN c.tip = {pv.TIPO_UNIDAD} THEN 'UNIDAD' "
         f"WHEN c.tip = {pv.TIPO_TAREA} THEN 'TAREA' "
         f"WHEN g.gratipide = {pv.GRATIPIDE_REPARACION} THEN 'REPARACION' "
-        "ELSE 'INCIDENCIA' END::TEXT AS familia"
+        "ELSE 'INCIDENCIA' END::TEXT AS familia_documento"
     )
     assert esperado in create
     tipos = ", ".join(str(t) for t in pv.TIPOS_POSTVENTA)
