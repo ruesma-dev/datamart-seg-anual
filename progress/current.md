@@ -16,9 +16,10 @@
 - T8/T10 (huella antes y después, solo lectura): 3.349 ficheros a REPARACION (3.341 de INCIDENCIA y 8
   de UNIDAD), mismo conjunto de 16.116, md5 iguales, `familia_documento` = familia de antes, R15 = 0.
 - Cerrada por decisión del humano sin repetir la puerta (detalle en `impl_F-164.md` y en `history.md`).
-- **Pendiente T11 / R16:** reiniciar `mcp-bbdd` (lo hace el despliegue de su F-033), abrir un 708 y un
-  707 movidos con los 4 perfiles (`PERMISO_DENEGADO` con estándar y restringido; abiertos con
-  postventa y total) y avisar a la sesión `mcp` (DH10 y los 8 huérfanos de 707).
+- **T11 / R16 hecha el 2026-11-18:** con `mcp-bbdd` F-034 desplegada (revisión `--0000025`) y el
+  perfil total, un 708 movido (adjunto 93904) y un 707 movido (164823, con aviso de huérfano) se
+  abren. Las pruebas con postventa, estándar y restringido quedan para los usuarios (cierre del
+  humano). DH10 cerrada.
 - Siguiente: F-104 (spec aprobada) y después F-165 (versión vigente del master, prioridad 3).
 
 ## 2026-11-16 · F-163 `done` y DESPLEGADA · sin feature activa
