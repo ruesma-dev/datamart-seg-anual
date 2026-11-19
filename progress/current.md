@@ -9,7 +9,12 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-11-19 · F-104 `in_progress` (implementer) · retención de cliente saneada, diccionario v80
+## 2026-11-19 · F-104 DONE (OK del humano), fusionada en `dev`; pendiente su T11 MANUAL · retención de cliente saneada, diccionario v80
+
+- Review principal APPROVED (`progress/review_F-104.md`), observaciones 1 y 2 hechas (`e51e692`), mutación
+  manual 13/13 (T10). Observaciones 3 (la guarda de `ventas` puede no correr si `build_retenciones` cae a
+  medias) y 4 (facturas anuladas en SIN_EFECTO) quedan como decisión del humano, sin prisa.
+- Pendiente: T11 MANUAL (abajo) tras imagen nueva del job, y el push de `azure-apps` `4621627`.
 
 - Tarea en curso: T2-T12 de `specs/F-104-retenciones-cliente/tasks.md` (un commit por tarea).
 - **Diccionario v80 (en la rama, SIN PUBLICAR): 326 objetos, 2819 columnas y 163 de consumo**
