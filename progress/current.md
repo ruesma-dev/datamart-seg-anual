@@ -33,12 +33,12 @@
 - **Hecho en la rama**: T1 (tests de F-104 en ROJO + `test_f094_cliente_usa_la_ficha_del_efecto_desde_f104`)
   en un commit. **Todo lo demás está ya escrito y probado fuera del repositorio**, listo para aplicar al
   desbloquear (no se pierde si el scratchpad sobrevive; si no, se rehace desde la spec):
-  - borradores SQL `C:\Users\pgris\AppData\Local\Temp\claude\8c090c429e3d52a1\4d25158c-2f67-4374-862c-39b2583c467e\scratchpad\copia\retenciones\01_movimientos.sql`, `C:\Users\pgris\AppData\Local\Temp\claude\8c090c429e3d52a1\4d25158c-2f67-4374-862c-39b2583c467e\scratchpad\08_saldo_cliente.sql`
-    (y su copia en `copia\retenciones`), `C:\Users\pgris\AppData\Local\Temp\claude\8c090c429e3d52a1\4d25158c-2f67-4374-862c-39b2583c467e\scratchpad\copia\ventas\06b_retencion_cliente.sql`;
-  - `C:\Users\pgris\AppData\Local\Temp\claude\8c090c429e3d52a1\4d25158c-2f67-4374-862c-39b2583c467e\scratchpad\patch_resto.py` (steps, `main.py`, tests que enumeran sub-pasos) y `C:\Users\pgris\AppData\Local\Temp\claude\8c090c429e3d52a1\4d25158c-2f67-4374-862c-39b2583c467e\scratchpad\patch_dicc.py`
+  - borradores SQL `<scratchpad del implementer>\copia\retenciones\01_movimientos.sql`, `<scratchpad del implementer>\08_saldo_cliente.sql`
+    (y su copia en `copia\retenciones`), `<scratchpad del implementer>\copia\ventas\06b_retencion_cliente.sql`;
+  - `<scratchpad del implementer>\patch_resto.py` (steps, `main.py`, tests que enumeran sub-pasos) y `<scratchpad del implementer>\patch_dicc.py`
     (diccionario v80, órdenes de magnitud, ARCHITECTURE, `tables_sigrid.yaml`; añade
-    `ret_nuevas.yaml` y `ven_nuevas.yaml`); `C:\Users\pgris\AppData\Local\Temp\claude\8c090c429e3d52a1\4d25158c-2f67-4374-862c-39b2583c467e\scratchpad\azure_f104.md` (sección para `azure-apps`);
-  - el árbol completo aplicado en `C:\Users\pgris\AppData\Local\Temp\claude\8c090c429e3d52a1\4d25158c-2f67-4374-862c-39b2583c467e\scratchpad\wt` (worktree desechable, HEAD `1e81f42`): **99 passed** en
+    `ret_nuevas.yaml` y `ven_nuevas.yaml`); `<scratchpad del implementer>\azure_f104.md` (sección para `azure-apps`);
+  - el árbol completo aplicado en `<scratchpad del implementer>\wt` (worktree desechable, HEAD `1e81f42`): **99 passed** en
     `test_f104_*` (12 de sandbox contra un PG16 local) + `test_f040_diccionario`.
   - Pendiente al retomar: recuentos del diccionario en esta sección de estado (test_f006) y presupuesto
     de contexto F-147 (`test_f147_r18_r19` falló en el árbol aplicado: revisar al retomar).

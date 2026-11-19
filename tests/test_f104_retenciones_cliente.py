@@ -187,7 +187,7 @@ def test_f104_r3_la_cabecera_explica_el_agr_con_el_caso_medido() -> None:
 
 def test_f104_r4_cuentas_cliente_es_la_union_de_cueretide_y_43x8() -> None:
     bloque = _cuentas_cliente()
-    for cosa in ("FROM raw.cli cl", "cl.cueretide", "cue.tip = 17", "cue.cod ~ '^43[0-9]8'",
+    for cosa in ("FROM raw.cli cl", "cl.cueretide", "pc.tip = 17", "pc.cod ~ '^43[0-9]8'",
                  "FULL JOIN", "'CUERETIDE'", "'PREFIJO_43X8'", "LEFT(cue.cod, 4) AS familia"):
         assert cosa in bloque, cosa
     assert _alias_final(bloque) == list(COLUMNAS_CUENTAS)
