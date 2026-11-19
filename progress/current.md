@@ -20,8 +20,7 @@
   que el guardián R2 de F-006 no tome `raw.con cue` por proyección directa; `tipo_id` sin
   `nulo_significa` (lo exige `test_f006_r2_los_filtros_que_pierden_filas_se_declaran`), el NULL de
   CLIENTE se explica en `significado`. Detalle en `progress/impl_F-104.md`.
-- T10 (mutación, INFORMATIVA en `estandar`): en la pasada de campaña, tras el APPROVED del reviewer
-  (`python -m harness.mutacion --feature F-104`), como manda `implementer.md`.
+- T10 hecha (2026-11-19, mutación manual sobre el SQL): 13 mutantes, 13 muertos (`impl_F-104.md`).
 - **T11 MANUAL (humano), tras merge e imagen nueva del job** (solo lecturas salvo el build y la publicación):
   1. `python main.py build-retenciones` y `python main.py build-ventas` (o la nocturna con la imagen nueva);
      después `python main.py check-unicidad` y `python main.py check-relaciones`.

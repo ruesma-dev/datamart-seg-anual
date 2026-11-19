@@ -60,8 +60,8 @@ D3 a, D9 a, D10 b, D11 a, D12 a. Commits `7ae1e00` (T1) … `516926d` (T11); `az
 4. Relación `cuentas_cliente.cliente_id → ventas.clientes` `N:1` (el validador R5 rechazó `1:1`).
 5. T2 y T3 tocan el mismo fichero: un solo commit `F-104 T2-T3`. El cambio de alias del test de R4 entró
    por error en `bca5c22` (un `commit -a` de la nota de current.md); es una línea, se deja así.
-6. T10 (mutación, INFORMATIVA en `estandar`): según `implementer.md`, en la pasada de campaña tras el
-   APPROVED del reviewer. T11 es MANUAL del humano (comandos en `progress/current.md`).
+6. T10 (mutación, INFORMATIVA en `estandar`): hecha en la pasada de campaña tras el APPROVED (abajo).
+   T11 es MANUAL del humano (comandos en `progress/current.md`).
 
 ## Fase RED (T1, antes de escribir SQL)
 
@@ -117,11 +117,42 @@ líneas cambiadas no contienen sentencias ejecutables)`; `PUERTA TAMAÑO` dentro
 
 ## Pendiente
 
-- T10 en la pasada de campaña; T11 MANUAL (humano): build, comprobaciones de R20, R21, R35 y R37,
+- T11 MANUAL (humano): build, comprobaciones de R20, R21, R35 y R37,
   `publicar-diccionario` con la imagen del job y reinicio de `mcp-bbdd`; push de la rama y de
   `azure-apps` (`4621627`) por el humano.
 - Fuera de alcance (spec): atribuir lo cobrado por un AGR a facturas (D11), repartir el saldo contable
   por obra (D5), corregir en Sigrid la ficha de UNEXUM (4308001593 frente a 4338001593).
+
+## T10 · pasada de campaña: mutación manual (2026-11-19, sobre `e51e692`, código aprobado)
+
+Por qué manual y no `python -m harness.mutacion --feature F-104`: la herramienta muta solo las líneas
+Python que cambia la feature, y las de F-104 son docstrings y tuplas de `SUB_PASOS` (la puerta da la
+cobertura N/A por eso); los tres puntos que pide la spec están en SQL. Es la «mutación manual
+documentada» que prevé T10. Script: un mutante cada vez sobre el fichero real, se corren
+`tests/test_f104_sandbox.py` (PG16 local) y los dos ficheros estáticos de F-104 por separado, y se
+restaura (árbol limpio al terminar, `git status` sin cambios). Base: `58 passed in 4.53s`.
+
+| Id | Mutante | Sandbox | Estáticos |
+|---|---|---|---|
+| E1 | CLIENTE: BAJA sin `fecbaj` (solo `est` 14/15) | muerto | muerto |
+| E2 | CLIENTE: BAJA sin el `est` 15 | muerto | muerto |
+| E3 | CLIENTE: LIQUIDADA sin `est` 10 | muerto | muerto |
+| E4 | CLIENTE: LIQUIDADA evaluada antes que BAJA | **vive** | muerto |
+| U1 | R4: prefijo sin `tip = 17` | muerto | muerto |
+| U2 | R4: `^43[0-9]` en vez de `^43[0-9]8` | muerto | muerto |
+| U3 | R4: declaradas con `cueretide >= 0` | muerto | **vive** |
+| U4 | R4: `LEFT JOIN` en vez de `FULL JOIN` (sin la unión) | muerto | muerto |
+| U5 | R6: `OR` → `AND` en el universo de CLIENTE | muerto | muerto |
+| M1 | R28: tolerancia de CUADRA 0,01 → 1000 | muerto | muerto |
+| M2 | R28: SIN_EFECTO solo si `retencion > 0` | **vive** | muerto |
+| M3 | R28: EFECTO_SIN_RETENCION con `num_efectos > 1` | muerto | muerto |
+| M4 | R28: DIFIERE con `num_efectos >= 0` | muerto | muerto |
+
+Totales: **13 generados, 13 muertos por la batería de F-104, 0 supervivientes.** Por capa, informativo:
+la sandbox sola mata 11 (E4: no hay efecto con `fecbaj` Y `fecrea`/`est 10` a la vez; M2: no hay
+factura con retención NEGATIVA sin efecto) y los estáticos solos 12 (U3: fijan el texto de la unión,
+no el `<> 0` de `cueretide`; lo mata la sandbox con su cliente de `cueretide = 0`). No son
+equivalentes, pero cada uno lo caza la otra capa: no se ha tocado código de producción.
 
 ## Evidencias
 
@@ -130,6 +161,6 @@ líneas cambiadas no contienen sentencias ejecutables)`; `PUERTA TAMAÑO` dentro
 | Tests de F-104 | 46 estáticos + 12 sandbox, todos en verde |
 | Suite completa (puerta final) | 13.620 passed, 2.549 skipped, 0 failed (puerta final) |
 | Cobertura de las líneas cambiadas | N/A según `PUERTA COBERTURA`: las líneas Python cambiadas son docstrings y tuplas de `SUB_PASOS`, sin sentencias ejecutables; el SQL lo cubren los 46 + 12 tests de F-104 |
-| Mutación | Informativa en `estandar`: se lanza en la pasada de campaña (`implementer.md`) |
+| Mutación (T10, manual, informativa) | **13 mutantes, 13 muertos, 0 supervivientes** con los tests de F-104 (ver «T10» abajo) |
 | Tiempo de la suite | 2 h 42 min 42 s (9.762,75 s, con el puesto compartido con otras suites) |
 | Capa e2e | N/A (línea `CAPA E2E` de `init.sh`: sin `harness/servicios.json`) |
