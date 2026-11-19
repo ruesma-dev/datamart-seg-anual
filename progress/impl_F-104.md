@@ -110,7 +110,10 @@ suite. El líder lo repitió solo (17 passed en `tests/test_f052_marcador.py`) y
 Antes, `init2` cayó por un GUID de sesión que yo había dejado en `current.md` (`test_f003`): corregido
 en `bca5c22`.
 
-Puerta final: PENDIENTE_PUERTA_FINAL
+Puerta final (2026-11-19, sobre `7e7376f`): **`bash harness/init.sh` EXIT 0, todo [OK]**:
+`13620 passed, 2549 skipped, 2787 warnings in 9762.75s (2:42:42)`; `PUERTA COBERTURA: N/A (F-104: las
+líneas cambiadas no contienen sentencias ejecutables)`; `PUERTA TAMAÑO` dentro de topes (impl 132/220);
+`PUERTA CARRIL: N/A (estandar)`; `CAPA E2E: N/A`. Sin repetir de 0xC0000142 en esta pasada.
 
 ## Pendiente
 
@@ -125,8 +128,8 @@ Puerta final: PENDIENTE_PUERTA_FINAL
 | Evidencia | Valor |
 |---|---|
 | Tests de F-104 | 46 estáticos + 12 sandbox, todos en verde |
-| Suite completa (puerta final) | PENDIENTE_SUITE |
-| Cobertura de las líneas cambiadas | PENDIENTE_COBERTURA |
+| Suite completa (puerta final) | 13.620 passed, 2.549 skipped, 0 failed (puerta final) |
+| Cobertura de las líneas cambiadas | N/A según `PUERTA COBERTURA`: las líneas Python cambiadas son docstrings y tuplas de `SUB_PASOS`, sin sentencias ejecutables; el SQL lo cubren los 46 + 12 tests de F-104 |
 | Mutación | Informativa en `estandar`: se lanza en la pasada de campaña (`implementer.md`) |
-| Tiempo de la suite | PENDIENTE_TIEMPO |
+| Tiempo de la suite | 2 h 42 min 42 s (9.762,75 s, con el puesto compartido con otras suites) |
 | Capa e2e | N/A (línea `CAPA E2E` de `init.sh`: sin `harness/servicios.json`) |
