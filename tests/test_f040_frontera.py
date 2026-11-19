@@ -30,8 +30,13 @@ INTOCABLES = (SQL / "retenciones", SQL / "tesoreria")
 # que F-040 protege (el lado de ingresos, `v_src_lineas_venta`, `00_setup.sql` y
 # toda `tesoreria/`) sigue sin poder cambiar.
 #   F-161 (R10): `05_fin_obra.sql` filtra `tiene_reparto` en el catálogo único.
+#   F-104 (R24): `01_movimientos.sql` sanea el estado de CLIENTE y construye
+#   `cuentas_cliente`; `08_saldo_cliente.sql` (nuevo) es el saldo contable de
+#   cliente y su cuadre. `00_setup.sql`, `v_src_lineas_venta` y `tesoreria/`, igual.
 TOCADOS_DESPUES = frozenset({
     "etl_sigrid/infrastructure/postgres/sql/retenciones/05_fin_obra.sql",
+    "etl_sigrid/infrastructure/postgres/sql/retenciones/01_movimientos.sql",
+    "etl_sigrid/infrastructure/postgres/sql/retenciones/08_saldo_cliente.sql",
 })
 
 

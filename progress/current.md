@@ -9,6 +9,19 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-19 · F-104 `in_progress` (implementer) · retención de cliente saneada, diccionario v80
+
+- Tarea en curso: T2-T12 de `specs/F-104-retenciones-cliente/tasks.md` (un commit por tarea).
+- **Diccionario v80 (en la rama, SIN PUBLICAR): 326 objetos, 2819 columnas y 163 de consumo**
+  (v79 + seis fichas de F-104 y dos columnas de `retenciones.movimientos`). Se publica con su imagen.
+- Puerta de precondición: rojo TRANSITORIO en `test_f052_r28` (powershell.exe 0xC0000142 por carga del
+  puesto; el líder lo repitió solo: 17 passed). Decisión del líder: no repetirla; manda la puerta final.
+- Desviaciones de la spec: el CTE `prefijo` de `cuentas_cliente` usa el alias `pc` (no `cue`) para
+  que el guardián R2 de F-006 no tome `raw.con cue` por proyección directa; `tipo_id` sin
+  `nulo_significa` (lo exige `test_f006_r2_los_filtros_que_pierden_filas_se_declaran`), el NULL de
+  CLIENTE se explica en `significado`. Detalle en `progress/impl_F-104.md`.
+- MANUAL para el humano, al final de la feature (abajo, en T11).
+
 ## 2026-11-19 · F-104 DESBLOQUEADA (líder, 2.ª vez) · test_f135 arreglado en `dev` y `main` llevado a `dev`
 
 - Causa del bloqueo: `test_f135_r23_la_ficha_de_f127_hereda_el_criterio_de_apa` exigía F-127 en `pending` y
