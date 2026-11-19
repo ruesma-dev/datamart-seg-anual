@@ -9,6 +9,14 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-19 · F-104 DESBLOQUEADA (líder, 2.ª vez) · test_f135 arreglado en `dev` y `main` llevado a `dev`
+
+- Causa del bloqueo: `test_f135_r23_la_ficha_de_f127_hereda_el_criterio_de_apa` exigía F-127 en `pending` y
+  el líder la pasó a `todo` el 2026-11-17 con el compromiso del humano. Arreglado en `dev`
+  (`chore/test-f135-f127-todo`, merge `d8566ac`): acepta `pending` o `todo`. Ningún otro test fija el estado de F-127.
+- Con el OK del humano, `main` en fast-forward a `d8566ac`; la rama trae `dev` (`41b8841`). F-104 vuelve a
+  `spec_ready` y se reanuda el implementer, que aplica lo preparado en su scratchpad (T1 ya en la rama).
+
 ## 2026-11-18 (2.ª vez) · F-104 `blocked` (implementer) · init.sh en ROJO por un test ajeno a F-104
 
 - `bash harness/init.sh` (precondición 1, sobre `1e81f42`, sin código de F-104): **1 failed, 10.295
