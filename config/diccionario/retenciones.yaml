@@ -2146,7 +2146,7 @@ objetos:
         porque: >-
           Para el nombre y el CIF (enmascarado si es persona fisica) del cliente
           de la cuenta. Un cliente puede tener mas de una cuenta: para cifras por
-          cliente, agregar por  antes de unir.
+          cliente, agregar por `cliente_id` antes de unir.
     ejemplos_preguntas:
       - Cual es la cuenta de retencion del cliente C
 

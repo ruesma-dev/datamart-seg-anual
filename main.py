@@ -5544,10 +5544,16 @@ def build_ventas() -> None:
       04_enlace.sql           certificación -> factura y la cobertura del enlace
       05_vistas.sql           cobro por factura, seguimiento y contraste por obra
       06_restringida.sql      ventas_restringida: lo personal del cliente
+      06b_retencion_cliente.sql  F-104: la retención de cliente por factura,
+                              por cuenta y por cliente (lee `retenciones`)
       07_guardas.sql          la guarda: recuentos, base, recargos y nada personal
 
     Requiere haber ingerido cli, cer, cerpro, cerrec, cerprodes, dvfpro, dvfrec
-    y dvf con sus 35 columnas (F-040). Tras lanzarlo suelto, `apply-grants`.
+    y dvf con sus 35 columnas (F-040). Y, desde F-104, haber lanzado ANTES
+    `build-retenciones` con F-104 (`retenciones.cuentas_cliente`,
+    `movimientos` con `cuenta_id` y `v_cuadre_cliente`): si no, la guarda de
+    `06b` (R33) para el paso antes de borrar nada. Tras lanzarlo suelto,
+    `apply-grants`.
     No publica el diccionario.
 
     LO QUE HAY QUE SABER ANTES DE CONSULTAR LO QUE ESTO CONSTRUYE:
