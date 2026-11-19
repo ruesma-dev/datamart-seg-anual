@@ -199,6 +199,9 @@ FICHEROS = (
     "00_setup.sql", "01_clientes.sql", "02_facturas.sql", "03_certificaciones.sql",
     "04_enlace.sql", "05_vistas.sql", "06_restringida.sql", "07_guardas.sql",
 )
+#: F-104: `06b` lee `retenciones`, que esta sandbox no monta; la suya es
+#: `tests/test_f104_sandbox.py`.
+FUERA_DE_ESTA_SANDBOX = ("06b_retencion_cliente.sql",)
 
 
 def _dir_sql():
@@ -223,8 +226,9 @@ def conexion():
         with psycopg.connect(make_conninfo(DSN, dbname=base), autocommit=True) as c:
             c.execute(RAW_DDL)
             c.execute(DATOS)
-            assert tuple(s.sql_file for s in SUB_PASOS) == FICHEROS
-            for sub in SUB_PASOS:
+            pasos = [s for s in SUB_PASOS if s.sql_file not in FUERA_DE_ESTA_SANDBOX]
+            assert tuple(s.sql_file for s in pasos) == FICHEROS
+            for sub in pasos:
                 c.execute((_dir_sql() / sub.sql_file).read_text(encoding="utf-8"))
             yield c
     finally:

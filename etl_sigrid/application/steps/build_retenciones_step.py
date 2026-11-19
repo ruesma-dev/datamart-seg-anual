@@ -18,9 +18,18 @@ Encadena los archivos SQL en orden:
     07_cuadre_factura.sql    - F-128: cuadre de la retencion de garantia por
                           FACTURA (factura, mayor y efectos) y por
                           (proveedor, obra); lee solo `raw` y `retenciones`,
-                          nunca `compras`, y por eso va el ultimo
+                          nunca `compras`
+    08_saldo_cliente.sql     - F-104: la retencion de CLIENTE desde la
+                          contabilidad (saldo por cuenta de retencion de
+                          cliente) y su cuadre con los efectos; lee `raw.apu`
+                          y lo que `01_movimientos.sql` deja (`cuentas_cliente`,
+                          `movimientos`), y por eso va el ultimo
 
-Lee de `raw.*` (cob, pag, rec, prv, con, apu, rac, obr, obrctr) y de la vista
+`01_movimientos.sql` construye antes, desde F-104, `retenciones.cuentas_cliente`
+(la union de `raw.cli.cueretide` y las cuentas 43x8): la rama CLIENTE incluye los
+efectos de esas cuentas y `08_saldo_cliente.sql` suma sus apuntes.
+
+Lee de `raw.*` (cob, pag, rec, prv, cli, con, apu, rac, obr, obrctr) y de la vista
 `maestro.centros_coste`. El sub-paso `fin_obra` lee ademas tres tablas de
 otros pasos:
 
@@ -105,13 +114,21 @@ SUB_PASOS: tuple[_SubStep, ...] = (
         target_table="fin_obra",
     ),
     _SubStep(name="views_contables", sql_file="06_views_contables.sql"),
-    # F-128: el cuadre por factura, el ULTIMO: lee `apuntes_contables`,
-    # `saldo_contable` y `movimientos`, que construyen los sub-pasos de arriba.
+    # F-128: el cuadre por factura: lee `apuntes_contables`, `saldo_contable` y
+    # `movimientos`, que construyen los sub-pasos de arriba.
     _SubStep(
         name="cuadre_factura",
         sql_file="07_cuadre_factura.sql",
         target_schema="retenciones",
         target_table="retencion_factura",
+    ),
+    # F-104: la retencion de CLIENTE desde la contabilidad, el ULTIMO: lee
+    # `cuentas_cliente` y `movimientos` (01) y no la lee nadie de este paso.
+    _SubStep(
+        name="saldo_cliente",
+        sql_file="08_saldo_cliente.sql",
+        target_schema="retenciones",
+        target_table="saldo_contable_cliente",
     ),
 )
 

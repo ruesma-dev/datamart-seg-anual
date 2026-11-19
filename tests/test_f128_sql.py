@@ -665,9 +665,12 @@ def test_f128_r18_r22_la_vista_lee_solo_retenciones():
 # --- R24 · los pasos ETL --------------------------------------------------------
 
 def test_f128_r24_cuadre_factura_es_el_ultimo_sub_paso_de_retenciones():
+    """Era el último hasta F-104, que pone detrás `saldo_cliente`
+    (`tests/test_f104_retenciones_cliente.py`): sigue después de todo lo que lee."""
     from etl_sigrid.application.steps import build_retenciones_step as paso
 
-    ultimo = paso.SUB_PASOS[-1]
+    ultimo = paso.SUB_PASOS[-2]
+    assert paso.SUB_PASOS[-1].name == "saldo_cliente"
     assert (ultimo.name, ultimo.sql_file, ultimo.target_schema, ultimo.target_table) == (
         "cuadre_factura", "07_cuadre_factura.sql", "retenciones", "retencion_factura"
     )

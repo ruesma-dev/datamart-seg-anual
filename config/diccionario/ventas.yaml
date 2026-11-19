@@ -15,7 +15,10 @@
 #
 # TRES CIFRAS QUE NO SON LA MISMA (`R-VENTAS-TRES-CIFRAS`): lo certificado, lo
 # facturado y lo cobrado. La conciliacion de la retencion de cliente por
-# documento es de F-104; el contraste de todas las obras, de F-160.
+# factura la cumple F-104 en `ventas.retencion_factura` (y por cuenta y por
+# cliente, `ventas.retencion_cuenta` y `ventas.v_retencion_cliente`); lo cobrado
+# por un AGR se explica alli y no se atribuye a ninguna factura (D11). El
+# contraste de todas las obras, de F-160.
 
 version: 1
 esquema: ventas
@@ -556,8 +559,9 @@ objetos:
       **CUANTO DEL CAMINO CERTIFICACION -> FACTURA -> COBRO ESTA ENLAZADO** la
       ultima noche, por eslabon: certificaciones que cuentan con factura,
       facturas con efecto de cobro y efectos de cobro que apuntan a una
-      factura (los agrupados `AGR` y las divisiones `DIV` no: lo explicara
-      F-104); y FACTURA_CLIENTE, facturas cuyo cliente esta en `raw.cli` (las
+      factura (los agrupados `AGR` y las divisiones `DIV` no: F-104 los explica
+      por cuenta en `ventas.retencion_cuenta`, junto a `ventas.retencion_factura`,
+      sin atribuirlos a ninguna factura); y FACTURA_CLIENTE, facturas cuyo cliente esta en `raw.cli` (las
       que no, `total - enlazados`, se publican como de persona fisica: enmienda
       del humano, 2026-11-10). Es la medida de lo que NO se puede seguir hasta el cobro: citala
       cuando una respuesta dependa del enlace.
@@ -602,7 +606,10 @@ objetos:
       efectos de cobro de `tesoreria.efectos` que apuntan a la factura:
       cobrado = REALIZADO, pendiente = PREVISTO y BAJA no suma nunca
       (`R-TESORERIA-ESTADO`). Lo cobrado por un agrupado `AGR` (sin documento)
-      NO se atribuye a la factura: hasta F-104 sale como no cobrado. Es VISTA:
+      NO se atribuye a la factura y sale como no cobrado (D11 de F-104): para
+      la retencion, la conciliacion por factura esta en
+      `ventas.retencion_factura` y lo vivo de los AGR, por cuenta, en
+      `ventas.retencion_cuenta`. Es VISTA:
       lee `tesoreria` al consultar y vale su frescura (`build_tesoreria`).
     grano: >-
       Una fila por factura de venta, identificada por `factura_id`.
@@ -833,3 +840,295 @@ objetos:
     columnas: {}
     relaciones: []
     ejemplos_preguntas: []
+
+  retencion_factura:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **LA RETENCION DE CLIENTE, FACTURA A FACTURA** (F-104, D10 = b): por que
+      descuadra cada cuenta de `retenciones.v_cuadre_cliente`. Una fila por
+      factura de venta con retencion, garantia o RETESP, o con efectos de
+      retencion de cliente: la retencion que la factura manda a una cuenta de
+      retencion de cliente frente a los efectos que la cobran.
+
+      **La retencion de la factura no es la garantia de `ventas.facturas`**
+      (D12 = a): `retencion` es la suma de sus recargos de `raw.dvfrec` cuya
+      cuenta es de `retenciones.cuentas_cliente`, sea cual sea su clase, que es
+      lo que ve la contabilidad. Los tres mayores descuadres (ESPACIO
+      PROMOCION VIII, obra 0686; LEVITT; MK MADRID II) llevan la retencion
+      como RETESP (clase 1), no como garantia, y su suma es exactamente el
+      saldo de su cuenta. `retencion_garantia` y `retencion_retesp` se copian
+      de `ventas.facturas` (D4 de F-040, provisional) y son informativas.
+
+      Los efectos son los de `retenciones.movimientos` CLIENTE con
+      `documento_id` = la factura, repartidos por su `estado`. Lo BAJA va a
+      `efectos_agrupada`: su dinero cuenta en un AGR o un DIV, que no tiene
+      factura y **NO se atribuye a ninguna** (D11): se explica por cuenta, en
+      `ventas.retencion_cuenta.viva_sin_factura`. Medido el 2026-11-16: 2.696
+      CUADRA, 1.114 SIN_EFECTO (17,78 M EUR, 783 de 2024-2026), 56 DIFIERE,
+      284 EFECTO_SIN_RETENCION y 27 SIN_CUENTA_RETENCION. Es TABLA, del paso
+      `build_ventas`, que lee lo que `build_retenciones` construyo esa misma
+      noche (si fallo, el de la anterior: `R-FRESCURA`).
+    grano: >-
+      Una fila por factura de venta (`factura_id`, clave primaria). NUNCA se
+      une a `ventas.factura_lineas` sin agregar antes: multiplica la retencion
+      por el numero de lineas.
+    clave_negocio: [factura_id]
+    paso_etl: build_ventas
+    refresco: nocturno
+    columnas:
+      factura_id:
+        significado: La factura de venta (la de `ventas.facturas`).
+        agregacion: no_sumable
+      codigo_factura:
+        significado: Codigo de la factura tal y como se ve en Sigrid.
+      fecha_factura:
+        significado: Fecha de la factura, ya tipada.
+        agregacion: no_sumable
+        nulo_significa: La factura no tiene fecha informada.
+      cliente_id:
+        significado: El cliente de la factura (`ventas.clientes.cliente_id`).
+        nulo_significa: La factura no tiene cliente informado.
+        agregacion: no_sumable
+      nombre_cliente:
+        significado: Nombre ACTUAL del cliente, el de `ventas.facturas` (publico).
+        nulo_significa: El cliente no esta en `raw.cli`.
+      obra_id:
+        significado: La obra de la factura, la de `ventas.facturas` (centro de coste o cabecera).
+        nulo_significa: La factura no tiene obra.
+        agregacion: no_sumable
+      codigo_obra:
+        significado: Codigo de la obra; para unir se usa `obra_id` (el codigo se repite entre empresas).
+        nulo_significa: La factura no tiene obra.
+      cuenta_id:
+        significado: >-
+          La cuenta de retencion de la factura: la de su recargo de retencion y,
+          sin recargo, la de su efecto (en 26 facturas difieren y manda el
+          recargo).
+        nulo_significa: Ni recargo a cuenta de retencion ni efecto con cuenta (solo garantia o RETESP a otra cuenta).
+        agregacion: no_sumable
+      retencion:
+        significado: >-
+          Suma de los recargos de la factura que van a una cuenta de retencion
+          de cliente, sea cual sea su clase (D12 = a). 0 si no tiene.
+        unidad: EUR
+        agregacion: suma
+      retencion_garantia:
+        significado: La garantia de `ventas.facturas` (clases de garantia, hoy 4 y 5), informativa.
+        unidad: EUR
+        agregacion: suma
+      retencion_retesp:
+        significado: El RETESP de `ventas.facturas` (clase 1), informativo.
+        unidad: EUR
+        agregacion: suma
+      efectos:
+        significado: >-
+          Suma de TODOS sus efectos de retencion (VIVA, LIQUIDADA y BAJA): lo que
+          Sigrid llego a emitir por la retencion. 0 si no tiene.
+        unidad: EUR
+        agregacion: suma
+      num_efectos:
+        significado: Cuantos efectos de retencion de cliente apuntan a la factura.
+        agregacion: suma
+      efectos_viva:
+        significado: La parte de `efectos` en estado VIVA (sigue pendiente de cobro).
+        unidad: EUR
+        agregacion: suma
+      efectos_liquidada:
+        significado: La parte de `efectos` en estado LIQUIDADA (cobrada).
+        unidad: EUR
+        agregacion: suma
+      efectos_agrupada:
+        significado: >-
+          La parte de `efectos` en estado BAJA: agrupada en un AGR o dividida en
+          DIV, cuyo dinero vive en ese efecto sin factura (D11).
+        unidad: EUR
+        agregacion: suma
+      diferencia:
+        significado: retencion - efectos. Positiva, la factura retiene mas de lo que Sigrid emitio.
+        unidad: EUR
+        agregacion: suma
+      motivo:
+        significado: >-
+          Por que cuadra o no, en este orden: SIN_EFECTO (retencion sin ningun
+          efecto), EFECTO_SIN_RETENCION (efectos y retencion 0), CUADRA (menos de
+          0,01 EUR de diferencia), DIFIERE (el resto con efectos) y
+          SIN_CUENTA_RETENCION (ni retencion ni efectos: solo garantia o RETESP
+          que no van a una cuenta de retencion).
+        valores: [SIN_EFECTO, EFECTO_SIN_RETENCION, CUADRA, DIFIERE, SIN_CUENTA_RETENCION]
+    relaciones:
+      - de: factura_id
+        a: ventas.facturas.factura_id
+        cardinalidad: "1:1"
+        porque: Para la base, el total y el estado de la factura.
+      - de: cuenta_id
+        a: ventas.retencion_cuenta.cuenta_id
+        cardinalidad: "N:1"
+        porque: Para el cuadre de la cuenta a la que va la retencion de la factura.
+    ejemplos_preguntas:
+      - Que facturas de venta tienen retencion sin efecto de cobro
+
+  retencion_cuenta:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **EL DESCUADRE DE CADA CUENTA DE RETENCION DE CLIENTE, EXPLICADO** (F-104,
+      D10 = b): el cuadre de `retenciones.v_cuadre_cliente` (saldo contable,
+      que manda, frente a efectos vivos) al lado de lo que lo explica: la
+      retencion de sus facturas sin efecto (contabilidad de mas) y los efectos
+      vivos sin factura (AGR, DIV o manuales: efectos de mas, D11).
+      `diferencia_sin_explicar` = `diferencia` - (`retencion_sin_efecto` -
+      `viva_sin_factura`); es NULL en CUADRA, donde las facturas antiguas sin
+      efecto, cobradas por asiento, no explican nada. Medido el 2026-11-16: de
+      44 cuentas que descuadran, veintidos quedan explicadas al euro (ESPACIO
+      PROMOCION VIII, 4308001634: 1.735.233,86 - 622.160,33 = 1.113.073,53) y
+      lo sin explicar baja de 9,47 a 4,94 M EUR en valor absoluto. Lo que queda
+      (UNEXUM, ARCHER, SABINA...) es la lista para Administracion (D8). Una
+      cuenta que no esta en el cuadre (sin saldo ni viva de 1 EUR) lleva 0 y
+      `categoria` NULL. Es TABLA (ver `ventas.retencion_factura`).
+    grano: Una fila por cuenta (`cuenta_id`, clave primaria).
+    clave_negocio: [cuenta_id]
+    paso_etl: build_ventas
+    refresco: nocturno
+    columnas:
+      cuenta_id:
+        significado: La cuenta de retencion, del cuadre o de la retencion de una factura.
+        agregacion: no_sumable
+      codigo_cuenta:
+        significado: Codigo contable de la cuenta, de su ficha en `raw.con`.
+        nulo_significa: La cuenta no tiene ficha en `raw.con`.
+      nombre_cuenta:
+        significado: Nombre de la cuenta en el plan contable.
+        nulo_significa: La cuenta no tiene ficha en `raw.con`.
+      cliente_id:
+        significado: El cliente que declara la cuenta (`retenciones.cuentas_cliente`).
+        nulo_significa: >-
+          Nadie la declara (entra por el prefijo 43x8, como la 4338001593 de
+          UNEXUM) o no es una cuenta de retencion de cliente.
+        agregacion: no_sumable
+      criterio_seleccion:
+        significado: Por donde entra la cuenta en `retenciones.cuentas_cliente`.
+        nulo_significa: La cuenta no esta en `retenciones.cuentas_cliente`.
+        valores: [CUERETIDE, PREFIJO_43X8]
+      saldo_contable:
+        significado: El saldo contable de la cuenta (copiado de `retenciones.v_cuadre_cliente`, el que manda). 0 si no esta.
+        unidad: EUR
+        agregacion: suma
+      viva_efectos:
+        significado: Sus efectos VIVA (copiado de `retenciones.v_cuadre_cliente`). 0 si no esta.
+        unidad: EUR
+        agregacion: suma
+      diferencia:
+        significado: saldo_contable - viva_efectos (copiado del cuadre). 0 si no esta.
+        unidad: EUR
+        agregacion: suma
+      categoria:
+        significado: La categoria del cuadre (copiada de `retenciones.v_cuadre_cliente`).
+        nulo_significa: La cuenta no esta en el cuadre (sin saldo ni viva de al menos 1 EUR).
+        valores: [CUADRA, SIN_EFECTOS_VIVOS, SIN_SALDO_CONTABLE, CONTABILIDAD_MAYOR, EFECTOS_MAYOR]
+      retencion_facturas:
+        significado: Suma de `retencion` de sus facturas en `ventas.retencion_factura`.
+        unidad: EUR
+        agregacion: suma
+      retencion_sin_efecto:
+        significado: La de sus facturas SIN_EFECTO (retencion en la contabilidad sin efecto que la cobre).
+        unidad: EUR
+        agregacion: suma
+      num_facturas_sin_efecto:
+        significado: Cuantas facturas SIN_EFECTO tiene la cuenta.
+        agregacion: suma
+      viva_sin_factura:
+        significado: >-
+          Sus efectos VIVA sin factura (`documento_id` NULL: AGR, DIV, manuales).
+          No se atribuyen a ninguna factura (D11).
+        unidad: EUR
+        agregacion: suma
+      diferencia_sin_explicar:
+        significado: >-
+          diferencia - (retencion_sin_efecto - viva_sin_factura): lo que ninguna
+          factura explica. 0 es descuadre explicado al euro.
+        nulo_significa: La cuenta CUADRA, no hay nada que explicar.
+        unidad: EUR
+        agregacion: suma
+    relaciones:
+      - de: cliente_id
+        a: ventas.clientes.cliente_id
+        cardinalidad: "N:1"
+        porque: Para el nombre del cliente de la cuenta.
+    ejemplos_preguntas:
+      - Por que no cuadra la retencion de la cuenta del cliente C
+
+  v_retencion_cliente:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **LA RETENCION DE CADA CLIENTE, CONCILIADA** (F-104): una fila por
+      cliente con facturas en `ventas.retencion_factura` o cuenta en
+      `ventas.retencion_cuenta`. De sus facturas: cuantas, su retencion, sus
+      efectos, la retencion sin efecto y la diferencia de las que DIFIEREN o no
+      tienen retencion. De sus cuentas: la suma del saldo contable (que manda),
+      los efectos vivos, la diferencia, lo vivo sin factura y lo sin explicar.
+      Lee solo esas dos tablas. Una cuenta sin cliente (PREFIJO_43X8) solo esta
+      en `ventas.retencion_cuenta`: el caso de UNEXUM, cuyo cliente ve
+      -947.835,66 en su cuenta declarada y la otra mitad queda en la 4338001593.
+    grano: Una fila por cliente (`cliente_id`).
+    clave_negocio: [cliente_id]
+    paso_etl: build_ventas
+    refresco: nocturno
+    columnas:
+      cliente_id:
+        significado: El cliente (`ventas.clientes.cliente_id`).
+        agregacion: no_sumable
+      nombre_cliente:
+        significado: Nombre del cliente, el de sus facturas en `ventas.retencion_factura`.
+        nulo_significa: El cliente solo tiene cuenta, sin facturas en `ventas.retencion_factura` (el nombre, en `ventas.clientes`).
+      num_facturas:
+        significado: Cuantas facturas suyas hay en `ventas.retencion_factura`.
+        agregacion: suma
+      retencion:
+        significado: Suma de la `retencion` de sus facturas.
+        unidad: EUR
+        agregacion: suma
+      efectos:
+        significado: Suma de los `efectos` de sus facturas (todos los estados).
+        unidad: EUR
+        agregacion: suma
+      retencion_sin_efecto:
+        significado: La retencion de sus facturas SIN_EFECTO.
+        unidad: EUR
+        agregacion: suma
+      diferencia_facturas:
+        significado: Suma de la `diferencia` de sus facturas DIFIERE y EFECTO_SIN_RETENCION.
+        unidad: EUR
+        agregacion: suma
+      saldo_contable:
+        significado: Suma del saldo contable de sus cuentas (el que manda).
+        unidad: EUR
+        agregacion: suma
+      viva_efectos:
+        significado: Suma de los efectos vivos de sus cuentas.
+        unidad: EUR
+        agregacion: suma
+      diferencia:
+        significado: Suma de la diferencia (saldo - efectos vivos) de sus cuentas.
+        unidad: EUR
+        agregacion: suma
+      viva_sin_factura:
+        significado: Suma de los efectos vivos sin factura de sus cuentas.
+        unidad: EUR
+        agregacion: suma
+      diferencia_sin_explicar:
+        significado: Suma de lo sin explicar de sus cuentas que no cuadran.
+        nulo_significa: Todas sus cuentas CUADRAN, o no tiene cuenta declarada.
+        unidad: EUR
+        agregacion: suma
+    relaciones:
+      - de: cliente_id
+        a: ventas.clientes.cliente_id
+        cardinalidad: "1:1"
+        porque: Para el nombre y el CIF publico del cliente.
+    ejemplos_preguntas:
+      - Cuanta retencion nos debe el cliente C y cuadra con la contabilidad

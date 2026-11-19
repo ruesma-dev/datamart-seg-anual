@@ -46,9 +46,13 @@ cliente es público en `ventas`. Una guarda (`07_guardas.sql`) tumba el paso si
 `ventas` publica una columna personal o si los recuentos, la base o el reparto
 de recargos no cuadran con `raw`. Reglas `R-VENTAS-TRES-CIFRAS` y
 `R-VENTAS-RESTRINGIDA`. **Frontera con F-104**: la conciliación de la retención
-de cliente por documento y lo cobrado por un agrupado `AGR` (que aquí no se
-atribuye a ninguna factura) son de F-104; `sql/retenciones/` y
-`sql/tesoreria/` no cambian (un test sobre el diff lo vigila).
+de cliente por factura la cumple F-104 en `ventas.retencion_factura` (y por
+cuenta y por cliente, `ventas.retencion_cuenta` y `ventas.v_retencion_cliente`,
+de `06b_retencion_cliente.sql`, que lee `retenciones` de la misma noche por
+posición); lo cobrado por un agrupado `AGR` se explica por cuenta y no se
+atribuye a ninguna factura (D11). `sql/tesoreria/` no cambia, y de
+`sql/retenciones/` solo cambian los dos ficheros de F-104 (un test sobre el
+diff lo vigila).
 
 **`postventa` (F-156, 2026-11-04) es la postventa de las viviendas
 entregadas**, construida por `build_postventa` desde trece tablas nuevas de `raw`
@@ -501,6 +505,17 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
     solo como columna informativa, con **una noche de desfase** porque
     `build_cierre` corre después, y ya no interviene en el vencimiento.
     `retenciones.fin_obra` y `retenciones.v_retencion_contable_obra`.
+- **La retención de cliente también la manda la contabilidad (F-104).** El
+  saldo vivo es `retenciones.saldo_contable_cliente`, por cuenta de retención
+  de cliente (`retenciones.cuentas_cliente`: las que declara `cli.cueretide`
+  más las 43x8 de `con.tip = 17`, porque una ficha de cliente mal declarada
+  dejaba fuera 0,95 M €), con `importe = debe - haber` (cuenta de activo) y la
+  misma clase del apunte que proveedor. En `cob` el original agrupado se queda
+  en `est 1` con `fecbaj` = fecha del AGR, y el AGR y sus DIV llevan
+  `retide = 0`: `movimientos` aplica a CLIENTE la precedencia de F-094 y trae
+  también los efectos de esas cuentas (`origen_retencion`). El cuadre por
+  cuenta es `retenciones.v_cuadre_cliente`, y su explicación factura a factura,
+  `ventas.retencion_factura`. Sin obra: el saldo contable no se reparte (D5).
 - **El plan de cuentas son prefijos, dentro de la empresa (F-056).** Los grupos
   del plan son las filas de `con.tip = 16` (1 a 4 dígitos: grupo, subgrupo,
   cuenta, subcuenta; son la tabla `cug` de Sigrid, que no se ingiere) y las

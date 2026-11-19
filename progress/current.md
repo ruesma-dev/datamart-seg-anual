@@ -9,6 +9,122 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-19 · F-104 DONE (OK del humano), fusionada en `dev`; pendiente su T11 MANUAL · retención de cliente saneada, diccionario v80
+
+- Review principal APPROVED (`progress/review_F-104.md`), observaciones 1 y 2 hechas (`e51e692`), mutación
+  manual 13/13 (T10). Observaciones 3 (la guarda de `ventas` puede no correr si `build_retenciones` cae a
+  medias) y 4 (facturas anuladas en SIN_EFECTO) quedan como decisión del humano, sin prisa.
+- Pendiente: T11 MANUAL (abajo) tras imagen nueva del job, y el push de `azure-apps` `4621627`.
+
+- Tarea en curso: T2-T12 de `specs/F-104-retenciones-cliente/tasks.md` (un commit por tarea).
+- **Diccionario v80 (en la rama, SIN PUBLICAR): 326 objetos, 2819 columnas y 163 de consumo**
+  (v79 + seis fichas de F-104 y dos columnas de `retenciones.movimientos`). Se publica con su imagen.
+- Puerta de precondición: rojo TRANSITORIO en `test_f052_r28` (powershell.exe 0xC0000142 por carga del
+  puesto; el líder lo repitió solo: 17 passed). Decisión del líder: no repetirla; manda la puerta final.
+- Desviaciones de la spec: el CTE `prefijo` de `cuentas_cliente` usa el alias `pc` (no `cue`) para
+  que el guardián R2 de F-006 no tome `raw.con cue` por proyección directa; `tipo_id` sin
+  `nulo_significa` (lo exige `test_f006_r2_los_filtros_que_pierden_filas_se_declaran`), el NULL de
+  CLIENTE se explica en `significado`. Detalle en `progress/impl_F-104.md`.
+- T10 hecha (2026-11-19, mutación manual sobre el SQL): 13 mutantes, 13 muertos (`impl_F-104.md`).
+- **T11 MANUAL (humano), tras merge e imagen nueva del job** (solo lecturas salvo el build y la publicación):
+  1. `python main.py build-retenciones` y `python main.py build-ventas` (o la nocturna con la imagen nueva);
+     después `python main.py check-unicidad` y `python main.py check-relaciones`.
+  2. R20/R21: `SELECT categoria, COUNT(*), SUM(saldo_contable), SUM(viva_efectos) FROM retenciones.v_cuadre_cliente GROUP BY 1;`
+     (esperado del 2026-11-16: saldo 16,00 M, viva 10,53 M; 64 cuentas).
+  3. R37: `SELECT motivo, COUNT(*), SUM(retencion), SUM(efectos) FROM ventas.retencion_factura GROUP BY 1;` y
+     `SELECT * FROM ventas.retencion_cuenta WHERE codigo_cuenta = '4308001634';`
+  4. R35: `SELECT has_table_privilege('mcp_sigrid_dm_ro', 'ventas.retencion_factura', 'SELECT');` (t) y lo mismo
+     con `mcp_sigrid_dm_restringido` (f).
+  5. `publicar-diccionario` SOLO con la imagen del job (v80) y reiniciar `mcp-bbdd` (cachea el diccionario).
+  6. `azure-apps`: commit `4621627` listo; `git -C <azure-apps> pull` y después `push` (lo hace el humano).
+
+## 2026-11-19 · F-104 DESBLOQUEADA (líder, 2.ª vez) · test_f135 arreglado en `dev` y `main` llevado a `dev`
+
+- Causa del bloqueo: `test_f135_r23_la_ficha_de_f127_hereda_el_criterio_de_apa` exigía F-127 en `pending` y
+  el líder la pasó a `todo` el 2026-11-17 con el compromiso del humano. Arreglado en `dev`
+  (`chore/test-f135-f127-todo`, merge `d8566ac`): acepta `pending` o `todo`. Ningún otro test fija el estado de F-127.
+- Con el OK del humano, `main` en fast-forward a `d8566ac`; la rama trae `dev` (`41b8841`). F-104 vuelve a
+  `spec_ready` y se reanuda el implementer, que aplica lo preparado en su scratchpad (T1 ya en la rama).
+
+## 2026-11-18 (2.ª vez) · F-104 `blocked` (implementer) · init.sh en ROJO por un test ajeno a F-104
+
+- `bash harness/init.sh` (precondición 1, sobre `1e81f42`, sin código de F-104): **1 failed, 10.295
+  passed, 2.449 skipped en 2 h 12 min**. El fallo:
+  `tests/test_f135_sql.py::test_f135_r23_la_ficha_de_f127_hereda_el_criterio_de_apa` →
+  `assert f127["status"] == "pending"` («F-135 no cambia el estado de F-127»), y F-127 está en `todo`.
+- **Causa**: el commit de `dev` «F-127 a todo» (`82b2ba1`/`04c8cc5`, entró en la rama con `4faa4d2`)
+  cambió el estado de F-127 sin tocar ese test. **`dev` y `main` están igual de rojos** (`git show
+  dev:harness/features.json` da F-127 `todo`; el test es el mismo). No es de F-104: el implementer no
+  lo toca (otra feature, y los estados son del líder).
+- **Arreglo propuesto (líder)**: en `dev`, que el test acepte el estado que el líder decida
+  (p. ej. `f127["status"] in ("pending", "todo")`, o comprobar solo que F-135 no lo escribe), merge a
+  `main` y traerlo a la rama.
+- **Hecho en la rama**: T1 (tests de F-104 en ROJO + `test_f094_cliente_usa_la_ficha_del_efecto_desde_f104`)
+  en un commit. **Todo lo demás está ya escrito y probado fuera del repositorio**, listo para aplicar al
+  desbloquear (no se pierde si el scratchpad sobrevive; si no, se rehace desde la spec):
+  - borradores SQL `<scratchpad del implementer>\copia\retenciones\01_movimientos.sql`, `<scratchpad del implementer>\08_saldo_cliente.sql`
+    (y su copia en `copia\retenciones`), `<scratchpad del implementer>\copia\ventas\06b_retencion_cliente.sql`;
+  - `<scratchpad del implementer>\patch_resto.py` (steps, `main.py`, tests que enumeran sub-pasos) y `<scratchpad del implementer>\patch_dicc.py`
+    (diccionario v80, órdenes de magnitud, ARCHITECTURE, `tables_sigrid.yaml`; añade
+    `ret_nuevas.yaml` y `ven_nuevas.yaml`); `<scratchpad del implementer>\azure_f104.md` (sección para `azure-apps`);
+  - el árbol completo aplicado en `<scratchpad del implementer>\wt` (worktree desechable, HEAD `1e81f42`): **99 passed** en
+    `test_f104_*` (12 de sandbox contra un PG16 local) + `test_f040_diccionario`.
+  - Pendiente al retomar: recuentos del diccionario en esta sección de estado (test_f006) y presupuesto
+    de contexto F-147 (`test_f147_r18_r19` falló en el árbol aplicado: revisar al retomar).
+
+## 2026-11-18 · F-104 DESBLOQUEADA (líder) · `main` llevado a `dev` con el OK del humano
+
+- `main` en fast-forward a `dev` (los tres commits de papeleo ya no se miden como de F-104); F-104 vuelve a `spec_ready` y se relanza el implementer.
+
+## 2026-11-18 · F-104 `blocked` (implementer, ANTES de escribir código) · init.sh en rojo
+
+- `bash harness/init.sh` (precondición 1 del implementer) sale en ROJO con 2 KO, ninguno de código
+  (pytest `-x` paró en el primero: 1 failed, 143 passed en 1 min 19 s):
+  1. `tests/test_base_de_la_puerta.py::test_en_este_repositorio_la_base_no_esta_rezagada`;
+  2. PUERTA COBERTURA: «la base «main» se ha quedado por detrás: de los commits que se medirían
+     desde su merge-base con feature/F-104-retenciones-cliente, 3 de los 9 ya están en «dev» y no
+     son de esta rama».
+- **Causa**: `4faa4d2` («F-104: trae dev») metió en la rama tres commits que están en `dev` y NO en
+  `main` (`git log main..dev`: `82b2ba1`/`04c8cc5` F-127 a todo, `8a7cd73`/`16ad177` T11 de F-164,
+  `e022b6d`/`97aaa46` recuentos de v79 de `current.md`). `RAMA_BASE=main` en `harness/init.sh`, así
+  que la puerta mediría como de F-104 lo que es de `dev`. Mismo caso que F-148 (2026-10-23, abajo).
+- **Arreglo propuesto (líder; no lo hace el implementer):** llevar `dev` a `main`
+  (`git checkout main && git merge --no-ff dev`, el merge a `main` se PREGUNTA al humano) y volver a
+  pasar la puerta en la rama; o, si no se quiere tocar `main`, reubicar la rama sin el merge de `dev`
+  (pierde el arreglo de `test_f006` de `e022b6d`, que habría que traer de otra forma). Después,
+  `status` de F-104 de vuelta a `spec_ready` (o `in_progress`) y relanzar el implementer.
+- Nada escrito: ni código, ni tests, ni Azure, ni Sigrid. Solo este bloqueo y `features.json`.
+
+## 2026-11-18 · F-104 `spec_ready` · al implementer
+
+- La spec está aprobada (D12 a, `6493af2`) y esperaba a F-164, ya `done`. `dev` traído a la rama
+  `feature/F-104-retenciones-cliente` el 2026-11-18 (F-164, la T11, F-127 a `todo`). Puerta en `dev` en
+  verde salvo `test_f006_los_recuentos_de_current_son_los_de_hoy` (recuentos de v79 que faltaban
+  desde F-164), arreglado en `chore/current-recuentos-v79`.
+
+## 2026-11-16 · Ventas primero · F-104 `spec_ready` (spec del 06-11, aprobada el 07-11) · se revalida contra `main`
+
+- Orden del humano: «vamos con las 5 que quedan de ventas, ponlas en las primeras prioridades».
+  F-104 (1), F-160 (2), F-099 (3), F-076 (4), F-119 (5); el resto del backlog baja 5 puestos.
+- F-104 en su rama `feature/F-104-retenciones-cliente`, en el checkout principal (el worktree viejo
+  se retiró limpio), con `main` dentro. Su spec (registro del 06-11, abajo en la historia de git:
+  90484ea) se escribió antes de F-040, F-162 y F-161: el spec-author la revalida antes del implementer.
+- **Fuera de este repo:** desde el 2026-11-18 la IA SÍ ve `ventas`, `ventas_restringida` y `postventa`
+  (F-034 de `mcp-bbdd` desplegada, revisión `--0000025`).
+- **Revalidación de la spec (spec-author, 2026-11-16): REQUIERE PARADA 1.** Informe en
+  `progress/spec_F-104.md` («Revalidación 2026-11-16»); spec marcada `[rev. 16-11]`, tabla en
+  `design.md` §9. Para el humano: **D3 se reabre** (recomendado: unión `cli.cueretide` ∪ 43x8,
+  porque solo `cueretide` pierde UNEXUM, 0,95 M en una cuenta que su ficha no declara) y tres
+  **nuevas** que F-040 dejó escritas a nombre de F-104: **D9** `entidad_cif` (recomendado: sigue
+  NULL, el CIF por `ventas.clientes`), **D10** conciliación por factura (recomendado: feature nueva;
+  654 facturas, 3,32 M sin efecto de retención) y **D11** cobro vía AGR (recomendado: explicar, no
+  atribuir). D1, D2, D4-D8 siguen valiendo con las cifras al día (VIVA 10,53 M; saldo 16,00 M).
+- **Decisiones del humano (b7dc9a2): D3 a, D9 a, D10 b, D11 a.** Spec ajustada a D10 b (conciliación
+  por factura en `ventas`: `retencion_factura`, `retencion_cuenta`, `v_retencion_cliente`, fichero
+  `06b`). **Nueva PARADA 1 por D12**: ESPACIO, LEVITT y MK llevan la retención como RETESP
+  (clase 1), que `ventas.facturas` no cuenta como garantía; recomendado (a) conciliar los recargos
+  que van a una cuenta de retención (`dvfrec.cueide`). `progress/spec_F-104.md` §12-§13 (corrige §10).
+
 ## 2026-11-17 · F-164 `done` y DESPLEGADA · sin feature activa
 
 - Desplegada el 2026-11-17: imagen `r20261117-1556` en el job, ejecución puntual sin ingesta

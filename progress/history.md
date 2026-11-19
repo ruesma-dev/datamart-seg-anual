@@ -2222,3 +2222,20 @@ Detonante: la 0721 salía con la ficha vacía de PORSAN (empresa 28) en lugar de
 **Ecosistema:** `azure-apps/datamart_seg_anual.md`, commits `f61570b` y `bd41a9e` (este, por subir).
 
 **Fuera, pendiente:** T11/R16 (reiniciar `mcp-bbdd` y probar los 4 perfiles; avisar a la sesión `mcp` de DH10 y los 8 huérfanos de 707).
+
+## F-104 — La retención de CLIENTE saneada y conciliada · `done` (2026-11-19)
+
+**Qué cambia.** `retenciones.movimientos` de CLIENTE con el estado de la precedencia de F-094 (BAJA > LIQUIDADA > VIVA, ficha `raw.con` del efecto: el original agrupado en un AGR deja de contar como vivo) y el universo ampliado a los AGR y DIV a cuenta de retención.
+- Nuevas: `retenciones.cuentas_cliente`, `saldo_contable_cliente` y `v_cuadre_cliente` (manda la contabilidad); en `ventas`, `retencion_factura` (con `motivo`), `retencion_cuenta` y `v_retencion_cliente`, con guarda R33 si `retenciones` no es de esa noche.
+- `movimientos` gana `origen_retencion` y `cuenta_id` al final; PROVEEDOR sin cambios. `entidad_cif` de CLIENTE sigue NULL (D9).
+- Diccionario v80: 326 objetos; la retención viva de cliente baja de 21,9 M a 10,5 M en efectos (16,0 M en contabilidad).
+
+**Verificado:**
+- Dos bloqueos ajenos antes de empezar (base `main` rezagada; `test_f135` fijaba F-127 en `pending`), resueltos en `dev` y `main`.
+- Puerta del implementer en verde sobre `7e7376f`: 13.620 passed. Tests de F-104: 46 estáticos y 12 de sandbox PG16.
+- Review principal APPROVED (pasada 1), con cuatro observaciones; la 1 y la 2 hechas en `e51e692` (tests del diccionario y del CLI).
+- Mutación informativa manual sobre el SQL: 13 mutantes, 13 muertos.
+
+**Ecosistema:** `azure-apps/datamart_seg_anual.md`, commit `4621627` (por subir).
+
+**Fuera, pendiente:** T11 MANUAL (build, cuadres R20/R21/R37, permisos R35, publicar v80 con la imagen del job y reiniciar `mcp-bbdd`); observaciones 3 y 4 del review, decisión del humano.

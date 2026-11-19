@@ -18,12 +18,15 @@ RAIZ = Path(__file__).resolve().parents[1]
 DIR_SQL = RAIZ / "etl_sigrid" / "infrastructure" / "postgres" / "sql" / "ventas"
 FICHEROS = [
     "00_setup.sql", "01_clientes.sql", "02_facturas.sql", "03_certificaciones.sql",
-    "04_enlace.sql", "05_vistas.sql", "06_restringida.sql", "07_guardas.sql",
+    "04_enlace.sql", "05_vistas.sql", "06_restringida.sql",
+    # F-104: la retención de cliente por factura, antes de la guarda.
+    "06b_retencion_cliente.sql", "07_guardas.sql",
 ]
 #: Lo que se cuenta tras cada sub-paso (setup, vistas y guardas no cuentan).
 CONTADOS = [
     ("ventas", "clientes"), ("ventas", "facturas"), ("ventas", "certificaciones"),
     ("ventas", "certificacion_factura"), ("ventas_restringida", "clientes_contacto"),
+    ("ventas", "retencion_factura"),
 ]
 
 

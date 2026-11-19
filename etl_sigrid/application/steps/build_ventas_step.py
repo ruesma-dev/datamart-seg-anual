@@ -12,6 +12,9 @@ Encadena los archivos SQL en orden:
     04_enlace.sql          - `certificacion_factura` y `cobertura_enlace`
     05_vistas.sql          - las vistas del cobro, el seguimiento y el contraste
     06_restringida.sql     - `ventas_restringida`: lo personal del cliente
+    06b_retencion_cliente.sql - F-104: la retencion de cliente factura a
+                             factura (`retencion_factura`, `retencion_cuenta` y
+                             `v_retencion_cliente`)
     07_guardas.sql         - la guarda R24/R25 (recuentos, base, recargos y
                              nada personal en `ventas`)
 
@@ -20,6 +23,15 @@ sobre `raw`, y lo que este mismo paso acaba de construir). Las VISTAS de
 `05_vistas.sql` leen `tesoreria` en tiempo de consulta: no hace falta que
 `build_tesoreria` se haya construido antes, solo que sus tablas existan. Por
 eso `depends_on = ["ingest_raw"]`.
+
+F-104: `06b_retencion_cliente.sql` LEE `retenciones` (`cuentas_cliente`,
+`movimientos`, `v_cuadre_cliente`) de la MISMA noche: `build_retenciones` corre
+antes en `run-all` por su POSICION en `build_pipeline_steps`, y NO se declara
+en `depends_on` a proposito (precedente de `build_retenciones_step`): un fallo
+de `retenciones` no debe dejar sin construir `ventas`. Si esa noche falla, se
+leen sus tablas de la anterior; si ni existen, la guarda de `06b` tumba el
+sub-paso con su nombre antes de borrar nada. Son TABLAS, no vistas, porque
+`retenciones/01_movimientos.sql` tira la suya con CASCADE cada noche.
 
 POR QUÉ ES UN ESQUEMA MÓDULO (patrón de `postventa` y `contabilidad`): **ningún
 paso declara `build_ventas` en su `depends_on`**, así que si falla la nocturna
@@ -42,7 +54,7 @@ from etl_sigrid.infrastructure.postgres.client_factory import build_postgres_cli
 
 logger = get_logger(__name__)
 
-#: Donde viven los ocho SQL del módulo.
+#: Donde viven los nueve SQL del módulo.
 DIR_SQL_VENTAS: Path = (
     Path(__file__).resolve().parents[2] / "infrastructure" / "postgres" / "sql" / "ventas"
 )
@@ -56,7 +68,7 @@ class _SubStep:
     target_table: str | None = None
 
 
-#: Los ocho ficheros SQL, EN ORDEN, y de qué tabla se cuentan filas. Es DATO,
+#: Los nueve ficheros SQL, EN ORDEN, y de qué tabla se cuentan filas. Es DATO,
 #: como en `build_postventa_step`: sustituirlo en un test es lo que permite
 #: ejercitar el recuento. `setup`, `vistas` y `guardas` no cuentan filas.
 SUB_PASOS: tuple[_SubStep, ...] = (
@@ -72,6 +84,9 @@ SUB_PASOS: tuple[_SubStep, ...] = (
     _SubStep(name="vistas", sql_file="05_vistas.sql"),
     _SubStep(name="restringida", sql_file="06_restringida.sql",
              target_schema="ventas_restringida", target_table="clientes_contacto"),
+    # F-104: antes de la guarda, que asi ve tambien sus columnas
+    _SubStep(name="retencion_cliente", sql_file="06b_retencion_cliente.sql",
+             target_schema="ventas", target_table="retencion_factura"),
     _SubStep(name="guardas", sql_file="07_guardas.sql"),
 )
 
@@ -93,6 +108,8 @@ class BuildVentasStep(PipelineStep):
     @property
     def depends_on(self) -> list[str]:
         # Las tablas solo leen `raw`; las vistas leen `tesoreria` al consultar.
+        # F-104: `06b` lee `retenciones` de la misma noche por POSICION en
+        # `run-all`; no se declara `build_retenciones` (ver el docstring).
         return ["ingest_raw"]
 
     def run(self) -> StepResult:

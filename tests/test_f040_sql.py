@@ -34,7 +34,10 @@ DIR_SQL = RAIZ / "etl_sigrid" / "infrastructure" / "postgres" / "sql"
 DIR_V = DIR_SQL / "ventas"
 FICHEROS = (
     "00_setup.sql", "01_clientes.sql", "02_facturas.sql", "03_certificaciones.sql",
-    "04_enlace.sql", "05_vistas.sql", "06_restringida.sql", "07_guardas.sql",
+    "04_enlace.sql", "05_vistas.sql", "06_restringida.sql",
+    # F-104: la retención de cliente por factura (va en el índice 7: los cortes
+    # [1:6] y [1:7] de abajo siguen siendo los de F-040).
+    "06b_retencion_cliente.sql", "07_guardas.sql",
 )
 #: Los ficheros del esquema GENERAL: ninguno toca lo personal de la cabecera.
 GENERALES = FICHEROS[1:6]
