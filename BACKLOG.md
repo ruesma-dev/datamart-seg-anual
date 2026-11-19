@@ -9,7 +9,7 @@ Resumen: **153 features**, 72 abiertas y 81 terminadas. Por columna: 1 en Review
 
 | # | Feature | La tiene | Prioridad | Rigor | Rama |
 |---|---|---|---|---|---|
-| F-104 | La retencion de CLIENTE no esta saneada: 22,16 M EUR «vivos» de los que 19,93 M tienen fecha de baja, y la contabilidad dice 13,81 M | reviewer | 2 | estandar | `feature/F-104-retenciones-cliente` |
+| F-104 | La retencion de CLIENTE no esta saneada: 22,16 M EUR «vivos» de los que 19,93 M tienen fecha de baja, y la contabilidad dice 13,81 M | humano | 2 | estandar | `feature/F-104-retenciones-cliente` |
 
 ## Blocked
 
@@ -195,7 +195,7 @@ _Ninguna feature en implementación._
 
 ### F-104 · La retencion de CLIENTE no esta saneada: 22,16 M EUR «vivos» de los que 19,93 M tienen fecha de baja, y la contabilidad dice 13,81 M
 
-estado **en QA / revisión** · spec aprobada el 2026-11-16 · prioridad 2 · rigor `estandar` · SDD sí · rama `feature/F-104-retenciones-cliente`
+estado **en revisión humana** · spec aprobada el 2026-11-16 · prioridad 2 · rigor `estandar` · SDD sí · rama `feature/F-104-retenciones-cliente`
 
 Decidido por el humano el 2026-09-23, prioridad 3. Sale de la decision H5 de la spec de F-095 («el lado cliente, fuera de F-095, feature propia tras F-094») y del hueco que deja F-094, que saneo SOLO el lado proveedor. EL PROBLEMA: `retenciones.movimientos` publica para CLIENTE **22.157.642,75 EUR en 2.196 efectos** como VIVA, y ese estado sale solo de `cob.fecrea` sin mirar `con.fecbaj` ni `con.est`, que es el defecto que F-094 corrigio en PROVEEDOR (donde lo vivo paso de 35,54 a 8,34 M EUR). **TRES CIFRAS QUE NO CUADRAN ENTRE SI**, todas medidas en solo lectura: lo que publica el datamart hoy, **22,16 M**; el saldo de las cuentas de retencion de cliente en la contabilidad, **13,81 M** (medido por el spec-author de F-095 el 2026-09-22); y lo que quedaria aplicando a `cob` el criterio de PROVEEDOR, **2,12 M** (misma medicion) o **2,23 M en 240 efectos** (medido por el MCP el 2026-09-23). **LO MEDIDO QUE APUNTA AL DEFECTO**: **1.956 de los 2.196 efectos «vivos» tienen `fecbaj` <> 0 y suman 19.928.538,74 EUR**, casi el 90 % del importe; y 2.096 efectos (21,08 M) tendrian la fecha prevista de cobro ya vencida, o sea el 95 % de la retencion de cliente vencida y sin cobrar, que no es creible. **LO QUE IMPIDE COPIAR EL CRITERIO DE PROVEEDOR, y por eso F-094 no lo toco**: en `cob` esos efectos con baja estan en `est` 1 (Pendiente) y NO en 14 (Agrupados) ni 15 (Divididos), asi que el mecanismo de agrupacion no es el mismo o no se registra igual. Hay que averiguar QUE les pasa de verdad antes de decidir el criterio. COMO SE EMPIEZA: revisar en Sigrid unos cuantos efectos de `cob` con `fecbaj` <> 0 y ver si se agruparon en otro efecto, se cobraron por otra via o siguen pendientes; y explicar la diferencia con los 13,81 M de la contabilidad (¿prescripciones, reclasificaciones, cuenta 4308?). MIENTRAS TANTO, el orden de magnitud publicado avisa de que la cifra de cliente esta SIN VERIFICAR (diccionario version 27, 2026-09-23). Coordinar con F-095, que decide si la fuente que manda es la contabilidad tambien en este lado.
 
