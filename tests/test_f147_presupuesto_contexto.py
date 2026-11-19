@@ -39,6 +39,15 @@ from tests.test_f006_formato import _dicc, _ficha, _regla
 #: fórmula de R17. Solo baja (trinquete: R19 falla si sobra más de
 #: `HOLGURA_TRINQUETE`). Historia, de la más reciente a la más antigua:
 #:
+#: * 37.914 · 2026-11-19, F-104 (diccionario v80), SUBIDO con motivo: la
+#:   retencion de cliente saneada (+558). Reglas 8.376 sin cambio, enrutado 19.439
+#:   (seis fichas recomendadas nuevas, una pregunta corta cada una:
+#:   `retenciones.cuentas_cliente`, `saldo_contable_cliente` y `v_cuadre_cliente`
+#:   enrutan «cuenta de retencion del cliente», «retencion de clientes segun la
+#:   contabilidad» y «que clientes no cuadran»; `ventas.retencion_factura`,
+#:   `retencion_cuenta` y `v_retencion_cliente`, la explicacion por factura,
+#:   por cuenta y por cliente), bloques 10.099 (la version y el orden de
+#:   magnitud de cliente partido en dos: contabilidad y efectos).
 #: * 37.356 · 2026-11-13, F-161 (diccionario v77), SUBIDO con motivo: el
 #:   catalogo completo de versiones master (D5-D14 del humano). Reglas 8.376
 #:   (`R-VERSION-MASTER` dice que solo rigen las de `tiene_reparto` y donde esta
@@ -107,7 +116,7 @@ from tests.test_f006_formato import _dicc, _ficha, _regla
 #:   todas las preguntas): 78.057.
 #: * 29.787 · 2026-10-22, F-147 T5: PROVISIONAL, la medida de T2 sobre la v58
 #:   (sin resúmenes todavía: reglas 2.233, enrutado 13.886, bloques 13.668).
-PRESUPUESTO_MAX = 37_356
+PRESUPUESTO_MAX = 37_914
 
 
 def _medir(dicc) -> PresupuestoContexto:

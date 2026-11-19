@@ -637,13 +637,14 @@ def test_f006_r10_la_cifra_absurda_de_compras_llega_avisada() -> None:
 
 
 def test_f006_r10_las_cifras_de_retencion_son_de_saldo_vivo_y_lo_dicen() -> None:
-    """8,35 M€ y 21,9 M€ son saldo VIVO, no el total practicado nunca (F-094:
-    la de proveedor era 34,7 M€, inflada 4,3 veces)."""
+    """8,35 M€ y 10,5 M€ son saldo VIVO, no el total practicado nunca (F-094:
+    la de proveedor era 34,7 M€, inflada 4,3 veces; F-104: la de cliente, 21,9 M€,
+    contaba los originales agrupados y pasa a 10,5 M€ en efectos)."""
     por_concepto = {
         o["concepto"]: o for o in _diccionario_real().global_raw["ordenes_de_magnitud"]
     }
 
-    vivos = [o for o in por_concepto.values() if o["valor_aproximado"] in (8350000, 21900000)]
+    vivos = [o for o in por_concepto.values() if o["valor_aproximado"] in (8350000, 10500000)]
 
     assert len(vivos) == 2
     for orden in vivos:

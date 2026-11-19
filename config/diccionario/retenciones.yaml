@@ -52,6 +52,16 @@ objetos:
       `retenciones.v_cuadre_proveedor`. Y `fecha_prevista_devolucion` es el
       vencimiento de Sigrid (factura + 15 meses), no el de fin de obra, que
       esta en `retenciones.v_retencion_contable_obra`.
+
+      **La retencion viva de cliente la manda la contabilidad** (F-104): el
+      saldo de sus cuentas de retencion, `retenciones.saldo_contable_cliente`
+      (16,00 M EUR el 2026-11-16); los efectos de CLIENTE son el detalle y el
+      vencimiento (10,53 M EUR vivos ese dia), y el cuadre, por cuenta, esta en
+      `retenciones.v_cuadre_cliente`. Desde F-104 la rama CLIENTE trae tambien
+      los efectos SIN tipo de retencion de esas cuentas (los agrupadores AGR y
+      sus divisiones DIV, `origen_retencion = 'CUENTA_RETENCION'`): hasta
+      entonces el dinero vivo agrupado estaba fuera y los originales agrupados,
+      dentro como VIVA (22,44 M EUR publicados).
     grano: >-
       UNA FILA POR EFECTO, no por linea de factura, y su clave es el par
       (`sentido`, `movimiento_id`): el identificador solo es unico dentro de su
@@ -77,11 +87,13 @@ objetos:
         agregacion: no_sumable
       tipo_id:
         significado: >-
-          Tipo de retencion aplicado. En Ruesma el 97 % de los efectos son de un
-          solo tipo, la retencion de garantia estandar. Nunca es nulo: **la tabla
-          se construye filtrando `retide <> 0`**, asi que un efecto sin tipo no
-          es una retencion y no entra. Buscar `WHERE tipo_id IS NULL` devuelve
-          cero filas siempre.
+          Tipo de retencion aplicado. En Ruesma el 97 % de los efectos con tipo
+          son de uno solo, la retencion de garantia estandar. En PROVEEDOR nunca
+          es nulo (la rama filtra `retide <> 0`). En CLIENTE, desde F-104, es
+          NULL en las filas `origen_retencion = 'CUENTA_RETENCION'`: los AGR, DIV
+          y efectos sin tipo de las cuentas de retencion de cliente (1.205 el
+          2026-11-16, 8,12 M EUR de los 10,53 M vivos). **Quien filtre por
+          `tipo_id` pierde ese dinero.**
         agregacion: no_sumable
       tipo_descripcion:
         significado: Nombre del tipo de retencion, ya resuelto para no tener que unir.
@@ -113,11 +125,14 @@ objetos:
       entidad_cif:
         significado: >-
           CIF de la entidad, y **solo existe en la mitad PROVEEDOR**. En
-          `sentido = 'CLIENTE'` la consulta escribe un NULL constante.
+          `sentido = 'CLIENTE'` la consulta escribe un NULL constante: el CIF del
+          cliente esta en `ventas.clientes` (por `entidad_id` = `cliente_id`), ya
+          enmascarado si es persona fisica (F-104, D9).
         nulo_significa: >-
           **Depende de la mitad, y son dos mecanismos distintos.** En
           `sentido = 'CLIENTE'` es NULL **siempre**: la consulta proyecta el
-          literal `NULL::VARCHAR(24)`, porque el CIF de cliente no se trae. En
+          literal `NULL::VARCHAR(24)`, porque el CIF de cliente vive en
+          `ventas.clientes` y copiarlo aqui seria tratar datos personales. En
           `sentido = 'PROVEEDOR'` el NULL significa que la entidad **no tiene
           ficha de proveedor** —el `LEFT JOIN` con `raw.prv` no casa—, y **no**
           que el proveedor exista sin CIF: ahi `prv.cif` va en crudo, sin el
@@ -203,9 +218,9 @@ objetos:
           lo que decide si una retencion sigue viva: los agrupadores AGR
           pagados en remesa no la llevan (ver `estado`).
         nulo_significa: >-
-          El efecto no tiene fecha real de devolucion. En CLIENTE eso es
-          exactamente VIVA; en PROVEEDOR puede ser VIVA, BAJA o LIQUIDADA por
-          `con.est = 10`.
+          El efecto no tiene fecha real de devolucion. En los dos sentidos puede
+          ser VIVA, BAJA o LIQUIDADA por `con.est = 10` (en CLIENTE, desde F-104,
+          los cobrados en remesa sin `fecrea`).
         agregacion: no_sumable
       estado:
         significado: >-
@@ -217,12 +232,16 @@ objetos:
           y **su dinero ya cuenta en el efecto que lo sustituye**: sumarlo es
           contar el mismo euro dos veces—; **LIQUIDADA** si tiene `fecrea` o
           `con.est = 10` (Pagado), que recoge los agrupadores AGR ya pagados en
-          remesa sin `fecrea`; **VIVA** el resto. En CLIENTE sigue saliendo
-          SOLO de `fecrea` (VIVA si es 0) y nunca vale BAJA: el patron de `cob`
-          es otro —sus ~19,9 M€ con `fecbaj <> 0` estan en estado 1,
-          Pendiente— y queda sin verificar para una feature propia. Antes de
-          F-094 el estado de PROVEEDOR salia solo de `fecrea` y daba 35,54 M€
-          vivos; con el criterio nuevo son 8,35 M€ (medido el 2026-09-22).
+          remesa sin `fecrea`; **VIVA** el resto. **En CLIENTE, desde F-104
+          (2026-11-18), la misma precedencia**, con un mecanismo distinto: el
+          original agrupado NO pasa a `est` 14, se queda en `est` 1 (Pendiente)
+          con `fecbaj` = la fecha del AGR que lo sustituye (cuenta 4308001150:
+          cinco efectos de 57.973,72 EUR con baja el 2020-03-04 y AGR20/0010 por
+          lo mismo ese dia). Hasta F-104 el estado de CLIENTE salia solo de
+          `fecrea` y publicaba 22,44 M EUR vivos; con el criterio nuevo y los
+          efectos de las cuentas, 10,53 M EUR (2026-11-16). Antes de F-094 el
+          estado de PROVEEDOR salia solo de `fecrea` y daba 35,54 M€ vivos; con
+          el criterio nuevo son 8,35 M€ (medido el 2026-09-22).
           **Para "cuanto queda retenido" se filtra `estado = 'VIVA'`; y
           `SUM(importe)` sin filtrar el estado cuenta dos veces lo agrupado.**
         valores: [VIVA, LIQUIDADA, BAJA]
@@ -235,7 +254,7 @@ objetos:
           (24): 1 Pendiente, 5 Cartera, 6 Descontado, 7 Remesado, 10 Cobrado,
           12 Devuelto, 14 Agrupado, 15 Dividido. El catalogo
           traducido esta en `maestro.estados_documento`. Es de donde sale
-          `estado` en PROVEEDOR; en CLIENTE es solo informativo.
+          `estado` en los dos sentidos (en CLIENTE desde F-104).
         agregacion: no_sumable
         nulo_significa: >-
           El efecto no tiene ficha en `raw.con`. Medido el 2026-09-22: no pasa
@@ -245,9 +264,9 @@ objetos:
           Fecha de baja del efecto (`con.fecbaj` de su propia ficha), ya
           tipada. En un original agrupado es la fecha del efecto agrupador AGR
           que lo sustituye, y es la unica pista para emparejarlos: Sigrid no
-          guarda puntero del original a su agrupador. En PROVEEDOR, con fecha
-          el estado es BAJA; en CLIENTE es solo informativa y convive con
-          VIVA.
+          guarda puntero del original a su agrupador. Con fecha, el estado es
+          BAJA en los dos sentidos (en CLIENTE desde F-104: en `cob` el original
+          agrupado se queda en `est` 1 y esta fecha es lo unico que lo delata).
         agregacion: no_sumable
         nulo_significa: El efecto no esta dado de baja.
       vencida_sin_liquidar:
@@ -267,6 +286,23 @@ objetos:
           Para los dias reales se recalcula sobre `fecha_prevista_devolucion`.
         agregacion: no_sumable
         nulo_significa: El efecto no tiene fecha de vencimiento con la que contar.
+      origen_retencion:
+        significado: >-
+          Por que entra el efecto (F-104). EFECTO_RETENCION si tiene tipo de
+          retencion (`retide <> 0`): todos los de PROVEEDOR. CUENTA_RETENCION, solo
+          en CLIENTE, si entra por su cuenta (`cueide` en
+          `retenciones.cuentas_cliente`) sin tipo: los agrupadores AGR, sus
+          divisiones DIV y los efectos manuales, que es donde vive el dinero
+          agrupado.
+        valores: [EFECTO_RETENCION, CUENTA_RETENCION]
+      cuenta_id:
+        significado: >-
+          La cuenta contable del efecto (`cueide`). En CLIENTE es la cuenta de
+          retencion de cliente con la que se cuadra
+          (`retenciones.v_cuadre_cliente`); en PROVEEDOR, la del efecto tal cual,
+          que no es necesariamente la de retencion.
+        nulo_significa: El efecto no tiene cuenta informada.
+        agregacion: no_sumable
 
     relaciones:
       - de: tipo_id
@@ -412,11 +448,14 @@ objetos:
       entidad_cif:
         significado: >-
           CIF de la entidad, y **solo existe en la mitad PROVEEDOR**. En
-          `sentido = 'CLIENTE'` la consulta escribe un NULL constante.
+          `sentido = 'CLIENTE'` la consulta escribe un NULL constante: el CIF del
+          cliente esta en `ventas.clientes` (por `entidad_id` = `cliente_id`), ya
+          enmascarado si es persona fisica (F-104, D9).
         nulo_significa: >-
           **Depende de la mitad, y son dos mecanismos distintos.** En
           `sentido = 'CLIENTE'` es NULL **siempre**: la consulta proyecta el
-          literal `NULL::VARCHAR(24)`, porque el CIF de cliente no se trae. En
+          literal `NULL::VARCHAR(24)`, porque el CIF de cliente vive en
+          `ventas.clientes` y copiarlo aqui seria tratar datos personales. En
           `sentido = 'PROVEEDOR'` el NULL significa que la entidad **no tiene
           ficha de proveedor** —el `LEFT JOIN` con `raw.prv` no casa—, y **no**
           que el proveedor exista sin CIF: ahi `prv.cif` va en crudo, sin el
@@ -678,11 +717,14 @@ objetos:
       entidad_cif:
         significado: >-
           CIF de la entidad, y **solo existe en la mitad PROVEEDOR**. En
-          `sentido = 'CLIENTE'` la consulta escribe un NULL constante.
+          `sentido = 'CLIENTE'` la consulta escribe un NULL constante: el CIF del
+          cliente esta en `ventas.clientes` (por `entidad_id` = `cliente_id`), ya
+          enmascarado si es persona fisica (F-104, D9).
         nulo_significa: >-
           **Depende de la mitad, y son dos mecanismos distintos.** En
           `sentido = 'CLIENTE'` es NULL **siempre**: la consulta proyecta el
-          literal `NULL::VARCHAR(24)`, porque el CIF de cliente no se trae. En
+          literal `NULL::VARCHAR(24)`, porque el CIF de cliente vive en
+          `ventas.clientes` y copiarlo aqui seria tratar datos personales. En
           `sentido = 'PROVEEDOR'` el NULL significa que la entidad **no tiene
           ficha de proveedor** —el `LEFT JOIN` con `raw.prv` no casa—, y **no**
           que el proveedor exista sin CIF: ahi `prv.cif` va en crudo, sin el
@@ -784,11 +826,14 @@ objetos:
       entidad_cif:
         significado: >-
           CIF de la entidad, y **solo existe en la mitad PROVEEDOR**. En
-          `sentido = 'CLIENTE'` la consulta escribe un NULL constante.
+          `sentido = 'CLIENTE'` la consulta escribe un NULL constante: el CIF del
+          cliente esta en `ventas.clientes` (por `entidad_id` = `cliente_id`), ya
+          enmascarado si es persona fisica (F-104, D9).
         nulo_significa: >-
           **Depende de la mitad, y son dos mecanismos distintos.** En
           `sentido = 'CLIENTE'` es NULL **siempre**: la consulta proyecta el
-          literal `NULL::VARCHAR(24)`, porque el CIF de cliente no se trae. En
+          literal `NULL::VARCHAR(24)`, porque el CIF de cliente vive en
+          `ventas.clientes` y copiarlo aqui seria tratar datos personales. En
           `sentido = 'PROVEEDOR'` el NULL significa que la entidad **no tiene
           ficha de proveedor** —el `LEFT JOIN` con `raw.prv` no casa—, y **no**
           que el proveedor exista sin CIF: ahi `prv.cif` va en crudo, sin el
@@ -2037,3 +2082,233 @@ objetos:
     columnas: {}
     relaciones: []
     ejemplos_preguntas: []
+
+  cuentas_cliente:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Las cuentas contables de retencion de CLIENTE (F-104, D3 = a): que cuenta
+      es de retencion de cliente y de que cliente, SIN importes (el saldo, en
+      `retenciones.saldo_contable_cliente`; el cuadre, en
+      `retenciones.v_cuadre_cliente`). La UNION
+      de las que declara un cliente en Sigrid (`raw.cli.cueretide`, 1:1, 211
+      el 2026-11-16) y las del plan de cuentas con codigo 43x8 (`raw.con` tipo
+      17, las imputables; 221). 225 cuentas, 169 con apuntes. Por que la union:
+      solo `cueretide` pierde UNEXUM REAL ESTATE (su ficha declara 4308001593 y
+      sus 947.835,66 EUR estan en 4338001593: error de ficha en Sigrid, para
+      Administracion), y solo el prefijo pierde el cliente y 4 cuentas
+      declaradas fuera de 43x8 (5540 de UTE y 4380, saldo 0). Ninguna es cuenta
+      de retencion de un proveedor. De aqui salen los efectos `retide = 0` que
+      entran en `retenciones.movimientos` (AGR, DIV) y los apuntes del saldo.
+    grano: >-
+      Una fila por cuenta. `cuenta_id` es clave primaria: si dos clientes
+      declararan la misma cuenta, el build falla en vez de duplicar efectos y
+      apuntes; y si la tabla saliera vacia, tambien.
+    clave_negocio: [cuenta_id]
+    paso_etl: build_retenciones
+    refresco: nocturno
+    columnas:
+      cuenta_id:
+        significado: >-
+          La cuenta contable de retencion (`ide` de su ficha en `raw.con`). Es
+          la de `raw.apu.cueide` de sus apuntes y la de `cob.cueide` de sus
+          efectos.
+        agregacion: no_sumable
+      cliente_id:
+        significado: >-
+          El cliente que declara la cuenta (`cli.ide`, el `cliente_id` de
+          `ventas.clientes`).
+        nulo_significa: >-
+          Ningun cliente la declara: entra solo por el prefijo 43x8
+          (`criterio_seleccion = 'PREFIJO_43X8'`), como la 4338001593 de UNEXUM.
+        agregacion: no_sumable
+      codigo_cuenta:
+        significado: Codigo de la cuenta tal y como se ve en la contabilidad (p. ej. 4308001634).
+        nulo_significa: La cuenta no tiene ficha en `raw.con`.
+      nombre_cuenta:
+        significado: Nombre de la cuenta en el plan contable, de `raw.con`.
+        nulo_significa: La cuenta no tiene ficha en `raw.con`.
+      familia:
+        significado: >-
+          Los cuatro primeros digitos del codigo (4308, 4328, 4338, y 5540 o
+          4380 en las declaradas). SOLO descriptiva.
+        nulo_significa: La cuenta no tiene ficha en `raw.con`.
+      criterio_seleccion:
+        significado: >-
+          Por donde entra la cuenta: CUERETIDE si la declara un cliente (manda
+          su ficha), PREFIJO_43X8 si solo la trae el plan de cuentas.
+        valores: [CUERETIDE, PREFIJO_43X8]
+    relaciones:
+      - de: cliente_id
+        a: ventas.clientes.cliente_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para el nombre y el CIF (enmascarado si es persona fisica) del cliente
+          de la cuenta. Un cliente puede tener mas de una cuenta: para cifras por
+          cliente, agregar por  antes de unir.
+    ejemplos_preguntas:
+      - Cual es la cuenta de retencion del cliente C
+
+  saldo_contable_cliente:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **LA RETENCION VIVA DE CLIENTE LA MANDA LA CONTABILIDAD** (F-104, D4):
+      el saldo de cada cuenta de retencion de cliente
+      (`retenciones.cuentas_cliente`). Los efectos de `retenciones.movimientos`
+      son el detalle y el vencimiento; el cuadre entre los dos, por cuenta, en
+      `retenciones.v_cuadre_cliente`. Saldo total **16.002.697,94 EUR** en 169
+      cuentas el 2026-11-16 (medido sobre `raw.apu`, igual al centimo que
+      `contabilidad.mayor.importe_saldo` de esas cuentas), frente a 10,53 M EUR
+      vivos en efectos.
+
+      `importe = debe - haber`: la cuenta 43x8 es de ACTIVO (lo que el cliente
+      nos debe). `saldo` = `altas` + `bajas` + `saldo_inicial`: los asientos de
+      cierre y apertura no suman nunca (la clase de
+      `retenciones.apuntes_contables`). SIN OBRA (D5): atribuir el saldo a obra
+      exige un reparto que Sigrid no tiene; por obra, los efectos.
+
+      **SIN EMPRESA: mezcla todas las empresas** del grupo
+      (`R-EMPRESA-POR-DEFECTO`): la cifra se da como de todas.
+    grano: >-
+      Una fila por cuenta de retencion de cliente con apuntes; `cuenta_id` es
+      clave primaria.
+    clave_negocio: [cuenta_id]
+    paso_etl: build_retenciones
+    refresco: nocturno
+    columnas:
+      cuenta_id:
+        significado: La cuenta de retencion de cliente (la de `retenciones.cuentas_cliente`).
+        agregacion: no_sumable
+      cliente_id:
+        significado: El cliente que declara la cuenta (`ventas.clientes.cliente_id`).
+        nulo_significa: La cuenta entra solo por el prefijo 43x8 (nadie la declara).
+        agregacion: no_sumable
+      codigo_cuenta:
+        significado: Codigo contable de la cuenta (p. ej. 4308001634).
+        nulo_significa: La cuenta no tiene ficha en `raw.con`.
+      nombre_cuenta:
+        significado: Nombre de la cuenta en el plan contable.
+        nulo_significa: La cuenta no tiene ficha en `raw.con`.
+      familia:
+        significado: Los cuatro primeros digitos del codigo (4308, 4328, 4338...), descriptiva.
+        nulo_significa: La cuenta no tiene ficha en `raw.con`.
+      criterio_seleccion:
+        significado: Por donde entra la cuenta (de `retenciones.cuentas_cliente`).
+        valores: [CUERETIDE, PREFIJO_43X8]
+      altas:
+        significado: Suma de los apuntes ALTA (retencion que el cliente nos practica), en positivo.
+        unidad: EUR
+        agregacion: suma
+      bajas:
+        significado: Suma de los apuntes BAJA (retencion cobrada o dada de baja), en negativo.
+        unidad: EUR
+        agregacion: suma
+      saldo_inicial:
+        significado: La apertura sin cierre previo de la cuenta (la historia anterior a Sigrid).
+        unidad: EUR
+        agregacion: suma
+      saldo:
+        significado: >-
+          altas + bajas + saldo_inicial: lo que el cliente nos debe de
+          retencion segun la contabilidad. Es la cifra que manda.
+        unidad: EUR
+        agregacion: suma
+      saldo_anterior_2016:
+        significado: La apertura de 2016 (saldo a 31-12-2015), informativa; ya esta dentro de `saldo`.
+        unidad: EUR
+        agregacion: suma
+      num_apuntes:
+        significado: Numero de apuntes ALTA, BAJA y SALDO_INICIAL de la cuenta.
+        agregacion: suma
+      primer_movimiento:
+        significado: Fecha del primer apunte que suma.
+        agregacion: no_sumable
+      ultimo_movimiento:
+        significado: Fecha del ultimo apunte que suma.
+        agregacion: no_sumable
+    relaciones:
+      - de: cuenta_id
+        a: retenciones.cuentas_cliente.cuenta_id
+        cardinalidad: "1:1"
+        porque: El catalogo del que sale la cuenta.
+    ejemplos_preguntas:
+      - Cuanta retencion nos deben los clientes segun la contabilidad
+
+  v_cuadre_cliente:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **El cuadre contabilidad - efectos de la retencion de CLIENTE, por
+      cuenta** (F-104): el saldo contable (`retenciones.saldo_contable_cliente`;
+      la retencion viva de cliente la manda la contabilidad) frente a lo vivo en
+      los efectos (`retenciones.movimientos` CLIENTE con estado VIVA, que aqui
+      solo se lee). Solo cuentas con saldo o viva de al menos 1 EUR. `categoria`,
+      en este orden: CUADRA (menos de 1 EUR), SIN_EFECTOS_VIVOS,
+      SIN_SALDO_CONTABLE, CONTABILIDAD_MAYOR y EFECTOS_MAYOR. Medido el
+      2026-11-16: 64 cuentas (20 CUADRA, 20 CONTABILIDAD_MAYOR, 3
+      EFECTOS_MAYOR, 16 SIN_EFECTOS_VIVOS, 5 SIN_SALDO_CONTABLE). Casos
+      testigo: 4308001150 (TERTIO MILLENNIO) CUADRA 12.000,00; 4308001634
+      (ESPACIO PROMOCION VIII, obra 0686) CONTABILIDAD_MAYOR 1,11 M EUR: sus
+      facturas de 2025-2026 cargan la retencion en la cuenta y Sigrid no crea
+      el efecto; 4308001550 (ARCHER) SIN_SALDO_CONTABLE 945.000,05: retencion
+      devuelta por factura y efectos AGR sin cancelar; 4338001593 (UNEXUM)
+      SIN_EFECTOS_VIVOS 947.835,66.
+
+      **POR QUE DESCUADRA, FACTURA A FACTURA**: `ventas.retencion_cuenta`
+      (por cuenta: la retencion de las facturas sin efecto, lo vivo sin
+      factura y lo que queda sin explicar) y `ventas.retencion_factura`. Es la
+      lista para Administracion (D8). Un efecto vivo sin cuenta (`cuenta_id`
+      NULL) no entra en el cuadre. Sin empresa: mezcla todas las empresas.
+    grano: Una fila por cuenta (`cuenta_id`), de cualquiera de los dos lados (FULL JOIN).
+    clave_negocio: [cuenta_id]
+    paso_etl: build_retenciones
+    refresco: nocturno
+    columnas:
+      cuenta_id:
+        significado: La cuenta de retencion, de la contabilidad o de los efectos vivos.
+        agregacion: no_sumable
+      codigo_cuenta:
+        significado: Codigo contable de la cuenta, de su ficha en `raw.con`.
+        nulo_significa: La cuenta no tiene ficha en `raw.con`.
+      nombre_cuenta:
+        significado: Nombre de la cuenta en el plan contable.
+        nulo_significa: La cuenta no tiene ficha en `raw.con`.
+      cliente_id:
+        significado: El cliente que declara la cuenta (`ventas.clientes.cliente_id`).
+        nulo_significa: >-
+          La cuenta entra solo por el prefijo 43x8, o es la cuenta de un efecto
+          vivo que no esta en `retenciones.cuentas_cliente`.
+        agregacion: no_sumable
+      criterio_seleccion:
+        significado: Por donde entra la cuenta en `retenciones.cuentas_cliente`.
+        nulo_significa: La cuenta no esta en `retenciones.cuentas_cliente` (solo la trae un efecto vivo).
+        valores: [CUERETIDE, PREFIJO_43X8]
+      saldo_contable:
+        significado: El `saldo` de la cuenta en `retenciones.saldo_contable_cliente`. 0 si no tiene.
+        unidad: EUR
+        agregacion: suma
+      viva_efectos:
+        significado: Suma de sus efectos CLIENTE en estado VIVA de `retenciones.movimientos`. 0 si no tiene.
+        unidad: EUR
+        agregacion: suma
+      num_efectos_vivos:
+        significado: Cuantos efectos VIVA tiene la cuenta.
+        agregacion: suma
+      diferencia:
+        significado: saldo_contable - viva_efectos. Positiva, la contabilidad tiene mas.
+        unidad: EUR
+        agregacion: suma
+      categoria:
+        significado: Como cuadra la cuenta, evaluada en el orden de la lista.
+        valores: [CUADRA, SIN_EFECTOS_VIVOS, SIN_SALDO_CONTABLE, CONTABILIDAD_MAYOR, EFECTOS_MAYOR]
+    relaciones:
+      - de: cuenta_id
+        a: ventas.retencion_cuenta.cuenta_id
+        cardinalidad: "1:1"
+        porque: Para la explicacion por factura del descuadre de la cuenta.
+    ejemplos_preguntas:
+      - Que clientes no cuadran entre la contabilidad y los efectos de retencion

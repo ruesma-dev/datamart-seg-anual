@@ -850,7 +850,17 @@
 # en el texto; los partes de 2021-2023 (sin clase) entran. Columna nueva
 # `familia_documento` (la de F-156). Cambian la ficha, `R-POSTVENTA-RESTRINGIDA`,
 # `postventa_restringida.contactos_incidencia` (los huerfanos de 707) y `raw.auxgra`.
-version: 79
+#
+# version 80 (F-104, 2026-11-18): LA RETENCION DE CLIENTE, SANEADA. La viva de
+# CLIENTE de `retenciones.movimientos` BAJA DE GOLPE de 22,44 a 10,53 M EUR: el
+# estado sigue la precedencia de proveedor (en `cob` el original agrupado queda
+# en `est` 1 con `fecbaj`) y entran los AGR y DIV de las cuentas de retencion
+# (columnas nuevas `origen_retencion` y `cuenta_id`). Y la manda la contabilidad,
+# 16,00 M EUR: `retenciones.cuentas_cliente`, `saldo_contable_cliente` y
+# `v_cuadre_cliente`. La conciliacion por factura en `ventas`:
+# `retencion_factura`, `retencion_cuenta` y `v_retencion_cliente`. El orden de
+# magnitud de cliente deja de estar SIN VERIFICAR.
+version: 80
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -1301,8 +1311,9 @@ reglas:
       coeficientes en el 85 %): no se mezclan. El enlace certificacion ->
       factura es N:M: si `factura_compartida` es verdadero, sumar lo facturado
       o lo cobrado por certificacion cuenta dos veces la misma factura. Lo
-      cobrado por un agrupado `AGR` no se atribuye a ninguna factura hasta
-      F-104: dilo si pesa en la respuesta (`ventas.cobertura_enlace`).
+      cobrado por un agrupado `AGR` no se atribuye a ninguna factura (D11 de
+      F-104; la retencion se concilia en `ventas.retencion_factura`): dilo si
+      pesa en la respuesta (`ventas.cobertura_enlace`).
     motivo: >-
       Medido el 2026-11-06/07 en solo lectura: 268 facturas son de dos
       certificaciones y 71 certificaciones tienen dos facturas; la base de la
@@ -1880,20 +1891,30 @@ ordenes_de_magnitud:
       orden de 35 M€ es ese error**: se esta sumando sin filtrar
       `estado = 'VIVA'`. NO es el total practicado historicamente: lo ya
       liquidado no cuenta aqui.
-  - concepto: >-
-      Retenido VIVO por clientes segun los efectos, SIN VERIFICAR: la
-      contabilidad da 13,8 M EUR y el criterio de proveedor daria 2,1 M EUR
-      (pendiente de su feature propia)
-    valor_aproximado: 21900000
+  - concepto: Retenido VIVO por clientes segun la CONTABILIDAD (la cifra que manda)
+    valor_aproximado: 16000000
     unidad: EUR
     criterio: saldo_vivo
     fuente: >-
-      LEEME_RETENCIONES_R1.md, misma tabla: efectos de `cob` con `retide <> 0`
-      y `fecrea = 0` (22,16 M€ el 2026-09-22). **SIN VERIFICAR**: F-094 midio
-      que el criterio de proveedor no vale para `cob` y que la contabilidad
-      de las cuentas de retencion de cliente da 13,81 M€; queda para una
-      feature propia. Es el orden de lo que publica el datamart, no un saldo
-      contrastado.
+      Medido el 2026-11-16 (F-104, `progress/spec_F-104.md`) en solo lectura:
+      16.002.697,94 EUR de saldo en las 225 cuentas de retencion de cliente
+      (`cli.cueretide` y 43x8; 169 con apuntes), igual al centimo en
+      `contabilidad.mayor.importe_saldo` de esas cuentas. Es `SUM(saldo)` de
+      `retenciones.saldo_contable_cliente`; **una cifra del orden de 22 M EUR**
+      es la que publicaba `movimientos` antes de F-104, que contaba los
+      originales agrupados como vivos.
+  - concepto: Retenido VIVO por clientes segun los EFECTOS (el detalle; manda la contabilidad)
+    valor_aproximado: 10500000
+    unidad: EUR
+    criterio: saldo_vivo
+    fuente: >-
+      Medido el 2026-11-16 (F-104, `progress/spec_F-104.md`) en solo lectura
+      con el criterio de F-104: 10.526.697,45 EUR en 347 efectos CLIENTE en
+      estado VIVA (247 con tipo de retencion, 2,40 M; 100 AGR, DIV o sin tipo
+      de las cuentas de retencion, 8,12 M). La diferencia con la contabilidad
+      se explica cuenta a cuenta en `retenciones.v_cuadre_cliente` y factura a
+      factura en `ventas.retencion_factura`. Hasta F-104 aqui ponia 21,9 M:
+      la cifra sin sanear, con los originales agrupados.
   - concepto: Efectos de retencion practicados a proveedores, vivos y liquidados
     valor_aproximado: 25631
     unidad: filas
@@ -1903,14 +1924,16 @@ ordenes_de_magnitud:
       25.631 filas de `pag` con `retide <> 0`, sin filtrar por estado (7.751
       VIVA + 2.369 LIQUIDADA + 15.511 BAJA). F-094 no borra filas, solo las
       reclasifica. Hasta hoy aqui ponia 25.124, de LEEME_RETENCIONES_R1.md.
-  - concepto: Efectos de retencion practicados por clientes, vivos y liquidados
-    valor_aproximado: 2238
+  - concepto: Efectos de retencion practicados por clientes, en todos los estados
+    valor_aproximado: 3461
     unidad: filas
     criterio: total
     fuente: >-
-      Medido en la base el 2026-09-23: 2.238 filas de `cob` con
-      `retide <> 0`, sin filtrar por estado (2.196 VIVA + 42 LIQUIDADA).
-      Hasta hoy aqui ponia 2.219, de LEEME_RETENCIONES_R1.md.
+      Medido el 2026-11-16 (F-104, `progress/spec_F-104.md`) en solo lectura:
+      3.461 filas CLIENTE, sin filtrar por estado: los 2.256 efectos de `cob`
+      con `retide <> 0` mas los 1.205 sin tipo de las cuentas de retencion de
+      cliente (AGR, DIV). F-104 no borra filas. Hasta F-104 aqui ponia 2.238
+      (2026-09-23), solo los de `retide <> 0`.
 
   # -------------------------------------------------------------------------
   # COMPRAS, MART y CIERRE. Anadidos el 2026-08-25 por T40.

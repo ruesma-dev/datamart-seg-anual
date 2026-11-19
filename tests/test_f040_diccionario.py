@@ -74,7 +74,8 @@ def test_f040_r31_una_ficha_por_objeto_del_sql() -> None:
     fichados = {f"ventas.{n}" for n in _fichas("ventas")}
     fichados |= {f"ventas_restringida.{n}" for n in _fichas("ventas_restringida")}
     objetos = _objetos_del_sql()
-    assert len(objetos) == 19, sorted(objetos)  # 8 tablas, 3 vistas, 5 funciones y 3 restringidas
+    # 8 tablas, 3 vistas, 5 funciones y 3 restringidas; F-104 añade 2 tablas y 1 vista
+    assert len(objetos) == 22, sorted(objetos)
     assert fichados == objetos
 
 

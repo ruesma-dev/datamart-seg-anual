@@ -300,6 +300,13 @@ infraestructura.
 > master).** Entran `stg.master_versiones`, `stg.v_master_lineas`,
 > `mart.v_master_version_partida` y `mart.master_importe_mensual`. Sin regla
 > nueva (`R-VERSION-MASTER` los alcanza). El inventario pasa a **320 objetos**.
+>
+> **Enmienda del 2026-11-19 (F-104, la retencion de cliente saneada).** Entran
+> `retenciones.cuentas_cliente`, `retenciones.saldo_contable_cliente`,
+> `retenciones.v_cuadre_cliente`, `ventas.retencion_factura`,
+> `ventas.retencion_cuenta` y `ventas.v_retencion_cliente`; `retenciones.movimientos`
+> gana `origen_retencion` y `cuenta_id`. Sin regla nueva. El inventario pasa a
+> **326 objetos**.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,
