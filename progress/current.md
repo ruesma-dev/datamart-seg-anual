@@ -20,7 +20,19 @@
   que el guardián R2 de F-006 no tome `raw.con cue` por proyección directa; `tipo_id` sin
   `nulo_significa` (lo exige `test_f006_r2_los_filtros_que_pierden_filas_se_declaran`), el NULL de
   CLIENTE se explica en `significado`. Detalle en `progress/impl_F-104.md`.
-- MANUAL para el humano, al final de la feature (abajo, en T11).
+- T10 (mutación, INFORMATIVA en `estandar`): en la pasada de campaña, tras el APPROVED del reviewer
+  (`python -m harness.mutacion --feature F-104`), como manda `implementer.md`.
+- **T11 MANUAL (humano), tras merge e imagen nueva del job** (solo lecturas salvo el build y la publicación):
+  1. `python main.py build-retenciones` y `python main.py build-ventas` (o la nocturna con la imagen nueva);
+     después `python main.py check-unicidad` y `python main.py check-relaciones`.
+  2. R20/R21: `SELECT categoria, COUNT(*), SUM(saldo_contable), SUM(viva_efectos) FROM retenciones.v_cuadre_cliente GROUP BY 1;`
+     (esperado del 2026-11-16: saldo 16,00 M, viva 10,53 M; 64 cuentas).
+  3. R37: `SELECT motivo, COUNT(*), SUM(retencion), SUM(efectos) FROM ventas.retencion_factura GROUP BY 1;` y
+     `SELECT * FROM ventas.retencion_cuenta WHERE codigo_cuenta = '4308001634';`
+  4. R35: `SELECT has_table_privilege('mcp_sigrid_dm_ro', 'ventas.retencion_factura', 'SELECT');` (t) y lo mismo
+     con `mcp_sigrid_dm_restringido` (f).
+  5. `publicar-diccionario` SOLO con la imagen del job (v80) y reiniciar `mcp-bbdd` (cachea el diccionario).
+  6. `azure-apps`: commit `4621627` listo; `git -C <azure-apps> pull` y después `push` (lo hace el humano).
 
 ## 2026-11-19 · F-104 DESBLOQUEADA (líder, 2.ª vez) · test_f135 arreglado en `dev` y `main` llevado a `dev`
 
