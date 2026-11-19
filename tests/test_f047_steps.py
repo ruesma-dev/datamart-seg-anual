@@ -78,6 +78,8 @@ STEPS = {
             "06_views_contables.sql",
             # F-128: el cuadre de la retención de garantía por factura.
             "07_cuadre_factura.sql",
+            # F-104: la retención de cliente desde la contabilidad.
+            "08_saldo_cliente.sql",
         ],
     ),
 }

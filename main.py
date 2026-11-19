@@ -5422,6 +5422,8 @@ def build_retenciones() -> None:
                           saldo, fin de obra y sus vistas)
       07_cuadre_factura.sql  F-128: el cuadre de la retención de garantía por
                           factura y por (proveedor, obra)
+      08_saldo_cliente.sql   F-104: la retención de CLIENTE desde la
+                          contabilidad (saldo por cuenta y cuadre con los efectos)
 
     Requiere haber ingerido antes cob, pag y rec.
 
