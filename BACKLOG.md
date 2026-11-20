@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **154 features**, 72 abiertas y 82 terminadas. Por columna: 0 en Review, 0 en Blocked, 0 en In progress, 1 en Spec aprobada, 8 en To do, 63 en Backlog y 82 en Done.
+Resumen: **154 features**, 72 abiertas y 82 terminadas. Por columna: 0 en Review, 0 en Blocked, 0 en In progress, 2 en Spec aprobada, 7 en To do, 63 en Backlog y 82 en Done.
 
 ## Review
 
@@ -21,6 +21,7 @@ _Ninguna feature en implementación._
 
 | # | Feature | Spec aprobada | Prioridad | Rigor | Rama |
 |---|---|---|---|---|---|
+| F-127 | El mayor analítico: los apuntes de la contabilidad analítica (apa) y sus saldos por cuenta analítica y mes, con las cuentas de contrapartida (CP) de los trabajadores | pendiente de tu aprobación | 9 | critico | `feature/F-127-mayor-analitico` |
 | F-111 | Los nombres de partida se resuelven por codigo en los niveles del arbol y en la dimension de costes indirectos: 10.593 filas con un escalon con el nombre de otra partida | pendiente de tu aprobación | 25 | estandar | `feature/F-111-nombres-partida-por-ancestro` |
 
 ## To do
@@ -33,7 +34,6 @@ _Ninguna feature en implementación._
 | F-099 | Los contratos de obra con el cliente (expedientes): importe adjudicado, coeficientes por separado, fechas y las partidas que cuelgan de cada uno | 6 | estandar | `feature/F-099-expedientes-obra` |
 | F-076 | La certificacion al cliente se puede consultar pero no esta modelada ni explicada: los ambitos VEN y CER_PEC viven en stg y no llegan al seguimiento | 7 | estandar | `feature/F-076-ambitos-certificacion` |
 | F-119 | La cartera de obra: lo contratado que queda por ejecutar, por obra y en total | 8 | estandar | `feature/F-119-cartera-de-obra` |
-| F-127 | El mayor analítico: los apuntes de la contabilidad analítica (apa) y sus saldos por cuenta analítica y mes, con las cuentas de contrapartida (CP) de los trabajadores | 9 | critico | `feature/F-127-mayor-analitico` |
 | F-054 | Glosario de negocio para la IA (`_meta.glosario`): qué significan en Ruesma la valorada, el incurrido, el ABC o la liquidatoria, y dónde están en el datamart | 14 | documental | `feature/F-054-conocimiento-de-negocio` |
 
 ## Backlog
@@ -231,7 +231,7 @@ Pedida por el humano el 2026-09-29 con prioridad MEDIA (30), al aclarar que «la
 
 ### F-127 · El mayor analítico: los apuntes de la contabilidad analítica (apa) y sus saldos por cuenta analítica y mes, con las cuentas de contrapartida (CP) de los trabajadores
 
-estado **to do (comprometida)** · prioridad 9 · rigor `critico` · SDD sí · rama `feature/F-127-mayor-analitico`
+estado **spec lista** · prioridad 9 · rigor `critico` · SDD sí · rama `feature/F-127-mayor-analitico`
 
 Nace el 2026-10-07 de los correos de **Juan Romero** (Dir. Administración y Control de Costes) del 2026-10-06, cuatro peticiones seguidas sobre el datamart en uso; el humano aprobó el reparto y el orden el 2026-10-07. Correo «Datamart: mayor analítico y analítica de albaranes y facturas», punto 1, que es un RECORDATORIO: el 24-09 Juan pidió los movimientos y el saldo de las cuentas analíticas de contrapartida (CP) y se le dijo que quedaría cubierto al traer el mayor. Lo publicado después (F-056) es el mayor FINANCIERO (`contabilidad.mayor`), que no las cubre: las CP son cuentas analíticas y el mayor analítico (`apa`) sigue solo en `raw`. Es una DEUDA prometida. ================ LO QUE PIDE: una tabla equivalente a `contabilidad.mayor` para la analítica: apunte, fecha, empresa, centro de coste (y su obra vía `maestro.centros_coste`), cuenta analítica (cruzable con `maestro.cuentas_analiticas`, F-107), debe, haber, importe y el enlace al apunte financiero cuando lo tenga; y, como en la financiera, saldos por cuenta y mes. Para ver el saldo y los movimientos de las cuentas analíticas de obra, incluidas las CP de los trabajadores, y cruzarlos con lo imputado en los partes. ================ LO QUE YA SE SABE (F-056, F-061): `apa` está en `raw` (709.403 filas el 2026-09-06), `cenide` al 99,98 %, `apuide` al 88 %, `obride` a 0 (la obra sale por el centro de coste); con el puente el 98,8 % de sus filas y el 93,2 % del debe caen en una obra. F-061 dejó a medir si el movimiento de las CP está en `apa` o en otra tabla (`caaide`). AVISO DE JUAN (F-061): «el asiento de nóminas no entra en estas cuentas analíticas»: el saldo de una CP solo recoge los partes; la ficha debe decirlo. OJO, DATOS PERSONALES: las CP son por trabajador (`personal.recursos.cuenta_analitica_contrapartida_id`); si el nombre de la cuenta o el concepto llevan el nombre del trabajador, esa parte va al esquema `personal` (F-057, se da o se quita con un GRANT) y no a `contabilidad`. DESBLOQUEA F-061 (coste real de mano de obra) y el «cuadrar coste documental con el analítico» de F-126. ================ CRITERIO HEREDADO DE F-135 (aprobada por el humano el 2026-10-11, R23 de su spec): el mayor analítico NACE RESTRINGIDO con el mismo mecanismo -la copia completa en un esquema que solo lee el rol autorizado `sigrid_dm_autorizado_ro` (renombrado por F-141) y la general filtrada-. Un apunte analítico (`apa`) está RESTRINGIDO si su `apuide` es un apunte restringido de `contabilidad_restringida.mayor`, si su `conide` es un asiento de personal, o si su cuenta analítica es la contrapartida (CP) de un trabajador (`personal.recursos.cuenta_analitica_contrapartida_id`). Medido el 2026-10-09: las dos primeras condiciones alcanzan 100.502 de las 716.007 filas de `raw.apa` (14 %), en 920 cuentas analíticas y 56 centros; la tercera queda por medir aquí. `raw` ya no lo lee el rol general desde F-135, así que el mayor analítico se publica solo por esos dos esquemas. ================ OBLIGACIÓN QUE VIENE DE F-141 (decisión del humano del 2026-10-16): el perfil RESTRINGIDO (administrativos, `sigrid_dm_perfil_restringido_ro`) NO ve el mayor analítico. Todo objeto que publique esta feature (apuntes de `apa` y sus saldos) queda FUERA de su lista: añadirlo a los excluidos del perfil restringido en el mismo trabajo. Tampoco ve `contabilidad.mayor`, `contabilidad.saldos_cuenta_mes`, `tesoreria` ni `personal`. ================ PRECISIÓN de F-141 (2026-10-18): la exclusión se hace añadiendo el objeto del mayor analítico a `PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES` (config/settings.py); si su nombre no lleva «mayor», la vigilancia nocturna de `apply_grants` no lo caza sola.
 

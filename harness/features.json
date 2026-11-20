@@ -1993,7 +1993,7 @@
         "El perfil restringido (F-141) no lee ningún objeto del mayor analítico: excluido en su lista y comprobado en el catálogo con `has_*_privilege`",
         "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
       ],
-      "status": "todo",
+      "status": "spec_ready",
       "sdd": true,
       "rigor": "critico",
       "priority": 9,
