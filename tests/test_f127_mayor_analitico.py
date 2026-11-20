@@ -610,3 +610,228 @@ def test_f127_ficheros_con_cabecera_ruta_y_sin_permisos(nombre: str) -> None:
     )
     sql = _sql(nombre).upper()
     assert "GRANT " not in sql and "REVOKE " not in sql, "los permisos los da apply_grants"
+
+
+# ===========================================================================
+# R12 · los saldos por cuenta analítica, centro y mes (completos)
+# ===========================================================================
+
+COLUMNAS_SALDOS_ANA = [
+    "cuenta_analitica_id", "centro_coste_id", "empresa_id", "ejercicio", "mes",
+    "num_apuntes", "debe", "haber", "importe", "saldo_acumulado",
+]
+CLAVE_SALDOS_ANA = "(cuenta_analitica_id, centro_coste_id, empresa_id, ejercicio, mes)"
+AGRUPACION_ANA = (
+    "GROUP BY COALESCE(m.cuenta_analitica_id, 0), COALESCE(m.centro_coste_id, 0), "
+    "m.empresa_id, m.ejercicio, m.mes"
+)
+VENTANA_MES = (
+    "SUM(s.importe) OVER ( PARTITION BY s.cuenta_analitica_id, s.centro_coste_id, "
+    "s.empresa_id ORDER BY s.ejercicio, s.mes )::NUMERIC(18, 2) AS saldo_acumulado"
+)
+
+
+def test_f127_r12_saldos_completos_desde_el_mayor_analitico() -> None:
+    texto = _sql(SALDOS_ANA)
+    assert texto.index(
+        f"DROP TABLE IF EXISTS {RESTR}.saldos_cuenta_analitica_mes CASCADE;"
+    ) < texto.index(f"CREATE TABLE {RESTR}.saldos_cuenta_analitica_mes AS")
+    assert f"COMMENT ON TABLE {RESTR}.saldos_cuenta_analitica_mes IS" in texto
+    assert (
+        f"ALTER TABLE {RESTR}.saldos_cuenta_analitica_mes ADD PRIMARY KEY {CLAVE_SALDOS_ANA};"
+    ) in texto
+    leidas = set(re.findall(r"(?:FROM|JOIN)\s+(\w+\.\w+)", texto))
+    assert leidas == {f"{RESTR}.mayor_analitico"}, f"09 lee {leidas}"
+
+
+def test_f127_r12_columnas_y_agregados() -> None:
+    assert _columnas(SALDOS_ANA, f"{RESTR}.saldos_cuenta_analitica_mes") == COLUMNAS_SALDOS_ANA
+    mensual = _cte(SALDOS_ANA, "mensual")
+    for expresion in (
+        "COALESCE(m.cuenta_analitica_id, 0) AS cuenta_analitica_id",
+        "COALESCE(m.centro_coste_id, 0) AS centro_coste_id",
+        "COUNT(*) AS num_apuntes",
+        "SUM(m.debe)::NUMERIC(18, 2) AS debe",
+        "SUM(m.haber)::NUMERIC(18, 2) AS haber",
+        "SUM(m.importe)::NUMERIC(18, 2) AS importe",
+    ):
+        assert expresion in mensual, f"falta «{expresion}»"
+    assert mensual.strip().endswith(f"FROM {RESTR}.mayor_analitico m {AGRUPACION_ANA}")
+    assert " WHERE " not in mensual and "FILTER" not in mensual, "el completo no filtra nada"
+
+
+def test_f127_r12_acumulado_a_fin_de_mes() -> None:
+    assert VENTANA_MES in _final(SALDOS_ANA, f"{RESTR}.saldos_cuenta_analitica_mes")
+
+
+def test_f127_r12_sin_columnas_por_clase() -> None:
+    """No hay cierres ni aperturas en la analítica: ni importe_saldo ni clase."""
+    texto = _sql(SALDOS_ANA)
+    for prohibido in ("clase_asiento", "importe_saldo", "importe_apertura", "importe_cierre"):
+        assert prohibido not in texto, prohibido
+
+
+# ===========================================================================
+# R14, R15 · el mayor analítico general y su guarda
+# ===========================================================================
+
+
+def test_f127_r14_el_general_son_los_no_restringidos() -> None:
+    consultas = _consultas(MAYOR_ANA_GEN, "contabilidad.mayor_analitico")
+    assert len(consultas) == 1
+    _, items, clausulas = consultas[0]
+    assert _columnas(MAYOR_ANA_GEN, "contabilidad.mayor_analitico") == COLUMNAS_MAYOR_ANA_GEN
+    assert clausulas == ["WHERE NOT r.restringido"]
+    assert f"FROM {RESTR}.mayor_analitico r WHERE NOT r.restringido" in _sql(MAYOR_ANA_GEN)
+    copiadas = [i for i in items if i != "r.saldo_acumulado_visible AS saldo_acumulado"]
+    assert copiadas == [f"r.{c}" for c in COLUMNAS_MAYOR_ANA_GEN if c != "saldo_acumulado"]
+    assert "r.saldo_acumulado_visible AS saldo_acumulado" in items
+
+
+def test_f127_r14_tabla_idempotente_con_indices() -> None:
+    texto = _sql(MAYOR_ANA_GEN)
+    assert texto.index("DROP TABLE IF EXISTS contabilidad.mayor_analitico CASCADE;") < texto.index(
+        "CREATE TABLE contabilidad.mayor_analitico AS"
+    )
+    assert "COMMENT ON TABLE contabilidad.mayor_analitico IS" in texto
+    assert "ALTER TABLE contabilidad.mayor_analitico ADD PRIMARY KEY (apunte_analitico_id);" in texto
+    for indice in (
+        "idx_con_mana_cuenta_fecha ON contabilidad.mayor_analitico (cuenta_analitica_id, fecha);",
+        "idx_con_mana_empresa_cuenta_fecha ON contabilidad.mayor_analitico "
+        "(empresa_id, codigo_cuenta_analitica, fecha);",
+        "idx_con_mana_obra ON contabilidad.mayor_analitico (obra_id);",
+        "idx_con_mana_obra_imputada ON contabilidad.mayor_analitico (obra_imputada_id);",
+        "idx_con_mana_apunte ON contabilidad.mayor_analitico (apunte_id);",
+        "idx_con_mana_asiento ON contabilidad.mayor_analitico (asiento_id);",
+    ):
+        assert "CREATE INDEX " + indice in texto, indice
+    assert "WHERE restringido;" not in texto, "sin índice parcial: aquí no hay restringidas"
+
+
+def test_f127_r15_guarda_sin_cp() -> None:
+    """La guarda recalcula el conjunto CP IGUAL que 08 (con D7-b), desde raw."""
+    guarda = _guarda(MAYOR_ANA_GEN)
+    for cte, texto in (("cp_recurso", CP_RECURSO), ("centros_cp", CENTROS_CP), ("cp", CP)):
+        assert f"{cte} AS ( {texto} )" in guarda, f"la guarda no recalcula {cte} como 08"
+    assert (
+        "SELECT count(*) INTO v_cp FROM contabilidad.mayor_analitico g "
+        "JOIN cp ON cp.cuenta_analitica_id = g.cuenta_analitica_id;"
+    ) in guarda
+    assert "IF v_cp <> 0 THEN RAISE EXCEPTION" in guarda
+
+
+def test_f127_r15_guarda_sin_apunte_restringido_ni_sin_resolver() -> None:
+    guarda = _guarda(MAYOR_ANA_GEN)
+    assert (
+        "SELECT count(*) INTO v_apunte FROM contabilidad.mayor_analitico g "
+        "WHERE g.apunte_id IS NOT NULL AND NOT EXISTS ( SELECT 1 FROM "
+        f"{RESTR}.mayor m WHERE m.apunte_id = g.apunte_id AND NOT m.restringido );"
+    ) in guarda
+    assert "IF v_apunte <> 0 THEN RAISE EXCEPTION" in guarda
+
+
+def test_f127_r15_guarda_general_mas_restringidas_igual_a_completo() -> None:
+    guarda = _guarda(MAYOR_ANA_GEN)
+    assert "SELECT count(*) INTO v_general FROM contabilidad.mayor_analitico;" in guarda
+    assert (
+        "SELECT count(*), count(*) FILTER (WHERE restringido) INTO v_completo, v_restringidas "
+        f"FROM {RESTR}.mayor_analitico;"
+    ) in guarda
+    assert "IF v_general + v_restringidas <> v_completo THEN RAISE EXCEPTION" in guarda
+    texto = _sql(MAYOR_ANA_GEN)
+    assert texto.index("DO $$") > texto.index("CREATE TABLE contabilidad.mayor_analitico AS")
+    for mensaje in re.findall(r"RAISE EXCEPTION '([^']*)'", guarda):
+        assert mensaje.startswith("mayor_analitico_general:"), mensaje
+
+
+def test_f127_r15_la_tabla_solo_lee_el_completo() -> None:
+    antes = _sql(MAYOR_ANA_GEN).split("DO $$")[0]
+    leidas = set(re.findall(r"(?:FROM|JOIN)\s+(\w+\.\w+)", antes))
+    assert leidas == {f"{RESTR}.mayor_analitico"}, leidas
+
+
+# ===========================================================================
+# R16 · los saldos generales, solo de lo visible
+# ===========================================================================
+
+
+def test_f127_r16_saldos_generales_solo_de_lo_visible() -> None:
+    mensual = _cte(SALDOS_ANA_GEN, "mensual")
+    assert mensual.strip().endswith(
+        f"FROM {RESTR}.mayor_analitico m {AGRUPACION_ANA} "
+        "HAVING COUNT(*) FILTER (WHERE NOT m.restringido) > 0"
+    )
+    for expresion in (
+        "COUNT(*) FILTER (WHERE NOT m.restringido) AS num_apuntes",
+        "SUM(m.debe) FILTER (WHERE NOT m.restringido)::NUMERIC(18, 2) AS debe",
+        "SUM(m.haber) FILTER (WHERE NOT m.restringido)::NUMERIC(18, 2) AS haber",
+        "SUM(m.importe) FILTER (WHERE NOT m.restringido)::NUMERIC(18, 2) AS importe",
+        "COUNT(*) FILTER (WHERE m.restringido) AS num_apuntes_restringidos",
+    ):
+        assert expresion in mensual, f"falta «{expresion}»"
+    for agregado in re.findall(r"SUM\([^)]*\)(?: FILTER \([^)]*\))?", mensual):
+        assert "NOT m.restringido" in agregado, f"agregado sin filtrar: {agregado}"
+
+
+def test_f127_r16_columnas_recuento_al_final() -> None:
+    assert _columnas(SALDOS_ANA_GEN, "contabilidad.saldos_cuenta_analitica_mes") == (
+        [*COLUMNAS_SALDOS_ANA, "num_apuntes_restringidos", "incompleto"]
+    )
+    final = _final(SALDOS_ANA_GEN, "contabilidad.saldos_cuenta_analitica_mes")
+    assert "s.num_apuntes_restringidos > 0 AS incompleto" in final
+    assert VENTANA_MES in final
+    texto = _sql(SALDOS_ANA_GEN)
+    assert (
+        f"ALTER TABLE contabilidad.saldos_cuenta_analitica_mes ADD PRIMARY KEY {CLAVE_SALDOS_ANA};"
+    ) in texto
+    assert texto.index(
+        "DROP TABLE IF EXISTS contabilidad.saldos_cuenta_analitica_mes CASCADE;"
+    ) < texto.index("CREATE TABLE contabilidad.saldos_cuenta_analitica_mes AS")
+    assert "COMMENT ON TABLE contabilidad.saldos_cuenta_analitica_mes IS" in texto
+
+
+# ===========================================================================
+# R17 · cuánto falta, sin importes
+# ===========================================================================
+
+
+def test_f127_r17_recuentos_por_motivo_sin_importes() -> None:
+    consultas = _consultas(RECUENTO_ANA, "contabilidad.apuntes_analiticos_restringidos_mes")
+    assert len(consultas) == 1
+    _, items, clausulas = consultas[0]
+    assert items == [
+        "m.empresa_id", "m.ejercicio", "m.mes",
+        "COUNT(*) AS num_apuntes", "COUNT(DISTINCT m.asiento_id) AS num_asientos",
+        f"COUNT(*) FILTER (WHERE m.motivo_restriccion = '{MOTIVO_CONTRAPARTIDA}') AS num_contrapartida",
+        f"COUNT(*) FILTER (WHERE m.motivo_restriccion = '{MOTIVO_APUNTE_RESTRINGIDO}') "
+        "AS num_apunte_restringido",
+        f"COUNT(*) FILTER (WHERE m.motivo_restriccion = '{MOTIVO_ASIENTO_PERSONAL}') "
+        "AS num_asiento_personal",
+        f"COUNT(*) FILTER (WHERE m.motivo_restriccion = '{MOTIVO_APUNTE_SIN_RESOLVER}') "
+        "AS num_apunte_sin_resolver",
+    ]
+    assert clausulas == ["WHERE m.restringido", "GROUP BY m.empresa_id, m.ejercicio, m.mes"]
+    assert f"FROM {RESTR}.mayor_analitico m" in _sql(RECUENTO_ANA)
+
+
+def test_f127_r17_ni_debe_ni_haber_ni_importe() -> None:
+    """D5 de F-135: el importe restringido por mes sería la masa salarial."""
+    sql = _sql(RECUENTO_ANA).split("COMMENT ON")[0]
+    for prohibido in ("debe", "haber", "importe", "SUM(", "saldo"):
+        assert prohibido not in sql, f"12 nombra {prohibido}"
+    assert (
+        "ALTER TABLE contabilidad.apuntes_analiticos_restringidos_mes "
+        "ADD PRIMARY KEY (empresa_id, ejercicio, mes);"
+    ) in sql
+    assert sql.index(
+        "DROP TABLE IF EXISTS contabilidad.apuntes_analiticos_restringidos_mes CASCADE;"
+    ) < sql.index("CREATE TABLE contabilidad.apuntes_analiticos_restringidos_mes AS")
+    assert "COMMENT ON TABLE contabilidad.apuntes_analiticos_restringidos_mes IS" in _sql(
+        RECUENTO_ANA
+    )
+
+
+@pytest.mark.parametrize("nombre", [SALDOS_ANA_GEN, RECUENTO_ANA])
+def test_f127_r16_r17_las_generales_solo_leen_el_completo(nombre: str) -> None:
+    leidas = set(re.findall(r"(?:FROM|JOIN)\s+(\w+\.\w+)", _sql(nombre)))
+    assert leidas == {f"{RESTR}.mayor_analitico"}, f"{nombre} lee {leidas}"
