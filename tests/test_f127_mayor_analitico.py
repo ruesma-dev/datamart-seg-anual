@@ -933,3 +933,67 @@ def test_f127_r18_el_docstring_cita_los_trece() -> None:
     cabecera = _crudo("00_setup.sql")
     for fichero in FICHEROS_F127:
         assert fichero in cabecera, f"la cabecera de 00_setup.sql no cita {fichero}"
+
+
+# ===========================================================================
+# R19 · ningún objeto del mayor analítico para el perfil restringido ni el de
+# postventa (D3: por el veto de esquema de F-146, no por la lista de excluidos)
+# ===========================================================================
+
+
+def _lista(texto: str) -> list[str]:
+    return [e.strip() for e in texto.split(",") if e.strip()]
+
+
+@pytest.mark.parametrize("perfil", ["DEFAULT_PERFIL_RESTRINGIDO_SCHEMAS",
+                                    "DEFAULT_PERFIL_POSTVENTA_SCHEMAS"])
+def test_f127_r19_ni_contabilidad_ni_la_restringida_en_los_perfiles(perfil: str) -> None:
+    import config.settings as ajustes
+
+    esquemas = _lista(getattr(ajustes, perfil))
+    assert esquemas, f"{perfil} vacía: el test no vería nada"
+    assert "contabilidad" not in esquemas and RESTR not in esquemas, (
+        f"{perfil} lee {sorted({'contabilidad', RESTR} & set(esquemas))}"
+    )
+
+
+def test_f127_r19_la_lista_de_excluidos_sigue_vacia() -> None:
+    """D3: añadir el mayor analítico aquí haría FALLAR la nocturna (R7 de F-141
+    rechaza excluir un objeto de un esquema que el perfil no ve)."""
+    from pathlib import Path
+
+    import config.settings as ajustes
+
+    assert ajustes.DEFAULT_PERFIL_RESTRINGIDO_EXCLUDED_TABLES == ""
+    fuente = Path(ajustes.__file__).read_text(encoding="utf-8")
+    assert re.search(
+        r"perfil_restringido_excluded_tables: str = Field\(\s+"
+        r"DEFAULT_PERFIL_RESTRINGIDO_EXCLUDED_TABLES,",
+        fuente,
+    ), "el campo toma su valor por defecto de la constante vacía"
+
+
+def test_f127_r19_el_completo_vive_en_un_esquema_vetado_y_restringido() -> None:
+    from config.settings import (
+        DEFAULT_CONSUMPTION_SCHEMAS,
+        DEFAULT_RESTRICTED_SCHEMAS,
+        DEFAULT_VETOED_SCHEMAS,
+    )
+
+    assert RESTR in _lista(DEFAULT_VETOED_SCHEMAS)
+    assert RESTR in _lista(DEFAULT_RESTRICTED_SCHEMAS)
+    assert RESTR not in _lista(DEFAULT_CONSUMPTION_SCHEMAS)
+    assert "contabilidad" in _lista(DEFAULT_CONSUMPTION_SCHEMAS), "el estándar lee el general"
+
+
+def test_f127_r19_el_comentario_del_perfil_dice_donde_nacio_f127() -> None:
+    from pathlib import Path
+
+    import config.settings as ajustes
+
+    fuente = Path(ajustes.__file__).read_text(encoding="utf-8")
+    bloque = fuente.split("DEFAULT_PERFIL_RESTRINGIDO_GROUP =", 1)[0].rsplit(
+        "# El perfil RESTRINGIDO del MCP", 1
+    )[1]
+    assert "F-127 nació en `contabilidad`" in bloque, "D3: el comentario dice dónde nació"
+    assert "si nace ahí" not in bloque, "ya no es una hipótesis"
