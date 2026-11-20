@@ -835,3 +835,101 @@ def test_f127_r17_ni_debe_ni_haber_ni_importe() -> None:
 def test_f127_r16_r17_las_generales_solo_leen_el_completo(nombre: str) -> None:
     leidas = set(re.findall(r"(?:FROM|JOIN)\s+(\w+\.\w+)", _sql(nombre)))
     assert leidas == {f"{RESTR}.mayor_analitico"}, f"{nombre} lee {leidas}"
+
+
+# ===========================================================================
+# R18 · los cinco sub-pasos, detrás de los ocho de F-056/F-135
+# ===========================================================================
+
+#: Los ocho de hoy, escritos A MANO: F-127 no cambia ninguno.
+OCHO_DE_ANTES = [
+    ("setup", "00_setup.sql", None, None),
+    ("plan_cuentas", "01_plan_cuentas.sql", RESTR, "plan_cuentas"),
+    ("mayor", "02_mayor.sql", RESTR, "mayor"),
+    ("saldos_cuenta_mes", "03_saldos_cuenta_mes.sql", RESTR, "saldos_cuenta_mes"),
+    ("plan_cuentas_general", "04_plan_cuentas_general.sql", "contabilidad", "plan_cuentas"),
+    ("mayor_general", "05_mayor_general.sql", "contabilidad", "mayor"),
+    ("saldos_general", "06_saldos_general.sql", "contabilidad", "saldos_cuenta_mes"),
+    ("apuntes_restringidos_mes", "07_apuntes_restringidos_mes.sql", "contabilidad",
+     "apuntes_restringidos_mes"),
+]
+CINCO_DE_F127 = [
+    ("mayor_analitico", MAYOR_ANA, RESTR, "mayor_analitico"),
+    ("saldos_analitica", SALDOS_ANA, RESTR, "saldos_cuenta_analitica_mes"),
+    ("mayor_analitico_general", MAYOR_ANA_GEN, "contabilidad", "mayor_analitico"),
+    ("saldos_analitica_general", SALDOS_ANA_GEN, "contabilidad", "saldos_cuenta_analitica_mes"),
+    ("apuntes_analiticos_restringidos_mes", RECUENTO_ANA, "contabilidad",
+     "apuntes_analiticos_restringidos_mes"),
+]
+
+
+def _declarados() -> list[tuple[str, str, str | None, str | None]]:
+    from etl_sigrid.application.steps import build_contabilidad_step
+
+    return [
+        (s.name, s.sql_file, s.target_schema, s.target_table)
+        for s in build_contabilidad_step.SUB_PASOS
+    ]
+
+
+def test_f127_r18_los_ocho_de_antes_no_cambian() -> None:
+    assert _declarados()[:8] == OCHO_DE_ANTES
+
+
+def test_f127_r18_los_cinco_nuevos_al_final_y_en_orden() -> None:
+    assert _declarados()[8:] == CINCO_DE_F127
+    for _, fichero, _, _ in _declarados():
+        assert (DIR_CON / fichero).exists(), f"{fichero} declarado y no existe"
+    assert sorted(f.name for f in DIR_CON.glob("*.sql")) == [d[1] for d in _declarados()], (
+        "los trece ficheros del directorio son los trece sub-pasos"
+    )
+
+
+def test_f127_r18_depends_on_no_cambia() -> None:
+    from types import SimpleNamespace
+
+    from etl_sigrid.application.steps.build_contabilidad_step import BuildContabilidadStep
+
+    paso = BuildContabilidadStep(SimpleNamespace())
+    assert paso.depends_on == ["ingest_raw"]
+    assert (paso.name, paso.stage) == ("build_contabilidad", "build_aux")
+
+
+def test_f127_r18_el_paso_ejecuta_los_trece_y_cuenta(monkeypatch: pytest.MonkeyPatch) -> None:
+    from types import SimpleNamespace
+
+    from etl_sigrid.application.steps import build_contabilidad_step
+    from etl_sigrid.domain.entities import StepStatus
+
+    class _PgFalso:
+        def __init__(self) -> None:
+            self.ejecutados: list[str] = []
+            self.contados: list[tuple[str, str]] = []
+
+        def execute_sql_file(self, path) -> None:
+            self.ejecutados.append(path.name)
+
+        def count_rows(self, schema: str, table: str) -> int:
+            self.contados.append((schema, table))
+            return 1
+
+    pg = _PgFalso()
+    monkeypatch.setattr(build_contabilidad_step, "build_postgres_client", lambda _s: pg)
+    resultado = build_contabilidad_step.BuildContabilidadStep(SimpleNamespace()).run()
+
+    assert resultado.status == StepStatus.SUCCESS
+    assert pg.ejecutados == [d[1] for d in OCHO_DE_ANTES + CINCO_DE_F127]
+    assert pg.contados[-5:] == [(d[2], d[3]) for d in CINCO_DE_F127]
+    assert resultado.rows_processed == 12
+
+
+def test_f127_r18_el_docstring_cita_los_trece() -> None:
+    from etl_sigrid.application.steps import build_contabilidad_step
+
+    doc = build_contabilidad_step.__doc__ or ""
+    for _, fichero, _, _ in OCHO_DE_ANTES + CINCO_DE_F127:
+        assert fichero in doc, f"el docstring no cita {fichero}"
+    assert "F-127" in doc
+    cabecera = _crudo("00_setup.sql")
+    for fichero in FICHEROS_F127:
+        assert fichero in cabecera, f"la cabecera de 00_setup.sql no cita {fichero}"
