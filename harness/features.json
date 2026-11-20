@@ -823,12 +823,12 @@
         "Probado de punta a punta: «¿cómo iba la valorada de junio de la obra X?» y «¿cuál es el incurrido de la obra X?» se responden bien por el MCP sin explicar nada en el prompt",
         "El dueño del contenido (Negocio) está nombrado y sabe cómo añadir un término"
       ],
-      "status": "pending",
+      "status": "todo",
       "sdd": true,
       "rigor": "documental",
       "priority": 14,
       "branch": "feature/F-054-conocimiento-de-negocio",
-      "notes": "2026-10-27: prioridad 4 -> 5 por orden del humano (tras F-150 van F-040 y F-104). 2026-11-11: llega la primera definición de Negocio, «incurrido / coste incurrido», de Juan Romero, más el término derivado «almacén». Fuente literal en `docs/referencia/07_glosario_incurrido.md`. Antes de publicarla, contrastar cada trampa con lo que calcula el datamart. 2026-11-11: el humano confirma el sinónimo: «a la planificación temporal la llamamos también VALORADA». 2026-11-20: llegan los términos 1 a 12 de Control de Costes (Juan Romero, «RV: expresiones ruemsa» del 2026-11-16 y del 2026-11-17): ABC, Planificación inicial, Master y versión vigente (versión editada del 17-11: el v1 es la referencia de indirectos y proporcionales), Cierre mensual, Fase 0, Objetivo, Oficina técnica, Comparativo, Liquidatoria, Costes proporcionales y «generales», Costes indirectos y Retención de garantía. Fuente literal en `docs/referencia/08_glosario_control_costes.md` (con `07_glosario_incurrido.md`, el 13). Quedan 18 términos pendientes de revisión por Negocio (14 a 31, incluidos los nuevos centro de coste, unidad de compra, partida/subcapítulo/capítulo y colchón o bolsa del jefe de obra). El criterio del término 3 ya es F-165; varias trampas tocan cálculos publicados (ej.: «el saldo vivo a proveedores que manda es el de contabilidad», «la retención del albarán y la de su factura no se suman», «el master v1 es la referencia de los proporcionales») y hay que contrastarlas antes de publicar."
+      "notes": "2026-10-27: prioridad 4 -> 5 por orden del humano (tras F-150 van F-040 y F-104). 2026-11-11: llega la primera definición de Negocio, «incurrido / coste incurrido», de Juan Romero, más el término derivado «almacén». Fuente literal en `docs/referencia/07_glosario_incurrido.md`. Antes de publicarla, contrastar cada trampa con lo que calcula el datamart. 2026-11-11: el humano confirma el sinónimo: «a la planificación temporal la llamamos también VALORADA». 2026-11-20: llegan los términos 1 a 12 de Control de Costes (Juan Romero, «RV: expresiones ruemsa» del 2026-11-16 y del 2026-11-17): ABC, Planificación inicial, Master y versión vigente (versión editada del 17-11: el v1 es la referencia de indirectos y proporcionales), Cierre mensual, Fase 0, Objetivo, Oficina técnica, Comparativo, Liquidatoria, Costes proporcionales y «generales», Costes indirectos y Retención de garantía. Fuente literal en `docs/referencia/08_glosario_control_costes.md` (con `07_glosario_incurrido.md`, el 13). Quedan 18 términos pendientes de revisión por Negocio (14 a 31, incluidos los nuevos centro de coste, unidad de compra, partida/subcapítulo/capítulo y colchón o bolsa del jefe de obra). El criterio del término 3 ya es F-165; varias trampas tocan cálculos publicados (ej.: «el saldo vivo a proveedores que manda es el de contabilidad», «la retención del albarán y la de su factura no se suman», «el master v1 es la referencia de los proporcionales») y hay que contrastarlas antes de publicar. 2026-11-20: COMPROMETIDA por el humano («y todas estas llévalas a todo», tras el alta de los correos de Juan Romero)."
     },
     {
       "id": "F-055",
@@ -2697,11 +2697,11 @@
         "Las personas de la obra (+DATOS) publicadas con la decisión del humano sobre su perfil (restringido o no) y sin datos personales en esquemas no autorizados",
         "Ficha del diccionario para cada columna nueva y `azure-apps/datamart_seg_anual.md` al día"
       ],
-      "status": "pending",
+      "status": "todo",
       "sdd": true,
       "priority": 5,
       "branch": "feature/F-166-ficha-obra-completa",
-      "notes": "2026-11-20: alta del líder a petición del humano («lee los últimos 2 correos de Juan para añadir a backlog»). 2026-11-20: el humano le da prioridad 5 («ponle 5»): F-099, F-076, F-119 y F-127 bajan un puesto. Relacionadas: F-099 (contratos de obra, del correo hermano del mismo día) y F-162 (fichas de obra por empresa)."
+      "notes": "2026-11-20: alta del líder a petición del humano («lee los últimos 2 correos de Juan para añadir a backlog»). 2026-11-20: el humano le da prioridad 5 («ponle 5»): F-099, F-076, F-119 y F-127 bajan un puesto. Relacionadas: F-099 (contratos de obra, del correo hermano del mismo día) y F-162 (fichas de obra por empresa). 2026-11-20: COMPROMETIDA por el humano («y todas estas llévalas a todo», tras el alta de los correos de Juan Romero)."
     }
   ]
 }
