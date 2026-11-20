@@ -1184,7 +1184,7 @@
       "status": "todo",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 6,
+      "priority": 7,
       "branch": "feature/F-076-ambitos-certificacion",
       "notes": "2026-11-16: COMPROMETIDA por el humano («vamos con las 5 que quedan de ventas, ponlas en las primeras prioridades»): prioridad 33 -> 4; el resto del backlog baja 5 puestos. 2026-11-20: Juan Romero la pide otra vez (correo del 2026-11-19, punto 11, ejemplo obra 0721): las LÍNEAS de la certificación por partida, con medición y precio a origen, anterior y del periodo; hoy solo salen totales. El ámbito 5 `VEN` ya está en `stg.presupuesto` por partida; `cerpro.paride` apenas se rellena (5 de 6.362 líneas, F-040), así que la vía es el ámbito y no `cerpro`."
     },
@@ -1591,7 +1591,7 @@
       "status": "todo",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 5,
+      "priority": 6,
       "branch": "feature/F-099-expedientes-obra",
       "notes": "2026-10-27: la parte de coeficientes por partida pasa a F-150 si el humano confirma su rediseño. 2026-11-16: COMPROMETIDA por el humano («vamos con las 5 que quedan de ventas, ponlas en las primeras prioridades»): prioridad 29 -> 3; el resto del backlog baja 5 puestos. 2026-11-20: Juan Romero AMPLÍA la petición (correo «Datamart: lo que falta de ventas, certificaciones y contratos de venta», 2026-11-19, ejemplo obra 0721). Por cada contrato de obra: (1) importes: adjudicado sin IVA, IVA, con IVA, ejecución material y adjudicado con coeficientes; (2) HISTÓRICO de situaciones e importes con fecha (qué coeficientes o importe tenía en cada momento); (3) datos generales: tipo («01 · Obras»), clase (abierto, cerrado o mixto), situación, persona de contacto, departamento y referencia del cliente; (4) el CÓDIGO del cliente de Sigrid (ej. 1673): hoy solo hay el id interno y el nombre; (5) adjudicación: «diferir IVA al generar certificaciones», interés de mora, fórmula de revisión, días de pago, plazo de entrega del medio de pago, anualidades, financiación del promotor, garantías para el promotor y para la empresa, seguros y observaciones; (6) condiciones: premio, anticipo, penalización, revisión y % de control de calidad y de tasas; (7) pestaña Coeficientes: % de costes indirectos y el CÓDIGO del tipo de retención (RET5, RETESP…), hoy solo nombre y porcentaje; (8) resto de pestañas: Fechas y plazos completa, Anualidades, Expedientes, Gestiones, Prórrogas y Comentario. RELACIÓN PRESUPUESTO-CONTRATO: (9) el contrato de cada partida y capítulo (columna «Cto.» del seguimiento) en `stg.partidas`, para TODAS las obras y ámbitos: hoy solo está en `tesoreria.devengo_pendiente_partida` (21 obras, solo partidas de venta con plan en la última versión master; la 0721 no está); (10) el desglose de la venta por contrato. OJO: la persona de contacto es dato personal (perfil y esquema restringido, como `ventas_restringida`), y la ingesta de `obrctr` hoy excluye `obs` y `tex`."
     },
@@ -1858,7 +1858,7 @@
       "status": "todo",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 7,
+      "priority": 8,
       "branch": "feature/F-119-cartera-de-obra",
       "notes": "2026-11-16: COMPROMETIDA por el humano («vamos con las 5 que quedan de ventas, ponlas en las primeras prioridades»): prioridad 40 -> 5; el resto del backlog baja 5 puestos."
     },
@@ -1996,7 +1996,7 @@
       "status": "todo",
       "sdd": true,
       "rigor": "critico",
-      "priority": 8,
+      "priority": 9,
       "branch": "feature/F-127-mayor-analitico",
       "notes": "2026-11-17: el humano la compromete («añade en todo el mayor analítico»): pasa de pending a todo, prioridad 8, detrás de la última comprometida (F-119); las pending de la 8 a la 16 bajan un puesto."
     },
@@ -2699,9 +2699,9 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 9,
+      "priority": 5,
       "branch": "feature/F-166-ficha-obra-completa",
-      "notes": "2026-11-20: alta del líder a petición del humano («lee los últimos 2 correos de Juan para añadir a backlog»). Prioridad 9 provisional (libre detrás de F-127): la fija el humano. Relacionadas: F-099 (contratos de obra, del correo hermano del mismo día) y F-162 (fichas de obra por empresa)."
+      "notes": "2026-11-20: alta del líder a petición del humano («lee los últimos 2 correos de Juan para añadir a backlog»). 2026-11-20: el humano le da prioridad 5 («ponle 5»): F-099, F-076, F-119 y F-127 bajan un puesto. Relacionadas: F-099 (contratos de obra, del correo hermano del mismo día) y F-162 (fichas de obra por empresa)."
     }
   ]
 }
