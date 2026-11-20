@@ -129,6 +129,27 @@ restringida o si general más restringidos no suman el completo. Regla dura
 `R-PERFILES`: el mayor completo se lee solo de
 `contabilidad_restringida` y los dos esquemas nunca se suman.
 
+**Desde F-127 (2026-11-20) también el mayor ANALÍTICO**, con el mismo patrón de
+dos esquemas y cinco sub-pasos más al final de `build_contabilidad` (08-12, sin
+tocar los ocho de antes). `contabilidad_restringida.mayor_analitico` es una fila
+por fila de `raw.apa` (722.631), con la cuenta ANALÍTICA, la obra solo por el
+centro, la obra imputada de cada asiento `ANALITICO` (`con.tip = 32`, la
+imputación de los partes) y la marca de lo restringido; su guarda compara el
+recuento con `raw.apa`. Criterio de restringido (R23 de F-135, oráculo en
+`domain/restriccion_personal.py`): la fila cuyo apunte financiero es restringido
+en el mayor completo, la de un asiento de personal y la de una cuenta de
+CONTRAPARTIDA del trabajador (`raw.res.caaconide`, más las CP antiguas de su
+centro con abono analítico: D7-b); falla cerrado con el apunte que no resuelve.
+181.712 filas restringidas (25,1 %). `contabilidad_restringida.saldos_cuenta_analitica_mes`
+agrega por cuenta, centro, empresa y mes. La general, `contabilidad.mayor_analitico`
+(solo lo visible, con su guarda: 0 CP, 0 apuntes restringidos y cuadre de
+recuentos), `contabilidad.saldos_cuenta_analitica_mes` (con `incompleto`) y
+`contabilidad.apuntes_analiticos_restringidos_mes` (solo recuentos por motivo).
+Al contrario que el mayor financiero, la analítica no tiene cierres ni aperturas:
+su saldo SÍ es `debe - haber`, y nunca se suma con el mayor financiero (es su
+reparto por centro). Los lee el MCP estándar (la general) y el total (las dos);
+el perfil restringido y el de postventa, ninguna (veto de esquema de F-146).
+
 **`tesoreria` (F-037, fase 1, 2026-10-13) es la cartera de cobros y pagos**:
 una fila por EFECTO de `raw.pag` (PAGO) y `raw.cob` (COBRO), tal cual, con su
 estado PREVISTO/REALIZADO/BAJA (precedencia de F-094, igual en los dos
@@ -1074,12 +1095,14 @@ fallo con cualquier tolerancia.
   La guarda solo ve vistas y nombres: una TABLA nueva con datos del mayor o de
   la cartera en un esquema del perfil la vería; la regla `R-PERFILES`
   del diccionario y este aviso son la mitigación.
-- **El mayor analítico y F-127.** Hoy no está publicado (es `raw.apa`, 709.403
-  filas). Si F-127 lo publica en `contabilidad`, el perfil restringido no lo ve
-  (F-146: esquema vetado entero). Si lo publica en un esquema del perfil, su spec
-  TIENE que añadirlo a `PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES` si su nombre no
-  lleva «mayor»: con «mayor» en el nombre y sin excluir, la nocturna se lo
-  revoca al perfil restringido y falla, pero con otro nombre nadie lo vería.
+- **El mayor analítico y F-127.** Publicado desde F-127 (2026-11-20) en
+  `contabilidad_restringida` (completo, solo el perfil total y el grupo
+  autorizado) y en `contabilidad` (general, el estándar): dos esquemas que el
+  perfil restringido y el de postventa no leen (F-146: veto de esquema entero),
+  así que NO va a `PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES`, que sigue vacía (la
+  guarda de excluidos rechazaría un objeto de un esquema que no se le concede y
+  la nocturna fallaría: D3 de su spec). Una tabla nueva con datos del mayor
+  analítico en un esquema del perfil sí tendría que excluirse ahí.
 - **Lo que NO es de este repositorio** (F-135, F-136): que el MCP conecte con
   el login total según quién pregunta (por oid, fuera de todo repositorio) y que
   su lista blanca admita `contabilidad_restringida`, `tesoreria_restringida` y

@@ -773,10 +773,13 @@ tables:
     where: null
     exclude_columns:
       - tex
-    # Desglose analitico del apunte (709.403 filas, 20 columnas): `cenide` en
-    # el 99,98 %, `apuide` en el 88 %, `obride` en 0. Candidata a fuente de la
-    # cuenta de resultados por obra de F-058. No es el puente obra<->centro de
-    # coste que F-045 busca: `obride` esta a cero en todas.
+    # Desglose analitico del apunte (722.631 filas el 2026-11-20, 20 columnas):
+    # `cenide` en el 99,98 %, `apuide` en el 88 %, `obride` en 0. 83.597 filas
+    # son de asientos ANALITICOS (`con.tip = 32`, la imputacion de los partes).
+    # Lo publica F-127 en `build_contabilidad`: el mayor analitico completo
+    # (`contabilidad_restringida.mayor_analitico`) y el general sin las cuentas
+    # de contrapartida de los trabajadores (`contabilidad.mayor_analitico`). No
+    # es el puente obra<->centro de coste que F-045 busca: `obride` esta a cero.
 
   - source_table: rac
     target_table: rac
