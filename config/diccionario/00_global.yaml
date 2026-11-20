@@ -1218,7 +1218,8 @@ reglas:
       `sigrid_dm_autorizado_ro`) lee ademas los `*_restringida`; el ESTANDAR,
       el consumo salvo `raw` y `*_restringida`; el RESTRINGIDO
       (administrativos), lo del estandar MENOS el esquema `contabilidad` entero
-      (`contabilidad.mayor`, `contabilidad.saldos_cuenta_mes`), `tesoreria` y
+      (`contabilidad.mayor`, `contabilidad.saldos_cuenta_mes`, el mayor
+      analitico), `tesoreria` y
       `personal`, y tampoco `ventas`. SI lee `retenciones` y `compras`.
       «restringida» = reservada al perfil total: los `*_restringida` son del
       perfil TOTAL y NO del perfil restringido. CP:
@@ -1228,8 +1229,7 @@ reglas:
       `compras.vencimientos`; responde que el perfil no lo incluye.
     motivo: >-
       Humano: F-135, F-037, F-138, F-141, F-146 (2026-10-21), F-156, F-040
-      (D2/D6). Se sirve entera: el MCP no filtra el diccionario por perfil. Lo
-      que falta, en cada ficha.
+      (D2/D6), F-127. Se sirve entera: el MCP no filtra el diccionario por perfil.
 
   - codigo: R-TESORERIA-ESTADO
     titulo: En la cartera de cobros y pagos BAJA no se suma, y fecha real vacia no es pendiente
