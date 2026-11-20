@@ -760,6 +760,11 @@ def test_f135_r23_la_ficha_de_f127_hereda_el_criterio_de_apa() -> None:
         "la ficha de F-127 no dice con qué rol (R23)"
     )
     assert "100.502 de las 716.007" in texto, "la cifra medida (R23)"
-    # F-135 no arranca F-127. El humano la comprometió (`todo`) el 2026-11-17:
-    # lo que el test protege es que nadie la dé por empezada desde F-135.
-    assert f127["status"] in ("pending", "todo"), "F-135 no cambia el estado de F-127"
+    # F-135 no arranca F-127. El humano la comprometió (`todo`) el 2026-11-17 y
+    # aprobó su spec el 2026-11-20: desde entonces avanza por su propio flujo SDD.
+    # Lo que el test protege es que su estado sea uno válido del flujo, no uno
+    # que le haya puesto F-135.
+    assert f127["status"] in (
+        "pending", "todo", "spec_ready", "in_progress", "in_review",
+        "human_review", "blocked", "done",
+    ), "F-127 con un estado fuera del flujo SDD"
