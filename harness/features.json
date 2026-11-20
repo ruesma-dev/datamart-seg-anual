@@ -1998,7 +1998,7 @@
       "rigor": "critico",
       "priority": 9,
       "branch": "feature/F-127-mayor-analitico",
-      "notes": "2026-11-17: el humano la compromete («añade en todo el mayor analítico»): pasa de pending a todo, prioridad 8, detrás de la última comprometida (F-119); las pending de la 8 a la 16 bajan un puesto."
+      "notes": "2026-11-17: el humano la compromete («añade en todo el mayor analítico»): pasa de pending a todo, prioridad 8, detrás de la última comprometida (F-119); las pending de la 8 a la 16 bajan un puesto. 2026-11-20: spec aprobada por el humano («ok») con todas las opciones recomendadas (D1-D8); D5 se da de alta como F-167."
     },
     {
       "id": "F-128",
@@ -2702,6 +2702,22 @@
       "priority": 5,
       "branch": "feature/F-166-ficha-obra-completa",
       "notes": "2026-11-20: alta del líder a petición del humano («lee los últimos 2 correos de Juan para añadir a backlog»). 2026-11-20: el humano le da prioridad 5 («ponle 5»): F-099, F-076, F-119 y F-127 bajan un puesto. Relacionadas: F-099 (contratos de obra, del correo hermano del mismo día) y F-162 (fichas de obra por empresa). 2026-11-20: COMPROMETIDA por el humano («y todas estas llévalas a todo», tras el alta de los correos de Juan Romero)."
+    },
+    {
+      "id": "F-167",
+      "title": "Las descripciones de las cuentas analíticas de contrapartida (CP) llevan el nombre del trabajador y hoy las publica `maestro.cuentas_analiticas` a los perfiles estándar y restringido",
+      "description": "Hallada por el spec-author de F-127 el 2026-11-20 (`progress/spec_F-127.md` §4, decisión D5 de su spec, aprobada por el humano el 2026-11-20 como feature aparte). Medido en Azure (solo lectura): de las 853 cuentas CP de los recursos (`raw.res.caaconide`), 207 llevan en la descripción el nombre completo de su trabajador y 758 (~89 %) su primera palabra. `maestro.cuentas_analiticas` (F-107) publica esa descripción, y la leen el perfil estándar y el restringido: es una fuga de datos personales ANTERIOR a F-127, que F-127 no corrige para no cambiar F-107 dentro de su alcance. QUÉ HACER: decidir con el humano entre enmascarar la descripción de las CP en `maestro.cuentas_analiticas` (con la descripción completa solo en un esquema restringido, como `personal` o `contabilidad_restringida`), quitar las CP del catálogo general o sustituir la descripción por el código del recurso; revisar si otros objetos publicados repiten esa descripción (por ejemplo, `personal.recursos` o el mayor analítico general de F-127, que ya excluye las CP) y añadir una guarda que pare la carga si una descripción de CP llega a un esquema no autorizado. RIESGO: romper consumidores de `maestro.cuentas_analiticas` (Power BI, MCP, F-126) si cambian columnas.",
+      "acceptance": [
+        "Medido en Azure qué objetos publicados exponen la descripción de una cuenta CP a los perfiles estándar, restringido o postventa",
+        "Ninguna descripción de cuenta CP con nombre de trabajador visible fuera de los esquemas autorizados, con la opción que decida el humano",
+        "Guarda en el SQL o test que lo impida en adelante, ficha del diccionario al día y `azure-apps/datamart_seg_anual.md` actualizado si cambia lo publicado"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "critico",
+      "priority": 86,
+      "branch": "feature/F-167-cp-sin-nombre-trabajador",
+      "notes": "2026-11-20: alta del líder con el OK del humano a D5 de F-127. Prioridad 86 provisional (la fija el humano): es una fuga de datos personales ya publicada, conviene subirla. Relacionadas: F-107 (catálogo de cuentas analíticas), F-127 (mayor analítico), F-135 y F-141 (perfiles)."
     }
   ]
 }
