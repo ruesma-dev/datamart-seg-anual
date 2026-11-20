@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **154 features**, 72 abiertas y 82 terminadas. Por columna: 0 en Review, 0 en Blocked, 0 en In progress, 1 en Spec aprobada, 8 en To do, 63 en Backlog y 82 en Done.
+Resumen: **155 features**, 73 abiertas y 82 terminadas. Por columna: 0 en Review, 0 en Blocked, 0 en In progress, 1 en Spec aprobada, 8 en To do, 64 en Backlog y 82 en Done.
 
 ## Review
 
@@ -103,6 +103,7 @@ _Ninguna feature en implementación._
 | F-116 | Un error de Postgres al escribir UNA version del descompuesto aborta la ingesta entera de esa noche | 82 | estandar | `feature/F-116-ingesta-descompuestos-error-por-version` |
 | F-117 | Cuatro obras no publican ni una fila en los ambitos master: 0578, 0585, 0670 y 0687 | 83 | estandar | `feature/F-117-obras-ciegas-en-master` |
 | F-143 | El TIPO DE CONTRATO DE COMPRA (`cocide` → `auxobrcoc`) en contratos, albaranes y facturas | 85 | estandar | `feature/F-143-tipo-contrato-compra` |
+| F-167 | Las descripciones de las cuentas analíticas de contrapartida (CP) llevan el nombre del trabajador y hoy las publica `maestro.cuentas_analiticas` a los perfiles estándar y restringido | 86 | critico | `feature/F-167-cp-sin-nombre-trabajador` |
 
 ## Done
 
@@ -624,6 +625,12 @@ RENUMERADA el 2026-09-29 al integrar main en la rama de F-052: se ficho como F-0
 estado **pendiente** · prioridad 85 · rigor `estandar` · SDD sí · rama `feature/F-143-tipo-contrato-compra`
 
 Nace el 2026-10-17 de la decisión D5 = A del humano en F-128: F-128 no ingiere catálogos nuevos y «el tipo de contrato de compra (cocide) pasa al backlog como feature aparte». QUÉ ES: `cocide` («Tipo de contrato de compra», índice a `auxobrcoc`, «Obras: Tipos de contratos compra») está en `ctr`, `dca`, `dcf` (y en `com`, `dco`, `dcp`, `defpli`, según `azure-apps/sigrid_tablas.md`). LO MEDIDO EL 2026-10-17 en `raw` (Azure, solo lectura): `ctr.cocide` informado en 14.453 de 19.137 contratos (75,5 %, 19 valores distintos); `dcf.cocide` en 15.726 facturas (9,4 %); `dca.cocide` en 37.157 albaranes (11,8 %); el catálogo tiene ~20 valores. La columna ya se ingiere en las tres tablas; el catálogo `auxobrcoc` NO se ingiere y ningún SQL del datamart usa `cocide` hoy. HAY QUE: ingerir `auxobrcoc` (catálogo pequeño, refresco completo) y publicar el tipo de contrato (id y nombre) AL FINAL de `compras.contratos` y, si la spec lo justifica, de `compras.albaranes` y `compras.facturas` (en F-128 están inventariados como CATALOGO_NO_INGERIDO). La spec decide si en el documento se publica o se hereda del contrato.
+
+### F-167 · Las descripciones de las cuentas analíticas de contrapartida (CP) llevan el nombre del trabajador y hoy las publica `maestro.cuentas_analiticas` a los perfiles estándar y restringido
+
+estado **pendiente** · prioridad 86 · rigor `critico` · SDD sí · rama `feature/F-167-cp-sin-nombre-trabajador`
+
+Hallada por el spec-author de F-127 el 2026-11-20 (`progress/spec_F-127.md` §4, decisión D5 de su spec, aprobada por el humano el 2026-11-20 como feature aparte). Medido en Azure (solo lectura): de las 853 cuentas CP de los recursos (`raw.res.caaconide`), 207 llevan en la descripción el nombre completo de su trabajador y 758 (~89 %) su primera palabra. `maestro.cuentas_analiticas` (F-107) publica esa descripción, y la leen el perfil estándar y el restringido: es una fuga de datos personales ANTERIOR a F-127, que F-127 no corrige para no cambiar F-107 dentro de su alcance. QUÉ HACER: decidir con el humano entre enmascarar la descripción de las CP en `maestro.cuentas_analiticas` (con la descripción completa solo en un esquema restringido, como `personal` o `contabilidad_restringida`), quitar las CP del catálogo general o sustituir la descripción por el código del recurso; revisar si otros objetos publicados repiten esa descripción (por ejemplo, `personal.recursos` o el mayor analítico general de F-127, que ya excluye las CP) y añadir una guarda que pare la carga si una descripción de CP llega a un esquema no autorizado. RIESGO: romper consumidores de `maestro.cuentas_analiticas` (Power BI, MCP, F-126) si cambian columnas.
 
 ### F-164 · Los partes firmados de postventa (con el DNI manuscrito del cliente) van siempre a la familia restringida, cuelguen de donde cuelguen en Sigrid
 
