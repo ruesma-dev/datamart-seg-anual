@@ -9,7 +9,11 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-11-20 · F-127 `in_progress` (implementer) · el mayor analítico
+## 2026-11-20 · F-127 `in_review` (implementer) · el mayor analítico
+
+- T1-T10 hechas (T10 en `azure-apps` 70a039a, sin push). Informe: `progress/impl_F-127.md`.
+- Pendiente: puerta completa `bash harness/init.sh` (líder, checkout con `.env`), reviewer, pasada de
+  campaña de mutación (T11) tras el APPROVED y los pasos MANUAL T12-T16 de abajo.
 
 - Worktree `.claude/worktrees/f127`, rama `feature/F-127-mayor-analitico`. Tarea en curso: ver `tasks.md`.
 - **Diccionario v81 (en la rama, SIN PUBLICAR): 331 objetos, 2912 columnas y 168 de consumo**
