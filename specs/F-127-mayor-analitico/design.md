@@ -167,13 +167,15 @@ o `todo`). Hay que arreglarlo en `dev` antes de lanzar el implementer, como el 2
 
 ## Decisiones
 
+Spec aprobada por el humano el 2026-11-20 («ok» al resumen de la spec), con todas las opciones recomendadas. D5 se da de alta como F-167 y las preguntas de D8 se envían a Juan Romero sin esperar respuesta.
+
 | Decisión | Opciones | Recomendado | Decidido |
 |---|---|---|---|
-| D1. Dónde se publica | (a) completo en `contabilidad_restringida` y general filtrado en `contabilidad` (R23 de F-135); (b) en `personal` (lo lee el estándar); (c) solo el completo | (a) | |
-| D2. Nombres | (a) `mayor_analitico`, `saldos_cuenta_analitica_mes`, `apuntes_analiticos_restringidos_mes`; (b) otros | (a) | |
-| D3. Perfil restringido (obligación de F-141) | (a) por el veto de esquema de F-146, fijado por test y comprobado con `has_table_privilege`; el acceptance «excluido en su lista» se lee así; (b) añadirlo a `PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES` (hace FALLAR la nocturna) | (a) | |
-| D4. La obra de un abono de CP | (a) `obra_imputada_id` / `clave_obra_imputada`: la única obra de cargo del asiento `ANALITICO` (37.202 de 38.612 filas CP); (b) sin columna, la ficha explica unir por `asiento_id` | (a) | |
-| D5. La descripción de 758 CP lleva el nombre del trabajador y ya la publica `maestro.cuentas_analiticas` (estándar y perfil restringido) | (a) ficha nueva aparte, priorizada por el humano; (b) enmascararla en F-127 (cambia F-107); (c) aceptarlo | (a) | |
-| D6. Regla dura | (a) sin regla nueva: frontera en las fichas y una línea en la `regla` de `R-PERFILES` y `R-SALDO-CONTABLE` (presupuesto de F-147); (b) regla `R-MAYOR-ANALITICO` | (a) | |
-| D7. Qué cuenta es CP (C3) | (a) solo `raw.res.caaconide` actual (853); (b) además las cuentas de un centro de CP con abono en un asiento `ANALITICO` (7 más, 324 filas): falla cerrado, «restringe DE MÁS» | (b) | |
-| D8. Preguntas a Juan (nómina desde abril, partes desde agosto, qué es «por repartir») | (a) enviarlas y publicar sin esperar: la ficha da las fechas medidas; (b) esperar respuesta | (a) | |
+| D1. Dónde se publica | (a) completo en `contabilidad_restringida` y general filtrado en `contabilidad` (R23 de F-135); (b) en `personal` (lo lee el estándar); (c) solo el completo | (a) || (a) · 2026-11-20, humano: «ok» |
+| D2. Nombres | (a) `mayor_analitico`, `saldos_cuenta_analitica_mes`, `apuntes_analiticos_restringidos_mes`; (b) otros | (a) || (a) · 2026-11-20, humano: «ok» |
+| D3. Perfil restringido (obligación de F-141) | (a) por el veto de esquema de F-146, fijado por test y comprobado con `has_table_privilege`; el acceptance «excluido en su lista» se lee así; (b) añadirlo a `PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES` (hace FALLAR la nocturna) | (a) || (a) · 2026-11-20, humano: «ok» |
+| D4. La obra de un abono de CP | (a) `obra_imputada_id` / `clave_obra_imputada`: la única obra de cargo del asiento `ANALITICO` (37.202 de 38.612 filas CP); (b) sin columna, la ficha explica unir por `asiento_id` | (a) || (a) · 2026-11-20, humano: «ok» |
+| D5. La descripción de 758 CP lleva el nombre del trabajador y ya la publica `maestro.cuentas_analiticas` (estándar y perfil restringido) | (a) ficha nueva aparte, priorizada por el humano; (b) enmascararla en F-127 (cambia F-107); (c) aceptarlo | (a) || (a (F-167)) · 2026-11-20, humano: «ok» |
+| D6. Regla dura | (a) sin regla nueva: frontera en las fichas y una línea en la `regla` de `R-PERFILES` y `R-SALDO-CONTABLE` (presupuesto de F-147); (b) regla `R-MAYOR-ANALITICO` | (a) || (a) · 2026-11-20, humano: «ok» |
+| D7. Qué cuenta es CP (C3) | (a) solo `raw.res.caaconide` actual (853); (b) además las cuentas de un centro de CP con abono en un asiento `ANALITICO` (7 más, 324 filas): falla cerrado, «restringe DE MÁS» | (b) || (b) · 2026-11-20, humano: «ok» |
+| D8. Preguntas a Juan (nómina desde abril, partes desde agosto, qué es «por repartir») | (a) enviarlas y publicar sin esperar: la ficha da las fechas medidas; (b) esperar respuesta | (a) || (a) · 2026-11-20, humano: «ok» |
