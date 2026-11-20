@@ -9,6 +9,14 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-20 · F-127 `in_progress` (implementer) · el mayor analítico
+
+- Worktree `.claude/worktrees/f127`, rama `feature/F-127-mayor-analitico`. Tarea en curso: ver `tasks.md`.
+- Desviaciones de la spec (justificadas en `progress/impl_F-127.md`):
+  - `test_f056_contabilidad.py` y `test_f135_sql.py` fijaban `SUB_PASOS` con EXACTAMENTE ocho ficheros;
+    T6 añade cinco al final, así que esos dos tests pasan a decir «los ocho de antes, y detrás los cinco
+    de F-127». No cambia ni un fichero ni una columna de F-056/F-135.
+
 ## 2026-11-20 · F-127 `spec_ready` (spec-author) · el mayor analítico
 
 - Spec en `specs/F-127-mayor-analitico/` (rama `feature/F-127-mayor-analitico`); mediciones en
