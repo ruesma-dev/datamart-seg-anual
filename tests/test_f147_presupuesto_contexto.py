@@ -39,6 +39,13 @@ from tests.test_f006_formato import _dicc, _ficha, _regla
 #: fórmula de R17. Solo baja (trinquete: R19 falla si sobra más de
 #: `HOLGURA_TRINQUETE`). Historia, de la más reciente a la más antigua:
 #:
+#: * 38.608 · 2026-11-20, F-127 (diccionario v81), SUBIDO con motivo: el
+#:   mayor analitico (D1-D8 del humano). Reglas 8.483 (+107: `R-PERFILES`, que
+#:   se sirve entera, dice que las cuentas de contrapartida de los trabajadores
+#:   solo estan en `contabilidad_restringida.mayor_analitico`), enrutado 20.026
+#:   (+587: cinco fichas recomendadas nuevas, dos preguntas cortas cada una;
+#:   sin ellas «saldo de la CP del recurso X en la obra Y» no llega a la tabla),
+#:   bloques 10.099 sin cambio.
 #: * 37.914 · 2026-11-19, F-104 (diccionario v80), SUBIDO con motivo: la
 #:   retencion de cliente saneada (+558). Reglas 8.376 sin cambio, enrutado 19.439
 #:   (seis fichas recomendadas nuevas, una pregunta corta cada una:
@@ -116,7 +123,7 @@ from tests.test_f006_formato import _dicc, _ficha, _regla
 #:   todas las preguntas): 78.057.
 #: * 29.787 · 2026-10-22, F-147 T5: PROVISIONAL, la medida de T2 sobre la v58
 #:   (sin resúmenes todavía: reglas 2.233, enrutado 13.886, bloques 13.668).
-PRESUPUESTO_MAX = 37_914
+PRESUPUESTO_MAX = 38_608
 
 
 def _medir(dicc) -> PresupuestoContexto:

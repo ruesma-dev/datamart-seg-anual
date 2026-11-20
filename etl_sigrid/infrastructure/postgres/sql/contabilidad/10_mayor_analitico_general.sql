@@ -90,10 +90,10 @@ BEGIN
         WHERE r.caaconide <> 0
     ),
     centros_cp AS (
-        SELECT DISTINCT ca.cenide AS centro_coste_id
-        FROM raw.caa ca
-        JOIN cp_recurso c ON c.cuenta_analitica_id = ca.ide
-        WHERE ca.cenide <> 0
+        SELECT DISTINCT caa.cenide AS centro_coste_id
+        FROM raw.caa caa
+        JOIN cp_recurso c ON c.cuenta_analitica_id = caa.ide
+        WHERE caa.cenide <> 0
     ),
     cp AS (
         SELECT c.cuenta_analitica_id
@@ -102,8 +102,8 @@ BEGIN
         SELECT a.cueide
         FROM raw.apa a
         JOIN raw.con asi ON asi.ide = a.conide
-        JOIN raw.caa ca ON ca.ide = a.cueide
-        JOIN centros_cp cc ON cc.centro_coste_id = ca.cenide
+        JOIN raw.caa caa ON caa.ide = a.cueide
+        JOIN centros_cp cc ON cc.centro_coste_id = caa.cenide
         WHERE asi.tip = 32 AND COALESCE(a.hab, 0) <> 0
     )
     SELECT count(*) INTO v_cp

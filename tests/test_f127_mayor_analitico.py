@@ -284,13 +284,13 @@ CP_RECURSO = (
     "SELECT DISTINCT r.caaconide AS cuenta_analitica_id FROM raw.res r WHERE r.caaconide <> 0"
 )
 CENTROS_CP = (
-    "SELECT DISTINCT ca.cenide AS centro_coste_id FROM raw.caa ca JOIN cp_recurso c "
-    "ON c.cuenta_analitica_id = ca.ide WHERE ca.cenide <> 0"
+    "SELECT DISTINCT caa.cenide AS centro_coste_id FROM raw.caa caa JOIN cp_recurso c "
+    "ON c.cuenta_analitica_id = caa.ide WHERE caa.cenide <> 0"
 )
 CP = (
     "SELECT c.cuenta_analitica_id FROM cp_recurso c UNION SELECT a.cueide FROM raw.apa a "
-    "JOIN raw.con asi ON asi.ide = a.conide JOIN raw.caa ca ON ca.ide = a.cueide "
-    "JOIN centros_cp cc ON cc.centro_coste_id = ca.cenide "
+    "JOIN raw.con asi ON asi.ide = a.conide JOIN raw.caa caa ON caa.ide = a.cueide "
+    "JOIN centros_cp cc ON cc.centro_coste_id = caa.cenide "
     f"WHERE asi.tip = {TIPO_CON_ASIENTO_ANALITICO} AND COALESCE(a.hab, 0) <> 0"
 )
 
@@ -997,3 +997,210 @@ def test_f127_r19_el_comentario_del_perfil_dice_donde_nacio_f127() -> None:
     )[1]
     assert "F-127 nació en `contabilidad`" in bloque, "D3: el comentario dice dónde nació"
     assert "si nace ahí" not in bloque, "ya no es una hipótesis"
+
+
+# ===========================================================================
+# R21-R23 · el diccionario
+# ===========================================================================
+
+DIR_DICC = DIR_CON.parents[4] / "config" / "diccionario"
+
+#: Las cinco fichas: (fichero, objeto, SQL, columnas, clave).
+FICHAS_F127 = [
+    ("contabilidad_restringida.yaml", "mayor_analitico", MAYOR_ANA, COLUMNAS_MAYOR_ANA,
+     ["apunte_analitico_id"]),
+    ("contabilidad_restringida.yaml", "saldos_cuenta_analitica_mes", SALDOS_ANA,
+     COLUMNAS_SALDOS_ANA, ["cuenta_analitica_id", "centro_coste_id", "empresa_id",
+                           "ejercicio", "mes"]),
+    ("contabilidad.yaml", "mayor_analitico", MAYOR_ANA_GEN, COLUMNAS_MAYOR_ANA_GEN,
+     ["apunte_analitico_id"]),
+    ("contabilidad.yaml", "saldos_cuenta_analitica_mes", SALDOS_ANA_GEN,
+     [*COLUMNAS_SALDOS_ANA, "num_apuntes_restringidos", "incompleto"],
+     ["cuenta_analitica_id", "centro_coste_id", "empresa_id", "ejercicio", "mes"]),
+    ("contabilidad.yaml", "apuntes_analiticos_restringidos_mes", RECUENTO_ANA,
+     ["empresa_id", "ejercicio", "mes", "num_apuntes", "num_asientos", "num_contrapartida",
+      "num_apunte_restringido", "num_asiento_personal", "num_apunte_sin_resolver"],
+     ["empresa_id", "ejercicio", "mes"]),
+]
+
+
+def _dicc(nombre: str) -> dict:
+    import yaml
+
+    return yaml.safe_load((DIR_DICC / nombre).read_text(encoding="utf-8"))
+
+
+def _ficha(fichero: str, objeto: str) -> dict:
+    return _dicc(fichero)["objetos"][objeto]
+
+
+def _texto_ficha(fichero: str, objeto: str) -> str:
+    import yaml
+
+    return yaml.safe_dump(_ficha(fichero, objeto), allow_unicode=True, width=10_000)
+
+
+@pytest.mark.parametrize(
+    ("fichero", "objeto", "sql", "columnas", "clave"), FICHAS_F127,
+    ids=[f"{f.split('.')[0]}.{o}" for f, o, *_ in FICHAS_F127],
+)
+def test_f127_r21_ficha_con_las_columnas_del_sql(
+    fichero: str, objeto: str, sql: str, columnas: list[str], clave: list[str]
+) -> None:
+    ficha = _ficha(fichero, objeto)
+    esquema = fichero.removesuffix(".yaml")
+    assert list(ficha["columnas"]) == columnas == _columnas(sql, f"{esquema}.{objeto}")
+    assert ficha["clave_negocio"] == clave
+    assert (ficha["tipo"], ficha["paso_etl"], ficha["refresco"]) == (
+        "tabla", "build_contabilidad", "nocturno",
+    )
+    assert ficha["consumo_recomendado"] is True and ficha["ejemplos_preguntas"]
+    for columna, datos in ficha["columnas"].items():
+        assert datos.get("significado"), f"{esquema}.{objeto}.{columna} sin significado"
+
+
+@pytest.mark.parametrize(
+    ("fichero", "objeto"), [(f, o) for f, o, *_ in FICHAS_F127],
+    ids=[f"{f.split('.')[0]}.{o}" for f, o, *_ in FICHAS_F127],
+)
+def test_f127_r21_cada_ficha_empieza_por_su_aviso_de_acceso(fichero: str, objeto: str) -> None:
+    descripcion = _ficha(fichero, objeto)["descripcion"]
+    if fichero == "contabilidad_restringida.yaml":
+        assert descripcion.startswith("**ACCESO RESTRINGIDO: solo el perfil total del MCP.**")
+        assert "sigrid_dm_autorizado_ro" in descripcion
+    else:
+        assert descripcion.startswith("**No disponible para el perfil restringido**")
+
+
+def _relaciones(fichero: str, objeto: str) -> set[tuple[str, str, str]]:
+    return {
+        (r["de"], r["a"], r["cardinalidad"]) for r in _ficha(fichero, objeto)["relaciones"]
+    }
+
+
+def test_f127_r21_relaciones_del_completo() -> None:
+    assert _relaciones("contabilidad_restringida.yaml", "mayor_analitico") >= {
+        ("cuenta_analitica_id", "maestro.cuentas_analiticas.cuenta_analitica_id", "N:1"),
+        ("centro_coste_id", "maestro.centros_coste.centro_coste_id", "N:1"),
+        ("obra_id", "maestro.obras.obra_id", "N:1"),
+        ("obra_imputada_id", "maestro.obras.obra_id", "N:1"),
+        ("apunte_id", f"{RESTR}.mayor.apunte_id", "N:1"),
+        ("cuenta_analitica_id", "personal.recursos.cuenta_analitica_contrapartida_id", "N:N"),
+    }
+    assert _relaciones("contabilidad_restringida.yaml", "saldos_cuenta_analitica_mes") >= {
+        ("cuenta_analitica_id", "maestro.cuentas_analiticas.cuenta_analitica_id", "N:1"),
+    }
+
+
+def test_f127_r21_relaciones_del_general() -> None:
+    relaciones = _relaciones("contabilidad.yaml", "mayor_analitico")
+    assert relaciones >= {
+        ("cuenta_analitica_id", "maestro.cuentas_analiticas.cuenta_analitica_id", "N:1"),
+        ("centro_coste_id", "maestro.centros_coste.centro_coste_id", "N:1"),
+        ("obra_id", "maestro.obras.obra_id", "N:1"),
+        ("apunte_id", "contabilidad.mayor.apunte_id", "N:1"),
+    }
+    assert not any(RESTR in a or "personal." in a for _, a, _ in relaciones), (
+        "el general no señala al completo ni a las CP de `personal`"
+    )
+
+
+def test_f127_r21_version_del_diccionario() -> None:
+    assert _dicc("00_global.yaml")["version"] == 81, "F-104 publicó la 80; F-127 sube a 81"
+
+
+def test_f127_r21_el_diccionario_del_arbol_valida() -> None:
+    from etl_sigrid.domain.diccionario import formatear_errores, validar
+    from tests.test_f006_frescura import PASOS_NOCTURNOS
+    from tests.test_f006_publicacion import DIR_DICCIONARIO, cargar_diccionario
+
+    dicc, _ = cargar_diccionario(DIR_DICCIONARIO)
+    errores = validar(dicc, PASOS_NOCTURNOS)
+    assert not errores, formatear_errores(errores)
+    nombres = {f.nombre for f in dicc.fichas}
+    for fichero, objeto, *_ in FICHAS_F127:
+        assert f"{fichero.removesuffix('.yaml')}.{objeto}" in nombres
+
+
+def test_f127_r22_las_fichas_dicen_las_cuatro_cosas() -> None:
+    completo = _texto_ficha("contabilidad_restringida.yaml", "mayor_analitico")
+    general = _texto_ficha("contabilidad.yaml", "mayor_analitico")
+    for texto in (completo, general):
+        assert "debe - haber" in texto and "0 de 639.034" in texto, "el saldo SÍ se suma"
+        assert "No se suma con `contabilidad" in texto, "el analítico no se suma con el mayor"
+        assert "marzo de 2026" in texto and "abril de 2026" in texto, "la nómina en las CP"
+        assert "agosto de 2026" in texto, "la imputación de partes"
+        assert "722.631" in texto and "181.712" in texto, "las cifras medidas"
+    assert "perfil restringido" in completo and "perfil restringido" in general
+
+
+def test_f127_r22_las_reglas_dicen_la_frontera() -> None:
+    reglas = {r["codigo"]: r for r in _dicc("00_global.yaml")["reglas"]}
+    assert "contabilidad_restringida.mayor_analitico" in reglas["R-PERFILES"]["regla"]
+    saldo = reglas["R-SALDO-CONTABLE"]
+    assert "mayor_analitico" in saldo["regla"] and "mayor_analitico" not in saldo["resumen"], (
+        "D6: una línea en la `regla`, no en el `resumen` que se sirve siempre"
+    )
+
+
+def test_f127_r22_raw_apa_dice_que_lo_publica_f127() -> None:
+    apa = _texto_ficha("raw.yaml", "apa")
+    assert "F-127" in apa and f"{RESTR}.mayor_analitico" in apa and "`con.tip = 32`" in apa
+
+
+def test_f127_r23_la_receta_de_la_cp_del_trabajador() -> None:
+    completo = _ficha("contabilidad_restringida.yaml", "mayor_analitico")["descripcion"]
+    for termino in (
+        "personal.recursos", "cuenta_analitica_contrapartida_id", "personal.partes_lineas",
+        "obra_imputada_id", "tipo_asiento = 'ANALITICO'", "compartid", "saldo_acumulado",
+    ):
+        assert termino in completo, f"la receta de R23 no dice «{termino}»"
+    preguntas = " ".join(_ficha("contabilidad_restringida.yaml", "mayor_analitico")[
+        "ejemplos_preguntas"
+    ])
+    assert "contrapartida" in preguntas.lower()
+
+
+@pytest.mark.parametrize(
+    ("fichero", "objeto"), [(f, o) for f, o, *_ in FICHAS_F127],
+    ids=[f"{f.split('.')[0]}.{o}" for f, o, *_ in FICHAS_F127],
+)
+def test_f127_r22_ningun_nombre_de_persona(fichero: str, objeto: str) -> None:
+    """Las fichas nuevas hablan de cuentas y recuentos, nunca de personas."""
+    texto = _texto_ficha(fichero, objeto)
+    assert "Juan" not in texto and "Romero" not in texto
+
+
+# ===========================================================================
+# R24 · la documentación
+# ===========================================================================
+
+RAIZ_REPO = DIR_CON.parents[4]
+
+
+def test_f127_r24_architecture_describe_los_objetos_y_quien_los_lee() -> None:
+    texto = (RAIZ_REPO / "docs" / "ARCHITECTURE.md").read_text(encoding="utf-8")
+    for termino in (
+        "Desde F-127", f"{RESTR}.mayor_analitico", f"{RESTR}.saldos_cuenta_analitica_mes",
+        "contabilidad.mayor_analitico", "contabilidad.saldos_cuenta_analitica_mes",
+        "contabilidad.apuntes_analiticos_restringidos_mes", "CONTRAPARTIDA", "D7-b",
+        "perfil restringido y el de postventa",
+    ):
+        assert termino in texto, f"ARCHITECTURE.md no dice «{termino}»"
+    assert "Hoy no está publicado (es `raw.apa`" not in texto, "ya no es verdad"
+
+
+def test_f127_r24_tables_sigrid_dice_que_lo_publica_f127() -> None:
+    texto = (RAIZ_REPO / "config" / "tables_sigrid.yaml").read_text(encoding="utf-8")
+    bloque = texto.split("source_table: apa", 1)[1].split("source_table:", 1)[0]
+    assert "F-127" in bloque and "contabilidad.mayor_analitico" in bloque
+
+
+def test_f127_r24_azure_apps_describe_los_objetos() -> None:
+    ruta = RAIZ_REPO.parent / "azure-apps" / "datamart_seg_anual.md"
+    if not ruta.exists():
+        pytest.skip("azure-apps no está junto a este repositorio")
+    texto = ruta.read_text(encoding="utf-8")
+    for termino in ("F-127", "contabilidad.mayor_analitico", f"{RESTR}.mayor_analitico",
+                    "apuntes_analiticos_restringidos_mes"):
+        assert termino in texto, f"azure-apps no dice «{termino}»"

@@ -12,10 +12,38 @@
 ## 2026-11-20 · F-127 `in_progress` (implementer) · el mayor analítico
 
 - Worktree `.claude/worktrees/f127`, rama `feature/F-127-mayor-analitico`. Tarea en curso: ver `tasks.md`.
+- **Diccionario v81 (en la rama, SIN PUBLICAR): 331 objetos, 2912 columnas y 168 de consumo**
+  (v80 + las cinco fichas de F-127). Se publica con su imagen (T16).
 - Desviaciones de la spec (justificadas en `progress/impl_F-127.md`):
   - `test_f056_contabilidad.py` y `test_f135_sql.py` fijaban `SUB_PASOS` con EXACTAMENTE ocho ficheros;
     T6 añade cinco al final, así que esos dos tests pasan a decir «los ocho de antes, y detrás los cinco
     de F-127». No cambia ni un fichero ni una columna de F-056/F-135.
+
+  - D7-b, tomada al pie de la letra (las 7 cuentas antiguas de los centros de CP con abono
+    `ANALITICO`, enteras), restringe 5.857 filas y no 324; frente a solo `caaconide` oculta 3.087 filas
+    más. Por eso T13 espera 181.712 restringidas y 540.919 generales, no ~178.301 / ~544.330.
+  - T14 de `tasks.md` no corre en PostgreSQL (FULL JOIN con `IS NOT DISTINCT FROM`): abajo, la versión que sí.
+
+### F-127 · pasos MANUAL (humano)
+
+Con la imagen nueva o desde un checkout con `.env` (Postgres de dev; contra Azure, el job):
+
+- **T12** · `python main.py build-contabilidad`, después `python main.py check-unicidad`,
+  `python main.py check-relaciones` y `python main.py check-diccionario`. Aviso esperado en
+  check-relaciones: cobertura parcial de `contabilidad_restringida.mayor_analitico.cuenta_analitica_id`
+  frente a `personal.recursos.cuenta_analitica_contrapartida_id` (solo las CP tienen recurso).
+- **T13** · `SELECT (SELECT count(*) FROM contabilidad_restringida.mayor_analitico), (SELECT count(*) FROM raw.apa), (SELECT count(*) FROM contabilidad.mayor_analitico), (SELECT count(*) FILTER (WHERE restringido) FROM contabilidad_restringida.mayor_analitico);`
+  → esperado (medido el 2026-11-20 en solo lectura): 722.631 / 722.631 / 540.919 / 181.712; y la duración
+  de `build_contabilidad` en `_meta.etl_runs` frente a 1.029-1.194 s.
+- **T14** · `SELECT count(*) FROM (SELECT COALESCE(cuenta_analitica_id, 0) c, sum(importe) i FROM contabilidad_restringida.mayor_analitico GROUP BY 1) m FULL JOIN (SELECT cuenta_analitica_id c, sum(importe) i FROM contabilidad_restringida.saldos_cuenta_analitica_mes GROUP BY 1) s ON s.c = m.c WHERE m.i IS DISTINCT FROM s.i;` → 0.
+- **T15** · `SELECT r, t, has_table_privilege(r, t, 'SELECT') FROM unnest(ARRAY['mcp_sigrid_dm_ro','sigrid_dm_perfil_restringido_ro','mcp_sigrid_dm_restringido','sigrid_dm_perfil_postventa_ro','mcp_sigrid_dm_postventa','sigrid_dm_autorizado_ro','mcp_sigrid_dm_total']) r, unnest(ARRAY['contabilidad_restringida.mayor_analitico','contabilidad_restringida.saldos_cuenta_analitica_mes','contabilidad.mayor_analitico','contabilidad.saldos_cuenta_analitica_mes','contabilidad.apuntes_analiticos_restringidos_mes']) t;`
+  → falso para los perfiles restringido y postventa en las cinco; `mcp_sigrid_dm_ro` verdadero solo en las
+  tres de `contabilidad`; `sigrid_dm_autorizado_ro` y `mcp_sigrid_dm_total` verdadero en las cinco.
+- **T16** · publicar el diccionario v81 CON LA IMAGEN DEL JOB, reiniciar `mcp-bbdd` y preguntar con el
+  perfil total «saldo y movimientos de la CP del recurso <código> en la obra <clave> y su cruce con sus
+  partes de 2025»; anotar si responde sin ayuda.
+- **Push** (humano): la rama `feature/F-127-mayor-analitico` y, en `azure-apps`, `git pull` y después
+  `git push` del commit `F-127: datamart_seg_anual.md ...`.
 
 ## 2026-11-20 · F-127 `spec_ready` (spec-author) · el mayor analítico
 

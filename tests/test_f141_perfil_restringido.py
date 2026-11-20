@@ -1526,7 +1526,10 @@ AVISO = "No disponible para el perfil restringido"
 #: los objetos de tabla o vista que el restringido no lee (R28); las funciones no cuentan
 NO_DISPONIBLES = {
     # F-146: el esquema entero (las cuatro tablas; `fn_fecha` es una función)
-    "contabilidad.yaml": ["plan_cuentas", "mayor", "saldos_cuenta_mes", "apuntes_restringidos_mes"],
+    "contabilidad.yaml": ["plan_cuentas", "mayor", "saldos_cuenta_mes", "apuntes_restringidos_mes",
+                          # F-127: el mayor analitico general, sus saldos y cuanto falta
+                          "mayor_analitico", "saldos_cuenta_analitica_mes",
+                          "apuntes_analiticos_restringidos_mes"],
     # F-140 anade al esquema sus ocho tablas y su vista (las tres funciones no cuentan)
     "tesoreria.yaml": ["efectos", "efectos_restringidos_mes", "plazos_forma_pago",
                        "condiciones_contrato_compra", "condiciones_contrato_cliente",

@@ -71,10 +71,10 @@ WITH cp_recurso AS (
 ),
 centros_cp AS (
     -- D7-b: los centros de coste de esas CP
-    SELECT DISTINCT ca.cenide AS centro_coste_id
-    FROM raw.caa ca
-    JOIN cp_recurso c ON c.cuenta_analitica_id = ca.ide
-    WHERE ca.cenide <> 0
+    SELECT DISTINCT caa.cenide AS centro_coste_id
+    FROM raw.caa caa
+    JOIN cp_recurso c ON c.cuenta_analitica_id = caa.ide
+    WHERE caa.cenide <> 0
 ),
 cp AS (
     -- C3 con D7-b: las CP actuales y las cuentas de esos centros con abono en
@@ -85,8 +85,8 @@ cp AS (
     SELECT a.cueide
     FROM raw.apa a
     JOIN raw.con asi ON asi.ide = a.conide
-    JOIN raw.caa ca ON ca.ide = a.cueide
-    JOIN centros_cp cc ON cc.centro_coste_id = ca.cenide
+    JOIN raw.caa caa ON caa.ide = a.cueide
+    JOIN centros_cp cc ON cc.centro_coste_id = caa.cenide
     WHERE asi.tip = 32 AND COALESCE(a.hab, 0) <> 0
 ),
 asientos_personal AS (

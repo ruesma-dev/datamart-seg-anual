@@ -21,6 +21,11 @@
 # F-141 (2026-10-17): «restringida» = reservada al perfil total. El perfil
 # restringido del MCP (administrativos, grupo `sigrid_dm_perfil_restringido_ro`)
 # ve MENOS que el estandar y NO la lee (`R-PERFILES`).
+#
+# F-127 (2026-11-20): EL MAYOR ANALITICO COMPLETO (`mayor_analitico`) y sus
+# saldos (`saldos_cuenta_analitica_mes`), con las cuentas de contrapartida de
+# los trabajadores. Lo construye `build_contabilidad` (08-09); el general sale
+# en `contabilidad` (10-12).
 
 version: 1
 esquema: contabilidad_restringida
@@ -519,3 +524,346 @@ objetos:
     ejemplos_preguntas:
       - Saldo de la subcuenta 434 de Ruesma mes a mes en 2026
       - Gastos del grupo 62 por empresa y mes
+
+  # F-127 (2026-11-20): EL MAYOR ANALITICO COMPLETO y sus saldos. Cifras del
+  # SELECT equivalente al build, en solo lectura sobre el `raw` de la nocturna
+  # del 2026-11-20 (`progress/impl_F-127.md`). Solo cuentas y recuentos.
+  mayor_analitico:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **ACCESO RESTRINGIDO: solo el perfil total del MCP.** Si no lo tienes, la
+      consulta devuelve «permission denied»: usa `contabilidad.mayor_analitico`
+      (`R-PERFILES`), sin reintentar ni buscar otro camino.
+
+      **SOLO PARA EL ROL AUTORIZADO** (`sigrid_dm_autorizado_ro`, F-127, del
+      que es miembro el perfil total del MCP): es el mayor analitico COMPLETO,
+      con las cuentas de contrapartida (CP) de los trabajadores, que llevan su
+      coste de nomina. El rol general lee `contabilidad.mayor_analitico`, que es
+      esta tabla con `restringido = false`; el perfil restringido y el de
+      postventa no leen ninguna de las dos. **No se suman los dos esquemas**: el
+      completo ya contiene al general.
+
+      **EL MAYOR ANALITICO** (F-127): una fila por fila de `raw.apa` (el
+      desglose analitico de Sigrid), SIN FILTRAR NINGUNA: 722.631 filas medidas
+      el 2026-11-20, de 2008 a 2026. Cada fila con su asiento, fecha, empresa,
+      centro de coste y obra, su cuenta ANALITICA (las de
+      `maestro.cuentas_analiticas`, no las del plan financiero), debe, haber e
+      `importe` = debe - haber. Dos clases de asiento (`tipo_asiento`):
+      CONTABLE (639.034 filas, cuelgan de un apunte financiero, `apunte_id`) y
+      ANALITICO (83.597 filas de 5.766 asientos `ANA...` de 2009-01 a 2026-07,
+      sin apunte financiero: imputan los partes de trabajo a las obras y abonan
+      la CP del trabajador).
+
+      **EL SALDO SI ES `debe - haber`**: la analitica no tiene cierres ni
+      aperturas (0 de 639.034 filas enlazadas cuelgan de un apunte que no sea
+      NORMAL), asi que `SUM(importe)` y `saldo_acumulado` son el saldo, al
+      contrario que en el mayor financiero (`R-SALDO-CONTABLE`). No es partida
+      doble: el debe y el haber de todo el mayor no cuadran entre si. **No se
+      suma con `contabilidad_restringida.mayor`** ni con `contabilidad.mayor`:
+      una fila analitica es el reparto por centro de un apunte financiero, y
+      sumar los dos cuenta el mismo gasto dos veces.
+
+      **QUE ES RESTRINGIDO** (criterio V2 de F-135, R23): la fila cuyo apunte
+      financiero es restringido en el mayor completo, la de un asiento de
+      personal, y la de una CP: la de algun recurso
+      (`personal.recursos.cuenta_analitica_contrapartida_id`) o una cuenta del
+      centro de una CP con abono en un asiento ANALITICO (CP de antes que el
+      recurso ya no declara: 7 cuentas, 5.857 filas). Se restringe DE MAS. Medido:
+      181.712 restringidas (el 25,1 %, 998 cuentas): 173.978 por CONTRAPARTIDA
+      y 7.734 por APUNTE_RESTRINGIDO.
+
+      **LAS CP EN 2026, OJO**: el asiento de nomina cargo las CP hasta marzo de
+      2026 (~0,9-1,1 M EUR al mes) y no carga nada desde abril de 2026; el
+      abono de los partes (asientos ANALITICO) iba a ~0,9-1,0 M EUR al mes hasta
+      enero de 2026, 31-44 mil EUR al mes de marzo a julio y nada desde agosto
+      de 2026, mientras los partes siguen a ~1,1 M EUR al mes. El saldo de una
+      CP en 2026 no significa lo mismo que en 2025 (aviso de Administracion y
+      Control de Costes; el sentido esta pendiente de confirmar).
+
+      **RECETA: SALDO Y MOVIMIENTOS DE LA CP DEL TRABAJADOR X EN LA OBRA Y, Y SU
+      CRUCE CON SUS PARTES.** (1) La CP es
+      `personal.recursos.cuenta_analitica_contrapartida_id` del recurso (por
+      `clave_recurso`). (2) Sus movimientos: las filas con `cuenta_analitica_id`
+      = esa CP, por `fecha`; el saldo a una fecha es el `saldo_acumulado` de la
+      ultima fila hasta ella. Los cargos (nomina, suministros) no llevan obra:
+      van al centro de la CP. (3) Lo imputado a la obra Y: los abonos de
+      `tipo_asiento = 'ANALITICO'` con `obra_imputada_id` = la obra (la obra
+      del asiento, no la del centro de la fila, que es el de la CP), sumando
+      `haber`. (4) El cruce: `SUM(importe)` de `personal.partes_lineas` con
+      `obra_id` = la obra y `recurso_id` de TODOS los recursos con esa CP: 430
+      de las 853 CP estan compartidas por hasta 8 recursos, asi que el cruce va
+      por CP, no por recurso. En 2025 cuadraron al euro 162 de 238 CP, y en
+      total 11.622.909 de abono frente a 12.016.833 de partes (96,7 %).
+    grano: >-
+      Una fila por fila de `raw.apa`, y `apunte_analitico_id` es clave
+      primaria: ninguna union multiplica (el build falla si el recuento no es
+      el de `raw.apa`). Varias filas por apunte financiero: es su reparto por
+      centro.
+    clave_negocio: [apunte_analitico_id]
+    paso_etl: build_contabilidad
+    refresco: nocturno
+    columnas:
+      apunte_analitico_id:
+        significado: Identificador de la fila analitica en Sigrid (`apa.ide`).
+        agregacion: no_sumable
+      asiento_id:
+        significado: >-
+          El asiento de la fila (`apa.conide`, un `con.ide`): el asiento contable
+          (el `asiento_id` del mayor) o el asiento ANALITICO.
+        agregacion: no_sumable
+      tipo_asiento:
+        significado: >-
+          CONTABLE si el asiento es contable (`con.tip = 20`: la fila cuelga de
+          un apunte financiero), ANALITICO si es un asiento analitico puro
+          (`con.tip = 32`, codigo `ANA...`: la imputacion de los partes), OTRO si
+          no (0 el 2026-11-20).
+        valores: [CONTABLE, ANALITICO, OTRO]
+      codigo_asiento:
+        significado: Numero del asiento (`con.cod`); los analiticos empiezan por `ANA`.
+      posicion:
+        significado: Posicion de la fila dentro de su asiento (`apa.pos`).
+        agregacion: no_sumable
+      fecha:
+        significado: Fecha de la fila (`apa.fec`); coincide con la de su apunte en 639.030 de 639.034.
+      ejercicio:
+        significado: Ano de `fecha`.
+        agregacion: no_sumable
+      mes:
+        significado: Mes de `fecha` (1-12).
+        agregacion: no_sumable
+      empresa_id:
+        significado: Empresa del ASIENTO (`con.emp`); la de la cuenta coincide en el 100 %.
+        agregacion: no_sumable
+      centro_coste_id:
+        significado: >-
+          Centro de coste de la fila (`apa.cenide`). En una CP es el centro de
+          la CP, no la obra: la obra de su abono es `obra_imputada_id`.
+        agregacion: no_sumable
+        nulo_significa: La fila no lleva centro (120 filas).
+      codigo_centro:
+        significado: Codigo del centro de coste, de `maestro.centros_coste`.
+        nulo_significa: La fila no lleva centro.
+      obra_id:
+        significado: >-
+          La obra del centro de coste de la fila, por `maestro.centros_coste`
+          (el `obra_id` de `maestro.obras`). Ningun otro campo de obra de la
+          fila se lee.
+        agregacion: no_sumable
+        nulo_significa: >-
+          La fila no lleva centro, o su centro no es una obra (estructura,
+          delegacion, el centro de las CP). No se reparte.
+      codigo_obra:
+        significado: Codigo de la obra, sin la empresa. Repetido entre empresas.
+        nulo_significa: La fila no tiene obra.
+      clave_obra:
+        significado: La clave legible de la obra, '<empresa>-<codigo>', la de `maestro.obras`.
+        nulo_significa: La fila no tiene obra.
+      cuenta_analitica_id:
+        significado: >-
+          La cuenta ANALITICA de la fila (`apa.cueide`, una cuenta de
+          `maestro.cuentas_analiticas`), no una del plan financiero.
+        agregacion: no_sumable
+        nulo_significa: La fila no lleva cuenta (127 filas).
+      codigo_cuenta_analitica:
+        significado: Codigo de la cuenta analitica (`con.cod`); empieza por el codigo del centro.
+        nulo_significa: La fila no lleva cuenta.
+      descripcion_cuenta_analitica:
+        significado: >-
+          Descripcion de la cuenta analitica (`con.res`). En las CP suele llevar
+          el nombre del trabajador.
+        nulo_significa: La fila no lleva cuenta.
+      es_contrapartida_recurso:
+        significado: >-
+          TRUE si la cuenta es una cuenta de contrapartida (CP) de trabajador:
+          la de algun recurso hoy o una CP antigua de su centro (D7). Es la
+          condicion C3 de lo restringido.
+      concepto:
+        significado: Texto de la fila (`apa.res`); coincide con el de su apunte en el 96,6 %.
+      documento:
+        significado: Documento de la fila segun Sigrid (`apa.doc`), tal cual.
+      punteo:
+        significado: Marca de punteo de la fila (`apa.pun`), tal cual.
+        agregacion: no_sumable
+      debe:
+        significado: Debe de la fila.
+        unidad: EUR
+        agregacion: suma
+      haber:
+        significado: Haber de la fila. En una CP, el abono de lo que sus partes imputan a la obra.
+        unidad: EUR
+        agregacion: suma
+      importe:
+        significado: >-
+          Debe menos haber, con signo. AQUI SI SE SUMA: la analitica no tiene
+          cierres ni aperturas.
+        unidad: EUR
+        agregacion: suma
+      saldo_acumulado:
+        significado: >-
+          Saldo de la cuenta analitica tras la fila: suma de `importe` de la
+          cuenta hasta la fila inclusive, por fecha, asiento, posicion y fila.
+          El saldo a una fecha es el de la ultima fila hasta esa fecha.
+        unidad: EUR
+        agregacion: ultimo_valor
+      apunte_id:
+        significado: >-
+          El apunte financiero del que cuelga la fila (`apa.apuide`), el
+          `apunte_id` de `contabilidad_restringida.mayor`.
+        agregacion: no_sumable
+        nulo_significa: Fila de un asiento ANALITICO, sin apunte financiero.
+      cuenta_id:
+        significado: La cuenta FINANCIERA de ese apunte (`contabilidad_restringida.mayor.cuenta_id`).
+        agregacion: no_sumable
+        nulo_significa: La fila no cuelga de un apunte, o el apunte no lleva cuenta.
+      codigo_cuenta:
+        significado: Codigo de la cuenta financiera del apunte (640..., 628...).
+        nulo_significa: La fila no cuelga de un apunte, o el apunte no lleva cuenta.
+      obra_imputada_id:
+        significado: >-
+          En un asiento ANALITICO, la UNICA obra a la que cargan sus filas que no
+          son de CP, repetida en todas las filas del asiento: es la obra del
+          abono de la CP (38.876 de las 38.943 filas de abono de CP).
+        agregacion: no_sumable
+        nulo_significa: >-
+          El asiento no es ANALITICO, o sus filas de cargo van a ninguna obra o
+          a varias.
+      clave_obra_imputada:
+        significado: La clave legible de `obra_imputada_id`, '<empresa>-<codigo>'.
+        nulo_significa: No hay obra imputada.
+      restringido:
+        significado: >-
+          TRUE si la fila NO esta en `contabilidad.mayor_analitico`: su apunte
+          financiero es restringido, su asiento es de personal, su cuenta es una
+          CP, o su apunte no esta en el mayor completo (falla cerrado). Nunca
+          NULL.
+      motivo_restriccion:
+        significado: >-
+          Por que esta restringida, en este orden: CONTRAPARTIDA (la cuenta es
+          CP), APUNTE_SIN_RESOLVER (su apunte no esta en el mayor completo; hoy
+          0), APUNTE_RESTRINGIDO (su apunte es restringido), ASIENTO_PERSONAL
+          (solo lo es el asiento; hoy 0: coincide con el anterior).
+        valores: [CONTRAPARTIDA, APUNTE_SIN_RESOLVER, APUNTE_RESTRINGIDO, ASIENTO_PERSONAL]
+        nulo_significa: La fila es visible (`restringido = false`).
+      saldo_acumulado_visible:
+        significado: >-
+          Lo que publica `contabilidad.mayor_analitico` como `saldo_acumulado`:
+          el saldo de la cuenta sumando SOLO lo visible. Difiere de
+          `saldo_acumulado` en las cuentas mixtas.
+        unidad: EUR
+        agregacion: ultimo_valor
+        nulo_significa: La fila esta restringida.
+    relaciones:
+      - de: cuenta_analitica_id
+        a: maestro.cuentas_analiticas.cuenta_analitica_id
+        cardinalidad: "N:1"
+        porque: La cuenta analitica en el catalogo, con su padre, su nivel y su centro.
+      - de: centro_coste_id
+        a: maestro.centros_coste.centro_coste_id
+        cardinalidad: "N:1"
+        porque: El centro de coste de la fila, del que sale la obra.
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: La ficha de la obra del centro de la fila.
+      - de: obra_imputada_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: La ficha de la obra a la que el asiento ANALITICO imputa los partes.
+      - de: apunte_id
+        a: contabilidad_restringida.mayor.apunte_id
+        cardinalidad: "N:1"
+        porque: El apunte financiero del que la fila es reparto, con su cuenta del plan y su tercero.
+      - de: cuenta_analitica_id
+        a: personal.recursos.cuenta_analitica_contrapartida_id
+        cardinalidad: "N:N"
+        porque: >-
+          Los recursos cuya CP es la cuenta de la fila (hasta 8 por CP). Solo
+          casan las CP: en el resto de cuentas no hay recurso, y check-relaciones
+          avisa de una cobertura parcial que es la esperada.
+    ejemplos_preguntas:
+      - Saldo de la cuenta de contrapartida del recurso X en la obra Y
+      - CP del recurso X frente a sus partes
+      - Mayor analitico de la cuenta X del centro Y
+      - Cuantas filas analiticas restringidas hay por motivo en 2025
+
+  saldos_cuenta_analitica_mes:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **ACCESO RESTRINGIDO: solo el perfil total del MCP.** Si no lo tienes, la
+      consulta devuelve «permission denied»: usa
+      `contabilidad.saldos_cuenta_analitica_mes` (`R-PERFILES`), sin reintentar
+      ni buscar otro camino.
+
+      **SOLO PARA EL ROL AUTORIZADO** (`sigrid_dm_autorizado_ro`, F-127): los
+      saldos ANALITICOS COMPLETOS, con las cuentas de contrapartida (CP) de los
+      trabajadores. Los generales solo suman lo visible y marcan con
+      `incompleto` lo que esta recortado.
+
+      **LOS SALDOS POR CUENTA ANALITICA, CENTRO Y MES** (F-127), construidos
+      desde `contabilidad_restringida.mayor_analitico`: una fila por cuenta
+      analitica, centro, empresa, ejercicio y mes con alguna fila (182.449 el
+      2026-11-20). Sin columnas por clase: la analitica no tiene cierres ni
+      aperturas, y `importe` (debe - haber) SI se suma. La suma de `importe` por
+      cuenta es la del mayor analitico. El centro va en la clave porque el
+      reparto lleva filas de una cuenta a otro centro: el saldo de una cuenta es
+      la suma de sus centros. Las filas sin cuenta o sin centro van con 0.
+      **No se suma con `contabilidad_restringida.saldos_cuenta_mes`**, que es
+      el mayor financiero.
+    grano: >-
+      Una fila por (`cuenta_analitica_id`, `centro_coste_id`, `empresa_id`,
+      `ejercicio`, `mes`) con alguna fila analitica. Un mes sin movimiento no
+      tiene fila: su saldo es el `saldo_acumulado` del ultimo mes con fila.
+    clave_negocio: [cuenta_analitica_id, centro_coste_id, empresa_id, ejercicio, mes]
+    paso_etl: build_contabilidad
+    refresco: nocturno
+    columnas:
+      cuenta_analitica_id:
+        significado: La cuenta analitica (`maestro.cuentas_analiticas`), o 0 para las filas sin cuenta.
+        agregacion: no_sumable
+      centro_coste_id:
+        significado: El centro de coste de las filas, o 0 para las filas sin centro.
+        agregacion: no_sumable
+      empresa_id:
+        significado: Empresa de las filas (la del asiento).
+        agregacion: no_sumable
+      ejercicio:
+        significado: Ano de las filas (el de su fecha).
+        agregacion: no_sumable
+      mes:
+        significado: Mes de las filas (1-12).
+        agregacion: no_sumable
+      num_apuntes:
+        significado: Filas analiticas de esa cuenta, centro y mes.
+        agregacion: suma
+      debe:
+        significado: Debe de las filas del mes.
+        unidad: EUR
+        agregacion: suma
+      haber:
+        significado: Haber de las filas del mes.
+        unidad: EUR
+        agregacion: suma
+      importe:
+        significado: Debe menos haber del mes. Se suma entre meses.
+        unidad: EUR
+        agregacion: suma
+      saldo_acumulado:
+        significado: Saldo de (cuenta, centro, empresa) a fin de mes. No se suma entre meses.
+        unidad: EUR
+        agregacion: ultimo_valor
+    relaciones:
+      - de: cuenta_analitica_id
+        a: maestro.cuentas_analiticas.cuenta_analitica_id
+        cardinalidad: "N:1"
+        porque: La cuenta analitica en el catalogo (el 0 de las filas sin cuenta no casa).
+      - de: centro_coste_id
+        a: maestro.centros_coste.centro_coste_id
+        cardinalidad: "N:1"
+        porque: El centro de coste, del que sale la obra.
+    ejemplos_preguntas:
+      - Saldo mensual de la contrapartida X
+      - Movimiento analitico del centro Y por mes
