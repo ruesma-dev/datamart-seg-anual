@@ -1,23 +1,19 @@
 # F-127 · Revisión (reviewer)
 
-Revisión incremental desde 876edbe (pasada 2): `git diff 876edbe..16651d9` (b5a2d62, 115d44b, a09e509, 16651d9) y `azure-apps` 7586308.
+Revisión incremental desde 876edbe (pasada 2): `git diff 876edbe..48849e9` (D9: b5a2d62-16651d9; tras la puerta roja: fe92a67, de92958, 598d51f, a893ec6, 1a272ad, 48849e9) y `azure-apps` 7586308.
 
-**Veredicto pasada 2: CHANGES_REQUESTED, solo por C1.** La puerta completa del líder sobre 16651d9 sale
-con EXIT 1. Todo lo demás está en `[x]`.
+**Veredicto pasada 2: APPROVED** (cerrada sobre 48849e9). La primera puerta, sobre 16651d9, salió roja
+(EXIT 1): `test_f104_r18` fijaba la versión del diccionario con `== 80`, F-127 la sube a 81, y la
+cobertura quedó en `[KO] 47.9 %` porque `-x` cortó la suite antes de llegar a F-127. El CHANGES_REQUESTED
+por C1 lo dejó c49591e. Lo que vino después:
+- fe92a67 cambia `test_f104_r18` a `>= 80`, como F-056, F-097 y F-120, y deja la cabecera como estaba.
+- Las tres observaciones están resueltas: de92958 (I001), 598d51f (T13 con las cifras del 2026-11-21) y
+  a893ec6 (el comentario de 10).
+- 1a272ad y 48849e9 son solo el informe.
 
-## Cambios requeridos (pasada 2)
-
-1. **[Implementer] `tests/test_f104_retenciones_cliente.py:458`**: `assert contenido["version"] == 80` falla
-   con `81 == 80`, porque F-127 sube el diccionario a la v81. Lo he reproducido en el worktree: `1 failed,
-   27 passed`. Hay que cambiarlo a `>= 80`, como hace el resto del repositorio. La comprobación de la
-   cabecera `# version 80 (F-104, 2026-11-` se queda como está y sigue pasando. El fallo ya estaba en 876edbe:
-   ni mi batería ni la del implementer incluían `test_f104`. Recomendado en la misma tarea:
-   `tests/test_f127_mayor_analitico.py:1156` (`== 81`) también a `>= 81`, para que la próxima feature que
-   suba la versión no tumbe F-127 de la misma forma.
-2. **[Líder] Repetir la puerta.** `PUERTA COBERTURA` salió `[KO] 47.9 %` (23/48). Casi seguro se debe al
-   corte de `-x` en el primer fallo: `test_f104` corre antes que `test_f127`. Mi medición del dominio en la
-   copia da 100 %. Hay que volver a medirla con la puerta tras el arreglo.
-3. **[Implementer, opcional en el mismo commit]** La observación 1 de abajo (`ruff --fix`, I001).
+He revisado el diff. `test_f104` + `test_f127` dan 216 passed, 1 skipped, y `ruff` queda limpio en los
+dos ficheros. Sigue abierto, sin bloquear: `test_f127_mayor_analitico.py:1156` fija la versión con
+`== 81`, y la próxima feature que la suba lo tumbará igual.
 
 **Nivel de rigor:** `critico` (declarado): fase RED, cobertura 90 %, mutación con 0 supervivientes (60 %,
 [100, 300]), RM1-RM7; e2e informativa.
@@ -78,7 +74,7 @@ passed` con las aserciones del CTE `centro_cp`; `3 failed` en las fichas) antes 
   `raw.con`, nombre y apellidos de `raw.emp`, `cif` y `dni`): **0 nombres completos, 0 parejas
   nombre-apellido, 0 NIF/DNI**, y 0 cadenas con forma de NIF. «Juan Romero» no casa con ningún recurso.
 
-## Pasada 2 · observaciones (no bloquean)
+## Pasada 2 · observaciones (resueltas en de92958, 598d51f y a893ec6)
 
 1. **Lint nuevo de F-127**: `ruff` I001 en `tests/test_f127_mayor_analitico.py:16` (import fuera de orden).
    No bloquea (`LINT_BLOQUEA=0`), pero nace aquí: `ruff check --fix` antes del merge.
@@ -87,9 +83,9 @@ passed` con las aserciones del CTE `centro_cp`; `3 failed` en las fichas) antes 
 
 ## Checkpoints (estado tras la pasada 2)
 
-- **C1** `[ ]` **EN ROJO.** Puerta del líder (`bash harness/init.sh`, 16651d9 en `puerta/F-127`, con `.env`):
-  EXIT 1. pytest: `1 failed, 9327 passed, 2461 skipped` (1:23:17, `-x`), el de F-104 (cambio 1).
-  `PUERTA COBERTURA [KO] 47.9 %` (cambio 2). `TAMAÑO` OK y `CARRIL` N/A (crítico).
+- **C1** `[x]` Puerta del líder sobre **48849e9** (con `.env`): **EXIT 0**. pytest: 13.852 passed, 2.556
+  skipped, 0 failed (48:39). `PUERTA COBERTURA` OK: 100,0 % (48/48). `TAMAÑO` OK. `CARRIL` N/A. La de 16651d9
+  salió roja (arriba).
 - **C2** `[x]` F-127 es `in_review`, la única activa, en su rama. **C3 bis** N/A: no entra ningún documento
   de fuera (la respuesta de D8 es un correo resumido, sin original que versionar).
 - **C3** `[x]` El dominio sigue siendo puro y el SQL está en `infrastructure/`. Sin secretos, sin prints y
