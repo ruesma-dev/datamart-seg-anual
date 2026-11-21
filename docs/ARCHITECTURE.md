@@ -132,18 +132,18 @@ restringida o si general más restringidos no suman el completo. Regla dura
 **Desde F-127 (2026-11-20) también el mayor ANALÍTICO**, con el mismo patrón de
 dos esquemas y cinco sub-pasos más al final de `build_contabilidad` (08-12, sin
 tocar los ocho de antes). `contabilidad_restringida.mayor_analitico` es una fila
-por fila de `raw.apa` (722.631), con la cuenta ANALÍTICA, la obra solo por el
+por fila de `raw.apa` (722.704 el 2026-11-21), con la cuenta ANALÍTICA, la obra solo por el
 centro, la obra imputada de cada asiento `ANALITICO` (`con.tip = 32`, la
 imputación de los partes) y la marca de lo restringido; su guarda compara el
 recuento con `raw.apa`. Criterio de restringido (R23 de F-135, oráculo en
 `domain/restriccion_personal.py`): la fila cuyo apunte financiero es restringido
 en el mayor completo, la de un asiento de personal y la de una cuenta de
 CONTRAPARTIDA del trabajador (`raw.res.caaconide`, más las CP antiguas de su
-centro con abono analítico: D7-b); falla cerrado con el apunte que no resuelve.
-181.712 filas restringidas (25,1 %). `contabilidad_restringida.saldos_cuenta_analitica_mes`
+centro con abono analítico, D7-b, y toda cuenta del centro `CP`, D9); falla
+cerrado con el apunte que no resuelve. 181.804 filas restringidas (25,2 %). `contabilidad_restringida.saldos_cuenta_analitica_mes`
 agrega por cuenta, centro, empresa y mes. La general, `contabilidad.mayor_analitico`
-(solo lo visible, con su guarda: 0 CP, 0 apuntes restringidos y cuadre de
-recuentos), `contabilidad.saldos_cuenta_analitica_mes` (con `incompleto`) y
+(solo lo visible, con su guarda: 0 CP, 0 apuntes restringidos, 0 asientos de
+personal y cuadre de recuentos), `contabilidad.saldos_cuenta_analitica_mes` (con `incompleto`) y
 `contabilidad.apuntes_analiticos_restringidos_mes` (solo recuentos por motivo).
 Al contrario que el mayor financiero, la analítica no tiene cierres ni aperturas:
 su saldo SÍ es `debe - haber`, y nunca se suma con el mayor financiero (es su

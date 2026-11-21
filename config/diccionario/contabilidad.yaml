@@ -623,8 +623,8 @@ objetos:
     ejemplos_preguntas: []
 
   # F-127 (2026-11-20): EL MAYOR ANALITICO GENERAL, sus saldos y cuanto falta.
-  # Cifras del SELECT equivalente al build, en solo lectura sobre el `raw` de
-  # la nocturna del 2026-11-20 (`progress/impl_F-127.md`).
+  # Cifras del SELECT equivalente al build (con D9), en solo lectura sobre el
+  # `raw` de la nocturna del 2026-11-21 (`progress/impl_F-127.md`, pasada 2).
   mayor_analitico:
     tipo: tabla
     capa: consumo
@@ -636,8 +636,8 @@ objetos:
       lo incluye.
 
       **EL MAYOR ANALITICO GENERAL** (F-127): una fila por fila de `raw.apa` (el
-      desglose analitico de Sigrid) SALVO LAS RESTRINGIDAS. De las 722.631 filas
-      medidas el 2026-11-20 (2008-2026) quedan 540.919. Cada fila con su
+      desglose analitico de Sigrid) SALVO LAS RESTRINGIDAS. De las 722.704 filas
+      medidas el 2026-11-21 (2008-2026) quedan 540.900. Cada fila con su
       asiento, fecha, empresa, centro de coste y obra, su cuenta ANALITICA (las
       de `maestro.cuentas_analiticas`, no las del plan financiero), debe, haber
       e `importe` = debe - haber. `tipo_asiento` CONTABLE: la fila es el reparto
@@ -646,9 +646,9 @@ objetos:
       financiero que imputa los partes de trabajo a las obras (aqui solo sus
       cargos a obra: el abono a la cuenta del trabajador es restringido).
 
-      **LE FALTAN 181.712 FILAS RESTRINGIDAS** (el 25,1 %, `R-PERFILES`): las de
+      **LE FALTAN 181.804 FILAS RESTRINGIDAS** (el 25,2 %, `R-PERFILES`): las de
       las cuentas de contrapartida (CP) de los trabajadores, que llevan su coste
-      de nomina, y las de los apuntes y asientos de personal del mayor. Viven
+      de nomina (las de los recursos y TODAS las del centro `CP`), y las de los apuntes y asientos de personal del mayor. Viven
       solo en `contabilidad_restringida.mayor_analitico`, que lee el rol
       autorizado. Cuantas faltan por empresa, mes y motivo, en
       `contabilidad.apuntes_analiticos_restringidos_mes` (solo recuentos); un
@@ -664,8 +664,10 @@ objetos:
 
       **LAS CP EN 2026** (por si alguien pregunta por que no estan): el asiento
       de nomina cargo las CP hasta marzo de 2026 y no carga nada desde abril de
-      2026; la imputacion de partes (asientos ANALITICO) no hay desde agosto de
-      2026. Sus saldos solo los lee el rol autorizado.
+      2026 (desde entonces la nomina se cierra fuera de Sigrid y solo llega el
+      asiento global); la imputacion de partes (asientos ANALITICO) no hay desde
+      agosto de 2026 porque esos partes aun no estan imputados. Sus saldos solo
+      los lee el rol autorizado.
     grano: >-
       Una fila por fila VISIBLE de `raw.apa`, identificada por
       `apunte_analitico_id`. Varias filas por apunte financiero: es su reparto
@@ -814,10 +816,10 @@ objetos:
       lo incluye.
 
       **LOS SALDOS ANALITICOS GENERALES POR CUENTA, CENTRO Y MES** (F-127),
-      solo con las filas visibles de `contabilidad.mayor_analitico`: 154.951
-      filas el 2026-11-20. Sin columnas por clase: `importe` (debe - haber) SI se
-      suma. Las cuentas de contrapartida de los trabajadores no tienen fila; a
-      682 filas les falta algo restringido y lo dicen `num_apuntes_restringidos`
+      solo con las filas visibles de `contabilidad.mayor_analitico`: 154.901
+      filas el 2026-11-21. Sin columnas por clase: `importe` (debe - haber) SI se
+      suma. Las cuentas de contrapartida de los trabajadores (las de los recursos
+      y todas las del centro `CP`) no tienen fila; a 681 filas les falta algo restringido y lo dicen `num_apuntes_restringidos`
       e `incompleto` (solo recuentos, nunca importes). No se suma con
       `contabilidad.saldos_cuenta_mes`, que es el mayor financiero.
     grano: >-
@@ -893,14 +895,14 @@ objetos:
 
       **CUANTO LE FALTA AL MAYOR ANALITICO GENERAL** (F-127): por empresa,
       ejercicio y mes, cuantas filas y asientos de `raw.apa` no estan en
-      `contabilidad.mayor_analitico`, y cuantas por motivo (181.712 en total el
-      2026-11-20: 173.978 de cuentas de contrapartida y 7.734 de apuntes de
+      `contabilidad.mayor_analitico`, y cuantas por motivo (181.804 en total el
+      2026-11-21: 174.295 de cuentas de contrapartida y 7.509 de apuntes de
       personal). SOLO RECUENTOS: el importe restringido por mes seria la masa
       salarial. Sirve para decir «este saldo no incluye N filas restringidas»
       en vez de presentar un total recortado como completo.
     grano: >-
       Una fila por (`empresa_id`, `ejercicio`, `mes`) con alguna fila
-      restringida (701 el 2026-11-20). Sin fila, no falta nada ese mes.
+      restringida (701 el 2026-11-21). Sin fila, no falta nada ese mes.
     clave_negocio: [empresa_id, ejercicio, mes]
     paso_etl: build_contabilidad
     refresco: nocturno

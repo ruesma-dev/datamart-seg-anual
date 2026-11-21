@@ -9,6 +9,12 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-21 · F-127 `in_review` (implementer, pasada 2) · el mayor analítico
+
+- CHANGES_REQUESTED de la review resuelto con D9 (c1): toda cuenta del centro `CP` es CP (+3 cuentas,
+  60 filas); cuarta comprobación de la guarda de 10 (asientos de personal). D7-b confirmada. D8
+  contestada (correo del 2026-11-20) y en las fichas de las CP. Nuevo commit en `azure-apps`, sin push.
+
 ## 2026-11-20 · F-127 `in_review` (implementer) · el mayor analítico
 
 - T1-T10 hechas (T10 en `azure-apps` 70a039a, sin push). Informe: `progress/impl_F-127.md`.
@@ -25,7 +31,7 @@
 
   - D7-b, tomada al pie de la letra (las 7 cuentas antiguas de los centros de CP con abono
     `ANALITICO`, enteras), restringe 5.857 filas y no 324; frente a solo `caaconide` oculta 3.087 filas
-    más. Por eso T13 espera 181.712 restringidas y 540.919 generales, no ~178.301 / ~544.330.
+    más. Confirmada por el humano (D7-b, 2026-11-21); con D9, T13 espera 181.804 / 540.900 (2026-11-21).
   - T14 de `tasks.md` no corre en PostgreSQL (FULL JOIN con `IS NOT DISTINCT FROM`): abajo, la versión que sí.
 
 ### F-127 · pasos MANUAL (humano)
@@ -37,7 +43,9 @@ Con la imagen nueva o desde un checkout con `.env` (Postgres de dev; contra Azur
   check-relaciones: cobertura parcial de `contabilidad_restringida.mayor_analitico.cuenta_analitica_id`
   frente a `personal.recursos.cuenta_analitica_contrapartida_id` (solo las CP tienen recurso).
 - **T13** · `SELECT (SELECT count(*) FROM contabilidad_restringida.mayor_analitico), (SELECT count(*) FROM raw.apa), (SELECT count(*) FROM contabilidad.mayor_analitico), (SELECT count(*) FILTER (WHERE restringido) FROM contabilidad_restringida.mayor_analitico);`
-  → esperado (medido el 2026-11-20 en solo lectura): 722.631 / 722.631 / 540.919 / 181.712; y la duración
+  → esperado (medido el 2026-11-21 en solo lectura, con D9): 722.704 / 722.704 / 540.900 / 181.804 (el
+  `raw` crece cada noche: lo que se comprueba es completo = `raw.apa` y general + restringidas = completo,
+  con restringidas ~25,2 %); y la duración
   de `build_contabilidad` en `_meta.etl_runs` frente a 1.029-1.194 s.
 - **T14** · `SELECT count(*) FROM (SELECT COALESCE(cuenta_analitica_id, 0) c, sum(importe) i FROM contabilidad_restringida.mayor_analitico GROUP BY 1) m FULL JOIN (SELECT cuenta_analitica_id c, sum(importe) i FROM contabilidad_restringida.saldos_cuenta_analitica_mes GROUP BY 1) s ON s.c = m.c WHERE m.i IS DISTINCT FROM s.i;` → 0.
 - **T15** · `SELECT r, t, has_table_privilege(r, t, 'SELECT') FROM unnest(ARRAY['mcp_sigrid_dm_ro','sigrid_dm_perfil_restringido_ro','mcp_sigrid_dm_restringido','sigrid_dm_perfil_postventa_ro','mcp_sigrid_dm_postventa','sigrid_dm_autorizado_ro','mcp_sigrid_dm_total']) r, unnest(ARRAY['contabilidad_restringida.mayor_analitico','contabilidad_restringida.saldos_cuenta_analitica_mes','contabilidad.mayor_analitico','contabilidad.saldos_cuenta_analitica_mes','contabilidad.apuntes_analiticos_restringidos_mes']) t;`

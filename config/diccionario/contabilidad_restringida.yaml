@@ -526,8 +526,9 @@ objetos:
       - Gastos del grupo 62 por empresa y mes
 
   # F-127 (2026-11-20): EL MAYOR ANALITICO COMPLETO y sus saldos. Cifras del
-  # SELECT equivalente al build, en solo lectura sobre el `raw` de la nocturna
-  # del 2026-11-20 (`progress/impl_F-127.md`). Solo cuentas y recuentos.
+  # SELECT equivalente al build (con D9), en solo lectura sobre el `raw` de la
+  # nocturna del 2026-11-21 (`progress/impl_F-127.md`, pasada 2). Solo cuentas
+  # y recuentos.
   mayor_analitico:
     tipo: tabla
     capa: consumo
@@ -546,12 +547,12 @@ objetos:
       completo ya contiene al general.
 
       **EL MAYOR ANALITICO** (F-127): una fila por fila de `raw.apa` (el
-      desglose analitico de Sigrid), SIN FILTRAR NINGUNA: 722.631 filas medidas
-      el 2026-11-20, de 2008 a 2026. Cada fila con su asiento, fecha, empresa,
+      desglose analitico de Sigrid), SIN FILTRAR NINGUNA: 722.704 filas medidas
+      el 2026-11-21, de 2008 a 2026. Cada fila con su asiento, fecha, empresa,
       centro de coste y obra, su cuenta ANALITICA (las de
       `maestro.cuentas_analiticas`, no las del plan financiero), debe, haber e
       `importe` = debe - haber. Dos clases de asiento (`tipo_asiento`):
-      CONTABLE (639.034 filas, cuelgan de un apunte financiero, `apunte_id`) y
+      CONTABLE (639.034 filas el 2026-11-20, cuelgan de un apunte financiero, `apunte_id`) y
       ANALITICO (83.597 filas de 5.766 asientos `ANA...` de 2009-01 a 2026-07,
       sin apunte financiero: imputan los partes de trabajo a las obras y abonan
       la CP del trabajador).
@@ -570,17 +571,26 @@ objetos:
       personal, y la de una CP: la de algun recurso
       (`personal.recursos.cuenta_analitica_contrapartida_id`) o una cuenta del
       centro de una CP con abono en un asiento ANALITICO (CP de antes que el
-      recurso ya no declara: 7 cuentas, 5.857 filas). Se restringe DE MAS. Medido:
-      181.712 restringidas (el 25,1 %, 998 cuentas): 173.978 por CONTRAPARTIDA
-      y 7.734 por APUNTE_RESTRINGIDO.
+      recurso ya no declara: 7 cuentas, 5.857 filas, enteras), o TODA cuenta
+      del centro `CP` (el de codigo `CP`, uno por empresa; D9, 2026-11-21: tres
+      cuentas `CP.*` sin recurso ni abono, 60 filas). Se restringe DE MAS.
+      Medido el 2026-11-21: 181.804 restringidas (el 25,2 %, 1.000 cuentas):
+      174.295 por CONTRAPARTIDA y 7.509 por APUNTE_RESTRINGIDO.
 
-      **LAS CP EN 2026, OJO**: el asiento de nomina cargo las CP hasta marzo de
-      2026 (~0,9-1,1 M EUR al mes) y no carga nada desde abril de 2026; el
-      abono de los partes (asientos ANALITICO) iba a ~0,9-1,0 M EUR al mes hasta
-      enero de 2026, 31-44 mil EUR al mes de marzo a julio y nada desde agosto
-      de 2026, mientras los partes siguen a ~1,1 M EUR al mes. El saldo de una
-      CP en 2026 no significa lo mismo que en 2025 (aviso de Administracion y
-      Control de Costes; el sentido esta pendiente de confirmar).
+      **LAS CP EN 2026, OJO** (Juan Romero, Control de Costes, correo del 2026-11-20). (1) LA NOMINA: hasta marzo de 2026,
+      incluido, la nomina se hacia en Sigrid y su asiento cargaba la CP de cada
+      trabajador (~0,9-1,1 M EUR al mes); desde abril de 2026 se cierra en
+      Cegid y a Sigrid solo llega el asiento global, asi que las CP ya no
+      reciben la nomina por trabajador. Las CP siguen restringidas porque
+      guardan el historico de las nominas. (2) LOS PARTES: el asiento ANALITICO
+      que abona la CP solo nace cuando el parte pasa a IMP (imputado); un parte
+      en CER (cerrado) ya no se edita pero aun no tiene asiento. De marzo a
+      septiembre de 2026 casi todo esta en CER (abonos de 31-44 mil EUR al mes
+      de marzo a julio, frente a ~0,9-1,0 M EUR hasta enero), no hay ninguno
+      desde agosto de 2026 y octubre y noviembre siguen en registro: el hueco
+      es de partes sin imputar, no un fallo del dato. (3) EL SALDO DE UNA CP es
+      «nomina menos partes» solo hasta marzo de 2026; despues no tiene ese
+      sentido y no se publica nada derivado.
 
       **RECETA: SALDO Y MOVIMIENTOS DE LA CP DEL TRABAJADOR X EN LA OBRA Y, Y SU
       CRUCE CON SUS PARTES.** (1) La CP es
@@ -677,8 +687,8 @@ objetos:
       es_contrapartida_recurso:
         significado: >-
           TRUE si la cuenta es una cuenta de contrapartida (CP) de trabajador:
-          la de algun recurso hoy o una CP antigua de su centro (D7). Es la
-          condicion C3 de lo restringido.
+          la de algun recurso hoy, una CP antigua de su centro (D7) o cualquier
+          cuenta del centro `CP` (D9). Es la condicion C3 de lo restringido.
       concepto:
         significado: Texto de la fila (`apa.res`); coincide con el de su apunte en el 96,6 %.
       documento:
@@ -805,14 +815,21 @@ objetos:
 
       **LOS SALDOS POR CUENTA ANALITICA, CENTRO Y MES** (F-127), construidos
       desde `contabilidad_restringida.mayor_analitico`: una fila por cuenta
-      analitica, centro, empresa, ejercicio y mes con alguna fila (182.449 el
-      2026-11-20). Sin columnas por clase: la analitica no tiene cierres ni
+      analitica, centro, empresa, ejercicio y mes con alguna fila (182.457 el
+      2026-11-21). Sin columnas por clase: la analitica no tiene cierres ni
       aperturas, y `importe` (debe - haber) SI se suma. La suma de `importe` por
       cuenta es la del mayor analitico. El centro va en la clave porque el
       reparto lleva filas de una cuenta a otro centro: el saldo de una cuenta es
       la suma de sus centros. Las filas sin cuenta o sin centro van con 0.
       **No se suma con `contabilidad_restringida.saldos_cuenta_mes`**, que es
       el mayor financiero.
+
+      **EL SALDO DE UNA CP** (Juan Romero, Control de Costes, correo del 2026-11-20): es «nomina menos partes» solo hasta marzo
+      de 2026. Desde abril de 2026 la nomina se cierra en Cegid y la CP ya no
+      recibe la de cada trabajador; y el abono de los partes solo llega cuando
+      el parte pasa de CER (cerrado) a IMP (imputado), asi que en 2026 falta
+      casi todo. Restringidas todas las CP: las de los recursos y las del
+      centro `CP`.
     grano: >-
       Una fila por (`cuenta_analitica_id`, `centro_coste_id`, `empresa_id`,
       `ejercicio`, `mes`) con alguna fila analitica. Un mes sin movimiento no

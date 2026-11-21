@@ -107,7 +107,25 @@ condiciones y los dos acumulados) da 722.631 filas = `count(DISTINCT ide)` en **
    lista HARÍA FALLAR la nocturna (R7 rechaza excluir lo de un esquema que no se le concede). D3.
 3. La fuga de nombres por `maestro.cuentas_analiticas` es anterior a F-127 (D5).
 
-## Preguntas a Juan (borrador, NO enviado)
+## Preguntas a Juan (CONTESTADAS: correo del 2026-11-20; D8 cerrada en la 2.ª pasada, 2026-11-21)
+
+**Respuesta resumida** (Juan Romero, Control de Costes, correo del 2026-11-20), ya en las fichas de
+`contabilidad_restringida.mayor_analitico` y `.saldos_cuenta_analitica_mes`:
+
+1. **Nómina en las CP**: hasta marzo de 2026, incluido, la nómina se hacía en Sigrid RRHH (integrado
+   con Sigrid Gestión) y su asiento entraba en la CP de cada trabajador. Desde abril de 2026 se cierra
+   en Cegid y a Sigrid solo llega el asiento global. Pide mantener restringidas las CP (guardan el
+   histórico de las nóminas), como ya hace el diseño; el resto del mayor analítico puede ser abierto.
+2. **Imputación de partes**: el asiento del parte (y el ANA que abona la CP) solo nace cuando el parte
+   pasa a IMP; en CER ya no se edita pero aún no tiene asiento. De marzo a septiembre de 2026 casi todo
+   está en CER, desde agosto no hay ninguno y octubre y noviembre siguen en registro: el hueco es de
+   partes sin imputar, no un fallo del dato.
+3. **«Lo que queda por repartir»** era el saldo de la CP (nómina menos partes); desde abril de 2026
+   deja de tener sentido y lo resolverá por otra vía. No se publica nada derivado: la ficha dice que
+   ese saldo solo vale hasta marzo de 2026.
+
+El borrador original, tal como se preparó:
+
 
 > Juan, preparando el mayor analítico (las cuentas CP de los trabajadores) hemos visto tres cosas
 > en Sigrid que solo tú puedes aclarar:
