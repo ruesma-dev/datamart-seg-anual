@@ -139,6 +139,72 @@ T12-T16, con sus comandos exactos y las cifras esperadas corregidas, en `progres
 - Lint: `tests/test_f146_restringido_sin_contabilidad.py` arrastra un `I001` de antes (verificado sobre
   8ae75df); no se toca.
 
+## Pasada 2 (2026-11-21): CHANGES_REQUESTED de `review_F-127.md` con D9, D7-b y D8
+
+Decisiones del humano (design D9, b5a2d62): **D9 = c1**, **D7-b confirmada** (cuentas enteras) y **cuarta
+comprobación** en la guarda de 10. Además, D8 contestada por Control de Costes (correo del 2026-11-20).
+
+| Commit | Qué |
+|---|---|
+| 115d44b | `requirements.md` R7 y R15 con «enmienda 2026-11-21, D9»; oráculo: `CODIGO_CENTRO_CONTRAPARTIDA = "CP"` y `es_cuenta_contrapartida(..., en_centro_contrapartida=False)`; 08 y la guarda de 10: CTE `centro_cp` (`raw.cen` × `raw.con`, `cod = 'CP'`, alias `ccp`) y una tercera rama en `cp`; guarda de 10: `v_personal` con el criterio C2 de 08. Tests de R7, R10 y R15 |
+| a09e509 | Fichas (cifras del 2026-11-21, «toda cuenta del centro `CP`», la respuesta de D8 en las dos fichas de las CP), ARCHITECTURE, `current.md` (T13) y `spec_F-127.md` (D8 contestada) |
+| `azure-apps` 7586308 | `datamart_seg_anual.md`: D9, la cuarta comprobación y las cifras. `git pull --rebase` antes: «Current branch main is up to date». Sin push (`main` va 2 por delante: 70a039a y 7586308) |
+
+**Fase RED** (antes de cada cambio):
+- Dominio: `E   ImportError: cannot import name 'CODIGO_CENTRO_CONTRAPARTIDA' from
+  'etl_sigrid.domain.restriccion_personal'` → `1 error in 0.80s`.
+- SQL (dominio ya en verde): `6 failed, 180 passed, 1 skipped in 11.20s`, entre ellos
+  ```
+  E       AssertionError: no encuentro el CTE «centro_cp» en 08_mayor_analitico.sql
+  E         - ab, 0) <> 0 UNION SELECT caa.ide FROM raw.caa caa JOIN centro_cp k ON k.centro_coste_id = caa.cenide
+  E           AssertionError: D9: el centro CP
+  E           AssertionError: la guarda no recalcula centro_cp como 08
+  ```
+  y `test_f127_r15_d9_guarda_sin_asientos_de_personal`. Tras el SQL: `188 passed, 1 skipped`.
+- Fichas: `E AssertionError: las cifras medidas (2.ª pasada, D9)` y
+  `E AssertionError: assert 'Juan Romero, Control de Costes, correo del 2026-11-20' in ...` → `3 failed`.
+
+**Medición en Azure, solo lectura** (`pg._bootstrap_done = True`, el SELECT de 08 con D9 como CTE, `raw`
+de la nocturna del 2026-11-21, 82 s):
+
+| Medida | Antes (2026-11-20) | Ahora (2026-11-21, con D9) |
+|---|---|---|
+| Completo = `raw.apa` | 722.631 | 722.704 |
+| Restringidas | 181.712 (25,1 %) | **181.804** (25,2 %): CONTRAPARTIDA 174.295, APUNTE_RESTRINGIDO 7.509, ASIENTO_PERSONAL 0, SIN_RESOLVER 0 |
+| Generales | 540.919 | **540.900** |
+| Cuentas con filas restringidas | 998 | **1.000** |
+| Visibles del centro `CP` / con código `CP.*` / de asiento de personal | (60 de 3 cuentas, review) | **0 / 0 / 0** |
+| Saldos completos / generales / `incompleto` / filas de 12 | 182.449 / 154.951 / 682 / 701 | 182.457 / 154.901 / 681 / 701 |
+| Con obra imputada; `restringido` nulo | 83.370; 0 | 83.370; 0 |
+
+Efecto aislado de D9 (`raw` del 2026-11-21): 10 centros `CP` en `raw.cen`; el conjunto CP pasa de 860 a
+890 cuentas (+30, 7 con movimiento, 285 filas); de esas, **60 filas de 3 cuentas** eran visibles y ahora
+se restringen (las demás ya caían por C1). El resto de la diferencia con el día 20 es la nocturna.
+
+**D8 en las fichas** (`contabilidad_restringida.mayor_analitico` y `.saldos_cuenta_analitica_mes`), citado
+como pidió el líder: nómina por trabajador en las CP hasta marzo de 2026 (Cegid desde abril), abono de los
+partes solo al pasar a IMP (el hueco de 2026 son partes en CER sin imputar) y el saldo de una CP es
+«nómina menos partes» solo hasta marzo de 2026. **Desviación:** `test_f127_r22_ningun_nombre_de_persona`
+admite ahora ESA cita y nada más (antes prohibía «Juan»/«Romero» sin excepción). Ningún nombre de
+trabajador. Las fichas generales solo dicen por qué faltan las cosas, sin la cita.
+
+**Evidencias de la pasada 2:**
+- `tests/test_f127_mayor_analitico.py`: 188 passed, 1 skipped (el de `azure-apps`).
+- Dominio al 100 % (90/90).
+- Mutación del SQL a mano: **39 mutantes, 39 muertos**. Son los 34 de antes, reanclados, y 5 de D9: el
+  código del centro, la rama de `centro_cp` (en 08 y en 10), y en la cuarta comprobación el umbral y el
+  criterio C2.
+- F-147 sin cambio (38.519).
+- `R-PERFILES` sin cambio.
+- La batería de lo afectado se recoge abajo.
+
+**Batería de lo afectado** (la misma lista que en la pasada 1, sobre a09e509):
+`22 failed, 4219 passed, 392 skipped in 1053.17s`. Los 22 son los 21 de `test_f006_comandos.py` y la
+frescura de `test_f006_reglas.py`, por `SigridApiSettings ... Field required`, los mismos que en la base,
+así que ninguno es de F-127. **La puerta completa `bash harness/init.sh` la pasa el líder** en el
+checkout con `.env`. La campaña `harness.mutacion` (T11) sigue para la pasada de campaña, tras el
+APPROVED.
+
 ## Evidencias
 
 | Evidencia | Valor real |
