@@ -196,12 +196,9 @@ trabajador. Las fichas generales solo dicen por qué faltan las cosas, sin la ci
   criterio C2.
 - F-147 sin cambio (38.519). `R-PERFILES` sin cambio.
 
-**Batería de lo afectado** (la misma lista que en la pasada 1, sobre a09e509):
-`22 failed, 4219 passed, 392 skipped in 1053.17s`. Los 22 son los 21 de `test_f006_comandos.py` y la
-frescura de `test_f006_reglas.py`, por `SigridApiSettings ... Field required`, los mismos que en la base,
-así que ninguno es de F-127. **La puerta completa `bash harness/init.sh` la pasa el líder** en el
-checkout con `.env`. La campaña `harness.mutacion` (T11) sigue para la pasada de campaña, tras el
-APPROVED.
+**Batería de lo afectado** (lista de la pasada 1, sobre a09e509): `22 failed, 4219 passed, 392 skipped
+in 1053.17s`; los 22 son los de `.env` de la base (21 de `test_f006_comandos.py` y la frescura). La puerta
+completa la pasa el líder; la campaña `harness.mutacion` (T11), tras el APPROVED.
 
 **Arreglos tras la puerta roja del líder** (review c49591e): `test_f104_r18` pasa a `>= 80` («F-127 la
 sube a 81»), con la cabecera de la v80 intacta y sin otro `["version"] ==` del diccionario en `tests/`
