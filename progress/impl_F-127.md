@@ -194,9 +194,7 @@ trabajador. Las fichas generales solo dicen por qué faltan las cosas, sin la ci
 - Mutación del SQL a mano: **39 mutantes, 39 muertos**. Son los 34 de antes, reanclados, y 5 de D9: el
   código del centro, la rama de `centro_cp` (en 08 y en 10), y en la cuarta comprobación el umbral y el
   criterio C2.
-- F-147 sin cambio (38.519).
-- `R-PERFILES` sin cambio.
-- La batería de lo afectado se recoge abajo.
+- F-147 sin cambio (38.519). `R-PERFILES` sin cambio.
 
 **Batería de lo afectado** (la misma lista que en la pasada 1, sobre a09e509):
 `22 failed, 4219 passed, 392 skipped in 1053.17s`. Los 22 son los 21 de `test_f006_comandos.py` y la
@@ -204,6 +202,12 @@ frescura de `test_f006_reglas.py`, por `SigridApiSettings ... Field required`, l
 así que ninguno es de F-127. **La puerta completa `bash harness/init.sh` la pasa el líder** en el
 checkout con `.env`. La campaña `harness.mutacion` (T11) sigue para la pasada de campaña, tras el
 APPROVED.
+
+**Arreglos tras la puerta roja del líder** (review c49591e): `test_f104_r18` pasa a `>= 80` («F-127 la
+sube a 81»), con la cabecera de la v80 intacta y sin otro `["version"] ==` del diccionario en `tests/`
+(fe92a67). I001 de `test_f127` (de92958), T13 de `tasks.md` con las cifras del 2026-11-21 (598d51f) y el
+comentario de la guarda de 10 con la cuarta comprobación (a893ec6). `test_f104` + `test_f127` +
+`test_f135*`: 405 passed, 4 skipped; ruff limpio en lo tocado salvo el SIM300 previo de `test_f104:368`.
 
 ## Evidencias
 
