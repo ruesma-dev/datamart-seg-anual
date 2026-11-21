@@ -39,7 +39,8 @@ R7. El sistema debe marcar una fila como restringida si se cumple cualquiera de:
 es un apunte con `restringido` en `contabilidad_restringida.mayor`; (C2) su `conide` es un asiento
 de personal (todos sus apuntes `NORMAL` y alguno restringido); (C3) su cuenta analítica es una CP,
 es decir, un `raw.res.caaconide` distinto de 0 [D7: o una cuenta de un centro de CP con abono en un
-asiento `ANALITICO`].
+asiento `ANALITICO`] [enmienda 2026-11-21, D9: o una cuenta cuyo centro de coste es el centro `CP`,
+el de código `CP` en `raw.con`, uno por empresa].
 (capa: unit)
 
 R8. El sistema debe publicar `motivo_restriccion` con este orden de precedencia: `CONTRAPARTIDA`
@@ -73,7 +74,8 @@ las columnas de R3 salvo `es_contrapartida_recurso`, y `saldo_acumulado` igual a
 `saldo_acumulado_visible` del completo. (capa: unit)
 
 R15. CUANDO termina el SQL del mayor analítico general, SI contiene alguna fila de una cuenta CP,
-alguna fila cuyo apunte es restringido o sin resolver, o si general más restringidas no suman el
+alguna fila cuyo apunte es restringido o sin resolver, [enmienda 2026-11-21, D9: alguna fila cuyo
+`asiento_id` es un asiento de personal del mayor completo,] o si general más restringidas no suman el
 completo, ENTONCES el sistema debe hacer fallar el sub-paso y deshacer el fichero. (capa: unit)
 
 R16. El sistema debe publicar `contabilidad.saldos_cuenta_analitica_mes` con los agregados de R12

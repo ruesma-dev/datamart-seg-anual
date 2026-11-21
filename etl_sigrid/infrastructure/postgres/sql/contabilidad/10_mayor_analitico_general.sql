@@ -22,9 +22,10 @@
 -- consulta con 30 s de ventana.
 --
 -- LA GUARDA (R15), al final y en la misma transaccion: 0 filas de una cuenta
--- CP (el conjunto recalculado desde raw IGUAL que en 08, con D7-b), 0 filas
--- cuyo apunte financiero no sea un apunte VISIBLE del mayor completo
--- (restringido o sin resolver) y `general + restringidas = completo`. Si no,
+-- CP (el conjunto recalculado desde raw IGUAL que en 08, con D7-b y D9), 0
+-- filas cuyo apunte financiero no sea un apunte VISIBLE del mayor completo
+-- (restringido o sin resolver), 0 filas de un asiento de personal (D9) y
+-- `general + restringidas = completo`. Si no,
 -- RAISE: el fichero se deshace y queda la tabla de la noche anterior.
 -- ============================================================================
 
@@ -83,6 +84,7 @@ DECLARE
     v_general       BIGINT;
     v_completo      BIGINT;
     v_restringidas  BIGINT;
+    v_personal      BIGINT;
 BEGIN
     WITH cp_recurso AS (
         SELECT DISTINCT r.caaconide AS cuenta_analitica_id
@@ -95,6 +97,12 @@ BEGIN
         JOIN cp_recurso c ON c.cuenta_analitica_id = caa.ide
         WHERE caa.cenide <> 0
     ),
+    centro_cp AS (
+        SELECT n.ide AS centro_coste_id
+        FROM raw.cen n
+        JOIN raw.con ccp ON ccp.ide = n.ide
+        WHERE ccp.cod = 'CP'
+    ),
     cp AS (
         SELECT c.cuenta_analitica_id
         FROM cp_recurso c
@@ -105,6 +113,10 @@ BEGIN
         JOIN raw.caa caa ON caa.ide = a.cueide
         JOIN centros_cp cc ON cc.centro_coste_id = caa.cenide
         WHERE asi.tip = 32 AND COALESCE(a.hab, 0) <> 0
+        UNION
+        SELECT caa.ide
+        FROM raw.caa caa
+        JOIN centro_cp k ON k.centro_coste_id = caa.cenide
     )
     SELECT count(*) INTO v_cp
     FROM contabilidad.mayor_analitico g
@@ -122,6 +134,21 @@ BEGIN
       );
     IF v_apunte <> 0 THEN
         RAISE EXCEPTION 'mayor_analitico_general: contabilidad.mayor_analitico tiene % filas de apuntes restringidos o sin resolver; no se publica', v_apunte;
+    END IF;
+
+    -- D9 (enmienda 2026-11-21): ninguna fila de un asiento de personal (C2),
+    -- con el mismo criterio que 08
+    SELECT count(*) INTO v_personal
+    FROM contabilidad.mayor_analitico g
+    WHERE g.asiento_id IN (
+        SELECT m.asiento_id
+        FROM contabilidad_restringida.mayor m
+        WHERE m.asiento_id IS NOT NULL
+        GROUP BY m.asiento_id
+        HAVING bool_and(m.clase_asiento = 'NORMAL') AND bool_or(m.restringido)
+    );
+    IF v_personal <> 0 THEN
+        RAISE EXCEPTION 'mayor_analitico_general: contabilidad.mayor_analitico tiene % filas de asientos de personal; no se publica', v_personal;
     END IF;
 
     SELECT count(*) INTO v_general FROM contabilidad.mayor_analitico;

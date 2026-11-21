@@ -191,6 +191,11 @@ MOTIVO_CONTRAPARTIDA = "CONTRAPARTIDA"
 MOTIVO_APUNTE_SIN_RESOLVER = "APUNTE_SIN_RESOLVER"
 MOTIVO_APUNTE_RESTRINGIDO = "APUNTE_RESTRINGIDO"
 
+#: D9 (c1, enmienda 2026-11-21): el código del centro de coste de las cuentas
+#: de contrapartida (`raw.con.cod` del centro, uno por empresa). Toda cuenta de
+#: ese centro es CP, la declare un recurso o no.
+CODIGO_CENTRO_CONTRAPARTIDA = "CP"
+
 
 def tipo_asiento(tip: int | None) -> str:
     """`CONTABLE` (`con.tip = 20`), `ANALITICO` (32) u `OTRO` (R3)."""
@@ -236,12 +241,14 @@ def es_cuenta_contrapartida(
     abonada_en_analitico: bool,
     contrapartidas: Set[int],
     centros_contrapartida: Set[int],
+    en_centro_contrapartida: bool = False,
 ) -> bool:
-    """C3 (R7, D7-b): la CP de un recurso, o una cuenta de un centro de CP con
-    abono (`hab <> 0`) en un asiento `ANALITICO`."""
+    """C3 (R7, D7-b, D9): la CP de un recurso, una cuenta de un centro de CP con
+    abono (`hab <> 0`) en un asiento `ANALITICO`, o una cuenta cuyo centro es el
+    de código `CODIGO_CENTRO_CONTRAPARTIDA`."""
     if cuenta_id is None:
         return False
-    if cuenta_id in contrapartidas:
+    if cuenta_id in contrapartidas or en_centro_contrapartida:
         return True
     return abonada_en_analitico and centro_coste_id in centros_contrapartida
 

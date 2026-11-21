@@ -13,7 +13,7 @@
 -- (02: el apunte financiero, su cuenta y su marca; C1 y C2) y la vista
 -- maestro.centros_coste (centro -> obra). Va DETRAS de 02.
 --
--- QUE ES (progress/spec_F-127.md): 722.631 filas el 2026-11-20, 2008-2026.
+-- QUE ES (progress/spec_F-127.md): 722.704 filas el 2026-11-21, 2008-2026.
 -- 639.034 cuelgan de un apunte financiero (`con.tip = 20`, el asiento
 -- contable); 83.597 son de 5.766 asientos ANALITICOS puros (`con.tip = 32`,
 -- codigo `ANA...`, sin apunte), los que imputan los partes a las obras y abonan
@@ -40,12 +40,14 @@
 --   C3  su cuenta analitica es una CP: la de algun recurso
 --       (`raw.res.caaconide`) o, por D7-b, una cuenta del centro de una CP con
 --       ABONO en un asiento ANALITICO (las CP de antes que el recurso ya no
---       declara: 7 cuentas, 324 filas). Falla cerrado: restringe DE MAS.
+--       declara: 7 cuentas, enteras: 5.857 filas) o, por D9 (enmienda
+--       2026-11-21), toda cuenta del centro `CP` (el de codigo 'CP', uno por
+--       empresa: +3 cuentas, 60 filas). Falla cerrado: restringe DE MAS.
 --   FALLA CERRADO (R9): una fila con apunte financiero que no esta en el mayor
 --       completo se restringe con motivo APUNTE_SIN_RESOLVER (hoy 0).
 -- `motivo_restriccion`, en este orden: CONTRAPARTIDA, APUNTE_SIN_RESOLVER,
--- APUNTE_RESTRINGIDO, ASIENTO_PERSONAL; NULL si es visible. Medido: 178.301
--- restringidas (24,7 %), 995 cuentas, 57 centros.
+-- APUNTE_RESTRINGIDO, ASIENTO_PERSONAL; NULL si es visible. Medido el 2026-11-21:
+-- 181.804 restringidas (25,2 %), 1.000 cuentas.
 --
 -- LOS ACUMULADOS (R5, R11): `saldo_acumulado` suma `importe` de la cuenta
 -- analitica hasta la fila inclusive (fecha, codigo de asiento, posicion, fila);
@@ -76,9 +78,17 @@ centros_cp AS (
     JOIN cp_recurso c ON c.cuenta_analitica_id = caa.ide
     WHERE caa.cenide <> 0
 ),
+centro_cp AS (
+    -- D9 (c1, enmienda 2026-11-21): el centro de coste `CP` de cada empresa
+    SELECT n.ide AS centro_coste_id
+    FROM raw.cen n
+    JOIN raw.con ccp ON ccp.ide = n.ide
+    WHERE ccp.cod = 'CP'
+),
 cp AS (
-    -- C3 con D7-b: las CP actuales y las cuentas de esos centros con abono en
-    -- un asiento ANALITICO. UNION (no ALL): una fila por cuenta
+    -- C3 con D7-b y D9: las CP actuales, las cuentas de esos centros con abono
+    -- en un asiento ANALITICO y toda cuenta del centro `CP`. UNION (no ALL):
+    -- una fila por cuenta
     SELECT c.cuenta_analitica_id
     FROM cp_recurso c
     UNION
@@ -88,6 +98,10 @@ cp AS (
     JOIN raw.caa caa ON caa.ide = a.cueide
     JOIN centros_cp cc ON cc.centro_coste_id = caa.cenide
     WHERE asi.tip = 32 AND COALESCE(a.hab, 0) <> 0
+    UNION
+    SELECT caa.ide
+    FROM raw.caa caa
+    JOIN centro_cp k ON k.centro_coste_id = caa.cenide
 ),
 asientos_personal AS (
     -- C2: los asientos de personal del mayor completo, una fila por asiento

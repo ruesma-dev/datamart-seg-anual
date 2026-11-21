@@ -22,6 +22,7 @@ import pytest
 from etl_sigrid.domain.restriccion_personal import (
     MOTIVO_APUNTE_RESTRINGIDO,
     MOTIVO_APUNTE_SIN_RESOLVER,
+    CODIGO_CENTRO_CONTRAPARTIDA,
     MOTIVO_ASIENTO_PERSONAL,
     MOTIVO_CONTRAPARTIDA,
     PATRON_CONCEPTO_NOMINA,
@@ -156,6 +157,28 @@ def test_f127_r7_c3_d7_no_alcanza_a_otras_cuentas(centro: int | None, abonada: b
     )
 
 
+def test_f127_r7_c3_d9_toda_cuenta_del_centro_cp_es_cp() -> None:
+    """D9 (c1, enmienda 2026-11-21): una cuenta del centro `CP` es CP aunque no
+    sea la de ningún recurso ni tenga abono analítico (las tres de la review)."""
+    assert es_cuenta_contrapartida(
+        99, centro_coste_id=7, abonada_en_analitico=False,
+        contrapartidas={10}, centros_contrapartida=frozenset({5}),
+        en_centro_contrapartida=True,
+    )
+
+
+def test_f127_r7_c3_d9_el_centro_cp_es_el_de_codigo_cp() -> None:
+    assert CODIGO_CENTRO_CONTRAPARTIDA == "CP"
+
+
+def test_f127_r7_c3_d9_sin_cuenta_no_es_cp_ni_en_el_centro_cp() -> None:
+    assert not es_cuenta_contrapartida(
+        None, centro_coste_id=7, abonada_en_analitico=True,
+        contrapartidas={10}, centros_contrapartida=frozenset({5}),
+        en_centro_contrapartida=True,
+    )
+
+
 def test_f127_r7_c3_sin_cuenta_no_es_cp() -> None:
     """`cueide = 0` (NULL): no es CP aunque su centro lo sea."""
     assert not es_cuenta_contrapartida(
@@ -287,11 +310,16 @@ CENTROS_CP = (
     "SELECT DISTINCT caa.cenide AS centro_coste_id FROM raw.caa caa JOIN cp_recurso c "
     "ON c.cuenta_analitica_id = caa.ide WHERE caa.cenide <> 0"
 )
+CENTRO_CP = (
+    "SELECT n.ide AS centro_coste_id FROM raw.cen n JOIN raw.con ccp ON ccp.ide = n.ide "
+    f"WHERE ccp.cod = '{CODIGO_CENTRO_CONTRAPARTIDA}'"
+)
 CP = (
     "SELECT c.cuenta_analitica_id FROM cp_recurso c UNION SELECT a.cueide FROM raw.apa a "
     "JOIN raw.con asi ON asi.ide = a.conide JOIN raw.caa caa ON caa.ide = a.cueide "
     "JOIN centros_cp cc ON cc.centro_coste_id = caa.cenide "
-    f"WHERE asi.tip = {TIPO_CON_ASIENTO_ANALITICO} AND COALESCE(a.hab, 0) <> 0"
+    f"WHERE asi.tip = {TIPO_CON_ASIENTO_ANALITICO} AND COALESCE(a.hab, 0) <> 0 "
+    "UNION SELECT caa.ide FROM raw.caa caa JOIN centro_cp k ON k.centro_coste_id = caa.cenide"
 )
 
 
@@ -508,7 +536,8 @@ def test_f127_r6_la_obra_imputada_es_la_unica_de_las_filas_no_cp() -> None:
 
 @pytest.mark.parametrize(
     ("cte", "texto"),
-    [("cp_recurso", CP_RECURSO), ("centros_cp", CENTROS_CP), ("cp", CP)],
+    [("cp_recurso", CP_RECURSO), ("centros_cp", CENTROS_CP), ("centro_cp", CENTRO_CP),
+     ("cp", CP)],
 )
 def test_f127_r7_c3_el_conjunto_cp_con_d7(cte: str, texto: str) -> None:
     assert _cte(MAYOR_ANA, cte).strip() == texto
@@ -567,6 +596,10 @@ def test_f127_r10_los_literales_del_sql_son_los_del_dominio(nombre: str) -> None
     assert tips <= {str(TIPO_CON_ASIENTO), str(TIPO_CON_ASIENTO_ANALITICO)}, tips
     citados = set(re.findall(r"'([A-Z_]{4,})'", sql))
     assert citados <= conocidos, f"literales {citados - conocidos}"
+    cortos = set(re.findall(r"= '([A-Z]{1,3})'", sql))
+    assert cortos <= {CODIGO_CENTRO_CONTRAPARTIDA}, f"códigos {cortos}"
+    if nombre in (MAYOR_ANA, MAYOR_ANA_GEN):
+        assert f"ccp.cod = '{CODIGO_CENTRO_CONTRAPARTIDA}'" in sql, "D9: el centro CP"
     assert REGEX_CUENTA_RESTRINGIDA not in sql and PATRON_CONCEPTO_NOMINA not in sql
     if nombre in (MAYOR_ANA, MAYOR_ANA_GEN):
         assert f"tip = {TIPO_CON_ASIENTO_ANALITICO}" in sql, "D7-b mira los asientos ANALITICO"
@@ -711,7 +744,8 @@ def test_f127_r14_tabla_idempotente_con_indices() -> None:
 def test_f127_r15_guarda_sin_cp() -> None:
     """La guarda recalcula el conjunto CP IGUAL que 08 (con D7-b), desde raw."""
     guarda = _guarda(MAYOR_ANA_GEN)
-    for cte, texto in (("cp_recurso", CP_RECURSO), ("centros_cp", CENTROS_CP), ("cp", CP)):
+    for cte, texto in (("cp_recurso", CP_RECURSO), ("centros_cp", CENTROS_CP),
+                       ("centro_cp", CENTRO_CP), ("cp", CP)):
         assert f"{cte} AS ( {texto} )" in guarda, f"la guarda no recalcula {cte} como 08"
     assert (
         "SELECT count(*) INTO v_cp FROM contabilidad.mayor_analitico g "
@@ -728,6 +762,19 @@ def test_f127_r15_guarda_sin_apunte_restringido_ni_sin_resolver() -> None:
         f"{RESTR}.mayor m WHERE m.apunte_id = g.apunte_id AND NOT m.restringido );"
     ) in guarda
     assert "IF v_apunte <> 0 THEN RAISE EXCEPTION" in guarda
+
+
+def test_f127_r15_d9_guarda_sin_asientos_de_personal() -> None:
+    """Enmienda 2026-11-21 (D9, cambio 3 de la review): la cuarta comprobación,
+    con el mismo criterio de asiento de personal que 08 (C2)."""
+    guarda = _guarda(MAYOR_ANA_GEN)
+    assert (
+        "SELECT count(*) INTO v_personal FROM contabilidad.mayor_analitico g "
+        "WHERE g.asiento_id IN ( SELECT m.asiento_id FROM "
+        f"{RESTR}.mayor m WHERE m.asiento_id IS NOT NULL GROUP BY m.asiento_id "
+        "HAVING bool_and(m.clase_asiento = 'NORMAL') AND bool_or(m.restringido) );"
+    ) in guarda
+    assert "IF v_personal <> 0 THEN RAISE EXCEPTION" in guarda
 
 
 def test_f127_r15_guarda_general_mas_restringidas_igual_a_completo() -> None:
@@ -1130,8 +1177,27 @@ def test_f127_r22_las_fichas_dicen_las_cuatro_cosas() -> None:
         assert "No se suma con `contabilidad" in texto, "el analítico no se suma con el mayor"
         assert "marzo de 2026" in texto and "abril de 2026" in texto, "la nómina en las CP"
         assert "agosto de 2026" in texto, "la imputación de partes"
-        assert "722.631" in texto and "181.712" in texto, "las cifras medidas"
+        assert "722.704" in texto and "181.804" in texto, "las cifras medidas (2.ª pasada, D9)"
+        assert "centro `CP`" in texto, "D9: toda cuenta del centro CP es restringida"
+    assert "540.900" in general and "1.000 cuentas" in completo
     assert "perfil restringido" in completo and "perfil restringido" in general
+
+
+#: La fuente de la respuesta a las preguntas de D8, tal como pidió el líder.
+FUENTE_D8 = "Juan Romero, Control de Costes, correo del 2026-11-20"
+
+
+@pytest.mark.parametrize("objeto", ["mayor_analitico", "saldos_cuenta_analitica_mes"])
+def test_f127_r22_d8_contestada_en_las_fichas_de_las_cp(objeto: str) -> None:
+    """D8 contestada: la nómina por trabajador en las CP solo hasta marzo de
+    2026 (Cegid desde abril), el abono de los partes solo con el parte en IMP,
+    y el saldo de una CP es «nómina menos partes» solo hasta marzo de 2026."""
+    texto = _texto_ficha("contabilidad_restringida.yaml", objeto)
+    assert FUENTE_D8 in texto
+    for termino in ("Cegid", "marzo de 2026", "abril de 2026", "IMP", "CER",
+                    "nomina menos partes"):
+        assert termino in texto, f"{objeto} no dice «{termino}»"
+    assert "pendiente de confirmar" not in texto
 
 
 def test_f127_r22_las_reglas_dicen_la_frontera() -> None:
@@ -1166,8 +1232,9 @@ def test_f127_r23_la_receta_de_la_cp_del_trabajador() -> None:
     ids=[f"{f.split('.')[0]}.{o}" for f, o, *_ in FICHAS_F127],
 )
 def test_f127_r22_ningun_nombre_de_persona(fichero: str, objeto: str) -> None:
-    """Las fichas nuevas hablan de cuentas y recuentos, nunca de personas."""
-    texto = _texto_ficha(fichero, objeto)
+    """Las fichas nuevas hablan de cuentas y recuentos, nunca de personas. La
+    única excepción es la fuente citada de D8 (petición del líder, 2.ª pasada)."""
+    texto = _texto_ficha(fichero, objeto).replace(FUENTE_D8, "")
     assert "Juan" not in texto and "Romero" not in texto
 
 
