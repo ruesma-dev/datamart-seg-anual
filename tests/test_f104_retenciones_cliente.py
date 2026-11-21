@@ -455,7 +455,7 @@ def test_f104_r17_el_orden_de_magnitud_de_cliente_queda_verificado() -> None:
 
 def test_f104_r18_la_version_sube_una_sobre_main() -> None:
     contenido = _yaml("00_global.yaml")
-    assert contenido["version"] == 80
+    assert contenido["version"] >= 80, "F-127 la sube a 81"
     cabecera = (DIR_DICC / "00_global.yaml").read_text(encoding="utf-8").split("\nversion:", 1)[0]
     assert "# version 80 (F-104, 2026-11-" in cabecera
 
