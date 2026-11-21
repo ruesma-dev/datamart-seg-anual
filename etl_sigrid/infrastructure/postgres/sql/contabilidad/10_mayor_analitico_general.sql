@@ -75,7 +75,8 @@ CREATE INDEX idx_con_mana_asiento              ON contabilidad.mayor_analitico (
 COMMENT ON TABLE contabilidad.mayor_analitico IS
 'F-127. El mayor ANALITICO GENERAL: una fila por fila de raw.apa SALVO las restringidas (cuentas de contrapartida de los trabajadores, apuntes de personal y sus asientos), que solo lee el rol autorizado en contabilidad_restringida.mayor_analitico. Cuanto falta, en contabilidad.apuntes_analiticos_restringidos_mes. saldo_acumulado es el de lo visible. Cuenta ANALITICA; obra solo por el centro; importe = debe - haber (sin cierres ni aperturas). No se suma con contabilidad.mayor.';
 
--- R15: ninguna fila de CP, ninguna de un apunte restringido o sin resolver, y
+-- R15: ninguna fila de CP, ninguna de un apunte restringido o sin resolver,
+-- ninguna de un asiento de personal (D9, enmienda 2026-11-21) y
 -- general + restringidas = completo
 DO $$
 DECLARE
