@@ -2,8 +2,22 @@
 
 Revisión incremental desde 876edbe (pasada 2): `git diff 876edbe..16651d9` (b5a2d62, 115d44b, a09e509, 16651d9) y `azure-apps` 7586308.
 
-**Veredicto pasada 2: PENDIENTE SOLO DE C1** (la puerta completa del líder sobre 16651d9). Todo lo demás está
-en `[x]`: si la puerta sale en verde, APPROVED; si no, CHANGES_REQUESTED por C1.
+**Veredicto pasada 2: CHANGES_REQUESTED, solo por C1.** La puerta completa del líder sobre 16651d9 sale
+con EXIT 1. Todo lo demás está en `[x]`.
+
+## Cambios requeridos (pasada 2)
+
+1. **[Implementer] `tests/test_f104_retenciones_cliente.py:458`**: `assert contenido["version"] == 80` falla
+   con `81 == 80`, porque F-127 sube el diccionario a la v81. Lo he reproducido en el worktree: `1 failed,
+   27 passed`. Hay que cambiarlo a `>= 80`, como hace el resto del repositorio. La comprobación de la
+   cabecera `# version 80 (F-104, 2026-11-` se queda como está y sigue pasando. El fallo ya estaba en 876edbe:
+   ni mi batería ni la del implementer incluían `test_f104`. Recomendado en la misma tarea:
+   `tests/test_f127_mayor_analitico.py:1156` (`== 81`) también a `>= 81`, para que la próxima feature que
+   suba la versión no tumbe F-127 de la misma forma.
+2. **[Líder] Repetir la puerta.** `PUERTA COBERTURA` salió `[KO] 47.9 %` (23/48). Casi seguro se debe al
+   corte de `-x` en el primer fallo: `test_f104` corre antes que `test_f127`. Mi medición del dominio en la
+   copia da 100 %. Hay que volver a medirla con la puerta tras el arreglo.
+3. **[Implementer, opcional en el mismo commit]** La observación 1 de abajo (`ruff --fix`, I001).
 
 **Nivel de rigor:** `critico` (declarado): fase RED, cobertura 90 %, mutación con 0 supervivientes (60 %,
 [100, 300]), RM1-RM7; e2e informativa.
@@ -66,18 +80,16 @@ passed` con las aserciones del CTE `centro_cp`; `3 failed` en las fichas) antes 
 
 ## Pasada 2 · observaciones (no bloquean)
 
-1. **Lint nuevo de F-127**: `ruff` da I001 en `tests/test_f127_mayor_analitico.py:16`
-   (`CODIGO_CENTRO_CONTRAPARTIDA` fuera de orden en el import). La puerta no lo bloquea (`LINT_BLOQUEA=0`),
-   pero es deuda que nace en esta feature: `python -m ruff check --fix` sobre ese fichero antes del merge;
-   lo compruebo en la pasada de evidencias.
-2. `specs/F-127-mayor-analitico/tasks.md` T13 sigue con las cifras del 2026-11-20 (~544.330 / ~178.301). Las
-   buenas están en `current.md`, que es lo que sigue el humano; conviene apuntar ahí en T13.
-3. El comentario de 10 justo encima del `DO $$` («R15: ninguna fila de CP, ninguna de un apunte ... y
-   general + restringidas») no nombra la cuarta comprobación; la cabecera del fichero sí la nombra.
+1. **Lint nuevo de F-127**: `ruff` I001 en `tests/test_f127_mayor_analitico.py:16` (import fuera de orden).
+   No bloquea (`LINT_BLOQUEA=0`), pero nace aquí: `ruff check --fix` antes del merge.
+2. `tasks.md` T13 sigue con las cifras del 2026-11-20; las buenas están en `current.md` (T13).
+3. El comentario encima del `DO $$` de 10 no nombra la cuarta comprobación (la cabecera sí).
 
 ## Checkpoints (estado tras la pasada 2)
 
-- **C1** `[ ]` **pendiente de la puerta del líder** (`bash harness/init.sh` sobre 16651d9 en `puerta/F-127`).
+- **C1** `[ ]` **EN ROJO.** Puerta del líder (`bash harness/init.sh`, 16651d9 en `puerta/F-127`, con `.env`):
+  EXIT 1. pytest: `1 failed, 9327 passed, 2461 skipped` (1:23:17, `-x`), el de F-104 (cambio 1).
+  `PUERTA COBERTURA [KO] 47.9 %` (cambio 2). `TAMAÑO` OK y `CARRIL` N/A (crítico).
 - **C2** `[x]` F-127 es `in_review`, la única activa, en su rama. **C3 bis** N/A: no entra ningún documento
   de fuera (la respuesta de D8 es un correo resumido, sin original que versionar).
 - **C3** `[x]` El dominio sigue siendo puro y el SQL está en `infrastructure/`. Sin secretos, sin prints y
@@ -111,23 +123,17 @@ passed` con las aserciones del CTE `centro_cp`; `3 failed` en las fichas) antes 
 
 ## Pasada 1 (resumen; detalle en el historial de este fichero, commit f920fb8)
 
-Revisión completa de `90d1bfd...876edbe` y `azure-apps` 70a039a: **CHANGES_REQUESTED**. (1) 60 filas de 3
-cuentas `CP.*` del centro `CP`, sin recurso ni abono `ANA`, llegaban al general (conceptos de nómina);
-opciones c1/c2/c3, recomendada c1. (2) Las cifras y frases dependientes. (3) La guarda de R15 no vigilaba
-C2. D7-b (5.857 filas y no 324) era la lectura literal de la spec, a confirmar por el humano. Verificado
-entonces: `restringido` nunca NULL, las tres guardas fallan cerrado, ningún test de otra feature pierde lo
-que protegía (F-056, F-135, F-141, F-146), F-147 +605 exactos, `R-PERFILES` en 996 caracteres, D3 y
-diccionario v81 correctos, 0 nombres y 0 NIF en el diff. RM4 con 9 mutantes muertos y RM7 (mover 10 delante
-de 08 pone en rojo la suite de F-127). Batería de entonces: 3.994 passed, 22 failed, todos previos a F-127
-(`SigridApiSettings ... Field required`, también en la base).
+`90d1bfd...876edbe` y `azure-apps` 70a039a: **CHANGES_REQUESTED** por 60 filas de 3 cuentas `CP.*` del centro
+`CP` visibles (c1 recomendada), sus cifras y la guarda sin C2; D7-b, a confirmar por el humano. Lo demás
+verificado (guardas, otras features, F-147, `R-PERFILES`, D3, v81, 0 nombres/NIF, RM4 9/9, RM7).
 
 ## Automejora (propuesta, no aplicada)
-- `spec-author.md` / `CHECKPOINTS.md` C4 bis (de la pasada 1): si una restricción se define por un
-  CONJUNTO, medir el **residuo visible de su familia** (mismo centro, prefijo, código en otra empresa), no
-  solo lo que el conjunto atrapa. En esta pasada se ha medido así y da 0 con seis criterios.
-- Un test de «ningún nombre de persona» que solo conoce dos palabras da una falsa sensación de cobertura.
-  Propuesta para `reviewer.md`: cuando una feature publique fichas sobre datos personales, el barrido
-  contra `raw.res`/`raw.emp` (en memoria, solo recuentos) es obligatorio en cada pasada y consta en el
-  informe; el test queda como guarda de la regresión concreta.
+- C4 bis: si una restricción se define por un CONJUNTO, medir el **residuo visible de su familia** (mismo
+  centro, prefijo, código en otra empresa). En esta pasada, 0 con seis criterios.
+- `reviewer.md`: con fichas sobre datos personales, el barrido contra `raw.res`/`raw.emp` (en memoria, solo
+  recuentos) es obligatorio en cada pasada; un test de dos palabras no basta.
+- `reviewer.md`/`implementer.md`: la «batería de lo afectado» que sustituye a la puerta debe incluir todo
+  test que fije la versión del diccionario (`grep '"version"\] =='`). Aquí `test_f104` cayó en las dos
+  pasadas y solo lo vio la puerta completa, 1 h 23 min después. Y fijar la versión con `>=`, nunca `==`.
 
 Azure: solo lecturas (`filas_solo_lectura`, READ ONLY) desde el checkout principal, sin cambiar su rama.
