@@ -9,6 +9,33 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-22 · F-127 `done` · el mayor analítico (pendientes MANUAL)
+
+- Cerrada con el OK del humano y fusionada en `dev`; resumen en `progress/history.md`.
+- Quedan los pasos MANUAL T12-T16 de abajo y el push de `dev`.
+
+### F-127 · pasos MANUAL (humano)
+
+Con la imagen nueva o desde un checkout con `.env` (Postgres de dev; contra Azure, el job):
+
+- **T12** · `python main.py build-contabilidad`, después `python main.py check-unicidad`,
+  `python main.py check-relaciones` y `python main.py check-diccionario`. Aviso esperado en
+  check-relaciones: cobertura parcial de `contabilidad_restringida.mayor_analitico.cuenta_analitica_id`
+  frente a `personal.recursos.cuenta_analitica_contrapartida_id` (solo las CP tienen recurso).
+- **T13** · `SELECT (SELECT count(*) FROM contabilidad_restringida.mayor_analitico), (SELECT count(*) FROM raw.apa), (SELECT count(*) FROM contabilidad.mayor_analitico), (SELECT count(*) FILTER (WHERE restringido) FROM contabilidad_restringida.mayor_analitico);`
+  → esperado (medido el 2026-11-21 en solo lectura, con D9): 722.704 / 722.704 / 540.900 / 181.804 (el
+  `raw` crece cada noche: lo que se comprueba es completo = `raw.apa` y general + restringidas = completo,
+  con restringidas ~25,2 %); y la duración
+  de `build_contabilidad` en `_meta.etl_runs` frente a 1.029-1.194 s.
+- **T14** · `SELECT count(*) FROM (SELECT COALESCE(cuenta_analitica_id, 0) c, sum(importe) i FROM contabilidad_restringida.mayor_analitico GROUP BY 1) m FULL JOIN (SELECT cuenta_analitica_id c, sum(importe) i FROM contabilidad_restringida.saldos_cuenta_analitica_mes GROUP BY 1) s ON s.c = m.c WHERE m.i IS DISTINCT FROM s.i;` → 0.
+- **T15** · `SELECT r, t, has_table_privilege(r, t, 'SELECT') FROM unnest(ARRAY['mcp_sigrid_dm_ro','sigrid_dm_perfil_restringido_ro','mcp_sigrid_dm_restringido','sigrid_dm_perfil_postventa_ro','mcp_sigrid_dm_postventa','sigrid_dm_autorizado_ro','mcp_sigrid_dm_total']) r, unnest(ARRAY['contabilidad_restringida.mayor_analitico','contabilidad_restringida.saldos_cuenta_analitica_mes','contabilidad.mayor_analitico','contabilidad.saldos_cuenta_analitica_mes','contabilidad.apuntes_analiticos_restringidos_mes']) t;`
+  → falso para los perfiles restringido y postventa en las cinco; `mcp_sigrid_dm_ro` verdadero solo en las
+  tres de `contabilidad`; `sigrid_dm_autorizado_ro` y `mcp_sigrid_dm_total` verdadero en las cinco.
+- **T16** · publicar el diccionario v81 CON LA IMAGEN DEL JOB, reiniciar `mcp-bbdd` y preguntar con el
+  perfil total «saldo y movimientos de la CP del recurso <código> en la obra <clave> y su cruce con sus
+  partes de 2025»; anotar si responde sin ayuda.
+- **Push** (humano): `dev` con el merge de F-127. Los commits de `azure-apps` ya están subidos.
+
 ## 2026-11-19 · F-104 DONE (OK del humano), fusionada en `dev`; pendiente su T11 MANUAL · retención de cliente saneada, diccionario v80
 
 - Review principal APPROVED (`progress/review_F-104.md`), observaciones 1 y 2 hechas (`e51e692`), mutación

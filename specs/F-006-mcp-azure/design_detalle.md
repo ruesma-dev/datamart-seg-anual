@@ -307,6 +307,13 @@ infraestructura.
 > `ventas.retencion_cuenta` y `ventas.v_retencion_cliente`; `retenciones.movimientos`
 > gana `origen_retencion` y `cuenta_id`. Sin regla nueva. El inventario pasa a
 > **326 objetos**.
+>
+> **Enmienda del 2026-11-20 (F-127, el mayor analitico).** Entran
+> `contabilidad_restringida.mayor_analitico`,
+> `contabilidad_restringida.saldos_cuenta_analitica_mes`,
+> `contabilidad.mayor_analitico`, `contabilidad.saldos_cuenta_analitica_mes` y
+> `contabilidad.apuntes_analiticos_restringidos_mes`. Sin regla nueva (una frase
+> en `R-PERFILES` y `R-SALDO-CONTABLE`). El inventario pasa a **331 objetos**.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,

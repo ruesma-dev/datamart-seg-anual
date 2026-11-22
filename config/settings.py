@@ -218,14 +218,19 @@ DEFAULT_TOTAL_VETOED_SCHEMAS = "raw"
 # `contabilidad` sale ENTERO de la lista (antes estaba, sin el mayor ni los
 # saldos: le quedaban el plan de cuentas y los recuentos de apuntes de
 # personal). Lo que no está en la lista se le veta cada noche desde el catálogo,
-# como `tesoreria` y `personal`, así que una tabla nueva de `contabilidad` (el
-# mayor analítico de F-127, si nace ahí) no le llega. `retenciones` sigue dentro.
+# como `tesoreria` y `personal`, así que una tabla nueva de `contabilidad` no le
+# llega. `retenciones` sigue dentro.
 # La lista de objetos excluidos (D2) queda VACÍA y no puede quedarse «como red»
 # con las dos de contabilidad: R7 rechaza una exclusión de un esquema que no se
 # le concede y la nocturna pararía. Sigue siendo el mecanismo para quitar un
-# objeto suelto de un esquema que SÍ ve: si F-127 publica su mayor analítico en
-# uno de ellos y sin «mayor» en el nombre, entra aquí. Grupo vacío = no se mira
-# el perfil.
+# objeto suelto de un esquema que SÍ ve.
+#
+# F-127 nació en `contabilidad` (D3 de su spec, 2026-11-20): el mayor analítico
+# completo en `contabilidad_restringida` y el general en `contabilidad`, dos
+# esquemas que este perfil y el de postventa no leen. La obligación de F-141
+# («excluirlo en su lista») se cumple por ese veto de esquema y NO se añade
+# nada aquí: la lista sigue vacía y la nocturna lo comprueba con
+# `has_table_privilege`. Grupo vacío = no se mira el perfil.
 DEFAULT_PERFIL_RESTRINGIDO_GROUP = "sigrid_dm_perfil_restringido_ro"
 DEFAULT_PERFIL_RESTRINGIDO_LOGIN = "mcp_sigrid_dm_restringido"
 #

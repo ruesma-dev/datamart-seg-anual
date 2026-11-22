@@ -929,7 +929,8 @@
       "rigor": "critico",
       "branch": "feature/F-061-coste-personal-obra",
       "status": "pending",
-      "sdd": true
+      "sdd": true,
+      "notes": "2026-11-22: observación de F-127 (correo de Juan Romero del 2026-11-20): el asiento analítico de mano de obra solo se genera cuando el parte pasa a IMP; los partes en CER no generan asiento y desde agosto de 2026 no hay ninguno imputado; desde abril de 2026 las nóminas van en Cegid con solo el asiento global. El coste de mano de obra de marzo a noviembre de 2026 puede estar sin imputar a las obras por la vía contable: comprobar si el coste real de F-061 sale de los partes o de los asientos."
     },
     {
       "id": "F-062",
@@ -1993,12 +1994,13 @@
         "El perfil restringido (F-141) no lee ningún objeto del mayor analítico: excluido en su lista y comprobado en el catálogo con `has_*_privilege`",
         "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
       ],
-      "status": "todo",
+      "status": "done",
       "sdd": true,
       "rigor": "critico",
       "priority": 9,
       "branch": "feature/F-127-mayor-analitico",
-      "notes": "2026-11-17: el humano la compromete («añade en todo el mayor analítico»): pasa de pending a todo, prioridad 8, detrás de la última comprometida (F-119); las pending de la 8 a la 16 bajan un puesto. 2026-11-20: spec aprobada por el humano («ok») con todas las opciones recomendadas (D1-D8); D5 se da de alta como F-167."
+      "notes": "2026-11-17: el humano la compromete («añade en todo el mayor analítico»): pasa de pending a todo, prioridad 8, detrás de la última comprometida (F-119); las pending de la 8 a la 16 bajan un puesto. 2026-11-20: spec aprobada por el humano («ok») con todas las opciones recomendadas (D1-D8); D5 se da de alta como F-167. 2026-11-22: review APPROVED (b45f5ac, puerta del líder en verde sobre 48849e9: 13.852 passed, cobertura 48/48) y review de evidencias APPROVED (33da7eb, mutación 19/19 muertos reverificados en serie; 3 no evaluados vivos y equivalentes, 249, 265 y 283, porque solo difieren con el 0, que el SQL convierte en NULL). Pasa a human_review. 2026-11-22: OK del humano a la PARADA 2 («ok, merge a dev»); done y fusionada en dev. Pendientes MANUAL T12-T16 en progress/current.md.",
+      "spec_aprobada": "2026-11-20"
     },
     {
       "id": "F-128",

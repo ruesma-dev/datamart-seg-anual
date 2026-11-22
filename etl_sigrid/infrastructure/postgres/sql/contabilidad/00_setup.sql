@@ -1,6 +1,6 @@
 -- etl_sigrid/infrastructure/postgres/sql/contabilidad/00_setup.sql
 -- ============================================================================
--- F-056 · SCHEMA contabilidad (1/8): los esquemas y su conversion de fecha
+-- F-056 · SCHEMA contabilidad (1/13): los esquemas y su conversion de fecha
 --
 -- Modulo independiente, como `retenciones` y `personal`: lee SOLO de `raw.*` y
 -- de la vista `maestro.centros_coste` (el puente centro de coste -> obra de
@@ -27,6 +27,14 @@
 --   05_mayor_general.sql            contabilidad.mayor                         solo lo visible
 --   06_saldos_general.sql           contabilidad.saldos_cuenta_mes             solo lo visible, con recuento de lo que falta
 --   07_apuntes_restringidos_mes.sql contabilidad.apuntes_restringidos_mes      cuanto falta, sin importes
+--
+-- F-127 (2026-11-20): EL MAYOR ANALITICO (`raw.apa`), cinco tablas mas detras
+-- de las siete, con el mismo patron de dos esquemas:
+--   08_mayor_analitico.sql          contabilidad_restringida.mayor_analitico   una fila por fila de apa, con la marca
+--   09_saldos_analitica.sql         contabilidad_restringida.saldos_cuenta_analitica_mes  cuenta analitica x centro x mes
+--   10_mayor_analitico_general.sql  contabilidad.mayor_analitico               solo lo visible
+--   11_saldos_analitica_general.sql contabilidad.saldos_cuenta_analitica_mes   solo lo visible, con recuento de lo que falta
+--   12_apuntes_analiticos_restringidos_mes.sql contabilidad.apuntes_analiticos_restringidos_mes  cuanto falta, sin importes
 -- ============================================================================
 
 CREATE SCHEMA IF NOT EXISTS contabilidad;

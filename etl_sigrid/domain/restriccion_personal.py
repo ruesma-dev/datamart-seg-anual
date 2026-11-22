@@ -26,16 +26,32 @@ Criterio aprobado por el humano el 2026-10-11 (V2 de la spec, D1-b):
   una auxiliar sin su fila en `raw.cua` dejaría pasar una 465 y su banco al
   general. Hoy son 0 en Azure: no cambia ninguna cifra.
 
-Este módulo es el ORÁCULO: el SQL de `contabilidad_restringida.mayor` no lo
-llama, pero lleva los mismos literales (`REGEX_CUENTA_RESTRINGIDA` y
-`PATRON_CONCEPTO_NOMINA`, escritos tal cual), y un test los compara (R4).
-Dominio puro: sin dependencias de infraestructura.
+F-127 (2026-11-20) extiende el criterio al MAYOR ANALÍTICO (`raw.apa`), con el
+criterio V2 que R23 de F-135 dejó escrito para él. Una fila analítica es
+restringida si cualquiera de:
+
+* **C1, apunte restringido**: su apunte financiero (`apuide`) es un apunte
+  restringido del mayor completo.
+* **C2, asiento de personal**: su asiento (`conide`) es un AP del mayor
+  completo (todos sus apuntes `NORMAL` y alguno restringido).
+* **C3, cuenta de contrapartida (CP)**: su cuenta analítica es la CP de algún
+  recurso (`raw.res.caaconide`) o, por D7-b, una cuenta de un centro de CP con
+  abono en un asiento `ANALITICO` (`con.tip = 32`): una CP de antes que el
+  recurso ya no declara. Falla cerrado: restringe DE MÁS.
+* **Falla cerrado**: una fila con `apuide` que no está en el mayor completo se
+  restringe con motivo `APUNTE_SIN_RESOLVER`.
+
+Este módulo es el ORÁCULO: el SQL de `contabilidad_restringida.mayor` y el de
+`contabilidad_restringida.mayor_analitico` no lo llaman, pero llevan los mismos
+literales (`REGEX_CUENTA_RESTRINGIDA`, `PATRON_CONCEPTO_NOMINA`, los motivos y
+los tipos de `con.tip`, escritos tal cual), y un test los compara (R4 de F-135,
+R10 de F-127). Dominio puro: sin dependencias de infraestructura.
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
+from collections.abc import Iterable, Mapping, Sequence, Set
 from dataclasses import dataclass
 
 #: Los catorce prefijos de cuenta restringida entera (D1-b y D11): los de Juan
@@ -152,3 +168,119 @@ def motivo_restriccion(apunte: ApunteContable, asiento_es_personal: bool) -> str
 def es_apunte_restringido(apunte: ApunteContable, asiento_es_personal: bool) -> bool:
     """True si el apunte no es legible por el rol general."""
     return motivo_restriccion(apunte, asiento_es_personal) is not None
+
+
+# ===========================================================================
+# F-127 · el mayor analítico (`raw.apa`)
+# ===========================================================================
+
+#: `con.tip` del asiento de una fila analítica: 20 es el asiento contable (el
+#: de los apuntes de `raw.apu`) y 32 el asiento ANALÍTICO puro (código `ANA…`,
+#: sin apunte financiero: el que imputa los partes a las obras y abona la CP).
+TIPO_CON_ASIENTO = 20
+TIPO_CON_ASIENTO_ANALITICO = 32
+
+#: Valores de `tipo_asiento` en el mayor analítico (R3).
+TIPO_ASIENTO_CONTABLE = "CONTABLE"
+TIPO_ASIENTO_ANALITICO = "ANALITICO"
+TIPO_ASIENTO_OTRO = "OTRO"
+
+#: Valores de `motivo_restriccion` del mayor analítico (R8), además de
+#: `MOTIVO_ASIENTO_PERSONAL`, que se reutiliza.
+MOTIVO_CONTRAPARTIDA = "CONTRAPARTIDA"
+MOTIVO_APUNTE_SIN_RESOLVER = "APUNTE_SIN_RESOLVER"
+MOTIVO_APUNTE_RESTRINGIDO = "APUNTE_RESTRINGIDO"
+
+#: D9 (c1, enmienda 2026-11-21): el código del centro de coste de las cuentas
+#: de contrapartida (`raw.con.cod` del centro, uno por empresa). Toda cuenta de
+#: ese centro es CP, la declare un recurso o no.
+CODIGO_CENTRO_CONTRAPARTIDA = "CP"
+
+
+def tipo_asiento(tip: int | None) -> str:
+    """`CONTABLE` (`con.tip = 20`), `ANALITICO` (32) u `OTRO` (R3)."""
+    if tip == TIPO_CON_ASIENTO:
+        return TIPO_ASIENTO_CONTABLE
+    if tip == TIPO_CON_ASIENTO_ANALITICO:
+        return TIPO_ASIENTO_ANALITICO
+    return TIPO_ASIENTO_OTRO
+
+
+@dataclass(frozen=True, slots=True)
+class FilaAnalitica:
+    """Lo que el criterio mira de una fila de `raw.apa`.
+
+    `apunte_id` es `NULLIF(apa.apuide, 0)`; `apunte_resuelto`, que ese apunte
+    está en el mayor completo; `apunte_restringido`, su `restringido` allí;
+    `asiento_personal`, que el asiento es AP (C2); `cuenta_es_contrapartida`,
+    que la cuenta analítica es CP (C3, con D7-b).
+    """
+
+    apunte_id: int | None
+    apunte_resuelto: bool
+    apunte_restringido: bool
+    asiento_personal: bool
+    cuenta_es_contrapartida: bool
+
+
+def centros_de_contrapartida(
+    contrapartidas: Set[int], centro_de_cuenta: Mapping[int, int | None]
+) -> frozenset[int]:
+    """Los centros de coste de las CP actuales (D7-b). Sin centro no cuenta."""
+    return frozenset(
+        centro
+        for cuenta in contrapartidas
+        if (centro := centro_de_cuenta.get(cuenta)) is not None
+    )
+
+
+def es_cuenta_contrapartida(
+    cuenta_id: int | None,
+    *,
+    centro_coste_id: int | None,
+    abonada_en_analitico: bool,
+    contrapartidas: Set[int],
+    centros_contrapartida: Set[int],
+    en_centro_contrapartida: bool = False,
+) -> bool:
+    """C3 (R7, D7-b, D9): la CP de un recurso, una cuenta de un centro de CP con
+    abono (`hab <> 0`) en un asiento `ANALITICO`, o una cuenta cuyo centro es el
+    de código `CODIGO_CENTRO_CONTRAPARTIDA`."""
+    if cuenta_id is None:
+        return False
+    if cuenta_id in contrapartidas or en_centro_contrapartida:
+        return True
+    return abonada_en_analitico and centro_coste_id in centros_contrapartida
+
+
+def motivo_apunte_analitico(fila: FilaAnalitica) -> str | None:
+    """El motivo de R8, en su precedencia; `None` si la fila es visible.
+
+    `CONTRAPARTIDA` > `APUNTE_SIN_RESOLVER` > `APUNTE_RESTRINGIDO` >
+    `ASIENTO_PERSONAL`. Sin apunte financiero (`apuide = 0`) no hay nada que
+    resolver.
+    """
+    if fila.cuenta_es_contrapartida:
+        return MOTIVO_CONTRAPARTIDA
+    if fila.apunte_id is not None and not fila.apunte_resuelto:
+        return MOTIVO_APUNTE_SIN_RESOLVER
+    if fila.apunte_restringido:
+        return MOTIVO_APUNTE_RESTRINGIDO
+    if fila.asiento_personal:
+        return MOTIVO_ASIENTO_PERSONAL
+    return None
+
+
+def es_apunte_analitico_restringido(fila: FilaAnalitica) -> bool:
+    """True si la fila analítica no es legible por el rol general (R7, R9)."""
+    return motivo_apunte_analitico(fila) is not None
+
+
+def obra_imputada(obras_de_cargo: Iterable[int | None]) -> int | None:
+    """La obra de un asiento `ANALITICO` (R6, D4): la de sus filas que no son
+    de CP si es UNA sola; con ninguna o con varias, `None`. Las filas sin obra
+    no cuentan, como `count(DISTINCT ...)` en SQL."""
+    distintas = {obra for obra in obras_de_cargo if obra is not None}
+    if len(distintas) == 1:
+        return next(iter(distintas))
+    return None

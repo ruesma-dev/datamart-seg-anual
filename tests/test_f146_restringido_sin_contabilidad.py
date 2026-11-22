@@ -39,6 +39,13 @@ TABLAS_CONTABILIDAD = (
     "contabilidad.plan_cuentas", "contabilidad.mayor", "contabilidad.saldos_cuenta_mes",
     "contabilidad.apuntes_restringidos_mes",
 )
+# F-127: el mayor analitico general, sus saldos y cuanto falta. Solo en el
+# diccionario: la comprobacion final de 02_roles.sql (R4) no cambia, porque el
+# veto es del esquema entero.
+TABLAS_CONTABILIDAD_F127 = (
+    "contabilidad.mayor_analitico", "contabilidad.saldos_cuenta_analitica_mes",
+    "contabilidad.apuntes_analiticos_restringidos_mes",
+)
 TABLA_NUEVA = "contabilidad.mayor_analitico"
 VERSION_F146 = 58
 DICC = RAIZ / "config" / "diccionario"
@@ -324,7 +331,7 @@ def _tablas_de_contabilidad() -> list[str]:
 
 def test_f146_r5_las_tablas_del_diccionario_son_las_de_hoy() -> None:
     assert sorted(f"contabilidad.{o}" for o in _tablas_de_contabilidad()) == sorted(
-        TABLAS_CONTABILIDAD
+        TABLAS_CONTABILIDAD + TABLAS_CONTABILIDAD_F127
     )
 
 

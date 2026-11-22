@@ -62,6 +62,20 @@ FICHEROS_F135 = [
     "04_plan_cuentas_general.sql", "05_mayor_general.sql", "06_saldos_general.sql",
     "07_apuntes_restringidos_mes.sql",
 ]
+#: F-127: los cinco del mayor analitico, detras de los ocho (no cambian ninguno)
+FICHEROS_F127 = [
+    "08_mayor_analitico.sql", "09_saldos_analitica.sql", "10_mayor_analitico_general.sql",
+    "11_saldos_analitica_general.sql", "12_apuntes_analiticos_restringidos_mes.sql",
+]
+#: F-127: los sub-pasos de esos cinco y la tabla que cuenta cada uno
+SUB_PASOS_F127 = [
+    ("mayor_analitico", FICHEROS_F127[0], ESQ_F127 := "contabilidad_restringida", "mayor_analitico"),
+    ("saldos_analitica", FICHEROS_F127[1], ESQ_F127, "saldos_cuenta_analitica_mes"),
+    ("mayor_analitico_general", FICHEROS_F127[2], "contabilidad", "mayor_analitico"),
+    ("saldos_analitica_general", FICHEROS_F127[3], "contabilidad", "saldos_cuenta_analitica_mes"),
+    ("apuntes_analiticos_restringidos_mes", FICHEROS_F127[4], "contabilidad",
+     "apuntes_analiticos_restringidos_mes"),
+]
 #: F-135: donde escriben 01-03 (la contabilidad COMPLETA)
 ESQ = "contabilidad_restringida"
 #: F-135: las tres columnas que el mayor COMPLETO anade al final
@@ -197,7 +211,9 @@ def test_f056_r1_esquema_y_paso_propio() -> None:
         "la vista maestro.centros_coste es SQL puro sobre raw: declarar "
         "build_maestros ataria la contabilidad a otro esquema (design)"
     )
-    assert [s.sql_file for s in build_contabilidad_step.SUB_PASOS] == FICHEROS + FICHEROS_F135
+    assert [s.sql_file for s in build_contabilidad_step.SUB_PASOS] == (
+        FICHEROS + FICHEROS_F135 + FICHEROS_F127
+    )
     for sub in build_contabilidad_step.SUB_PASOS:
         assert (DIR_CON / sub.sql_file).exists(), f"{sub.sql_file} declarado y no existe"
 
@@ -314,17 +330,17 @@ def test_f056_r3_el_step_encadena_y_cuenta(monkeypatch: pytest.MonkeyPatch) -> N
         def count_rows(self, schema: str, table: str) -> int:
             self.contados.append((schema, table))
             return {"plan_cuentas": 5, "mayor": 7, "saldos_cuenta_mes": 11,
-                    "apuntes_restringidos_mes": 13}[table]
+                    "apuntes_restringidos_mes": 13}.get(table, 0)  # F-127: los suyos, 0
 
     pg = _PgFalso()
     monkeypatch.setattr(build_contabilidad_step, "build_postgres_client", lambda _s: pg)
     resultado = BuildContabilidadStep(SimpleNamespace()).run()
 
     assert resultado.status == StepStatus.SUCCESS
-    assert pg.ejecutados == FICHEROS + FICHEROS_F135
+    assert pg.ejecutados == FICHEROS + FICHEROS_F135 + FICHEROS_F127
     assert pg.contados == [(ESQ, t) for t in TABLAS] + [
         ("contabilidad", t) for t in (*TABLAS, "apuntes_restringidos_mes")
-    ]
+    ] + [(esquema, tabla) for _, _, esquema, tabla in SUB_PASOS_F127]
     assert resultado.rows_processed == 23 + 23 + 13
     assert resultado.finished_at is not None
     assert resultado.error_message is None
@@ -388,7 +404,7 @@ def test_f056_r3_el_log_de_cada_sub_paso(monkeypatch: pytest.MonkeyPatch) -> Non
         ("contabilidad_substep_done", "mayor_general", 9),
         ("contabilidad_substep_done", "saldos_general", 9),
         ("contabilidad_substep_done", "apuntes_restringidos_mes", 9),
-    ], "setup no cuenta filas: su log dice 0, no lo que valga por defecto"
+    ] + [("contabilidad_substep_done", nombre, 9) for nombre, _, _, _ in SUB_PASOS_F127], "setup no cuenta filas: su log dice 0, no lo que valga por defecto"
     assert {d["duration_s"] for _, d in registro.info_} == {1.23}, "segundos con dos decimales"
 
 
@@ -482,6 +498,7 @@ def test_f056_r3_sub_pasos_y_sus_tablas() -> None:
         ("mayor_general", FICHEROS_F135[1], "contabilidad", "mayor"),
         ("saldos_general", FICHEROS_F135[2], "contabilidad", "saldos_cuenta_mes"),
         ("apuntes_restringidos_mes", FICHEROS_F135[3], "contabilidad", "apuntes_restringidos_mes"),
+        *SUB_PASOS_F127,
     ]
 
 

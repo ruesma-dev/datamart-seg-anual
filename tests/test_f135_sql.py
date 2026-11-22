@@ -552,13 +552,15 @@ def test_f135_generales_idempotentes(nombre: str, tabla: str) -> None:
 
 
 def test_f135_sub_pasos_los_ocho_ficheros_con_su_esquema() -> None:
+    """Los ocho de F-135, en su orden y al principio. F-127 añade cinco detrás
+    (el mayor analítico); los fija `tests/test_f127_mayor_analitico.py`."""
     from etl_sigrid.application.steps import build_contabilidad_step
 
     declarados = [
         (s.name, s.sql_file, s.target_schema, s.target_table)
         for s in build_contabilidad_step.SUB_PASOS
     ]
-    assert declarados == [
+    assert declarados[:8] == [
         ("setup", SETUP, None, None),
         ("plan_cuentas", PLAN, RESTR, "plan_cuentas"),
         ("mayor", MAYOR, RESTR, "mayor"),

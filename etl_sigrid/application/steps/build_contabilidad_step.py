@@ -27,11 +27,25 @@ Encadena los archivos SQL en orden:
                                        lo que falta (`incompleto`)
     07_apuntes_restringidos_mes.sql  - general: cuántos apuntes faltan por empresa y
                                        mes, sin importes
+    08_mayor_analitico.sql           - restringida (F-127): una fila por fila de
+                                       `raw.apa`, con la marca de lo restringido
+                                       (C1-C3, cuentas de contrapartida) y su guarda
+    09_saldos_analitica.sql          - restringida: cuenta analítica x centro x mes
+    10_mayor_analitico_general.sql   - general: solo lo visible, con su guarda (0 CP,
+                                       0 apuntes restringidos y cuadre de recuentos)
+    11_saldos_analitica_general.sql  - general: saldos analíticos de lo visible +
+                                       recuento de lo que falta (`incompleto`)
+    12_apuntes_analiticos_restringidos_mes.sql
+                                     - general: cuántas filas analíticas faltan por
+                                       empresa, mes y motivo, sin importes
+
+F-127 (el mayor analítico) va DETRÁS de los ocho de F-056/F-135, sin cambiar
+ninguno: lee el mayor completo (02) para heredar su marca.
 
 Los permisos NO van aquí: los da (y los veta y verifica) `apply_grants` cada
 noche. Este paso solo construye.
 
-Lee de `raw.*` (con, cua, auxemp, apu) y de UNA cosa fuera de `raw`: la vista
+Lee de `raw.*` (con, cua, auxemp, apu; y apa, res y caa desde F-127) y de UNA cosa fuera de `raw`: la vista
 `maestro.centros_coste`, el puente centro de coste -> obra. Esa vista es SQL
 puro sobre `raw` y nunca se dropea, así que `depends_on = ["ingest_raw"]` y no
 `build_maestros`: el mismo motivo escrito en `build_retenciones_step.py`.
@@ -66,8 +80,10 @@ class _SubStep:
     target_table: str | None = None
 
 
-#: Los ocho ficheros SQL, EN ORDEN, y de qué tabla se cuentan filas. Los de la
-#: contabilidad general (04-07) van DETRÁS de los del completo: leen de él.
+#: Los trece ficheros SQL, EN ORDEN, y de qué tabla se cuentan filas. Los de la
+#: contabilidad general (04-07) van DETRÁS de los del completo: leen de él. Los
+#: cinco del mayor analítico (08-12, F-127) van al final: 08 lee el mayor
+#: completo (02) y 10-12 leen 08.
 #:
 #: Vive fuera de `run()` por lo mismo que en `build_personal_step`: es DATO, y
 #: sustituirla en un test es lo que permite ejercitar el fichero que falta.
@@ -115,6 +131,37 @@ SUB_PASOS: tuple[_SubStep, ...] = (
         sql_file="07_apuntes_restringidos_mes.sql",
         target_schema="contabilidad",
         target_table="apuntes_restringidos_mes",
+    ),
+    # F-127: el mayor analítico, completo (08, 09) y general (10-12)
+    _SubStep(
+        name="mayor_analitico",
+        sql_file="08_mayor_analitico.sql",
+        target_schema="contabilidad_restringida",
+        target_table="mayor_analitico",
+    ),
+    _SubStep(
+        name="saldos_analitica",
+        sql_file="09_saldos_analitica.sql",
+        target_schema="contabilidad_restringida",
+        target_table="saldos_cuenta_analitica_mes",
+    ),
+    _SubStep(
+        name="mayor_analitico_general",
+        sql_file="10_mayor_analitico_general.sql",
+        target_schema="contabilidad",
+        target_table="mayor_analitico",
+    ),
+    _SubStep(
+        name="saldos_analitica_general",
+        sql_file="11_saldos_analitica_general.sql",
+        target_schema="contabilidad",
+        target_table="saldos_cuenta_analitica_mes",
+    ),
+    _SubStep(
+        name="apuntes_analiticos_restringidos_mes",
+        sql_file="12_apuntes_analiticos_restringidos_mes.sql",
+        target_schema="contabilidad",
+        target_table="apuntes_analiticos_restringidos_mes",
     ),
 )
 
