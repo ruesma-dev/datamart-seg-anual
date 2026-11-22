@@ -2239,3 +2239,24 @@ Detonante: la 0721 salía con la ficha vacía de PORSAN (empresa 28) en lugar de
 **Ecosistema:** `azure-apps/datamart_seg_anual.md`, commit `4621627` (por subir).
 
 **Fuera, pendiente:** T11 MANUAL (build, cuadres R20/R21/R37, permisos R35, publicar v80 con la imagen del job y reiniciar `mcp-bbdd`); observaciones 3 y 4 del review, decisión del humano.
+
+## F-127 — El mayor analítico, con lo de personal en el esquema restringido · `done` (2026-11-22)
+
+**Qué cambia.** Cinco tablas nuevas en `build_contabilidad`.
+- `contabilidad_restringida.mayor_analitico` y `.saldos_cuenta_analitica_mes`: el analítico entero (`raw.apa`).
+- `contabilidad.mayor_analitico` y `.saldos_cuenta_analitica_mes`: sin lo restringido. `contabilidad.apuntes_analiticos_restringidos_mes`: solo recuentos.
+- Restringido: toda cuenta del centro `CP` (D9, c1), los asientos de personal y, con D7-b, las cuentas antiguas de los centros de CP con abono analítico, enteras (5.857 filas).
+- Guarda de cuatro comprobaciones en `10_mayor_analitico_general.sql`. El oráculo está en `etl_sigrid/domain/restriccion_personal.py`.
+- Diccionario v81 (cinco fichas). El tope de contexto de F-147 sube de 37.914 a 38.519.
+
+**Verificado:**
+- Review: pasada 1 CHANGES_REQUESTED (3 cuentas CP visibles, resuelto con D9). Pasada 2 CHANGES_REQUESTED por la puerta (`test_f104_r18` fijaba la v80 con `==`), y APPROVED en `b45f5ac`.
+- Puerta del líder en verde sobre `48849e9`: 13.852 passed, cobertura 48/48.
+- Azure (solo lectura, 2026-11-21): 722.704 filas, 181.804 restringidas y 540.900 visibles; residuo 0 en seis criterios.
+- Mutación (rigor crítico, `progress/mutacion_F-127.md`): 19/19 muertos, reverificados en serie. Evidencias APPROVED (`33da7eb`).
+- De los 11 no evaluados, 3 vivos (249, 265 y 283): equivalentes, solo difieren con el 0 que el SQL convierte en NULL.
+
+**Ecosistema:** `azure-apps/datamart_seg_anual.md`, commits `70a039a` y `7586308` (ya subidos).
+
+**Fuera, pendiente:** pasos MANUAL T12-T16 (en `current.md`), F-167 (descripciones de CP con nombre en `maestro.cuentas_analiticas`) y la observación a F-061 (partes en CER sin asiento).
+

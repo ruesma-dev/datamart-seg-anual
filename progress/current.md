@@ -9,30 +9,10 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-11-21 · F-127 `in_review` (implementer, pasada 2) · el mayor analítico
+## 2026-11-22 · F-127 `done` · el mayor analítico (pendientes MANUAL)
 
-- CHANGES_REQUESTED de la review resuelto con D9 (c1): toda cuenta del centro `CP` es CP (+3 cuentas,
-  60 filas); cuarta comprobación de la guarda de 10 (asientos de personal). D7-b confirmada. D8
-  contestada (correo del 2026-11-20) y en las fichas de las CP. Nuevo commit en `azure-apps`, sin push.
-
-## 2026-11-20 · F-127 `in_review` (implementer) · el mayor analítico
-
-- T1-T10 hechas (T10 en `azure-apps` 70a039a, sin push). Informe: `progress/impl_F-127.md`.
-- Pendiente: puerta completa `bash harness/init.sh` (líder, checkout con `.env`), reviewer, pasada de
-  campaña de mutación (T11) tras el APPROVED y los pasos MANUAL T12-T16 de abajo.
-
-- Worktree `.claude/worktrees/f127`, rama `feature/F-127-mayor-analitico`. Tarea en curso: ver `tasks.md`.
-- **Diccionario v81 (en la rama, SIN PUBLICAR): 331 objetos, 2912 columnas y 168 de consumo**
-  (v80 + las cinco fichas de F-127). Se publica con su imagen (T16).
-- Desviaciones de la spec (justificadas en `progress/impl_F-127.md`):
-  - `test_f056_contabilidad.py` y `test_f135_sql.py` fijaban `SUB_PASOS` con EXACTAMENTE ocho ficheros;
-    T6 añade cinco al final, así que esos dos tests pasan a decir «los ocho de antes, y detrás los cinco
-    de F-127». No cambia ni un fichero ni una columna de F-056/F-135.
-
-  - D7-b, tomada al pie de la letra (las 7 cuentas antiguas de los centros de CP con abono
-    `ANALITICO`, enteras), restringe 5.857 filas y no 324; frente a solo `caaconide` oculta 3.087 filas
-    más. Confirmada por el humano (D7-b, 2026-11-21); con D9, T13 espera 181.804 / 540.900 (2026-11-21).
-  - T14 de `tasks.md` no corre en PostgreSQL (FULL JOIN con `IS NOT DISTINCT FROM`): abajo, la versión que sí.
+- Cerrada con el OK del humano y fusionada en `dev`; resumen en `progress/history.md`.
+- Quedan los pasos MANUAL T12-T16 de abajo y el push de `dev`.
 
 ### F-127 · pasos MANUAL (humano)
 
@@ -54,25 +34,7 @@ Con la imagen nueva o desde un checkout con `.env` (Postgres de dev; contra Azur
 - **T16** · publicar el diccionario v81 CON LA IMAGEN DEL JOB, reiniciar `mcp-bbdd` y preguntar con el
   perfil total «saldo y movimientos de la CP del recurso <código> en la obra <clave> y su cruce con sus
   partes de 2025»; anotar si responde sin ayuda.
-- **Push** (humano): la rama `feature/F-127-mayor-analitico` y, en `azure-apps`, `git pull` y después
-  `git push` del commit `F-127: datamart_seg_anual.md ...`.
-
-## 2026-11-20 · F-127 `spec_ready` (spec-author) · el mayor analítico
-
-- Spec en `specs/F-127-mayor-analitico/` (rama `feature/F-127-mayor-analitico`); mediciones en
-  `progress/spec_F-127.md`, con el borrador de «Preguntas a Juan» (NO enviado). Rigor `critico`
-  confirmado (disparadores 3 y 4).
-- Cinco tablas en `build_contabilidad` (patrón F-135): `contabilidad_restringida.mayor_analitico` y
-  `.saldos_cuenta_analitica_mes`; `contabilidad.mayor_analitico`, `.saldos_cuenta_analitica_mes` y
-  `.apuntes_analiticos_restringidos_mes`. Restringidas 178.301 de 722.631 filas (24,7 %).
-- **Decisiones abiertas para el humano: D1-D8** (tabla de `design.md`). Las que más pesan: D3 (la
-  obligación de F-141 se cumple por el veto de esquema de F-146; añadirlo a
-  `PG_PERFIL_RESTRINGIDO_EXCLUDED_TABLES` haría fallar la nocturna), D5 (la descripción de 758 CP lleva
-  el nombre del trabajador y ya la publica `maestro.cuentas_analiticas` para el estándar y el perfil
-  restringido: fuga anterior a F-127), D7 (CP históricas) y D8 (nómina en las CP solo hasta 2026-03;
-  imputación de partes solo hasta 2026-07).
-- **Para el líder antes del implementer**: `test_f135_sql.py::test_f135_r23_…` exige F-127 en
-  `pending`/`todo` y con `spec_ready` queda en ROJO (design §8).
+- **Push** (humano): `dev` con el merge de F-127. Los commits de `azure-apps` ya están subidos.
 
 ## 2026-11-19 · F-104 DONE (OK del humano), fusionada en `dev`; pendiente su T11 MANUAL · retención de cliente saneada, diccionario v80
 
