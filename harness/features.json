@@ -1993,12 +1993,12 @@
         "El perfil restringido (F-141) no lee ningún objeto del mayor analítico: excluido en su lista y comprobado en el catálogo con `has_*_privilege`",
         "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
       ],
-      "status": "in_review",
+      "status": "human_review",
       "sdd": true,
       "rigor": "critico",
       "priority": 9,
       "branch": "feature/F-127-mayor-analitico",
-      "notes": "2026-11-17: el humano la compromete («añade en todo el mayor analítico»): pasa de pending a todo, prioridad 8, detrás de la última comprometida (F-119); las pending de la 8 a la 16 bajan un puesto. 2026-11-20: spec aprobada por el humano («ok») con todas las opciones recomendadas (D1-D8); D5 se da de alta como F-167.",
+      "notes": "2026-11-17: el humano la compromete («añade en todo el mayor analítico»): pasa de pending a todo, prioridad 8, detrás de la última comprometida (F-119); las pending de la 8 a la 16 bajan un puesto. 2026-11-20: spec aprobada por el humano («ok») con todas las opciones recomendadas (D1-D8); D5 se da de alta como F-167. 2026-11-22: review APPROVED (b45f5ac, puerta del líder en verde sobre 48849e9: 13.852 passed, cobertura 48/48) y review de evidencias APPROVED (33da7eb, mutación 19/19 muertos reverificados en serie; 3 no evaluados vivos y equivalentes, 249, 265 y 283, porque solo difieren con el 0, que el SQL convierte en NULL). Pasa a human_review.",
       "spec_aprobada": "2026-11-20"
     },
     {
