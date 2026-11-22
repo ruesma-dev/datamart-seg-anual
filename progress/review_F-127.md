@@ -1,135 +1,135 @@
 # F-127 · Revisión (reviewer)
 
-Revisión incremental desde 876edbe (pasada 2): `git diff 876edbe..48849e9` (D9: b5a2d62-16651d9; tras la puerta roja: fe92a67, de92958, 598d51f, a893ec6, 1a272ad, 48849e9) y `azure-apps` 7586308.
+Revisión de evidencias desde b45f5ac: `git diff b45f5ac..9502df9` (solo `progress/`) y `progress/mutacion_F-127.md`.
 
-**Veredicto pasada 2: APPROVED** (cerrada sobre 48849e9). La primera puerta, sobre 16651d9, salió roja
-(EXIT 1): `test_f104_r18` fijaba la versión del diccionario con `== 80`, F-127 la sube a 81, y la
-cobertura quedó en `[KO] 47.9 %` porque `-x` cortó la suite antes de llegar a F-127. El CHANGES_REQUESTED
-por C1 lo dejó c49591e. Lo que vino después:
-- fe92a67 cambia `test_f104_r18` a `>= 80`, como F-056, F-097 y F-120, y deja la cabecera como estaba.
-- Las tres observaciones están resueltas: de92958 (I001), 598d51f (T13 con las cifras del 2026-11-21) y
-  a893ec6 (el comentario de 10).
-- 1a272ad y 48849e9 son solo el informe.
+**Veredicto (pasada de evidencias): APPROVED.**
 
-He revisado el diff. `test_f104` + `test_f127` dan 216 passed, 1 skipped, y `ruff` queda limpio en los
-dos ficheros. Sigue abierto, sin bloquear: `test_f127_mayor_analitico.py:1156` fija la versión con
-`== 81`, y la próxima feature que la suba lo tumbará igual.
+**Pasadas anteriores:**
+- **Pasada principal:** APPROVED en b45f5ac. Antes hubo dos CHANGES_REQUESTED. El de f920fb8 era por las
+  CP del centro `CP` visibles, y lo resolvió D9 (c1). El de c49591e era por C1 (`test_f104_r18 == 80`), y lo
+  resolvió fe92a67. Las pruebas de esas pasadas están en el historial de este fichero.
+- **Mediciones de la pasada principal, en Azure y en solo lectura:** 722.704 filas en total, 181.804
+  restringidas, 540.900 generales y 1.000 cuentas. El residuo visible del centro `CP`, de `CP%` y de asientos
+  de personal da 0 con seis criterios propios. El barrido de nombres y NIF del diff da 0. RM4 a mano: 9/9 en
+  la pasada 1 y 9/9 en la pasada 2.
 
-**Nivel de rigor:** `critico` (declarado): fase RED, cobertura 90 %, mutación con 0 supervivientes (60 %,
-[100, 300]), RM1-RM7; e2e informativa.
+**Nivel de rigor:** `critico` (declarado en `features.json`). Exige fase RED, cobertura del 90 % y mutación
+uno por línea con fracción 0,6 y tope [100, 300], con cero supervivientes y RM1-RM7. La capa e2e es
+informativa.
 
-## Pasada 2 · los tres cambios de la pasada 1
+## C4 bis · la campaña (no reejecutada: 8.637 s según el informe, más de 60 s)
 
-1. **[x] D9 (c1), las CP del centro `CP`.** R7 lleva la enmienda «2026-11-21, D9» y R15 la suya (la cuarta
-   comprobación); design D9 tiene la decisión del humano con la confirmación de D7-b. El oráculo
-   (`CODIGO_CENTRO_CONTRAPARTIDA = "CP"`, `es_cuenta_contrapartida(..., en_centro_contrapartida)`), el CTE
-   `centro_cp` + la tercera rama de `cp` en 08 (`08_mayor_analitico.sql:81-105`) y su copia literal en la
-   guarda de 10 (`10_mayor_analitico_general.sql:100-120`) dicen lo mismo, y `test_f127_r7_c3_el_conjunto_cp_con_d7`
-   y `test_f127_r15_guarda_sin_cp` comparan los cuatro CTE con el mismo texto. R10: el literal `'CP'` lo
-   fija el test contra la constante del dominio.
-2. **[x] Cifras y frases.** Fichas, ARCHITECTURE, `current.md` (T13) y `azure-apps` 7586308 dicen 722.704 /
-   181.804 (25,2 %) / 540.900 / 1.000 cuentas, con fecha 2026-11-21; la frase «Las cuentas de contrapartida
-   ... no tienen fila» ahora incluye «todas las del centro `CP`». Ninguna cifra vieja sin fecha en el árbol
-   (las de `raw.yaml`/`tables_sigrid.yaml` son la medición fechada de `raw.apa` del 2026-11-20).
-3. **[x] Cuarta comprobación (C2) en la guarda.** `v_personal` con el mismo `GROUP BY ... HAVING
-   bool_and(NORMAL) AND bool_or(restringido)` que el CTE `asientos_personal` de 08, sobre `g.asiento_id`
-   (en 08, `NULLIF(a.conide, 0)`: el mismo identificador). Su test es `test_f127_r15_d9_guarda_sin_asientos_de_personal`.
+La lanzó el líder con `python -m harness.mutacion --feature F-127 --base main --rama puerta/F-127 --workers 3
+--timeout 2400 --con-seleccion` sobre b45f5ac. Resultado: **30 generados, 19 evaluados, 19 muertos, 0
+supervivientes, 0 timeouts y 0 sin veredicto**. No lleva la cabecera «CAMPAÑA NO VÁLIDA». Las tres líneas
+base corrieron en verde (1.862-1.924 s), y el JSON dice `fiable: true` con el SHA de b45f5ac.
 
-**Fase RED `[x]`:** `impl_F-127.md` trae las salidas reales (ImportError de la constante; `6 failed, 180
-passed` con las aserciones del CTE `centro_cp`; `3 failed` en las fichas) antes de cada cambio.
+**Recálculo puro (independiente):**
+- Alcance: con `alcance_de_feature("F-127", base="main", rama="b45f5ac")` salen **197 líneas**:
+  `settings.py` 10, `build_contabilidad_step.py` 50 y `restriccion_personal.py` 137.
+- Mutantes: `generar_mutantes` da **30**, los 30 en el dominio.
+- Muestreo: `reducir_por_linea(Random(20261030))` deja **19 candidatos**. El tope del nivel es
+  min(300, max(100, ⌈0,6·19⌉)) = 100, así que la campaña es completa: no hay muestreo y coincide con
+  `rigor.json`.
+- Los 19 que salen, con su línea, operador y texto original→mutado, son **exactamente** los 19 de la tabla
+  del informe y del JSON. Los he cruzado todos, no solo una muestra.
 
-## Pasada 2 · verificación independiente
+**Ficheros sin mutantes, prueba de control:** sobre el fichero entero, `generar_mutantes` saca 40 mutantes de
+`settings.py` y 18 de `build_contabilidad_step.py`. El generador funciona, así que el 0 del alcance es
+legítimo.
+- `settings.py`: las 10 líneas son comentarios.
+- `build_contabilidad_step.py`: las 50 líneas son el docstring y cinco `_SubStep` de cadenas.
 
-- **Azure, solo lectura** (desde el checkout principal, `pg._bootstrap_done = True`, `filas_solo_lectura`,
-  el SELECT de 08 de 16651d9 como subconsulta, 35 s): completo **722.704** = `raw.apa`; restringidas
-  **181.804** (CONTRAPARTIDA 174.295, APUNTE_RESTRINGIDO 7.509, SIN_RESOLVER 0, ASIENTO_PERSONAL 0);
-  generales **540.900**; **1.000** cuentas; `restringido` nulo 0. Coincide con el implementer.
-- **Residuo visible, con criterios propios y no con el CTE de 08:** cuenta cuyo centro tiene `raw.con.cod =
-  'CP'` sin exigir `raw.cen` (833 cuentas): **0**; código `CP%`: **0**; asiento de personal (criterio C2):
-  **0**; asiento con algún apunte restringido aunque no sea todo NORMAL (más laxo): **0**; mismo código que
-  una CP actual en otra empresa (la c2): **0**; cuenta que es `caaconide` de algún recurso: **0**. Hay 20
-  filas `raw.con` con `cod = 'CP'`, pero solo 10 son centros (`raw.cen`), y el residuo es 0 con las 20.
-- **Mutación a mano (RM4), en una copia `git archive` de 16651d9** en el scratchpad, con `pytest -x
-  tests/test_f127_mayor_analitico.py`: **9 de 9 muertos**. En 08: sin la rama `centro_cp`, con `'CP'`
-  cambiado a `'CPX'` y sin el JOIN a `raw.cen`. En 10: sin la rama `centro_cp`, con `IF v_personal < 0`,
-  con `bool_and` cambiado a `bool_or` y con `v_personal` sobre el completo. En el dominio: sin
-  `en_centro_contrapartida` y con su defecto en `True`.
-- **Cobertura del dominio**: 100 % (90 sentencias, 28 ramas) con `coverage --branch` en la copia.
-- **Tests en el worktree:** `test_f127`: **188 passed, 1 skipped** (el de `azure-apps`, por la ruta del
-  worktree). Batería de lo afectado (F-127, F-006, F-056, F-135, F-141, F-146, F-147, F-128, F-107, F-057,
-  F-005 y los documentos del arnés): **3.994 passed, 22 failed, 370 skipped (1.413 s)**. Los 22 son los
-  de siempre: 21 de `test_f006_comandos.py` y la frescura de `test_f006_reglas.py`, por `SigridApiSettings
-  ... Field required` (el worktree no tiene `.env`). Caen igual en la base. Ninguno es de F-127.
+Ninguna de las dos declaraciones queda en `PENDIENTE`. El SQL no lo muta la herramienta (solo muta Python).
+Lo cubren las mutaciones a mano: 39 del implementer y 9 + 9 mías.
 
-## Pasada 2 · las preguntas del líder
+## RM1-RM7
 
-- **(4) `test_f127_r22_ningun_nombre_de_persona`.** Antes prohibía «Juan» y «Romero»; ahora quita primero
-  la cita exacta `FUENTE_D8` y prohíbe esas dos palabras en lo demás. Sigue cazando cualquier otra mención
-  de Juan, y una cita mal escrita o partida haría fallar el test, no lo ablandaría. **Nunca protegió contra
-  nombres de trabajadores en general**: solo conoce esas dos palabras. Esa protección la da el barrido de
-  abajo, no el test. Acepto la desviación: la cita es la fuente de un dato de negocio (quien lo afirma), no
-  un dato de un trabajador, y R22 ya nombraba el «aviso de Juan».
-- **(5) Nombres y NIF en el diff nuevo.** Barrido en memoria (sin escribir nada a disco) de las líneas
-  añadidas de `876edbe..16651d9` y de `azure-apps` 7586308 contra los 2.642 recursos de `raw.res` (nombre de
-  `raw.con`, nombre y apellidos de `raw.emp`, `cif` y `dni`): **0 nombres completos, 0 parejas
-  nombre-apellido, 0 NIF/DNI**, y 0 cadenas con forma de NIF. «Juan Romero» no casa con ningún recurso.
+- **RM1** `[x]` Se midió `b45f5acc…` y HEAD es 9502df9. Entre los dos, `git diff b45f5ac..9502df9` solo toca
+  `progress/impl_F-127.md` y `progress/mutacion_F-127.md`. El alcance es el mismo que se midió.
+- **RM2** `[x]` Línea base ≈ 1.890 s y media por mutante de 454,6 s (24 %, no llega a ser un salto de orden de
+  magnitud). Además 19 × 454,6 = 8.637 s, que es el «Tiempo total». Una media por debajo de la base es lo
+  esperable con `-x`, con 19/19 muertos y con subconjuntos de 8,5 tests de media. Cuatro mutantes se
+  juzgaron con la suite entera (1.139,5 s de media): son los de línea sin mapa (constantes y decorador).
+- **RM3** `[x]` Ninguno de los 19 muertos es equivalente.
+  - 180 y 181 cambian los literales `20`/`32`, que fija `r3_los_literales_de_con_tip`.
+  - 209 (`slots=False`) se ve en `__slots__`, y lo caza `test_f006_toda_dataclass_del_paquete_usa_slots`.
+  - 244 (el defecto `True`) cambia el resultado de C3.
+  - El resto invierte comparaciones o ramas que tienen test.
+- **RM4** `[x]` Hecha en las pasadas 1 y 2 (18 mutantes de SQL y dominio, todos muertos), y ahora RM5.
+- **RM5** `[x]` Los tres «equivalentes» no son supervivientes de la campaña. Son 3 de los 11 generados que el
+  uno por línea dejó fuera, y el implementer los pasó en serie por su cuenta. **He elegido el 265**
+  (veracidad): `if fila.apunte_id is not None and not fila.apunte_resuelto` →
+  `if fila.apunte_id and not fila.apunte_resuelto`.
+  - Lo he reproducido en una copia `git archive` de b45f5ac con la batería del implementer más el barrido de
+    F-006: **618 passed, rc 0, vivo**.
+  - Con una fila que tiene `apunte_resuelto = False`, el original y el mutante solo difieren con
+    `apunte_id = 0`. Con `None` los dos dan visible y con `7` los dos dan `APUNTE_SIN_RESOLVER`; con `0`,
+    el original da `APUNTE_SIN_RESOLVER` y el mutante da visible.
+- **RM6** `[x]` El 0 nunca llega, y está comprobado en **quien construye el dato**, que es el SQL. El oráculo
+  no tiene ningún llamante de producción: es el espejo del SQL que prueban los tests.
+  - **Medido en Azure (solo lectura).** `raw.apa` sí trae ceros: `apuide = 0` en 83.597 filas y
+    `cueide = 0` en 127. Pero 08 los convierte en NULL con `NULLIF(a.apuide, 0)` y `NULLIF(a.cueide, 0)`, y
+    esas dos líneas las fija `test_f127_r3_columnas_en_orden` (líneas 427 y 434 del test). El tipo `FilaAnalitica` declara
+    además `apunte_id` = `NULLIF(apa.apuide, 0)`.
+  - **No existe ninguna cuenta 0.** `raw.caa` y `raw.con` no tienen `ide = 0`, y la rama D9 y `cp_recurso`
+    filtran `caaconide <> 0`.
+  - **No existe ninguna obra 0.** `maestro.centros_coste` tiene 0 filas con `obra_id = 0`: la obra que no se
+    resuelve sale NULL.
+  - **Conclusión: los tres son equivalentes en el dominio declarado.** Un test con el 0 no lo recomiendo. En
+    el 265 obligaría al oráculo a restringir un `apunte_id = 0` que el SQL publica como visible (NULL), así
+    que fijaría un contrato distinto del SQL que corre. Tampoco hace falta una feature aparte.
+  - No se ha quitado ninguna guarda: desde b45f5ac no ha cambiado el código.
+- **RM7** `[x]` Hecha en la pasada 1: mover 10 delante de 08 pone en rojo F-127 y F-056. La cuarta
+  comprobación no añade ningún orden nuevo.
 
-## Pasada 2 · observaciones (resueltas en de92958, 598d51f y a893ec6)
+## Checkpoints
 
-1. **Lint nuevo de F-127**: `ruff` I001 en `tests/test_f127_mayor_analitico.py:16` (import fuera de orden).
-   No bloquea (`LINT_BLOQUEA=0`), pero nace aquí: `ruff check --fix` antes del merge.
-2. `tasks.md` T13 sigue con las cifras del 2026-11-20; las buenas están en `current.md` (T13).
-3. El comentario encima del `DO $$` de 10 no nombra la cuarta comprobación (la cabecera sí).
-
-## Checkpoints (estado tras la pasada 2)
-
-- **C1** `[x]` Puerta del líder sobre **48849e9** (con `.env`): **EXIT 0**. pytest: 13.852 passed, 2.556
-  skipped, 0 failed (48:39). `PUERTA COBERTURA` OK: 100,0 % (48/48). `TAMAÑO` OK. `CARRIL` N/A. La de 16651d9
-  salió roja (arriba).
-- **C2** `[x]` F-127 es `in_review`, la única activa, en su rama. **C3 bis** N/A: no entra ningún documento
-  de fuera (la respuesta de D8 es un correo resumido, sin original que versionar).
-- **C3** `[x]` El dominio sigue siendo puro y el SQL está en `infrastructure/`. Sin secretos, sin prints y
-  sin GRANT. `ruff`: observación 1.
-- **C3 ter** `[x]` D8, contestada, con su fuente y su fecha en `spec_F-127.md` y en las fichas.
-- **C3 quater** `[x]` `azure-apps` 7586308 toca solo `datamart_seg_anual.md`, en commit aparte, con
-  `pull --rebase` previo y **sin push**: `main` va 3 por delante de `origin` (70a039a, 7586308 y un
-  cd58cab de `partes`, que no es de F-127).
-- **C4** `[x]` Requisitos → tests (tabla abajo); los tests no tocan red ni BBDD.
-- **C4 bis**: fase RED `[x]`; cobertura: dominio al 100 % y la línea `PUERTA COBERTURA` llega con la
-  puerta (C1); mutación, RM1-RM3, RM5 y RM6: **pendientes, pasada de evidencias** (T11 va tras el APPROVED);
-  RM4 `[x]` (arriba); **RM7** `[x]`: la cuarta comprobación lee `contabilidad_restringida.mayor` (paso 02) y
-  el general recién creado, así que no añade orden nuevo, y el orden 08 → 10 ya lo probé en la pasada 1.
-  «Evidencias» `[x]`. Capa e2e: N/A, es un ETL sin interfaz y ningún requisito es `(capa: e2e)`.
-- **C4 ter** N/A: no hay `harness/rutas_sensibles.json`.
-- **C5** `[x]` T1-T10 `[x]`; los commits de la pasada 2 son de corrección de review (D9) y citan la
-  decisión. T11 (campaña), T12-T16 (MANUAL) y T17 (la puerta) siguen abiertos, como corresponde.
+- **C1** `[x]` La puerta completa del líder sobre **48849e9** salió con EXIT 0 (13.852 passed, 0 failed) y
+  `PUERTA COBERTURA` al 100,0 % (48/48). Desde 48849e9 solo cambia `progress/`. En el worktree, que no tiene
+  `.env`, `test_f127` da 188 passed y 1 skipped. Tamaño: review 135/140.
+- **C2** `[x]` F-127 es la única feature activa (`in_review`) y va en su rama. **C3 bis**: N/A, no entra
+  ningún documento de fuera.
+- **C3** `[x]` Dominio puro y SQL en `infrastructure/`, sin secretos ni prints, y `ruff` limpio en los
+  ficheros de F-127 (de92958).
+- **C3 ter** `[x]` D8 está contestada, con su fuente y su fecha.
+- **C3 quater** `[x]` `azure-apps` 70a039a y 7586308 tocan solo `datamart_seg_anual.md`, van en commit aparte
+  y **no están subidos**.
+- **C4** `[x]` La tabla de abajo. **C4 bis** `[x]`: fase RED, cobertura, mutación (arriba), RM1-RM7 y la
+  sección «Evidencias». La capa e2e es N/A: es un ETL sin interfaz y ningún requisito es `(capa: e2e)`.
+- **C4 ter**: N/A, no hay `harness/rutas_sensibles.json`.
+- **C5** `[x]` T1-T11 `[x]` (T11 en 9502df9). T12-T16 son MANUAL (humano) y T17 es la puerta del líder.
 
 ## Cobertura requisito → test (`tests/test_f127_mayor_analitico.py`)
 | Req | Test(s) |
 |---|---|
 | R1-R2 | `r1_el_completo_es_una_tabla…`, `r1_sin_filtrar…`, `r1_nada_multiplica`, `r1_indices…`, `r2_la_guarda_de_recuento` |
 | R3-R6 | `r3_*`, `r4_no_lee_los_campos_vetados_de_apa`, `r4_la_obra_solo…`, `r5_saldo_acumulado…`, `r6_*` |
-| R7 | `r7_*` (C1-C3, D7-b) y, de D9, `r7_c3_d9_toda_cuenta_del_centro_cp_es_cp`, `r7_c3_d9_el_centro_cp_es_el_de_codigo_cp`, `r7_c3_d9_sin_cuenta…`, `r7_c3_el_conjunto_cp_con_d7[centro_cp]` |
+| R7 | `r7_*` (C1-C3, D7-b) y, de D9, `r7_c3_d9_*`, `r7_c3_el_conjunto_cp_con_d7[centro_cp]` |
 | R8-R11 | `r8_*`, `r9_*`, `r10_los_literales_del_sql_son_los_del_dominio` (con `'CP'`), `r11_*` · R13: MANUAL (T14) |
 | R12, R14 | `r12_*`, `r14_*` |
-| R15 | `r15_guarda_sin_cp` (con `centro_cp`), `r15_guarda_sin_apunte…`, **`r15_d9_guarda_sin_asientos_de_personal`**, `r15_guarda_general_mas…` |
+| R15 | `r15_guarda_sin_cp`, `r15_guarda_sin_apunte…`, `r15_d9_guarda_sin_asientos_de_personal`, `r15_guarda_general_mas…` |
 | R16-R19 | `r16_*`, `r17_*`, `r18_*`, `r19_*` · R20: MANUAL (T15) |
-| R21-R23 | `r21_*`, `r22_*` (cifras de la pasada 2, `r22_d8_contestada_en_las_fichas_de_las_cp`), `r23_*` |
+| R21-R23 | `r21_*`, `r22_*` (con `r22_d8_contestada_en_las_fichas_de_las_cp`), `r23_*` |
 | R24 | `r24_*` (el de `azure-apps` se salta en el worktree) · R25, R26: MANUAL (T13, T16) |
 
-## Pasada 1 (resumen; detalle en el historial de este fichero, commit f920fb8)
+## Para el líder y el humano
 
-`90d1bfd...876edbe` y `azure-apps` 70a039a: **CHANGES_REQUESTED** por 60 filas de 3 cuentas `CP.*` del centro
-`CP` visibles (c1 recomendada), sus cifras y la guarda sin C2; D7-b, a confirmar por el humano. Lo demás
-verificado (guardas, otras features, F-147, `R-PERFILES`, D3, v81, 0 nombres/NIF, RM4 9/9, RM7).
+- Los tres mutantes vivos de fuera de la campaña (249, 265 y 283) los acepto como **equivalentes justificados
+  por escrito**. Conviene que el humano lo vea en el resumen final. En `critico`, un superviviente necesita su
+  aceptación, y aunque estos no lo son formalmente, son de la misma familia.
+- Sigue abierto, sin bloquear: `test_f127_mayor_analitico.py:1156` fija la versión del diccionario con
+  `== 81`.
+- `progress/mutacion_F-127.json` queda sin versionar, como el de F-164.
 
 ## Automejora (propuesta, no aplicada)
 - C4 bis: si una restricción se define por un CONJUNTO, medir el **residuo visible de su familia** (mismo
-  centro, prefijo, código en otra empresa). En esta pasada, 0 con seis criterios.
-- `reviewer.md`: con fichas sobre datos personales, el barrido contra `raw.res`/`raw.emp` (en memoria, solo
-  recuentos) es obligatorio en cada pasada; un test de dos palabras no basta.
-- `reviewer.md`/`implementer.md`: la «batería de lo afectado» que sustituye a la puerta debe incluir todo
-  test que fije la versión del diccionario (`grep '"version"\] =='`). Aquí `test_f104` cayó en las dos
-  pasadas y solo lo vio la puerta completa, 1 h 23 min después. Y fijar la versión con `>=`, nunca `==`.
+  centro, prefijo, código en otra empresa), no solo lo que el conjunto atrapa.
+- `reviewer.md`: con fichas sobre datos personales, el barrido contra `raw.res`/`raw.emp` (en memoria y solo
+  con recuentos) es obligatorio en cada pasada.
+- `reviewer.md`/`implementer.md`: la batería que sustituye a la puerta debe incluir todo test que fije la
+  versión del diccionario (`grep '"version"\] =='`), y esa versión se fija con `>=`.
+- `reviewer.md` RM5: aclarar qué hacer con los mutantes que el «uno por línea» deja fuera cuando alguien los
+  evalúa y salen vivos. Hoy no son supervivientes, pero se tratan como tales.
 
 Azure: solo lecturas (`filas_solo_lectura`, READ ONLY) desde el checkout principal, sin cambiar su rama.
