@@ -16,7 +16,7 @@ Este cliente respeta `page_size` que debe ser <= ese límite.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from typing import Any
 
 import httpx
@@ -29,6 +29,7 @@ from tenacity import (
 
 from etl_sigrid.domain.entities import ColumnSpec
 from etl_sigrid.domain.extraccion import es_sentencia_de_lectura
+from etl_sigrid.domain.texto_largo import expresion_recorte
 from etl_sigrid.infrastructure.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -190,6 +191,7 @@ class SigridApiClient:
         schema: str = "dbo",
         start_id: int = 0,
         page_size: int | None = None,
+        recortes: Mapping[str, int] | None = None,
     ) -> Iterator[list[dict[str, Any]]]:
         """
         Itera la tabla `schema.source_table` usando paginación keyset sobre `id_column`.
@@ -204,6 +206,9 @@ class SigridApiClient:
           page_size : si se pasa, sobreescribe self._page_size para esta llamada.
                       Útil para tablas con columnas texto/blob pesadas que necesitan
                       batches más pequeños.
+          recortes  : F-168 (R3). `{columna: N}`: esas columnas se piden cortadas
+                      a N caracteres y sin NUL (`expresion_recorte`), con su
+                      mismo nombre; el resto, `[col]` como siempre.
         """
         if not columns:
             raise ValueError("La lista de columnas no puede estar vacía")
@@ -213,7 +218,13 @@ class SigridApiClient:
         effective_page_size = page_size or self._page_size
 
         # Construye la lista de columnas escapando con corchetes (SQL Server quoted identifiers)
-        col_list = ", ".join(f"[{c}]" for c in columns)
+        recortes = dict(recortes or {})
+        sobrantes = sorted(set(recortes) - set(columns))
+        if sobrantes:
+            raise ValueError(f"recortes de columnas que no se piden: {sobrantes}")
+        col_list = ", ".join(
+            expresion_recorte(c, recortes[c]) if c in recortes else f"[{c}]" for c in columns
+        )
         where_clause = f"AND ({where})" if where else ""
 
         sql_template = (
