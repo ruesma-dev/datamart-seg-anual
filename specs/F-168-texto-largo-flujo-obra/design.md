@@ -194,11 +194,12 @@ pasar `PRESUPUESTO_MAX`.
 
 | Decisión | Opciones | Recomendado | Decidido |
 |---|---|---|---|
-| D1 Cómo se trae el texto | (a) `tex` en `raw` de las seis tablas, con tope y sin NUL en origen: +856 MB y +6-8 min por noche; (b) paso INCREMENTAL por huella (como F-097): ~10 veces menos bytes por noche, pero un paso con estado propio y su primera carga | (a): el coste cabe y (b) duplica el trabajo | |
-| D2 Dónde va el texto de la partida | (a) tabla aparte `stg.partida_texto`; (b) columna en `stg.partidas` | (a) | |
-| D3 Dónde va el texto de las líneas | (a) catálogo deduplicado `compras.textos` + `compras.linea_texto` + vista; (b) columna `texto` en cada tabla de línea de `compras` (~900 MB) | (a) | |
-| D4 Tope | (a) 16.000 caracteres (no corta ninguna línea; corta 8 partidas de basura); (b) 32.000; (c) sin tope | (a) | |
-| D5 El campo 9 de los descompuestos | (a) en F-168, con un retroceso MANUAL del master; (b) feature aparte | (a): el humano lo pidió («descompuestos de obra y estudios») | |
-| D6 Datos personales | (a) sin máscara, en los esquemas generales (contacto profesional en unas decenas de textos); (b) la máscara de postventa (destroza referencias de producto); (c) máscara dirigida: correo y teléfono tras «tfno/tel/móvil» | (a) | |
-| D7 Memo de comparativos y ofertas (`con.tex`, 5.902 + 832) | (a) en `compras.documento_texto`; (b) no | (a) | |
-| D8 Pedidos (`dcp`/`dcppro`) | (a) fuera: 25 pedidos y 656 líneas, 99 % copia de la planificación; (b) ingerirlos y publicarlos | (a) | |
+| D1 Cómo se trae el texto | (a) `tex` en `raw` de las seis tablas, con tope y sin NUL en origen: +856 MB y +6-8 min por noche; (b) paso INCREMENTAL por huella (como F-097): ~10 veces menos bytes por noche, pero un paso con estado propio y su primera carga | (a): el coste cabe y (b) duplica el trabajo || (a) (humano, 2026-11-23) |
+| D2 Dónde va el texto de la partida | (a) tabla aparte `stg.partida_texto`; (b) columna en `stg.partidas` | (a) || (a) (humano, 2026-11-23) |
+| D3 Dónde va el texto de las líneas | (a) catálogo deduplicado `compras.textos` + `compras.linea_texto` + vista; (b) columna `texto` en cada tabla de línea de `compras` (~900 MB) | (a) || (a) (humano, 2026-11-23) |
+| D4 Tope | (a) 16.000 caracteres (no corta ninguna línea; corta 8 partidas de basura); (b) 32.000; (c) sin tope | (a) || (a) (humano, 2026-11-23) |
+| D5 El campo 9 de los descompuestos | (a) en F-168, con un retroceso MANUAL del master; (b) feature aparte | (a): el humano lo pidió («descompuestos de obra y estudios») || (a) (humano, 2026-11-23) |
+| D6 Datos personales | (a) sin máscara, en los esquemas generales (contacto profesional en unas decenas de textos); (b) la máscara de postventa (destroza referencias de producto); (c) máscara dirigida: correo y teléfono tras «tfno/tel/móvil» | (a) || (a) (humano, 2026-11-23) |
+| D7 Memo de comparativos y ofertas (`con.tex`, 5.902 + 832) | (a) en `compras.documento_texto`; (b) no | (a) || (a), confirmada por el humano (humano, 2026-11-23) |
+| D8 Pedidos (`dcp`/`dcppro`) | (a) fuera: 25 pedidos y 656 líneas, 99 % copia de la planificación; (b) ingerirlos y publicarlos | (a) || (a); albarán y factura SÍ entran (el humano: «Dentro») (humano, 2026-11-23) |
+| D9 Historia del texto de la partida (Sigrid no la guarda: un cambio en fase 0 se ve en todos los master) | (a) solo el texto vigente; (b) guardar desde F-168 cada cambio con su fecha | (b) | **(a)** (humano, 2026-11-23): sin historia |

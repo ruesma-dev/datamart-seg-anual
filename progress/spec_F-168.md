@@ -230,3 +230,35 @@ ampliado a comparativos y ofertas (D7).
 '') AS VARCHAR(MAX)) AS [tex]` sobre las cinco primeras partidas de > 16 KB (223 KB a 3,5 MB): las
 cinco salen a 16.000 caracteres (una a 15.998 por `LEN`, que no cuenta los espacios finales), en
 0,6 s. Una página de 5.000 partidas con esa expresión, con el `WHERE [ide] > ?` del ingestor: 0,3 s.
+
+## M12 · Dónde puede variar el texto (medido por el líder, 2026-11-23, solo lectura)
+
+Pregunta del humano: «la descripción puede variar entre estudios, la planificación del jefe de obra
+en fase 0 o las diferentes versiones de master». Medido:
+
+- **Partida: UN texto** (`obrparpar.tex`). `obrparpre.tex` vacío en los 15 ámbitos (14,3 M filas);
+  `obrestpar`, `obreshpar`, `obrparres`, `catpar` y `ppopar` vacías. 162.305 de las 168.941 partidas
+  del master son las mismas `paride` que las de coste; 153.082 están en varias versiones. Sigrid no
+  guarda historia: un cambio en fase 0 se ve en todos los master (D9: sin historia).
+- **Descompuesto = planificación.** Muestra del 5 % de partidas, registros del `des` enlazados a
+  `dncpro` (campo 36), texto normalizado (espacios y mayúsculas): ámbito 3, 360 de 360 iguales;
+  última versión del master, 2.450 de 2.450; versiones anteriores, 39.266 iguales, 125 distintos,
+  279 con texto añadido o quitado después y 3.212 con la línea de planificación ya borrada. Cada
+  versión del master guarda una FOTO del texto de la planificación al hacerse: se publica por línea.
+- **Entre orígenes del descompuesto** (muestra del 10 %, normalizado, sin los 1.197 elementos
+  repetidos dentro de una misma versión): Estudios ~ master 10 de 908 distintos (1,1 %); entre
+  versiones del master 133 de 7.405 (1,8 %); 124 de 7.343 partidas con algún cambio.
+- **Comparativo:** `comlin` y `comprv` no tienen NINGUNA columna de texto (ni corta). El texto de
+  cada proveedor está en su línea de oferta (`dcopro.tex`).
+
+Correo de Juan Romero «DESCRIPCIONES LARGAS» (2026-11-23 17:04) con la ficha de la partida 01.12 de
+la 0723 y la línea de planificación 340.899: coincide en la partida (constante en todos los master)
+y en que el producto planificado es independiente de la partida, se arrastra a ofertas y contrato y
+no vuelve atrás. Dice que la planificación «no se guarda en los diferentes master»: en su propio
+ejemplo las versiones 3 a 7 del master de coste llevan el texto de la 340.899 en su `des` (las 0-2
+no, son anteriores a esa línea). Probablemente se refiere a que no se ve en pantalla o a que un
+cambio en fase 0 no llega a los master ya hechos (esto último es cierto).
+
+Alcance confirmado por el humano: partida, planificación y descompuestos, oferta, contrato,
+albarán, factura y el memo de comparativos y ofertas. D1-D8 en (a); D9 en (a).
+
