@@ -5,7 +5,8 @@
 --
 -- Lee: descompuestos._des_texto, descompuestos._versiones_cargadas,
 --      descompuestos.lineas, raw.obrfasamb, raw.conext, raw.dncpro,
---      raw.obrparpre, raw.obrparpar.
+--      raw.obrparpre, raw.obrparpar, y las funciones `stg.fn_texto_largo` /
+--      `stg.fn_texto_id` (F-168).
 --
 -- NO SE EJECUTA TAL CUAL. `build_descompuestos_step.py` sustituye tres
 -- marcadores antes de enviarlo (patron de F-019), cada uno UNA vez:
@@ -34,7 +35,10 @@
 --      `descompuestos.fn_trocear`, con el producto por el enlace a `dncpro` y
 --      el factor del campo 14 (F-120: del propio texto de la version, NUNCA de
 --      `dncpro`, que es el estado actual y no la foto de la version);
---      cuadre de cada partida hoja con precio de la version (R23).
+--      cuadre de cada partida hoja con precio de la version (R23). F-168: con
+--      el `texto_id` del campo 9 (la FOTO del texto de la planificacion al
+--      hacerse la version, medido M12) y sus textos en `descompuestos.textos`,
+--      en la MISMA sentencia que las lineas (R21).
 --   4. Borra las lineas y el cuadre de las versiones que ya no estan cargadas
 --      (la ingesta las borro porque Sigrid ya no las tiene).
 --   5. Los flags cambian sin que cambie el texto (la vigente se mueve, entra
@@ -136,6 +140,27 @@ WHERE q.ambito_id = 8
   AND q.obra_id = t.obra_id
   AND q.fase_num = t.fase_num;
 
+-- F-168: el troceado del lote una vez, con el campo 9 limpio; de el salen los
+-- textos (sin repetir los ya guardados) y las lineas, en la misma sentencia.
+WITH troceado AS (
+    SELECT a.origen, a.es_version_inicial, a.es_primera_abc, a.es_vigente, a.es_ultima,
+           a.tipo_version, a.texto_version,
+           d.obra_id, d.partida_id, d.presupuesto_id, d.ambito_id, d.fase_num, t.*,
+           stg.fn_texto_largo(t.texto_largo) AS texto_limpio
+    FROM descompuestos._des_texto d
+    JOIN _lote l ON l.obra_id = d.obra_id AND l.fase_num = d.fase_num
+    JOIN _atributos a ON a.obra_id = d.obra_id AND a.fase_num = d.fase_num
+    CROSS JOIN LATERAL descompuestos.fn_trocear(d.des) t
+    WHERE d.ambito_id = 8
+),
+textos_del_lote AS (
+    INSERT INTO descompuestos.textos (texto_id, texto)
+    SELECT DISTINCT ON (x.texto_id) x.texto_id, x.texto
+    FROM (SELECT stg.fn_texto_id(t.texto_limpio) AS texto_id, t.texto_limpio AS texto
+          FROM troceado t WHERE t.texto_limpio IS NOT NULL) x
+    ORDER BY x.texto_id
+    ON CONFLICT (texto_id) DO NOTHING
+)
 INSERT INTO descompuestos.lineas (
     origen, obra_id, partida_id, presupuesto_id, ambito_id, fase_num, orden,
     codigo_elemento, descripcion, unidad, codigo_alternativo,
@@ -144,9 +169,9 @@ INSERT INTO descompuestos.lineas (
     es_porcentaje, porcentaje, base_porcentaje, dncpro_id, producto_id,
     proveedor_recomendado_id, contrato_id, contrato_linea_id, fecha_maxima,
     grupo_planificacion_id, nivel, es_nivel_padre, es_version_inicial,
-    es_primera_abc, es_vigente, es_ultima, tipo_version, texto_version, factor
+    es_primera_abc, es_vigente, es_ultima, tipo_version, texto_version, factor, texto_id
 )
-SELECT a.origen, d.obra_id, d.partida_id, d.presupuesto_id, d.ambito_id, d.fase_num, t.orden,
+SELECT t.origen, t.obra_id, t.partida_id, t.presupuesto_id, t.ambito_id, t.fase_num, t.orden,
        t.codigo_elemento, t.descripcion, t.unidad, t.codigo_alternativo,
        t.tipo_elemento_codigo, t.tipo_elemento, t.naturaleza_codigo, t.naturaleza,
        t.rendimiento, t.precio, t.importe_unitario, t.cantidad_total, t.importe_total,
@@ -154,14 +179,10 @@ SELECT a.origen, d.obra_id, d.partida_id, d.presupuesto_id, d.ambito_id, d.fase_
        t.dncpro_id, NULLIF(dp.proide, 0),
        NULL::BIGINT, NULL::BIGINT, NULL::BIGINT, NULL::DATE,
        NULL::BIGINT, NULL::INTEGER, NULL::BOOLEAN,
-       a.es_version_inicial, a.es_primera_abc, a.es_vigente, a.es_ultima,
-       a.tipo_version, a.texto_version, t.factor
-FROM descompuestos._des_texto d
-JOIN _lote l ON l.obra_id = d.obra_id AND l.fase_num = d.fase_num
-JOIN _atributos a ON a.obra_id = d.obra_id AND a.fase_num = d.fase_num
-CROSS JOIN LATERAL descompuestos.fn_trocear(d.des) t
-LEFT JOIN raw.dncpro dp ON dp.ide = t.dncpro_id
-WHERE d.ambito_id = 8;
+       t.es_version_inicial, t.es_primera_abc, t.es_vigente, t.es_ultima,
+       t.tipo_version, t.texto_version, t.factor, stg.fn_texto_id(t.texto_limpio)
+FROM troceado t
+LEFT JOIN raw.dncpro dp ON dp.ide = t.dncpro_id;
 
 -- El cuadre de cada partida HOJA con precio de las versiones del lote. Las
 -- filas con `obride = 0` quedan fuera (no son de ninguna obra).

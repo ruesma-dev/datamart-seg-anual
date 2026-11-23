@@ -71,9 +71,12 @@ COLUMNAS_ELEMENTOS = [
 #: Huellas del texto compacto (sin comentarios) de los trozos que F-123 NO toca,
 #: tomadas de `main` (d4f58ea, F-120). Si una cambia, el cambio se salio del
 #: alcance (R3, R8, R10): o se revierte o se justifica en la spec.
-HUELLA_PLANIF_JO = "f55320200a6f8f4e"        # 02: el INSERT de PLANIF_JO entero
-HUELLA_ESTUDIO_SELECT = "158954cd31dfcf4d"   # 02: las columnas del INSERT de ESTUDIO
-HUELLA_ESTUDIO_WITH = "d79b1212acd034c7"     # 02: el troceado y `enlazadas`
+#: F-168 (2026-11-23) las cambia a proposito: `texto_id` al final de los dos
+#: INSERT, el campo 9 limpio en el troceado y el CTE que guarda sus textos. Las
+#: de F-123 eran f55320200a6f8f4e, 158954cd31dfcf4d y d79b1212acd034c7.
+HUELLA_PLANIF_JO = "3df2581eb5073324"        # 02: el INSERT de PLANIF_JO entero
+HUELLA_ESTUDIO_SELECT = "2f743b1a7c48539e"   # 02: las columnas del INSERT de ESTUDIO
+HUELLA_ESTUDIO_WITH = "7c504c681b57a238"     # 02: el troceado y `enlazadas`
 HUELLA_CUADRE_COSTE = "20f367990493a455"     # 05: DELETE, h, s, su, INSERT y CASE
 
 #: La condicion de «obra sin master 0» (design §3), con el alias de cada fichero.
@@ -280,7 +283,8 @@ def test_f123_r12_sin_objeto_ni_estado_nuevo() -> None:
     assert declarados == {
         "_des_texto", "_versiones_cargadas", "lineas", "cuadre_partida", "elementos",
         "v_pbi_estudio", "v_pbi_planif_jo", "v_pbi_master_planif_jo", "v_pbi_master_estudio",
-        "fn_num", "fn_fecha", "fn_trocear"}
+        "fn_num", "fn_fecha", "fn_trocear",
+        "textos"}  # F-168 (R21): el catalogo de textos, sin estado nuevo
     assert sorted(f.name for f in DIR_DES.glob("*.sql"))[-1] == VISTAS, "sin fichero 07"
 
 

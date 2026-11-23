@@ -3,7 +3,8 @@
 -- F-097 · SCHEMA descompuestos (3/7): las dos tablas publicadas que PERSISTEN
 -- entre noches y las lineas de COSTE (ambito 3): ESTUDIO y PLANIF_JO.
 --
--- Lee: descompuestos._des_texto, raw.obr, raw.dncpro, raw.con, raw.auxpronat.
+-- Lee: descompuestos._des_texto, raw.obr, raw.dncpro, raw.con, raw.auxpronat,
+--      y las funciones `stg.fn_texto_largo` / `stg.fn_texto_id` (F-168).
 --
 -- POR QUE `CREATE ... IF NOT EXISTS` Y NO `DROP + CREATE`. Las lineas y el
 -- cuadre del master (MASTER_*) se trocean por lotes de versiones (03): lo de
@@ -49,6 +50,21 @@
 -- importe unitario. La columna va AL FINAL (D8): la tabla persiste entre
 -- noches y en una base que ya la tiene la anade el `ALTER TABLE`, que es solo
 -- catalogo; sin DEFAULT, las filas del master aun no retroceadas quedan NULL.
+--
+-- EL TEXTO LARGO (F-168, R20, R21). `lineas.texto_id` es la identidad del
+-- texto largo del elemento (`md5` del texto limpio, `stg/11_texto_largo.sql`):
+-- ESTUDIO y el master, el campo 9 del registro (`fn_trocear.texto_largo`);
+-- PLANIF_JO, el `tex` de su linea de `dncpro`, que es el MISMO `texto_id` que
+-- su fila NECESIDAD de `compras.linea_texto`. El texto va una vez en
+-- `descompuestos.textos`, en la MISMA sentencia que sus lineas (ESTUDIO y
+-- master) o en la misma transaccion (PLANIF_JO), y con `ON CONFLICT DO
+-- NOTHING`: un texto ya guardado no se repite. `textos` NUNCA se vacia (no hay
+-- `DELETE` ni `TRUNCATE`): un texto que ya no usa ninguna linea se queda, asi
+-- que se lee uniendo DESDE `lineas`. Las dos son las unicas lecturas fuera de
+-- `raw` y de este esquema, y son funciones, no tablas: este paso no depende de
+-- que `build_stg` haya terminado esta noche, solo de que haya corrido alguna
+-- vez con F-168. Columna AL FINAL y sin DEFAULT, como `factor`: las filas del
+-- master aun no retroceadas quedan NULL hasta su retroceo (cambia el sello).
 --
 -- EL CAMBIO DE NOMBRE DEL MASTER 0 (F-123). Las dos tablas persisten y
 -- `CREATE TABLE IF NOT EXISTS` no cambia un `CHECK` ya instalado: el bloque
@@ -100,15 +116,28 @@ CREATE TABLE IF NOT EXISTS descompuestos.lineas (
     tipo_version              TEXT,
     texto_version             TEXT,
     factor                    NUMERIC,
+    texto_id                  UUID,
     CONSTRAINT ck_lineas_origen CHECK (origen IN ('ESTUDIO', 'PLANIF_JO', 'MASTER_ESTUDIO', 'MASTER_PRE_ABC', 'MASTER_PLANIF_JO')),
     CONSTRAINT pk_lineas PRIMARY KEY (origen, obra_id, partida_id, ambito_id, fase_num, orden)
 );
 
 -- La tabla de F-097 no tenia `factor`: se anade sin DROP (F-120, R17).
 ALTER TABLE descompuestos.lineas ADD COLUMN IF NOT EXISTS factor NUMERIC;
+-- Ni `texto_id` (F-168, R20): tambien sin DROP, al final y sin DEFAULT.
+ALTER TABLE descompuestos.lineas ADD COLUMN IF NOT EXISTS texto_id UUID;
+
+-- El texto largo, una vez (F-168, R21). Persiste entre noches y no se vacia.
+CREATE TABLE IF NOT EXISTS descompuestos.textos (
+    texto_id  UUID PRIMARY KEY,
+    texto     TEXT NOT NULL
+);
+
+COMMENT ON TABLE descompuestos.textos IS
+'F-168. Cada texto largo de los descompuestos una sola vez (texto_id = md5 del texto limpio). No se vacia: se lee uniendo desde descompuestos.lineas.';
 
 CREATE INDEX IF NOT EXISTS ix_lineas_version ON descompuestos.lineas (obra_id, ambito_id, fase_num);
 CREATE INDEX IF NOT EXISTS ix_lineas_partida ON descompuestos.lineas (partida_id);
+CREATE INDEX IF NOT EXISTS ix_lineas_texto ON descompuestos.lineas (texto_id);
 
 COMMENT ON TABLE descompuestos.lineas IS
 'F-097. Una fila por linea de descompuesto de cada partida, con su origen (ESTUDIO, PLANIF_JO, MASTER_ESTUDIO, MASTER_PRE_ABC, MASTER_PLANIF_JO). Nunca se suman origenes distintos: R-DESCOMPUESTO-ORIGEN.';
@@ -174,7 +203,8 @@ DELETE FROM descompuestos.lineas WHERE origen IN ('ESTUDIO', 'PLANIF_JO');
 -- ANTES que 03 (una version 0 cargada esta noche aun no tendria lineas). Asi
 -- ninguna partida tiene a la vez MASTER_ESTUDIO y ESTUDIO.
 WITH troceado AS (
-    SELECT d.presupuesto_id, d.obra_id, d.partida_id, d.ambito_id, d.fase_num, t.*
+    SELECT d.presupuesto_id, d.obra_id, d.partida_id, d.ambito_id, d.fase_num, t.*,
+           stg.fn_texto_largo(t.texto_largo) AS texto_limpio
     FROM descompuestos._des_texto d
     CROSS JOIN LATERAL descompuestos.fn_trocear(d.des) t
     WHERE d.ambito_id = 3 AND d.fase_num = 0
@@ -183,6 +213,18 @@ enlazadas AS (
     SELECT DISTINCT t.presupuesto_id
     FROM troceado t
     WHERE t.dncpro_id IS NOT NULL
+),
+-- F-168 (R21): los textos del ambito 3 fase 0, una vez y sin repetir los ya
+-- guardados. Todos los del troceado, tambien los de las partidas que no salen
+-- como ESTUDIO: un texto de mas no rompe nada; uno de menos dejaria una linea
+-- sin su texto.
+textos_estudio AS (
+    INSERT INTO descompuestos.textos (texto_id, texto)
+    SELECT DISTINCT ON (x.texto_id) x.texto_id, x.texto
+    FROM (SELECT stg.fn_texto_id(t.texto_limpio) AS texto_id, t.texto_limpio AS texto
+          FROM troceado t WHERE t.texto_limpio IS NOT NULL) x
+    ORDER BY x.texto_id
+    ON CONFLICT (texto_id) DO NOTHING
 )
 INSERT INTO descompuestos.lineas (
     origen, obra_id, partida_id, presupuesto_id, ambito_id, fase_num, orden,
@@ -192,7 +234,7 @@ INSERT INTO descompuestos.lineas (
     es_porcentaje, porcentaje, base_porcentaje, dncpro_id, producto_id,
     proveedor_recomendado_id, contrato_id, contrato_linea_id, fecha_maxima,
     grupo_planificacion_id, nivel, es_nivel_padre, es_version_inicial,
-    es_primera_abc, es_vigente, es_ultima, tipo_version, texto_version, factor
+    es_primera_abc, es_vigente, es_ultima, tipo_version, texto_version, factor, texto_id
 )
 SELECT 'ESTUDIO', t.obra_id, t.partida_id, t.presupuesto_id, t.ambito_id, t.fase_num, t.orden,
        t.codigo_elemento, t.descripcion, t.unidad, t.codigo_alternativo,
@@ -204,7 +246,7 @@ SELECT 'ESTUDIO', t.obra_id, t.partida_id, t.presupuesto_id, t.ambito_id, t.fase
        NULL::BIGINT, NULL::BIGINT, NULL::BIGINT, NULL::DATE,
        NULL::BIGINT, NULL::INTEGER, NULL::BOOLEAN, NULL::BOOLEAN,
        NULL::BOOLEAN, NULL::BOOLEAN, NULL::BOOLEAN, NULL::TEXT, NULL::TEXT,
-       t.factor
+       t.factor, stg.fn_texto_id(t.texto_limpio)
 FROM troceado t
 WHERE NOT EXISTS (SELECT 1 FROM enlazadas e WHERE e.presupuesto_id = t.presupuesto_id)
   AND NOT EXISTS (SELECT 1 FROM descompuestos._versiones_cargadas v
@@ -222,7 +264,7 @@ INSERT INTO descompuestos.lineas (
     es_porcentaje, porcentaje, base_porcentaje, dncpro_id, producto_id,
     proveedor_recomendado_id, contrato_id, contrato_linea_id, fecha_maxima,
     grupo_planificacion_id, nivel, es_nivel_padre, es_version_inicial,
-    es_primera_abc, es_vigente, es_ultima, tipo_version, texto_version, factor
+    es_primera_abc, es_vigente, es_ultima, tipo_version, texto_version, factor, texto_id
 )
 SELECT 'PLANIF_JO', o.ide, p.paride, NULL::BIGINT, 3, 0,
        (row_number() OVER (PARTITION BY o.ide, p.paride ORDER BY p.pos, p.ide))::INTEGER,
@@ -243,7 +285,7 @@ SELECT 'PLANIF_JO', o.ide, p.paride, NULL::BIGINT, 3, 0,
        descompuestos.fn_fecha(p.fec),
        NULLIF(p.gpcide, 0), p.niv, COALESCE(p.nivpad, 0) <> 0,
        NULL::BOOLEAN, NULL::BOOLEAN, NULL::BOOLEAN, NULL::BOOLEAN, NULL::TEXT, NULL::TEXT,
-       f.factor
+       f.factor, stg.fn_texto_id(stg.fn_texto_largo(p.tex))
 FROM raw.obr o
 JOIN raw.dncpro p ON p.dncide = o.dncide
 LEFT JOIN raw.con c ON c.ide = p.proide
@@ -252,3 +294,15 @@ LEFT JOIN raw.auxpronat n ON n.ide = p.natide
 CROSS JOIN LATERAL (SELECT CASE p.factip WHEN 1 THEN p.faccan::NUMERIC
                                           WHEN 0 THEN 1::NUMERIC END AS factor) f
 WHERE COALESCE(o.dncide, 0) <> 0 AND COALESCE(p.paride, 0) <> 0;
+
+-- F-168 (R21): los textos de PLANIF_JO (el `tex` de `dncpro`), con las mismas
+-- lineas de arriba. Misma transaccion que su INSERT (`execute_sql_file`).
+INSERT INTO descompuestos.textos (texto_id, texto)
+SELECT DISTINCT ON (x.texto_id) x.texto_id, x.texto
+FROM raw.obr o
+JOIN raw.dncpro p ON p.dncide = o.dncide
+CROSS JOIN LATERAL (SELECT stg.fn_texto_id(stg.fn_texto_largo(p.tex)) AS texto_id,
+                           stg.fn_texto_largo(p.tex) AS texto) x
+WHERE COALESCE(o.dncide, 0) <> 0 AND COALESCE(p.paride, 0) <> 0 AND x.texto IS NOT NULL
+ORDER BY x.texto_id
+ON CONFLICT (texto_id) DO NOTHING;

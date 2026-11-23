@@ -318,8 +318,9 @@ infraestructura.
 > **Enmienda del 2026-11-23 (F-168, el texto largo de la partida y del flujo de
 > obra).** Entran `stg.partida_texto`, las funciones `stg.fn_texto_largo`,
 > `stg.fn_texto_id` y `stg.fn_texto_recortado`, y en `compras` las tablas
-> `compras.linea_texto` y `compras.textos` y la vista `compras.v_linea_texto`.
-> Sin regla nueva. El inventario pasa a **338 objetos**.
+> `compras.linea_texto` y `compras.textos` y la vista `compras.v_linea_texto`;
+> en `descompuestos`, el catalogo `descompuestos.textos` (y la columna
+> `lineas.texto_id`). Sin regla nueva. El inventario pasa a **339 objetos**.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,

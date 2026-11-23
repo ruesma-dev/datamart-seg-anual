@@ -211,6 +211,7 @@ GRUPO_I_F168 = {
     "stg.fn_texto_recortado": "funcion auxiliar del build",
     "compras.linea_texto": "se consulta por compras.v_linea_texto",
     "compras.textos": "se lee desde compras.linea_texto o en la vista",
+    "descompuestos.textos": "se lee desde descompuestos.lineas",
 }
 
 
