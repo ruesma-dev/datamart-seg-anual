@@ -230,8 +230,12 @@ objetos:
       modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
       corre de noche es el primero.
 
-      **No se traen** 3 columnas: solo `des`, `med`, `tex`. Preguntar por
+      **No se traen** 2 columnas: solo `des`, `med`. Preguntar por
       ellas aqui no devuelve nulo, devuelve "columna inexistente".
+
+      El texto largo de la partida (`tex`) SI se trae desde F-168, cortado en
+      Sigrid a 16000 caracteres y sin NUL. Limpio, uno por partida y para
+      todos sus ambitos, se lee en `stg.partida_texto`.
     grano: Una fila por partida o capitulo de obra, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -1053,10 +1057,12 @@ objetos:
       modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
       corre de noche es el primero.
 
-      **No se traen** 13 columnas: 2 de descripciones largas, 2 de
+      **No se traen** 12 columnas: 1 de descripcion larga, 2 de
       observaciones, 2 de textos de direccion, 7 sueltas entre textos y
       campos auxiliares. Preguntar por ellas aqui no devuelve nulo, devuelve
       "columna inexistente".
+
+      El texto largo de la linea (`tex`) SI se trae desde F-168, cortado en Sigrid a 16000 caracteres y sin NUL; limpio y deduplicado se lee en `compras.v_linea_texto`.
     grano: Una fila por linea de contrato de compra, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -1137,10 +1143,12 @@ objetos:
       modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
       corre de noche es el primero.
 
-      **No se traen** 13 columnas: 2 de descripciones largas, 2 de
+      **No se traen** 12 columnas: 1 de descripcion larga, 2 de
       observaciones, 2 de textos de direccion, 7 sueltas entre textos y
       campos auxiliares. Preguntar por ellas aqui no devuelve nulo, devuelve
       "columna inexistente".
+
+      El texto largo de la linea (`tex`) SI se trae desde F-168, cortado en Sigrid a 16000 caracteres y sin NUL; limpio y deduplicado se lee en `compras.v_linea_texto`.
 
       Se pide paginada de 5000 en 5000.
     grano: Una fila por linea de albaran, identificada por `ide`.
@@ -1230,10 +1238,12 @@ objetos:
       modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
       corre de noche es el primero.
 
-      **No se traen** 13 columnas: 2 de descripciones largas, 2 de
+      **No se traen** 12 columnas: 1 de descripcion larga, 2 de
       observaciones, 2 de textos de direccion, 7 sueltas entre textos y
       campos auxiliares. Preguntar por ellas aqui no devuelve nulo, devuelve
       "columna inexistente".
+
+      El texto largo de la linea (`tex`) SI se trae desde F-168, cortado en Sigrid a 16000 caracteres y sin NUL; limpio y deduplicado se lee en `compras.v_linea_texto`.
 
       Se pide paginada de 5000 en 5000.
     grano: Una fila por linea de factura, identificada por `ide`.
@@ -1780,7 +1790,9 @@ objetos:
 
       **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
 
-      **No se traen** 13 columnas de binario o texto ilimitado: la lista estandar de documentos que comparten todas las tablas de compras del ETL; esta tabla no tiene la mayoria de esos nombres, y excluir un nombre inexistente es inofensivo. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+      **No se traen** 12 columnas de binario o texto ilimitado: la lista estandar de documentos que comparten todas las tablas de compras del ETL; esta tabla no tiene la mayoria de esos nombres, y excluir un nombre inexistente es inofensivo. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+
+      El texto largo de la linea (`tex`) SI se trae desde F-168, cortado en Sigrid a 16000 caracteres y sin NUL; limpio y deduplicado se lee en `compras.v_linea_texto`.
     grano: Una fila por linea de oferta, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -1842,7 +1854,9 @@ objetos:
 
       **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
 
-      **No se traen** 13 columnas de binario o texto ilimitado: la lista estandar de documentos que comparten todas las tablas de compras del ETL; esta tabla no tiene la mayoria de esos nombres, y excluir un nombre inexistente es inofensivo. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+      **No se traen** 12 columnas de binario o texto ilimitado: la lista estandar de documentos que comparten todas las tablas de compras del ETL; esta tabla no tiene la mayoria de esos nombres, y excluir un nombre inexistente es inofensivo. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+
+      El texto largo de la linea (`tex`) SI se trae desde F-168, cortado en Sigrid a 16000 caracteres y sin NUL; limpio y deduplicado se lee en `compras.v_linea_texto`.
     grano: Una fila por linea de necesidad, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
