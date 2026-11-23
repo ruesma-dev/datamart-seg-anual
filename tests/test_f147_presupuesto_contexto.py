@@ -39,6 +39,14 @@ from tests.test_f006_formato import _dicc, _ficha, _regla
 #: fórmula de R17. Solo baja (trinquete: R19 falla si sobra más de
 #: `HOLGURA_TRINQUETE`). Historia, de la más reciente a la más antigua:
 #:
+#: * 38.739 · 2026-11-23, F-168 (diccionario v82 en el arbol), SUBIDO con
+#:   motivo: el texto largo de la partida y del flujo de obra (D1-D9 del
+#:   humano). Enrutado 20.246 (+220: dos fichas recomendadas nuevas,
+#:   `stg.partida_texto` y `compras.v_linea_texto`, dos preguntas cortas cada
+#:   una; sin ellas «que incluye la partida X» acaba en la descripcion corta de
+#:   `stg.partidas`). `compras.linea_texto`, `compras.textos` y
+#:   `descompuestos.textos` NO son recomendadas (se leen por la vista o desde
+#:   las lineas) y no suman. Reglas 8.394 y bloques 10.099 sin cambio.
 #: * 38.519 · 2026-11-20, F-127 (diccionario v81), SUBIDO con motivo: el
 #:   mayor analitico (D1-D8 del humano). Reglas 8.394 (+18: `R-PERFILES`, que
 #:   se sirve entera, dice que las cuentas de contrapartida de los trabajadores
@@ -124,7 +132,7 @@ from tests.test_f006_formato import _dicc, _ficha, _regla
 #:   todas las preguntas): 78.057.
 #: * 29.787 · 2026-10-22, F-147 T5: PROVISIONAL, la medida de T2 sobre la v58
 #:   (sin resúmenes todavía: reglas 2.233, enrutado 13.886, bloques 13.668).
-PRESUPUESTO_MAX = 38_519
+PRESUPUESTO_MAX = 38_739
 
 
 def _medir(dicc) -> PresupuestoContexto:

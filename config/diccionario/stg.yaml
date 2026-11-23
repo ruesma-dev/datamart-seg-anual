@@ -1200,8 +1200,8 @@ objetos:
         cardinalidad: "N:1"
         porque: Para el codigo y el nombre de la obra.
     ejemplos_preguntas:
-      - Que incluye exactamente la partida 04.02 de la obra X (su texto largo)
-      - En que se diferencian los forjados reticulares de dos obras segun su descripcion
+      - Que incluye la partida 04.02 de la obra X
+      - Texto largo de las partidas de forjado de dos obras
 
   obras:
     tipo: tabla

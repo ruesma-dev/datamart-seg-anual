@@ -2,8 +2,8 @@
 --
 -- F-168 · La limpieza y la identidad del TEXTO LARGO, UNA sola vez para todo el
 -- datamart: `stg.partida_texto` (12), `compras.linea_texto` y `compras.textos`
--- (compras/16) y `descompuestos.textos` (descompuestos/02 y 03) llaman a estas
--- funciones y a ninguna otra.
+-- (compras/16) y el catalogo de textos de los descompuestos (sql/descompuestos/,
+-- ficheros 02 y 03) llaman a estas funciones y a ninguna otra.
 --
 -- Lee: nada (funciones puras sobre el texto que se les pasa).
 --
@@ -53,7 +53,7 @@ SELECT NULLIF(
 $$;
 
 COMMENT ON FUNCTION stg.fn_texto_largo(TEXT) IS
-'F-168. El texto largo limpio: saltos normalizados, sin caracteres de control, sin espacios en los extremos y cortado a 16000 caracteres; NULL si queda vacio. Una sola limpieza para stg, compras y descompuestos.';
+'F-168. El texto largo limpio: saltos normalizados, sin caracteres de control, sin espacios en los extremos y cortado a 16000 caracteres; NULL si queda vacio. Una sola limpieza para stg, compras y los descompuestos de obra.';
 
 CREATE OR REPLACE FUNCTION stg.fn_texto_id(t TEXT)
 RETURNS UUID
@@ -62,7 +62,7 @@ SELECT md5(t)::uuid
 $$;
 
 COMMENT ON FUNCTION stg.fn_texto_id(TEXT) IS
-'F-168. La identidad de un texto YA limpio: md5(texto)::uuid. Mismo texto_id, mismo texto, en stg, compras y descompuestos.';
+'F-168. La identidad de un texto YA limpio: md5(texto)::uuid. Mismo texto_id, mismo texto, en stg, compras y los descompuestos de obra.';
 
 CREATE OR REPLACE FUNCTION stg.fn_texto_recortado(t TEXT)
 RETURNS BOOLEAN

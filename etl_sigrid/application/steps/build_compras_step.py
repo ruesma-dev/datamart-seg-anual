@@ -232,6 +232,18 @@ SUB_PASOS: tuple[_SubStep, ...] = (
         target_schema="compras",
         target_table="documento_alarmas",
     ),
+    # F-168: el texto largo de cada línea del flujo (planificación, oferta,
+    # contrato, albarán y factura): `compras.linea_texto`, el catálogo
+    # deduplicado `compras.textos` y la vista `compras.v_linea_texto`. El
+    # ÚLTIMO: solo lee `raw` y `stg.partida_texto` (build_stg va antes en la
+    # noche) y nadie de `compras` lo lee. Cuenta `linea_texto` (~1,3 M filas),
+    # la que dice si llegaron las cinco fuentes.
+    _SubStep(
+        name="textos_linea",
+        sql_file="16_textos_linea.sql",
+        target_schema="compras",
+        target_table="linea_texto",
+    ),
 )
 
 

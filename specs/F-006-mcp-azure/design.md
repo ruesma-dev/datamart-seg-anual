@@ -118,7 +118,6 @@ IngestRaw -> LoadExcelAux -> BuildStg -> BuildMart -> PublicarDiccionario -> App
 | 2026-09-28 (F-097) | Entra el esquema **`descompuestos`** --el duodecimo--, con `descompuestos.lineas` (una fila por linea de descompuesto de cada partida, con su ORIGEN), `descompuestos.cuadre_partida`, `descompuestos.elementos`, tres vistas `v_pbi_*` con el origen cableado, las dos tablas de estado del incremental del master y tres funciones locales. Regla dura nueva `R-DESCOMPUESTO-ORIGEN`. Inventario a **187** objetos, **1401** columnas y **85** fichas de consumo |
 | 2026-09-30 (F-118) | Entran `stg.fn_parse_mes_texto` y `stg.fn_mes_de_fase`: el mes de las filas reales lo da el texto de la fase, una sola vez y en `stg` (F-051 absorbida). Son funciones auxiliares, no de consumo. Once columnas nuevas (`es_relleno`, `es_deshacer` y la venta con coeficientes aparte). Inventario a **189** objetos, **1412** columnas y **85** fichas de consumo |
 | 2026-11-09 (F-040) | Entran las **7 tablas de `raw`** del lado de ingresos (`cli`, `cer`, `cerpro`, `cerrec`, `cerprodes`, `dvfpro`, `dvfrec`), cada una con su ficha, y los esquemas **`ventas`** (8 tablas, 3 vistas y 5 funciones) y **`ventas_restringida`** (3 tablas, solo perfil total). Inventario a **316** objetos |
-| 2026-11-23 (F-168) | Entra el TEXTO LARGO de la partida y del flujo de obra: `stg.partida_texto` y las funciones `stg.fn_texto_largo`, `stg.fn_texto_id` y `stg.fn_texto_recortado`. Inventario a **335** objetos |
 
 ## 3 · Componentes y ficheros que toca
 

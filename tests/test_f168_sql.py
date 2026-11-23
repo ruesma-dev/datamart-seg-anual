@@ -166,3 +166,125 @@ def test_f168_el_preflight_exige_tex_en_obrparpar() -> None:
     linea = re.search(r'\("raw", "obrparpar"\):\s*\[[^\]]*\]', texto)
     assert linea and '"tex"' in linea.group(0)
 
+
+# ---------------------------------------------------------------------------
+# R12 · R13 · R14 · R15 · R16 · R17 · R23 · compras/16_textos_linea.sql
+# ---------------------------------------------------------------------------
+
+TEXTOS_LINEA = DIR_SQL / "compras" / "16_textos_linea.sql"
+
+#: Las cinco fuentes: tipo de línea, tabla, columna del documento y de dónde
+#: sale la obra (R13).
+FUENTES = {
+    "NECESIDAD": ("raw.dncpro", "dncide"),
+    "OFERTA": ("raw.dcopro", "docide"),
+    "CONTRATO": ("raw.ctrpro", "docide"),
+    "ALBARAN": ("raw.dcapro", "docide"),
+    "FACTURA": ("raw.dcfpro", "docide"),
+}
+
+
+def _rama(tipo: str) -> str:
+    """El SELECT de la rama `tipo` dentro del UNION ALL de las fuentes."""
+    compacto = _compacto(TEXTOS_LINEA)
+    inicio = compacto.index(f"'{tipo}'::TEXT AS tipo_linea")
+    fin = compacto.find("UNION ALL", inicio)
+    return compacto[inicio: fin if fin > 0 else compacto.index(")", compacto.index("FROM", inicio))]
+
+
+def test_f168_r12_cabecera_y_tres_objetos() -> None:
+    assert _crudo(TEXTOS_LINEA).splitlines()[0] == (
+        "-- etl_sigrid/infrastructure/postgres/sql/compras/16_textos_linea.sql"
+    )
+    cuerpo = _compacto(TEXTOS_LINEA)
+    for objeto in ("CREATE TABLE compras.linea_texto AS", "CREATE TABLE compras.textos AS",
+                   "CREATE OR REPLACE VIEW compras.v_linea_texto AS"):
+        assert objeto in cuerpo, objeto
+    assert "ALTER TABLE compras.linea_texto ADD PRIMARY KEY (tipo_linea, linea_id);" in cuerpo
+    assert "ALTER TABLE compras.textos ADD PRIMARY KEY (texto_id);" in cuerpo
+
+
+def test_f168_r13_las_cinco_fuentes_y_sus_enlaces() -> None:
+    for tipo, (tabla, documento) in FUENTES.items():
+        rama = _rama(tipo)
+        assert f"FROM {tabla} " in rama + " ", f"{tipo} lee {tabla}"
+        assert f".{documento}::BIGINT AS documento_id" in rama, f"{tipo}: documento por {documento}"
+        assert ".paride::BIGINT AS partida_id" in rama, f"{tipo}: partida por paride"
+        if tipo == "NECESIDAD":
+            assert "NULL::BIGINT AS linea_necesidad_id" in rama
+            assert "d.obride::BIGINT AS obra_id" in rama and "LEFT JOIN raw.dnc d" in rama
+        else:
+            assert ".dncproide::BIGINT AS linea_necesidad_id" in rama
+            assert ".obride::BIGINT AS obra_id" in rama
+
+
+def test_f168_r13_cero_es_nulo() -> None:
+    cuerpo = _compacto(TEXTOS_LINEA)
+    for columna in ("documento_id", "obra_id", "partida_id", "linea_necesidad_id"):
+        assert f"NULLIF(f.{columna}, 0) AS {columna}" in cuerpo, columna
+
+
+def test_f168_r13_no_se_compara_por_linoriide() -> None:
+    assert "linoriide" not in _sin_comentarios(_crudo(TEXTOS_LINEA)), (
+        "linoriide no dice a qué tabla apunta (M3): se compara por paride y dncproide"
+    )
+
+
+def test_f168_r12_solo_texto_limpio_no_nulo_y_tope_del_dominio() -> None:
+    cuerpo = _compacto(TEXTOS_LINEA)
+    assert "stg.fn_texto_largo(c.tex)" in cuerpo
+    assert "stg.fn_texto_id(x.texto) AS texto_id" in cuerpo
+    assert "stg.fn_texto_recortado(c.tex) AS recortado" in cuerpo
+    assert "WHERE x.texto IS NOT NULL" in cuerpo
+    assert not re.search(r"\b\d{4,}\b", cuerpo), "el tope vive en el dominio y en stg/11"
+
+
+def test_f168_r14_igualdades_con_case_y_nulo() -> None:
+    cuerpo = _compacto(TEXTOS_LINEA)
+    assert ("CASE WHEN pt.texto_id IS NULL THEN NULL ELSE f.texto_id = pt.texto_id END "
+            "AS igual_a_partida") in cuerpo
+    assert ("CASE WHEN f.tipo_linea = 'NECESIDAD' OR nec.texto_id IS NULL THEN NULL "
+            "ELSE f.texto_id = nec.texto_id END AS igual_a_necesidad") in cuerpo
+    assert "LEFT JOIN stg.partida_texto pt ON pt.partida_id = f.partida_id" in cuerpo
+    assert ("LEFT JOIN _f168_fuentes nec ON nec.tipo_linea = 'NECESIDAD' "
+            "AND nec.linea_id = f.linea_necesidad_id") in cuerpo
+
+
+def test_f168_r15_textos_deduplicado_de_las_mismas_fuentes() -> None:
+    cuerpo = _compacto(TEXTOS_LINEA)
+    bloque = cuerpo[cuerpo.index("CREATE TABLE compras.textos AS"):]
+    bloque = bloque[: bloque.index(";")]
+    assert "SELECT DISTINCT ON (f.texto_id)" in bloque
+    assert "FROM _f168_fuentes f" in bloque
+    assert "ORDER BY f.texto_id, f.recortado DESC" in bloque, "recortado si alguna línea lo está"
+
+
+def test_f168_r15_linea_texto_no_guarda_el_texto() -> None:
+    cuerpo = _compacto(TEXTOS_LINEA)
+    bloque = cuerpo[cuerpo.index("CREATE TABLE compras.linea_texto AS"):]
+    proyeccion = bloque[: bloque.index(" FROM ")]
+    assert "AS texto " not in proyeccion + " " and "f.texto AS" not in proyeccion
+
+
+def test_f168_r16_la_vista_une_por_texto_id() -> None:
+    cuerpo = _compacto(TEXTOS_LINEA)
+    bloque = cuerpo[cuerpo.index("CREATE OR REPLACE VIEW compras.v_linea_texto AS"):]
+    bloque = bloque[: bloque.index(";")]
+    assert "FROM compras.linea_texto l JOIN compras.textos t ON t.texto_id = l.texto_id" in bloque
+    assert "t.texto AS texto" in bloque
+
+
+def test_f168_r23_un_solo_fichero_sin_commit() -> None:
+    cuerpo = _compacto(TEXTOS_LINEA)
+    # `ON COMMIT DROP` de la temporal no es un COMMIT: lo es la sentencia suelta.
+    for vetado in (r"(?<!ON )\bCOMMIT\b", r"\bBEGIN\s*;", r"\bROLLBACK\b"):
+        assert not re.search(vetado, cuerpo), vetado
+    assert "CREATE TEMP TABLE _f168_fuentes ON COMMIT DROP AS" in cuerpo
+
+
+def test_f168_el_sub_paso_de_compras_es_el_ultimo_y_cuenta_linea_texto() -> None:
+    from etl_sigrid.application.steps.build_compras_step import SUB_PASOS
+
+    ultimo = SUB_PASOS[-1]
+    assert (ultimo.name, ultimo.sql_file) == ("textos_linea", "16_textos_linea.sql")
+    assert (ultimo.target_schema, ultimo.target_table) == ("compras", "linea_texto")
