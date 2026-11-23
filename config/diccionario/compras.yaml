@@ -2957,7 +2957,8 @@ objetos:
     descripcion: >-
       El memo de la pestaña «Texto» del documento de compra, INTEGRO y tal y
       como llega: los comentarios que la gente ha ido escribiendo en la factura
-      o en el contrato, concatenados por el propio ERP.
+      o en el contrato, concatenados por el propio ERP. Desde F-168 tambien
+      el de las ofertas y los comparativos, partido con la misma regla.
 
       **SALE DE `con.tex`, NO DE `dcf.tex` NI DE `ctr.tex`.** Medido: `con.tex`
       esta informado en el **65,5 %** de las facturas (108.527 de 165.759) y en
@@ -2969,9 +2970,9 @@ objetos:
       `compras.documento_comentarios`, que es este mismo texto ya partido.
     grano: >-
       Una fila por documento con memo, `documento_id` como clave primaria
-      declarada. Solo facturas (`tip = 15`) y contratos (`tip = 44`); los
-      documentos sin memo NO salen, y los comparativos (`tip = 46`, 5.707 con
-      texto) tampoco: son de F-067.
+      declarada. Facturas (`tip = 15`), contratos (`tip = 44`), ofertas
+      (`tip = 12`) y comparativos (`tip = 46`, desde F-168); los documentos sin
+      memo NO salen.
     clave_negocio: [documento_id]
     paso_etl: build_compras
     refresco: nocturno
@@ -2984,14 +2985,15 @@ objetos:
         agregacion: no_sumable
       tipo_documento_codigo:
         significado: >-
-          El `tip` de Sigrid: 15 factura o abono, 44 contrato. Se conserva para
-          filtrar sin depender del literal.
+          El `tip` de Sigrid: 12 oferta, 15 factura o abono, 44 contrato, 46
+          comparativo. Se conserva para filtrar sin depender del literal.
         agregacion: no_sumable
-        valores: [15, 44]
+        valores: [12, 15, 44, 46]
       tipo_documento:
         significado: >-
-          Que clase de documento es, resuelto con `compras.fn_tipo_documento`.
-        valores: [FACTURA, ABONO, CONTRATO, OTRO]
+          Que clase de documento es: OFERTA (12) y COMPARATIVO (46), y el resto
+          resuelto con `compras.fn_tipo_documento`.
+        valores: [OFERTA, FACTURA, ABONO, CONTRATO, COMPARATIVO, OTRO]
       codigo_documento:
         significado: Codigo del documento tal y como se ve en Sigrid.
       texto:

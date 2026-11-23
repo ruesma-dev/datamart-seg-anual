@@ -288,3 +288,43 @@ def test_f168_el_sub_paso_de_compras_es_el_ultimo_y_cuenta_linea_texto() -> None
     ultimo = SUB_PASOS[-1]
     assert (ultimo.name, ultimo.sql_file) == ("textos_linea", "16_textos_linea.sql")
     assert (ultimo.target_schema, ultimo.target_table) == ("compras", "linea_texto")
+
+
+# ---------------------------------------------------------------------------
+# R18 · el memo de comparativos (46) y ofertas (12) en compras/07
+# ---------------------------------------------------------------------------
+
+TEXTO_DOC = DIR_SQL / "compras" / "07_texto.sql"
+
+
+def test_f168_r18_el_memo_entra_tambien_de_ofertas_y_comparativos() -> None:
+    cuerpo = _compacto(TEXTO_DOC)
+    assert "WHERE c.tip IN (12, 15, 44, 46)" in cuerpo
+    assert "c.tip IN (15, 44)" not in cuerpo
+
+
+def test_f168_r18_misma_regla_de_partir_para_todos() -> None:
+    """Los comentarios salen de `documento_texto` sin volver a filtrar por tipo:
+    la regla de partir es la misma para ofertas y comparativos."""
+    cuerpo = _compacto(TEXTO_DOC)
+    comentarios = cuerpo.split("CREATE TABLE compras.documento_comentarios AS", 1)[1]
+    assert "FROM compras.documento_texto t" in comentarios
+    assert "c.tip" not in comentarios and ".tipo_documento" not in comentarios
+
+
+def test_f168_r18_el_tipo_de_oferta_y_comparativo_tiene_nombre() -> None:
+    """`fn_tipo_documento` no conoce el 12 ni el 46 (darían OTRO): se nombran
+    en `07`, sin tocar la función que comparten las demás tablas."""
+    cuerpo = _compacto(TEXTO_DOC)
+    assert ("CASE c.tip WHEN 12 THEN 'OFERTA' WHEN 46 THEN 'COMPARATIVO' "
+            "ELSE compras.fn_tipo_documento(c.tip, compras.fn_serie(c.cod)) END") in cuerpo
+
+
+def test_f168_r18_la_ficha_declara_los_cuatro_tipos() -> None:
+    import yaml
+
+    fichas = yaml.safe_load((RAIZ / "config" / "diccionario" / "compras.yaml")
+                            .read_text(encoding="utf-8"))["objetos"]
+    columnas = fichas["documento_texto"]["columnas"]
+    assert columnas["tipo_documento_codigo"]["valores"] == [12, 15, 44, 46]
+    assert {"OFERTA", "COMPARATIVO"} <= set(columnas["tipo_documento"]["valores"])
