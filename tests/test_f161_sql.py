@@ -312,7 +312,11 @@ def _sub_pasos_stg() -> list:
 
 def test_f161_r6_el_sub_paso_va_detras_de_fase0_y_es_el_ultimo() -> None:
     nombres = [n for n, _ in _sub_pasos_stg()]
-    assert nombres[-2:] == ["build_plan_mensual_fase0", "build_master_versiones"]
+    # F-168 pone detrás sus dos sub-pasos enteros (funciones del texto largo y
+    # `stg.partida_texto`), que no leen nada de F-161: este sigue siendo el
+    # último que lee `stg.presupuesto` y `stg.plan_mensual`.
+    assert nombres[-4:] == ["build_plan_mensual_fase0", "build_master_versiones",
+                            "texto_largo", "build_partida_texto"]
     assert ("build_master_versiones", "10_master_versiones.sql") in _sub_pasos_stg()
 
 

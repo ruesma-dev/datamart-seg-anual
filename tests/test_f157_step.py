@@ -96,7 +96,9 @@ def test_f157_r12_va_despues_de_plan_mensual_y_es_el_ultimo(monkeypatch) -> None
     assert pasos.index(PASO) == pasos.index("build_stg.build_plan_mensual") + 1
     # F-161 (R6) pone detrás `build_master_versiones`, que lee `plan_mensual`
     # entero: fase0 deja de ser el último, pero sigue detrás de plan_mensual.
-    assert pasos[-2:] == [PASO, "build_stg.build_master_versiones"]
+    # F-168 añade detrás sus dos sub-pasos del texto largo, que no leen fase0.
+    assert pasos[-4:] == [PASO, "build_stg.build_master_versiones",
+                          "build_stg.texto_largo", "build_stg.build_partida_texto"]
 
 
 def test_f157_r12_r13_una_sola_pasada_borra_e_inserta_las_obras_del_plan(monkeypatch) -> None:

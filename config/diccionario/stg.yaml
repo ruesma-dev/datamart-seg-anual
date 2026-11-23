@@ -1026,6 +1026,9 @@ objetos:
           texto libre, y hoy es la unica via —heuristica— de adivinar el oficio.
           **Nunca es NULL**: se proyecta `p.res` en crudo desde `raw.obrparpar`,
           asi que una partida sin descripcion llega como **cadena vacia**.
+          Es el resumen corto (128 caracteres); el TEXTO LARGO de la partida, lo
+          que de verdad incluye, esta en `stg.partida_texto` (F-168), por
+          `partida_id`.
         nulo_significa: null
       unidad_medida:
         significado: Unidad de medicion (m3, m2, ud, kg...).
@@ -1124,6 +1127,81 @@ objetos:
           Recorrerlo a mano no hace falta, para eso esta `ruta_capitulos`.
     ejemplos_preguntas:
       - Que estructura de capitulos tiene la obra X
+
+  partida_texto:
+    tipo: tabla
+    capa: preparacion
+    consumo_recomendado: true
+    descripcion: >-
+      El TEXTO LARGO de cada partida (F-168): la descripcion tecnica completa
+      de lo que incluye (`obrparpar.tex`), limpia. Es lo que permite comparar
+      partidas y precios entre obras por lo que de verdad incluyen; la
+      descripcion corta de 128 caracteres esta en `stg.partidas`.
+
+      **Un texto para TODOS los ambitos.** La partida es la misma en coste,
+      venta, fase 0 y cada version del master, y Sigrid guarda su texto una
+      sola vez: no hay que filtrar por ambito ni version para encontrarlo, y
+      un capitulo con texto tambien sale. **Solo el texto VIGENTE**: Sigrid no
+      guarda historia, y un cambio hecho hoy en fase 0 se ve en todos los
+      master. La foto del texto de la planificacion en cada version del master
+      esta en `descompuestos.lineas.texto_id`.
+
+      Limpio quiere decir: saltos normalizados, sin caracteres de control, sin
+      espacios en los extremos y cortado a 16000 caracteres
+      (`stg.fn_texto_largo`). Las partidas sin texto NO salen.
+    grano: >-
+      Una fila por partida con texto, `partida_id` su clave primaria. Del orden
+      de 242.000 filas (medido en Sigrid el 2026-11-23).
+    clave_negocio: [partida_id]
+    paso_etl: build_stg
+    refresco: nocturno
+    columnas:
+      partida_id:
+        significado: Identificador de la partida en Sigrid (`obrparpar.ide`).
+        agregacion: no_sumable
+      obra_id:
+        significado: Obra de la partida (`obrparpar.obride`).
+        agregacion: no_sumable
+      codigo_partida:
+        significado: Codigo de la partida, el de `stg.partidas`.
+        nulo_significa: >-
+          La partida no esta publicada en `stg.partidas` (un nodo que esa tabla
+          no publica); el texto sale igual.
+      descripcion_corta:
+        significado: La descripcion corta (128 caracteres), la de `stg.partidas`.
+        nulo_significa: La partida no esta publicada en `stg.partidas`.
+      texto:
+        significado: >-
+          El texto largo limpio. Plano (Sigrid no lo guarda en RTF). Sirve para
+          leerlo y buscar en el (`ILIKE`), no para agrupar por el.
+      texto_id:
+        significado: >-
+          La identidad del texto: `md5(texto)::uuid`. Mismo `texto_id`, mismo
+          texto, aqui, en `compras.linea_texto` y en `descompuestos.lineas`:
+          compararlo dice si una linea del flujo copia el texto de su partida
+          sin traer los textos.
+        agregacion: no_sumable
+      bytes:
+        significado: Tamano del texto limpio en bytes.
+        unidad: bytes
+        agregacion: suma
+      recortado:
+        significado: >-
+          El texto de Sigrid media 16000 caracteres o mas y se corto: puede
+          faltar el final. Medido: solo 8 partidas, todas con texto basura.
+        agregacion: no_sumable
+    relaciones:
+      - de: partida_id
+        a: stg.partidas.partida_id
+        cardinalidad: "1:1"
+        porque: El codigo, el arbol y la categoria de la partida.
+      - de: obra_id
+        a: stg.obras.obra_id
+        cardinalidad: "N:1"
+        porque: Para el codigo y el nombre de la obra.
+    ejemplos_preguntas:
+      - Que incluye exactamente la partida 04.02 de la obra X (su texto largo)
+      - En que se diferencian los forjados reticulares de dos obras segun su descripcion
 
   obras:
     tipo: tabla
@@ -1600,6 +1678,62 @@ objetos:
       fecha de verdad, tratando el 0 como ausencia de fecha y no como el ano 0.
       Es la original: `compras`, `retenciones` y `maestro` tienen cada uno su
       copia, a proposito, para no depender del orden de construccion.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_stg
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_texto_largo:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build (F-168). El texto ya sale limpio en
+      `stg.partida_texto`, `compras.v_linea_texto` y `descompuestos.textos`.
+    descripcion: >-
+      La UNA limpieza del texto largo: saltos normalizados, fuera los
+      caracteres de control salvo tabulador y salto, fuera los espacios de los
+      extremos, corte a 16000 caracteres y vacio como nulo. La usan `stg`,
+      `compras` y `descompuestos`; cambiarla cambia el `texto_id` de todo.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_stg
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_texto_id:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build (F-168). El `texto_id` ya esta publicado en
+      cada tabla con texto largo.
+    descripcion: >-
+      La identidad de un texto ya limpio: `md5(texto)::uuid`. Mismo `texto_id`,
+      mismo texto, en `stg`, `compras` y `descompuestos`.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_stg
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_texto_recortado:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build (F-168). Su resultado es la columna
+      `recortado` de las tablas de texto largo.
+    descripcion: >-
+      Dice si el texto de `raw` mide 16000 caracteres o mas, es decir, si la
+      ingesta lo corto y puede faltar el final.
     grano: null
     clave_negocio: []
     paso_etl: build_stg

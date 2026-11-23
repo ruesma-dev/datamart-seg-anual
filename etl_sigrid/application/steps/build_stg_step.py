@@ -488,6 +488,18 @@ class BuildStgStep(PipelineStep):
                 "stg",
                 "master_versiones",
             ),
+            # F-168. Detrás de todo lo anterior y ENTEROS, fuera de la ventana de
+            # F-025 y del sello: `11` solo crea las funciones de limpieza e
+            # identidad del texto largo (las usan `compras` y `descompuestos`,
+            # que van después en la noche) y `12` publica `stg.partida_texto`
+            # desde `raw.obrparpar` y `stg.partidas` de esta noche.
+            _SubStep("texto_largo", "11_texto_largo.sql"),
+            _SubStep(
+                "build_partida_texto",
+                "12_partida_texto.sql",
+                "stg",
+                "partida_texto",
+            ),
         ]
 
         table_stats: dict[str, int] = {}
@@ -1182,7 +1194,9 @@ class BuildStgStep(PipelineStep):
             ("raw", "cen"):       ["ide"],
             ("raw", "auxobrtip"): ["ide", "res"],
             ("raw", "auxobrcla"): ["ide", "res"],
-            ("raw", "obrparpar"): ["ide", "obride", "padide", "cod", "res", "tipdes", "unimed", "tcaide"],
+            # F-168: `tex` lo lee 12_partida_texto.sql (lo trae la ingesta recortado).
+            ("raw", "obrparpar"): ["ide", "obride", "padide", "cod", "res", "tipdes", "unimed", "tcaide",
+                                   "tex"],
             ("raw", "obrfas"):    ["ide", "obride", "fasnum", "fecini", "fecfin", "ano", "mes", "res"],
             ("raw", "obrfasamb"): ["ide", "obride", "amb", "fas", "plafec", "fec", "res", "tex"],
             ("raw", "obrparpre"): ["ide", "obride", "paride", "amb", "fas", "can", "pre", "planif", "totinc", "impcoe"],
