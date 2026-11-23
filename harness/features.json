@@ -2720,6 +2720,23 @@
       "priority": 86,
       "branch": "feature/F-167-cp-sin-nombre-trabajador",
       "notes": "2026-11-20: alta del líder con el OK del humano a D5 de F-127. Prioridad 86 provisional (la fija el humano): es una fuga de datos personales ya publicada, conviene subirla. Relacionadas: F-107 (catálogo de cuentas analíticas), F-127 (mayor analítico), F-135 y F-141 (perfiles)."
+    },
+    {
+      "id": "F-168",
+      "title": "El texto largo de las partidas y de cada documento del flujo de obra (descompuestos, estudios, planificación de compras, comparativos, contratos, pedidos, albaranes y facturas), enlazado a su partida",
+      "description": "Pedida por Juan Romero (Control de Costes), correo «Datamart Sigrid – texto largo de las partidas (prioritario)» del 2026-11-23, tras revisar el ABC de Laguna: el datamart solo publica la descripción corta de la partida (`stg.partidas.descripcion_corta`, el `res` de 128 caracteres) y no su texto largo, que es lo que permite comparar precios entre obras por lo que de verdad incluye cada partida. El humano la amplía el mismo día: «hay que añadirlo a todas las partidas, y descompuestos de obra y estudios (planificación compras). ¿En los comparativos está? Ese texto largo que va por todo el flujo de obra tiene que estar en todas las partes que lo tengan». MEDIDO POR EL LÍDER el 2026-11-23 (solo lectura): `config/tables_sigrid.yaml` EXCLUYE A PROPÓSITO los textos largos (`tex`, `des`, `obs`) de casi todo el flujo: `obrparpar` (tex: «descripción larga, no usada en seguimiento»; des: «descomposición desglose»), `obrparpre`, `obrctr`, `ctr`, `ctrpro`, `com`, `comlin`, `comprv`, `dco`/`dcopro`, `dca`/`dcapro`, `dcf`/`dcfpro`/`dcfprodes` y otras; la lista es genérica y en algunas tablas la columna no existe (en Sigrid `comlin.tex` no existe). En Sigrid, `obrparpar.tex` tiene texto en 242.438 de 401.017 partidas (60 %), texto PLANO (0 RTF), media ~553 bytes, ~166 MB en total, con un máximo de 24,8 MB en una sola fila (basura: hace falta tope). `obrparpre.tex` está vacío (0 de 14,3 M). Ejemplo: partida 419079 (04.02 «FORJ. RETICULAR 35+10» de la 0726) lleva la descripción técnica completa. QUÉ HACER: medir en Sigrid (con `azure-apps/sigrid_tablas.md`) qué tablas del flujo de obra tienen texto largo de verdad y con qué cobertura (partidas por ámbito: coste, venta, fase 0 y master; descompuestos de obra y de estudios; planificación de compras; comparativos y ofertas; contratos y sus líneas; pedidos; albaranes; facturas), cómo se enlaza cada línea con su partida y si el texto se copia de la partida o se edita en cada documento; publicarlo donde ya se publica la línea (o en tablas de texto aparte, por volumen) con `partida_id` como enlace; tope de tamaño y limpieza; fichas del diccionario. RIESGOS: volumen en `raw` (disco de 64 GB del Postgres compartido; los descompuestos ya son incrementales, F-097) y tiempo de ingesta por la pasarela (230 s por petición); datos personales en textos libres de documentos (`obs` de contratos y documentos puede llevar nombres o teléfonos: decidir qué textos se publican y en qué esquema); las tablas de personal (familia 43) siguen fuera.",
+      "acceptance": [
+        "Definida por specs/F-168-*/ (sdd=true) con la medición previa en Sigrid (solo lectura) de cada tabla del flujo de obra que lleva texto largo: columna, cobertura, tamaño, si es plano o RTF y cómo enlaza con la partida",
+        "El texto largo de la partida publicado y consultable por `partida_id` en todas las obras y ámbitos (coste, venta, fase 0 y master)",
+        "El texto largo de los descompuestos (obra y estudios), de la planificación de compras, de los comparativos y ofertas y del resto de documentos del flujo que lo tengan, publicado junto a su línea o declarado fuera de alcance con su motivo medido",
+        "Tope de tamaño y limpieza del texto, sin datos personales en esquemas no autorizados, ficha del diccionario de cada columna nueva y `azure-apps/datamart_seg_anual.md` al día"
+      ],
+      "status": "todo",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 0,
+      "branch": "feature/F-168-texto-largo-flujo-obra",
+      "notes": "2026-11-23: alta del líder con prioridad MÁXIMA por decisión del humano («prioridad máxima»), que la compromete (`todo`). Rigor estándar provisional: lo confirma o lo sube el spec-author. Relacionadas: F-097 (descompuestos), F-090 (índice de adjuntos de compras), F-099 (contratos de venta) y F-076 (líneas de certificación)."
     }
   ]
 }
