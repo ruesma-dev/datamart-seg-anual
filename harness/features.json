@@ -2733,6 +2733,7 @@
       ],
       "status": "in_progress",
       "sdd": true,
+      "spec_aprobada": "2026-11-23",
       "rigor": "estandar",
       "priority": 0,
       "branch": "feature/F-168-texto-largo-flujo-obra",
