@@ -4,7 +4,7 @@
 Una tarea, un commit (`F-168 Tn: ...`). Tests antes o junto a su código. Las MANUAL las hace el humano
 (o el líder con su permiso) con la imagen nueva; ninguna escribe en Sigrid.
 
-- [ ] T1: `domain/texto_largo.py` (TOPE, patrón de control, `limpiar`, `texto_id`, `es_recortado`, `expresion_recorte`) con `tests/test_f168_dominio.py` en RED primero  |  Verificación: `python -m pytest tests/test_f168_dominio.py`
+- [x] T1: `domain/texto_largo.py` (TOPE, patrón de control, `limpiar`, `texto_id`, `es_recortado`, `expresion_recorte`) con `tests/test_f168_dominio.py` en RED primero  |  Verificación: `python -m pytest tests/test_f168_dominio.py`
 - [ ] T2: `TableSpec.recortar_columnas`, su lectura y validación en `ingest_raw_step.py` (R4) y la expresión de R3 en `stream_table`, con `tests/test_f168_ingesta.py`  |  Verificación: `python -m pytest tests/test_f168_ingesta.py` y los tests de ingesta existentes (`python -m pytest tests -k "ingest or stream_table"`)
 - [ ] T3: `config/tables_sigrid.yaml`: `tex` deja de excluirse en las seis tablas y declaran `recortar_columnas: {tex: 16000}`, con el comentario de lo medido (R1, R2)  |  Verificación: `python -m pytest tests/test_f168_ingesta.py`
 - [ ] T4: `sql/stg/11_texto_largo.sql` y `sql/stg/12_partida_texto.sql` y sus `_SubStep` en `build_stg_step.py` (R5-R10, R23)  |  Verificación: `python -m pytest tests/test_f168_sql.py`
