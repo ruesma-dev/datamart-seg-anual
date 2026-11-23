@@ -561,7 +561,9 @@ def test_f120_r26_version_del_diccionario() -> None:
 def test_f120_r27_docs_arquitectura_y_ayuda() -> None:
     arquitectura = DOC_ARQUITECTURA.read_text(encoding="utf-8")
     assert "14 «factor x rendimiento»" in arquitectura
-    assert "`00_setup.sql`, `01_troceado.sql` y `03_lineas_master.sql`" in arquitectura, "el sello"
+    # F-168 suma `../stg/11_texto_largo.sql` al sello.
+    assert ("`00_setup.sql`, `01_troceado.sql`, `03_lineas_master.sql` y, desde F-168,\n"
+            "`../stg/11_texto_largo.sql`") in arquitectura, "el sello"
     import main
 
     ayuda = {o.name: o.help for o in main.cli.commands["build-descompuestos"].params}["sin_tope"]

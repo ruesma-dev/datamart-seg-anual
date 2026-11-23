@@ -119,6 +119,13 @@ confirmación cubre el plan que se enseñó, no lo que apareció después.
   `v_master_version_partida` (coste de una versión por partida) y
   `master_importe_mensual` (el último cierre al lado de la temporal, sin
   reescalar). Solo las de `tiene_reparto` rigen el mensual: la parte temporal no cambia.
+  **`partida_texto` (F-168)** es el TEXTO LARGO vigente de cada partida (uno para
+  todos los ámbitos, sin historia), limpio y con su `texto_id` (`md5`), y en
+  `compras/` **`linea_texto` + `textos` + la vista `v_linea_texto`** el de cada
+  línea de planificación, oferta, contrato, albarán y factura, una sola vez: se
+  llega por (`tipo_linea`, `linea_id`). Limpieza e identidad, UNA: las funciones
+  de `stg/11_texto_largo.sql`, que también usa `descompuestos` (y están en su
+  sello).
   **`postventa/` (F-156)** son unidades, incidencias, tareas, su histórico, sus adjuntos y el coste por obra
   de origen (solo facturas), sin personas y con el texto enmascarado; los datos
   personales, en `postventa_restringida`, que solo leen el perfil postventa
