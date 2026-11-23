@@ -9,20 +9,22 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-11-23 · F-168 `spec_ready` · el texto largo de la partida y del flujo de obra (PRIORIDAD MÁXIMA)
+## 2026-11-23 · F-168 `in_progress` · el texto largo de la partida y del flujo de obra (PRIORIDAD MÁXIMA)
 
-- Spec: `specs/F-168-texto-largo-flujo-obra/` (rama `feature/F-168-texto-largo-flujo-obra`); mediciones
-  en solo lectura (Sigrid y Azure) en `progress/spec_F-168.md` (M1-M11). Rigor `estandar` confirmado.
-- Respuesta a «¿en los comparativos está?»: no en la tabla del comparativo (`comlin` no tiene texto);
-  sí en su planificación (`dncpro.tex`) y en cada oferta (`dcopro.tex`), y el memo del comparativo
-  en `con.tex` (5.902 de 20.802, sin publicar). La spec publica las tres.
-- **Decisiones abiertas para el humano** (tabla de `design.md` §8): D1 ingesta en `raw` (+856 MB y
-  +6-8 min por noche) o incremental por huella; D2 `stg.partida_texto` aparte; D3 catálogo deduplicado
-  en `compras` (207.000 textos en vez de 1,56 M); D4 tope 16.000; D5 campo 9 de los descompuestos dentro
-  (retroceso MANUAL del master); D6 sin máscara (contacto profesional de proveedores en unas decenas de
-  textos; la máscara de postventa destroza referencias de producto); D7 memo de comparativos y
-  ofertas; D8 pedidos fuera.
-- Preguntas a Juan Romero en BORRADOR al final de `progress/spec_F-168.md` (no enviadas).
+- Spec: `specs/F-168-texto-largo-flujo-obra/` (rama `feature/F-168-texto-largo-flujo-obra`, worktree
+  `.claude/worktrees/f168`); D1-D8 = (a), D9 = (a) (solo el texto vigente, sin historia).
+- **Implementer**: T1-T8 y T10-T12 hechas, un commit por tarea; informe en `progress/impl_F-168.md`.
+  T9 (sandbox) escrita y en `skip`: el puesto no tiene Postgres local ni Docker en marcha.
+  T13-T16 MANUAL, descritas en el informe. Commit de `azure-apps` `2f4d08c` sin push.
+- **Desviaciones, justificadas en el informe**: función extra `stg.fn_texto_recortado`; el recuento
+  del inventario va como enmienda en `specs/F-006-mcp-azure/design_detalle.md` (la fila puesta en T4
+  en `design.md` se retiró); `07_texto.sql` nombra OFERTA y COMPARATIVO con un `CASE` local;
+  `descompuestos.lineas.texto_id` también en el `CREATE TABLE`; tests anteriores (F-079, F-080,
+  F-097, F-120, F-123, F-127, F-147) adaptados donde fijaban la forma que F-168 cambia a propósito.
+- Suite entera en el worktree: 13.856 pasan; los 11 fallos de F-168 arreglados en `8c2e670`; los otros
+  116 son de entorno (115 idénticos en la base `5566284`, uno de tiempos que pasa solo). T17 queda al
+  líder: `init.sh` aquí da 3 KO de entorno (`.env`, base rezagada x2).
+- La puerta completa la pasa el líder en el checkout principal (el worktree no tiene `.env`).
 
 ## 2026-11-22 · F-127 `done` · el mayor analítico (pendientes MANUAL)
 
