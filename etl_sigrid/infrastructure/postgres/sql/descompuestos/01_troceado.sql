@@ -14,6 +14,8 @@
 --
 --    1 codigo            2 descripcion        3 precio (del elemento)
 --    4 cantidad total    5 unidad             7 codigo alternativo (= dncpro.cod2)
+--    9 texto largo (F-168, `texto_largo`: sin limpiar; su `texto_id` lo da
+--      `stg.fn_texto_id(stg.fn_texto_largo(...))` en 02 y 03)
 --   11 cod. naturaleza  14 factor x rendimiento (F-120)    16 tipo
 --   17 naturaleza       36 enlace: `dncpro.ide` (0 o vacio si no viene de la
 --                          planificacion)
@@ -50,7 +52,8 @@
 -- tope por noche; de una vez con `build-descompuestos --sin-tope`).
 --
 -- EL DROP (F-120). `CREATE OR REPLACE` no puede cambiar las columnas de un
--- `RETURNS TABLE`, y F-120 le anade `factor`. Nada depende de la funcion en el
+-- `RETURNS TABLE`, y F-120 le anade `factor` (y F-168, `texto_largo`, al
+-- final para no mover las demas). Nada depende de la funcion en el
 -- catalogo (02, 03 y 05 la llaman en tiempo de ejecucion; ninguna vista la
 -- usa), asi que se borra y se crea. ORDEN DE DESPLIEGUE: primero la imagen del
 -- job y despues el retroceo; al reves, la imagen vieja fallaria en su `CREATE
@@ -79,7 +82,8 @@ RETURNS TABLE (
     es_porcentaje         BOOLEAN,
     porcentaje            NUMERIC,
     base_porcentaje       NUMERIC,
-    factor                NUMERIC
+    factor                NUMERIC,
+    texto_largo           TEXT
 )
 LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
 SELECT
@@ -119,7 +123,8 @@ SELECT
     COALESCE(c.tipo_elemento_codigo IN ('4', '13'), FALSE) AS es_porcentaje,
     CASE WHEN c.tipo_elemento_codigo IN ('4', '13') THEN c.rendimiento * 100 END AS porcentaje,
     CASE WHEN c.tipo_elemento_codigo IN ('4', '13') THEN c.precio END AS base_porcentaje,
-    c.factor
+    c.factor,
+    c.texto_largo
 FROM (
     -- El campo 14 partido en factor y rendimiento (F-120). `fn_num` primero: un
     -- numero es factor 1; si no, la forma factor; si tampoco, NULL. `fn_num('')`
@@ -145,6 +150,7 @@ FROM (
             descompuestos.fn_num(split_part(g.reg, '|', 5)) AS cantidad_total,
             NULLIF(btrim(split_part(g.reg, '|', 6)), '') AS unidad,
             NULLIF(btrim(split_part(g.reg, '|', 8)), '') AS codigo_alternativo,
+            NULLIF(btrim(split_part(g.reg, '|', 10)), '') AS texto_largo,
             NULLIF(btrim(split_part(g.reg, '|', 12)), '') AS naturaleza_codigo,
             NULLIF(btrim(split_part(g.reg, '|', 15)), '') AS factor_rendimiento,
             NULLIF(btrim(split_part(g.reg, '|', 17)), '') AS tipo_elemento_codigo,

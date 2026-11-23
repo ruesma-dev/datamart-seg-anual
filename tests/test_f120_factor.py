@@ -357,8 +357,10 @@ def test_f120_r19_troceado_drop_y_factor_en_returns() -> None:
     assert drop in texto and crear in texto
     assert texto.index(drop) < texto.index(crear)
     retorno = _bloque(TROCEADO, "RETURNS TABLE (", ") LANGUAGE sql")
-    assert retorno.strip().endswith("base_porcentaje NUMERIC, factor NUMERIC")
-    assert "THEN c.precio END AS base_porcentaje, c.factor FROM (" in texto, "el orden del RETURNS TABLE"
+    # F-168 (R19) añade `texto_largo` DETRÁS de `factor`: las de F-120 no se mueven.
+    assert retorno.strip().endswith("base_porcentaje NUMERIC, factor NUMERIC, texto_largo TEXT")
+    assert ("THEN c.precio END AS base_porcentaje, c.factor, c.texto_largo FROM (" in texto), (
+        "el orden del RETURNS TABLE")
 
 
 # ===========================================================================

@@ -75,6 +75,8 @@ POSICIONES = {
     "cantidad_total": 4,
     "unidad": 5,
     "codigo_alternativo": 7,
+    # F-168: el TEXTO LARGO del elemento (puede traer saltos de linea dentro)
+    "texto_largo": 9,
     "naturaleza_codigo": 11,
     # «factor x rendimiento» o un numero (F-120): lo parte `factor_rendimiento`
     "factor_rendimiento": 14,
@@ -166,6 +168,10 @@ class RegistroDes:
     es_porcentaje: bool
     porcentaje: Decimal | None
     base_porcentaje: Decimal | None
+    # F-168 (R19): el campo 9, tal cual (sin limpiar: la limpieza es la de
+    # `texto_largo.limpiar`, que es la que da su `texto_id`). Al final, como en
+    # el `RETURNS TABLE` de `fn_trocear`.
+    texto_largo: str | None
 
     @property
     def es_enlazado(self) -> bool:
@@ -286,6 +292,7 @@ def trocear_des(des: str | None) -> tuple[RegistroDes, ...]:
                     _producto(rendimiento, Decimal(100)) if es_porcentaje else None
                 ),
                 base_porcentaje=precio if es_porcentaje else None,
+                texto_largo=_texto(campos, POSICIONES["texto_largo"]),
             )
         )
     return tuple(registros)
