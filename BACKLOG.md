@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **156 features**, 73 abiertas y 83 terminadas. Por columna: 0 en Review, 0 en Blocked, 0 en In progress, 1 en Spec aprobada, 8 en To do, 64 en Backlog y 83 en Done.
+Resumen: **156 features**, 73 abiertas y 83 terminadas. Por columna: 0 en Review, 0 en Blocked, 0 en In progress, 2 en Spec aprobada, 7 en To do, 64 en Backlog y 83 en Done.
 
 ## Review
 
@@ -21,13 +21,13 @@ _Ninguna feature en implementación._
 
 | # | Feature | Spec aprobada | Prioridad | Rigor | Rama |
 |---|---|---|---|---|---|
+| F-168 | El texto largo de las partidas y de cada documento del flujo de obra (descompuestos, estudios, planificación de compras, comparativos, contratos, pedidos, albaranes y facturas), enlazado a su partida | pendiente de tu aprobación | 0 | estandar | `feature/F-168-texto-largo-flujo-obra` |
 | F-111 | Los nombres de partida se resuelven por codigo en los niveles del arbol y en la dimension de costes indirectos: 10.593 filas con un escalon con el nombre de otra partida | pendiente de tu aprobación | 25 | estandar | `feature/F-111-nombres-partida-por-ancestro` |
 
 ## To do
 
 | # | Feature | Prioridad | Rigor | Rama |
 |---|---|---|---|---|
-| F-168 | El texto largo de las partidas y de cada documento del flujo de obra (descompuestos, estudios, planificación de compras, comparativos, contratos, pedidos, albaranes y facturas), enlazado a su partida | 0 | estandar | `feature/F-168-texto-largo-flujo-obra` |
 | F-165 | La versión vigente del master con el criterio de Control de Costes: la «Planif Inicial» no es vigente; antes del ABC manda el master 0 (coste directo) y el v1 (indirectos) | 3 | estandar | `feature/F-165-version-vigente-master` |
 | F-160 | Ventas fase 2: contraste producido / certificado de todas las obras y los conceptos certificados fuera de coeficiente | 4 | estandar | `feature/F-160-ventas-contraste-fase2` |
 | F-166 | La ficha de obra completa: delegación, área y división, marcas UTE y obra pública, gestión comercial, almacenes y las personas de la obra (+DATOS) | 5 |  | `feature/F-166-ficha-obra-completa` |
@@ -197,7 +197,7 @@ _Ninguna feature en implementación._
 
 ### F-168 · El texto largo de las partidas y de cada documento del flujo de obra (descompuestos, estudios, planificación de compras, comparativos, contratos, pedidos, albaranes y facturas), enlazado a su partida
 
-estado **to do (comprometida)** · prioridad 0 · rigor `estandar` · SDD sí · rama `feature/F-168-texto-largo-flujo-obra`
+estado **spec lista** · prioridad 0 · rigor `estandar` · SDD sí · rama `feature/F-168-texto-largo-flujo-obra`
 
 Pedida por Juan Romero (Control de Costes), correo «Datamart Sigrid – texto largo de las partidas (prioritario)» del 2026-11-23, tras revisar el ABC de Laguna: el datamart solo publica la descripción corta de la partida (`stg.partidas.descripcion_corta`, el `res` de 128 caracteres) y no su texto largo, que es lo que permite comparar precios entre obras por lo que de verdad incluye cada partida. El humano la amplía el mismo día: «hay que añadirlo a todas las partidas, y descompuestos de obra y estudios (planificación compras). ¿En los comparativos está? Ese texto largo que va por todo el flujo de obra tiene que estar en todas las partes que lo tengan». MEDIDO POR EL LÍDER el 2026-11-23 (solo lectura): `config/tables_sigrid.yaml` EXCLUYE A PROPÓSITO los textos largos (`tex`, `des`, `obs`) de casi todo el flujo: `obrparpar` (tex: «descripción larga, no usada en seguimiento»; des: «descomposición desglose»), `obrparpre`, `obrctr`, `ctr`, `ctrpro`, `com`, `comlin`, `comprv`, `dco`/`dcopro`, `dca`/`dcapro`, `dcf`/`dcfpro`/`dcfprodes` y otras; la lista es genérica y en algunas tablas la columna no existe (en Sigrid `comlin.tex` no existe). En Sigrid, `obrparpar.tex` tiene texto en 242.438 de 401.017 partidas (60 %), texto PLANO (0 RTF), media ~553 bytes, ~166 MB en total, con un máximo de 24,8 MB en una sola fila (basura: hace falta tope). `obrparpre.tex` está vacío (0 de 14,3 M). Ejemplo: partida 419079 (04.02 «FORJ. RETICULAR 35+10» de la 0726) lleva la descripción técnica completa. QUÉ HACER: medir en Sigrid (con `azure-apps/sigrid_tablas.md`) qué tablas del flujo de obra tienen texto largo de verdad y con qué cobertura (partidas por ámbito: coste, venta, fase 0 y master; descompuestos de obra y de estudios; planificación de compras; comparativos y ofertas; contratos y sus líneas; pedidos; albaranes; facturas), cómo se enlaza cada línea con su partida y si el texto se copia de la partida o se edita en cada documento; publicarlo donde ya se publica la línea (o en tablas de texto aparte, por volumen) con `partida_id` como enlace; tope de tamaño y limpieza; fichas del diccionario. RIESGOS: volumen en `raw` (disco de 64 GB del Postgres compartido; los descompuestos ya son incrementales, F-097) y tiempo de ingesta por la pasarela (230 s por petición); datos personales en textos libres de documentos (`obs` de contratos y documentos puede llevar nombres o teléfonos: decidir qué textos se publican y en qué esquema); las tablas de personal (familia 43) siguen fuera.
 

@@ -9,6 +9,21 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-23 · F-168 `spec_ready` · el texto largo de la partida y del flujo de obra (PRIORIDAD MÁXIMA)
+
+- Spec: `specs/F-168-texto-largo-flujo-obra/` (rama `feature/F-168-texto-largo-flujo-obra`); mediciones
+  en solo lectura (Sigrid y Azure) en `progress/spec_F-168.md` (M1-M11). Rigor `estandar` confirmado.
+- Respuesta a «¿en los comparativos está?»: no en la tabla del comparativo (`comlin` no tiene texto);
+  sí en su planificación (`dncpro.tex`) y en cada oferta (`dcopro.tex`), y el memo del comparativo
+  en `con.tex` (5.902 de 20.802, sin publicar). La spec publica las tres.
+- **Decisiones abiertas para el humano** (tabla de `design.md` §8): D1 ingesta en `raw` (+856 MB y
+  +6-8 min por noche) o incremental por huella; D2 `stg.partida_texto` aparte; D3 catálogo deduplicado
+  en `compras` (207.000 textos en vez de 1,56 M); D4 tope 16.000; D5 campo 9 de los descompuestos dentro
+  (retroceso MANUAL del master); D6 sin máscara (contacto profesional de proveedores en unas decenas de
+  textos; la máscara de postventa destroza referencias de producto); D7 memo de comparativos y
+  ofertas; D8 pedidos fuera.
+- Preguntas a Juan Romero en BORRADOR al final de `progress/spec_F-168.md` (no enviadas).
+
 ## 2026-11-22 · F-127 `done` · el mayor analítico (pendientes MANUAL)
 
 - Cerrada con el OK del humano y fusionada en `dev`; resumen en `progress/history.md`.
