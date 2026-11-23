@@ -148,9 +148,11 @@ E       assert 'texto limpio' in 'Verdadero si el texto es el de su partida (`st
 2 failed, 17 passed in 2.20s
 ```
 
-En las fases RED parciales, lo que ya pasaba son guardas de «no cambia» o requisitos de una tarea
-anterior. En T6, por ejemplo, la regla de partir no cambia. Los 4 tests de R19 se pusieron en verde
-en T7 y los 8 de R20-R22, en T8.
+Lo que ya pasaba en RED son guardas de «no cambia» o requisitos de una tarea anterior.
+**R17 (review)**: el código existía, así que su RED es una mutación a mano (OFERTA con
+`o.dncproide` en vez de `o.ide` en `16`), revertida después:
+`pytest tests/test_f168_sql.py -k r17` → `E assert ('o.ide::BIGINT AS linea_id' in "'OFERTA'::TEXT
+AS tipo_linea, o.dncproide::BIGINT AS linea_id, ...` · `1 failed`.
 
 ## Salida de `init.sh`
 
@@ -175,15 +177,15 @@ Como `init.sh` para en el primer fallo, la suite entera se lanzó aparte; su res
 
 ## Verificaciones MANUAL pendientes (no ejecutadas: son del humano o del líder)
 
-- **T9 · sandbox.** `F168_SANDBOX_DSN=<dsn local> python -m pytest tests/test_f168_sandbox.py`. El
-  puesto no tiene Postgres local (solo `psqlODBC`) y Docker no está en marcha, así que nunca se ha
-  ejecutado. Los 13 casos de design §6 están escritos, pero puede hacer falta un ajuste de fixture
-  la primera vez.
+- **T9 · sandbox: HECHA.** El puesto sí tiene PostgreSQL 16 (`C:\Program Files\PostgreSQL\16\bin`,
+  con `initdb`; yo solo había mirado el PATH). Clúster desechable en el scratchpad (`initdb -A trust`,
+  `pg_ctl -p 54398`, borrado al acabar): `tests/test_f168_sandbox.py` → **14 passed en 7,90 s**.
 - **T13 · lectura de prueba.** Solo lectura y sin escribir en ningún Postgres, desde un script del
   scratchpad con `api.leer_sql`. Es una página de 5.000 filas de cada una de las seis tablas, con la
   expresión de recorte de `expresion_recorte('tex', 16000)`. Hay que anotar tiempo y bytes.
 - **T14 · tras desplegar la imagen.**
-  1. `python main.py ingest` de las seis tablas (o esperar a la nocturna).
+  1. `python main.py ingest --full --table <t>` para cada una de las seis. Sin `--full` es
+     incremental (`max(ide)`) y las filas ya cargadas se quedan con `tex` NULL. O la nocturna.
   2. `build-stg` y `build-compras`.
   3. `build-descompuestos --sin-tope` + `apply-grants`. Cambia el sello: retroceso del master
      entero, SIEMPRE después de la imagen.
@@ -200,15 +202,13 @@ Como `init.sh` para en el primer fallo, la suite entera se lanzó aparte; su res
 
 ## Qué queda fuera
 
-- La historia del texto (D9), los pedidos (D8) y el `tex` de las cabeceras.
-- La máscara (D6): ningún `GRANT` ni esquema `*_restringida` (lo comprueba `test_f168_r24_*`).
-- La campaña de mutación: la lanza el líder en la pasada de campaña.
+- Historia (D9), pedidos (D8), `tex` de cabeceras, máscara (D6, vigilada por `r24_*`) y mutación (pasada de campaña).
 
 ## Evidencias
 
 | Evidencia | Valor real |
 |---|---|
-| Tests de F-168 | **121 pasan y 13 se saltan** (la sandbox, sin DSN), en **16,66 s**. Por fichero: dominio 29, ingesta 34, sql 27, descompuestos 12, diccionario 19, sandbox 13 |
+| Tests de F-168 | **122 pasan y 14 se saltan** sin DSN (la sandbox), 16,66 s; con DSN la sandbox, 14/14. Por fichero: dominio 29, ingesta 34, sql 28, descompuestos 12, diccionario 19, sandbox 14 |
 | Suite entera (`python -m pytest -q`, sin `-x`) | **13.856 pasan, 127 fallan y 2.605 se saltan**, en **4.166,75 s (1 h 09 min)** |
 | Los 127 fallos | 11 eran de F-168 (F-047, F-066, F-073, F-080 y F-138) y se arreglaron en `8c2e670`: los 5 ficheros, ya en verde (403 pasan) |
 | | Los otros 116 son de entorno. 115 fallan **idénticos** en la base `5566284`, en un worktree desechable, con `diff` vacío. Son `SigridApiSettings` sin `.env` (CLI de check-*, f025, f078 y f118, entre otros) y la base rezagada |
@@ -217,4 +217,4 @@ Como `init.sh` para en el primer fallo, la suite entera se lanzó aparte; su res
 | Cobertura de las líneas cambiadas | **No medible en el worktree**: `PUERTA COBERTURA` da KO de entorno (la base `main` va 34 commits por detrás de `dev`). La da el líder con `RAMA_BASE` bien puesta |
 | Mutantes | **Pendiente de la pasada de campaña**: `python -m harness.mutacion --feature F-168` sobre código aprobado, como manda el protocolo |
 | Capa e2e | N/A (`CAPA E2E: N/A`, sin `harness/servicios.json`) |
-| Sandbox SQL (T9) | Sin ejecutar: no hay Postgres local. Es MANUAL |
+| Sandbox SQL (T9) | **14/14 pasan** (7,90 s) contra un PostgreSQL 16 desechable del puesto |

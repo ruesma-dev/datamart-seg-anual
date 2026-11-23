@@ -286,3 +286,23 @@ def test_f168_r23_un_fallo_deja_la_tabla_anterior(conexion) -> None:
     finally:
         conexion.execute("ALTER TABLE stg.partidas_fuera RENAME TO partidas")
     assert _uno(conexion, "SELECT count(*) FROM stg.partida_texto")[0] == antes
+
+
+# ---------------------------------------------------------------------------
+# R17 · del comparativo al texto por (tipo_linea, linea_id)
+# ---------------------------------------------------------------------------
+
+
+def test_f168_r17_comparativo_y_oferta_llegan_al_texto_sin_intermedias(conexion) -> None:
+    """Con las claves que publica `compras/09`: `NULLIF(comlin.dncproide, 0)` como
+    `linea_necesidad_id` y `dcopro.ide` como `linea_oferta_id`."""
+    necesidad = _uno(conexion, """
+        SELECT v.texto FROM (VALUES (501)) cl(dncproide)
+        JOIN compras.v_linea_texto v
+          ON v.tipo_linea = 'NECESIDAD' AND v.linea_id = NULLIF(cl.dncproide, 0)""")
+    assert necesidad == (NEC,)
+    oferta = _uno(conexion, """
+        SELECT v.texto FROM raw.dcopro lp
+        JOIN compras.v_linea_texto v ON v.tipo_linea = 'OFERTA' AND v.linea_id = lp.ide
+        WHERE lp.ide = 601""")
+    assert oferta == (NEC,)

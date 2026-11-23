@@ -328,3 +328,22 @@ def test_f168_r18_la_ficha_declara_los_cuatro_tipos() -> None:
     columnas = fichas["documento_texto"]["columnas"]
     assert columnas["tipo_documento_codigo"]["valores"] == [12, 15, 44, 46]
     assert {"OFERTA", "COMPARATIVO"} <= set(columnas["tipo_documento"]["valores"])
+
+
+# ---------------------------------------------------------------------------
+# R17 · del comparativo al texto, sin tablas intermedias
+# ---------------------------------------------------------------------------
+
+COMPARATIVOS_DETALLE = DIR_SQL / "compras" / "09_comparativos_detalle.sql"
+
+
+def test_f168_r17_las_claves_del_comparativo_son_las_de_linea_texto() -> None:
+    """`comparativo_lineas.linea_necesidad_id` es `dncpro.ide` y
+    `comparativo_oferta_lineas.linea_oferta_id` es `dcopro.ide`: las mismas que
+    `linea_texto.linea_id` en NECESIDAD y en OFERTA. Basta (`tipo_linea`, `linea_id`)."""
+    detalle = _compacto(COMPARATIVOS_DETALLE)
+    assert "NULLIF(l.dncproide, 0) AS linea_necesidad_id" in detalle
+    assert "lp.ide AS linea_oferta_id" in detalle and "FROM raw.dcopro lp" in detalle
+    necesidad, oferta = _rama("NECESIDAD"), _rama("OFERTA")
+    assert "n.ide::BIGINT AS linea_id" in necesidad and "FROM raw.dncpro n" in necesidad
+    assert "o.ide::BIGINT AS linea_id" in oferta and "FROM raw.dcopro o" in oferta
