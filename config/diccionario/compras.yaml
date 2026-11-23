@@ -5636,13 +5636,14 @@ objetos:
       igual_a_partida:
         significado: >-
           Verdadero si el texto es el de su partida (`stg.partida_texto`), falso
-          si los dos existen y difieren.
+          si los dos existen y difieren. Compara el texto limpio (`texto_id`):
+          un espacio de mas en un extremo o un salto de Windows no lo cambian.
         agregacion: no_sumable
         nulo_significa: La linea no tiene partida, o su partida no tiene texto largo.
       igual_a_necesidad:
         significado: >-
           Verdadero si el texto es el de su linea de planificacion, falso si los
-          dos existen y difieren.
+          dos existen y difieren. Compara el texto limpio (`texto_id`).
         agregacion: no_sumable
         nulo_significa: >-
           Siempre en NECESIDAD; en el resto, la linea no viene de la
@@ -5749,11 +5750,11 @@ objetos:
         significado: La identidad del texto limpio (`md5(texto)::uuid`).
         agregacion: no_sumable
       igual_a_partida:
-        significado: El texto es el de su partida (falso si los dos existen y difieren).
+        significado: El texto es el de su partida (falso si los dos existen y difieren); compara el texto limpio.
         agregacion: no_sumable
         nulo_significa: Sin partida, o la partida no tiene texto largo.
       igual_a_necesidad:
-        significado: El texto es el de su linea de planificacion (falso si difieren).
+        significado: El texto es el de su linea de planificacion (falso si difieren); compara el texto limpio.
         agregacion: no_sumable
         nulo_significa: Siempre en NECESIDAD; en el resto, sin planificacion o sin su texto.
       texto:

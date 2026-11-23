@@ -215,7 +215,7 @@ def _cliente_que_graba(sql_enviadas: list[str]) -> SigridApiClient:
 
     cliente = SigridApiClient(base_url="http://sigrid.invalid", function_key="k",
                               database="d", page_size=5)
-    cliente._client = httpx.Client(transport=httpx.MockTransport(responder),  # noqa: SLF001
+    cliente._client = httpx.Client(transport=httpx.MockTransport(responder),
                                    base_url="http://sigrid.invalid")
     return cliente
 

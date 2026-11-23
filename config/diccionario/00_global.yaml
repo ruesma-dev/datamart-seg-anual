@@ -868,7 +868,17 @@
 # `.apuntes_analiticos_restringidos_mes` (lo visible y cuanto falta). Sin regla
 # nueva (D6): una frase en la `regla` de `R-PERFILES` y de `R-SALDO-CONTABLE`,
 # y la ficha de `raw.apa`.
-version: 81
+#
+# version 82 (F-168, 2026-11-23): EL TEXTO LARGO DE LA PARTIDA Y DEL FLUJO DE
+# OBRA. Fichas nuevas: `stg.partida_texto` (el texto vigente de cada partida,
+# uno para todos los ambitos) y sus tres funciones de limpieza e identidad;
+# `compras.linea_texto`, `compras.textos` y `compras.v_linea_texto` (el texto de
+# cada linea de planificacion, oferta, contrato, albaran y factura, una vez y
+# con su igualdad a la partida y a la planificacion); `descompuestos.textos` y
+# la columna `descompuestos.lineas.texto_id`. `compras.documento_texto` publica
+# tambien el memo de ofertas y comparativos. Sin regla nueva y sin tocar ningun
+# esquema restringido (D6).
+version: 82
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 

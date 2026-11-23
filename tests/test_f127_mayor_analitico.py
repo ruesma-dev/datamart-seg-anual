@@ -1153,7 +1153,9 @@ def test_f127_r21_relaciones_del_general() -> None:
 
 
 def test_f127_r21_version_del_diccionario() -> None:
-    assert _dicc("00_global.yaml")["version"] == 81, "F-104 publicó la 80; F-127 sube a 81"
+    # F-168 sube a 82: lo que fija F-127 es que la suya fue la 81, no que sea la ultima.
+    assert _dicc("00_global.yaml")["version"] >= 81, "F-104 publicó la 80; F-127 sube a 81"
+    assert "# version 81 (F-127, 2026-11-20)" in (RAIZ_REPO / "config" / "diccionario" / "00_global.yaml").read_text(encoding="utf-8")
 
 
 def test_f127_r21_el_diccionario_del_arbol_valida() -> None:
