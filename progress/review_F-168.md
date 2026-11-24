@@ -1,13 +1,21 @@
-Revisión incremental desde bb1b130 (pasada 2) · `git diff bb1b130..e05fde7`
+Revisión incremental desde e05fde7 (pasada 2, cierre) · `git diff e05fde7..a524811` (solo `current.md` y esta review)
 
 # F-168 · Review · El texto largo de la partida y del flujo de obra
 
-**Veredicto (pasada 2): PENDIENTE DE LA PUERTA. Esto todavía NO es un APPROVED.** La feature no tiene
-nada pendiente de cambiar: los tres cambios de la pasada 1 están hechos y verificados. Solo faltan
-C1 y la cobertura, que dependen de la puerta completa del líder. Esa puerta está parada porque `main`
-va por detrás de `dev`, un problema de base que tiene que resolver el humano. Cuando la puerta salga
-en verde, se marcan esos dos puntos y el veredicto pasa a **APPROVED** sin volver a mirar el código
-(salvo que la puerta descubra algo). Mientras siga en rojo, el reviewer no aprueba.
+**Veredicto final: APPROVED** sobre `a524811`. La puerta completa salió en verde, así que C1 y la
+cobertura, lo único que faltaba en la pasada 2, quedan marcados. El delta desde `e05fde7` es esta
+review (`3f41ae5`) y dos líneas de `current.md` con los recuentos del diccionario v82 (`a524811`).
+Ninguno toca código, SQL ni el diccionario, así que lo verificado en las pasadas 1 y 2 sigue valiendo.
+
+**La puerta**, según el informe del líder. La pasó en el checkout principal, rama `puerta/F-168` en
+`a524811`, porque el worktree no tiene `.env`; yo no la ejecuté. Antes, el humano dio su OK para llevar
+`main` a `dev` (`970ef98`). Resultado de `bash harness/init.sh`: exit 0, 2026-11-24 de 09:37 a 11:01 UTC.
+`14016 passed, 2574 skipped in 4977.72s`; `[OK] PUERTA COBERTURA: 100.0% de 53 líneas cambiadas
+(53/53, umbral 80 %, diff desde 970ef98c0d)`; `[OK] PUERTA TAMAÑO`; CARRIL y E2E N/A; único aviso,
+ruff 437 (deuda previa).
+
+**Veredicto de la pasada 2 (resumen):** pendiente de la puerta. Las tres correcciones de la pasada 1
+estaban hechas y verificadas.
 
 **Pasada 1 (resumen):** CHANGES_REQUESTED sobre `bb1b130`. El código y el SQL estaban bien, y los
 ejecuté: sandbox 13/13, `03_lineas_master.sql` real, migración desde la base, y 1.301 tests de F-168 y
@@ -41,10 +49,8 @@ al acabar). Resultado: **1.303 passed, 4 skipped (no son de F-168), 0 failed, en
 
 ## Checkpoints (estado tras la pasada 2)
 
-**C1** — [ ] `ARNES_SIN_CACHE=1 bash harness/init.sh` en verde: **pendiente de la puerta del líder**.
-Saldrá en rojo con los dos KO de base ya conocidos (`PUERTA COBERTURA` y
-`test_en_este_repositorio_la_base_no_esta_rezagada`, por `main` detrás de `dev`). No son de F-168, pero
-no se aprueba con la puerta en rojo. [x] Los ficheros del arnés están.
+**C1** — [x] `init.sh` en verde: exit 0 en la puerta completa del líder (arriba), 14016 passed, con
+`.env` y con la base corregida (`main` = `dev`, `970ef98`). [x] Los ficheros del arnés están.
 
 **C2** — [x] una sola feature activa. [x] orden de prioridad respetado. [x] rama `feature/F-168-...`.
 [x] `current.md` abre con la sesión activa. [x] resúmenes en `history.md`. `spec_aprobada` ya consta.
@@ -61,12 +67,12 @@ comando exacto. [x] dobles: el de `test_f150` acepta `recortes=`; la comprobaci�
 la puerta del líder.
 
 **C4 bis** — [x] nivel `estandar` declarado. [x] fase RED con trazas reales (T1-T8, T10 y R17).
-[ ] cobertura de lo cambiado: **pendiente de la puerta del líder**. N/A por nivel: mutación, RM1-RM7 y
+[x] cobertura de lo cambiado: `[OK] PUERTA COBERTURA 100.0 %` (53/53, umbral 80 %). N/A por nivel: mutación, RM1-RM7 y
 análisis de supervivientes (en `estandar` la mutación es informativa). [x] sección «Evidencias»
 completa. Capa e2e N/A (`CAPA E2E: N/A`). C4 ter N/A (no hay `harness/rutas_sensibles.json`).
 
-**C5** — [x] T1-T12 en `[x]`. T13-T16 son MANUAL de después del despliegue y T17 es la puerta: siguen
-abiertas con motivo. [x] un commit `F-168 Tn:` por tarea, más el de la review. [x] el árbol del
+**C5** — [x] T1-T12 en `[x]`. T13-T16 son MANUAL de después del despliegue: siguen abiertas
+con motivo. T17 (la puerta) ya está en verde: el líder puede marcarla. [x] un commit `F-168 Tn:` por tarea, más el de la review. [x] el árbol del
 worktree está limpio. [x] `features.json` dice `in_progress`; el líder la pasará a `in_review`.
 
 ## Requisito → test (`test_f168_` + …)

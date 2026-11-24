@@ -9,7 +9,7 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-11-23 · F-168 `in_progress` · el texto largo de la partida y del flujo de obra (PRIORIDAD MÁXIMA)
+## 2026-11-24 · F-168 `human_review` · review APPROVED y puerta en verde (a524811; 14016 passed, cobertura 53/53) · el texto largo de la partida y del flujo de obra (PRIORIDAD MÁXIMA)
 
 - Spec: `specs/F-168-texto-largo-flujo-obra/` (rama `feature/F-168-texto-largo-flujo-obra`, worktree
   `.claude/worktrees/f168`); D1-D8 = (a), D9 = (a) (solo el texto vigente, sin historia).
