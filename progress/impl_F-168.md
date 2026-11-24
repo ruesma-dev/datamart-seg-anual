@@ -186,7 +186,7 @@ Como `init.sh` para en el primer fallo, la suite entera se lanzó aparte; su res
 - **T14 · tras desplegar la imagen.**
   1. `python main.py ingest --full --table <t>` para cada una de las seis. Sin `--full` es
      incremental (`max(ide)`) y las filas ya cargadas se quedan con `tex` NULL. O la nocturna.
-  2. `build-stg` y `build-compras`.
+  2. `stage` y `build-compras` (decía `build-stg`, que no existe).
   3. `build-descompuestos --sin-tope` + `apply-grants`. Cambia el sello: retroceso del master
      entero, SIEMPRE después de la imagen.
   4. `check-diccionario` y publicar la v82 CON LA IMAGEN.
