@@ -41,7 +41,8 @@
   1. `python main.py ingest --full --table obrparpar`, y lo mismo con `--table dncpro`, `dcopro`,
      `ctrpro`, `dcapro` y `dcfpro`. **Con `--full`**: sin él es incremental desde `max(ide)` y las filas
      ya cargadas se quedan con `tex` NULL. (Alternativa: esperar a la nocturna, que va con `run-all --full`.)
-  2. `python main.py build-stg` y `python main.py build-compras`.
+  2. `python main.py stage` y `python main.py build-compras` (aquí decía `build-stg`, que no existe:
+     el comando es `stage`).
   3. `python main.py build-descompuestos --sin-tope` y `python main.py apply-grants` (cambia el sello:
      retroceso del master entero, SIEMPRE después de la imagen).
   4. `python main.py check-diccionario` y `python main.py publicar-diccionario` CON LA IMAGEN (v82).
@@ -58,6 +59,20 @@
   y `SELECT count(*) FROM descompuestos.lineas d JOIN compras.linea_texto c ON c.tipo_linea = 'NECESIDAD' AND c.linea_id = d.dncpro_id WHERE d.origen = 'PLANIF_JO' AND d.texto_id IS DISTINCT FROM c.texto_id;`
   → 0 y 0 (R20, R21). Después reiniciar `mcp-bbdd` y preguntar «¿qué incluye la partida 04.02 de la
   0726 y en qué se diferencia del forjado reticular de otra obra?».
+- **RESULTADOS T14 y T16 (2026-11-24, humano en local + líder en solo lectura)**:
+  - `stage` SUCCESS 13:08-16:29 UTC: **3 h 21 min** (frente a ~80 min de una noche parcial; el
+    cambio del sello rehízo todas las obras, casi todo en los tramos de `plan_mensual`).
+  - `build-compras` SUCCESS 16:29-16:55; `build-descompuestos --sin-tope` SUCCESS 16:56-18:03 (67 min,
+    3.090 versiones con el sello nuevo); `apply-grants` SUCCESS 18:03.
+  - `check-diccionario`: 339 fichas, 338 objetos; los de F-168 ya existen. Única discrepancia,
+    ANTERIOR a F-168: `postventa.v_coste_obra` fichada y no existe (pendiente aparte). Lo publicado es
+    la v82 (hash `82b2bb69a896`).
+  - T14.5: la partida 419079 trae su texto (1.014 caracteres). T14.6: `linea_texto` dentro de lo
+    esperado; `compras.textos` 118.507.
+  - **T16: 0 y 0** (R20, R21). `descompuestos.textos` 77.405, sin duplicados.
+  - Base 39,48 GB (≤ 42,7, R27).
+  - `mcp-bbdd` reiniciado por el líder (revisión `--0000025`) para refrescar la caché del diccionario.
+  - Quedan: la pregunta de la 0726 por el conector y **T15 tras la nocturna del 25-11**.
 - **Push** (humano): la rama de F-168 tras el merge, y `azure-apps` `2f4d08c` (`pull` y después `push`).
 
 ## 2026-11-22 · F-127 `done` · el mayor analítico (pendientes MANUAL)
