@@ -2731,12 +2731,13 @@
         "El texto largo de los descompuestos (obra y estudios), de la planificación de compras, de los comparativos y ofertas y del resto de documentos del flujo que lo tengan, publicado junto a su línea o declarado fuera de alcance con su motivo medido",
         "Tope de tamaño y limpieza del texto, sin datos personales en esquemas no autorizados, ficha del diccionario de cada columna nueva y `azure-apps/datamart_seg_anual.md` al día"
       ],
-      "status": "todo",
+      "status": "done",
       "sdd": true,
+      "spec_aprobada": "2026-11-23",
       "rigor": "estandar",
       "priority": 0,
       "branch": "feature/F-168-texto-largo-flujo-obra",
-      "notes": "2026-11-23: alta del líder con prioridad MÁXIMA por decisión del humano («prioridad máxima»), que la compromete (`todo`). Rigor estándar provisional: lo confirma o lo sube el spec-author. Relacionadas: F-097 (descompuestos), F-090 (índice de adjuntos de compras), F-099 (contratos de venta) y F-076 (líneas de certificación)."
+      "notes": "2026-11-23: spec escrita por el spec-author (specs/F-168-texto-largo-flujo-obra/, mediciones en progress/spec_F-168.md); rigor estándar confirmado; ocho decisiones abiertas (D1-D8) para el humano. 2026-11-23: alta del líder con prioridad MÁXIMA por decisión del humano («prioridad máxima»), que la compromete (`todo`). Rigor estándar provisional: lo confirma o lo sube el spec-author. Relacionadas: F-097 (descompuestos), F-090 (índice de adjuntos de compras), F-099 (contratos de venta) y F-076 (líneas de certificación). 2026-11-23: OK del humano al resumen de la spec (PARADA 1): D1-D8 en (a), albarán y factura dentro, memo del comparativo dentro y D9 (historia del texto de la partida) en (a), sin historia. in_progress. 2026-11-24: review APPROVED (progress/review_F-168.md) tras dos vueltas y puerta completa del líder en verde sobre a524811 (14016 passed, cobertura 100 %, 53/53); human_review. 2026-11-24: done con el OK del humano a la PARADA 2 (acepta PRESUPUESTO_MAX +220 frente a R25); fusionada en dev. Pendientes MANUAL T13-T16 en progress/current.md."
     }
   ]
 }

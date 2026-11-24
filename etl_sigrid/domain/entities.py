@@ -63,6 +63,10 @@ class TableSpec:
     # (en el orden de Sigrid). Excluye a `exclude_columns`: declarar las dos es
     # un error de configuración y la tabla falla antes de crear nada.
     include_columns: tuple[str, ...] = ()
+    # F-168 (R1, R3, R4): columnas de texto que se piden a Sigrid CORTADAS a N
+    # caracteres y sin NUL (`domain/texto_largo.expresion_recorte`). Tienen que
+    # ser columnas que se ingieren; si no, la tabla falla antes de crear nada.
+    recortar_columnas: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass(slots=True)

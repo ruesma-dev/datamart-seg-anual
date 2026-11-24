@@ -451,6 +451,10 @@ objetos:
       `R-EMPRESA-POR-DEFECTO`): no se puede filtrar por Construcciones Ruesma;
       la respuesta dice que la cifra es de todas las empresas y no dice «he
       supuesto Construcciones Ruesma».
+
+      **El texto largo de la linea** (lo que de verdad incluye) esta en
+      `compras.v_linea_texto` con `tipo_linea = 'CONTRATO'` y
+      `linea_id = linea_id` (F-168); `descripcion` es solo el resumen corto.
     grano: Una fila por linea de contrato. `linea_id` es clave primaria aqui.
     clave_negocio: [linea_id]
     paso_etl: build_compras
@@ -927,6 +931,10 @@ objetos:
       El detalle de lo entregado, y la fuente de la pregunta "que tenemos
       recibido y sin facturar". Cada linea sabe cuanta cantidad suya se ha
       facturado ya y cuanto importe queda pendiente.
+
+      **El texto largo de la linea** (lo que de verdad incluye) esta en
+      `compras.v_linea_texto` con `tipo_linea = 'ALBARAN'` y
+      `linea_id = linea_id` (F-168); `descripcion` es solo el resumen corto.
     grano: Una fila por linea de albaran, proforma o nota. `linea_id` es clave.
     clave_negocio: [linea_id]
     paso_etl: build_compras
@@ -1486,6 +1494,10 @@ objetos:
     descripcion: >-
       El detalle de cada factura recibida, con la trazabilidad de donde viene
       cada linea: del albaran que la origino, o directamente del contrato.
+
+      **El texto largo de la linea** (lo que de verdad incluye) esta en
+      `compras.v_linea_texto` con `tipo_linea = 'FACTURA'` y
+      `linea_id = linea_id` (F-168); `descripcion` es solo el resumen corto.
     grano: Una fila por linea de factura o abono. `linea_id` es clave primaria.
     clave_negocio: [linea_id]
     paso_etl: build_compras
@@ -2945,7 +2957,8 @@ objetos:
     descripcion: >-
       El memo de la pestaña «Texto» del documento de compra, INTEGRO y tal y
       como llega: los comentarios que la gente ha ido escribiendo en la factura
-      o en el contrato, concatenados por el propio ERP.
+      o en el contrato, concatenados por el propio ERP. Desde F-168 tambien
+      el de las ofertas y los comparativos, partido con la misma regla.
 
       **SALE DE `con.tex`, NO DE `dcf.tex` NI DE `ctr.tex`.** Medido: `con.tex`
       esta informado en el **65,5 %** de las facturas (108.527 de 165.759) y en
@@ -2957,9 +2970,9 @@ objetos:
       `compras.documento_comentarios`, que es este mismo texto ya partido.
     grano: >-
       Una fila por documento con memo, `documento_id` como clave primaria
-      declarada. Solo facturas (`tip = 15`) y contratos (`tip = 44`); los
-      documentos sin memo NO salen, y los comparativos (`tip = 46`, 5.707 con
-      texto) tampoco: son de F-067.
+      declarada. Facturas (`tip = 15`), contratos (`tip = 44`), ofertas
+      (`tip = 12`) y comparativos (`tip = 46`, desde F-168); los documentos sin
+      memo NO salen.
     clave_negocio: [documento_id]
     paso_etl: build_compras
     refresco: nocturno
@@ -2972,14 +2985,15 @@ objetos:
         agregacion: no_sumable
       tipo_documento_codigo:
         significado: >-
-          El `tip` de Sigrid: 15 factura o abono, 44 contrato. Se conserva para
-          filtrar sin depender del literal.
+          El `tip` de Sigrid: 12 oferta, 15 factura o abono, 44 contrato, 46
+          comparativo. Se conserva para filtrar sin depender del literal.
         agregacion: no_sumable
-        valores: [15, 44]
+        valores: [12, 15, 44, 46]
       tipo_documento:
         significado: >-
-          Que clase de documento es, resuelto con `compras.fn_tipo_documento`.
-        valores: [FACTURA, ABONO, CONTRATO, OTRO]
+          Que clase de documento es: OFERTA (12) y COMPARATIVO (46), y el resto
+          resuelto con `compras.fn_tipo_documento`.
+        valores: [OFERTA, FACTURA, ABONO, CONTRATO, COMPARATIVO, OTRO]
       codigo_documento:
         significado: Codigo del documento tal y como se ve en Sigrid.
       texto:
@@ -3597,6 +3611,12 @@ objetos:
       precio 0, 4.206 negativas y los 52 comparativos con adjudicado atipico,
       que son la mitad del total. «El adjudicado» se da con y sin ellos
       (`compras.comparativos.adjudicado_atipico`).
+
+      **El texto largo** de la linea del comparativo no esta en el
+      comparativo (`comlin` no tiene texto): es el de su planificacion,
+      `compras.v_linea_texto` con `tipo_linea = 'NECESIDAD'` y
+      `linea_id = linea_necesidad_id`, y el de cada proveedor, el de su
+      linea de oferta (`tipo_linea = 'OFERTA'`, F-168).
     grano: >-
       Una fila por linea de comparativo de `raw.comlin` (198.626 el
       2026-10-04). `linea_id` es clave primaria declarada.
@@ -3726,6 +3746,10 @@ objetos:
       que `build_descompuestos`. La primera ABC y el master 0 estan
       congelados, asi que el desfase no cambia la base; si
       `build_descompuestos` falla, la base es la de otra noche.
+
+      **El texto largo de la linea** (lo que de verdad incluye) esta en
+      `compras.v_linea_texto` con `tipo_linea = 'OFERTA'` y
+      `linea_id = linea_oferta_id` (F-168); `descripcion` es solo el resumen corto.
     grano: >-
       Una fila por linea de oferta de `raw.dcopro` que responde a una linea
       del comparativo (`comlinide > 0`), de una oferta de
@@ -5538,3 +5562,217 @@ objetos:
     columnas: {}
     relaciones: []
     ejemplos_preguntas: []
+
+  linea_texto:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es `compras.v_linea_texto` sin el texto: para leer o buscar en el texto,
+      la vista. Esta sirve para contar y comparar textos sin traerlos.
+    descripcion: >-
+      El TEXTO LARGO de cada linea del flujo de obra (F-168): planificacion de
+      compras del jefe de obra (NECESIDAD), oferta de un comparativo (OFERTA),
+      contrato (CONTRATO), albaran (ALBARAN) y factura (FACTURA). Aqui va QUE
+      texto lleva cada linea (`texto_id`) y si es el de su partida o el de su
+      planificacion; el texto, una vez, en `compras.textos`, y las dos cosas
+      unidas en `compras.v_linea_texto`, que es la que se consulta.
+
+      **Se llega por (`tipo_linea`, `linea_id`)**: `linea_id` es el `linea_id`
+      de `compras.contrato_lineas`, `albaran_lineas` y `factura_lineas`, el
+      `linea_oferta_id` de `compras.comparativo_oferta_lineas` y el
+      `linea_necesidad_id` de `compras.comparativo_lineas`. Sin `tipo_linea` el
+      `linea_id` no es unico: son cinco tablas de Sigrid.
+
+      **El texto se copia por el flujo y casi nunca vuelve atras** (medido el
+      2026-11-23): la oferta copia el de la planificacion en el 97 % de las
+      lineas, el albaran el del contrato en el 99,9 %, la factura el del
+      albaran en el 99,6 %; la planificacion copia el de su partida en el 61 %.
+      `igual_a_partida` e `igual_a_necesidad` comparan el texto LIMPIO; un
+      falso es un texto editado en ese documento.
+
+      Solo las lineas con texto: la que no tiene NO sale.
+    grano: >-
+      Una fila por linea con texto, (`tipo_linea`, `linea_id`) su clave
+      primaria. Del orden de 1,3 M filas (medido en Sigrid el 2026-11-23).
+    clave_negocio: [tipo_linea, linea_id]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      tipo_linea:
+        significado: De que documento es la linea.
+        valores: [NECESIDAD, OFERTA, CONTRATO, ALBARAN, FACTURA]
+      linea_id:
+        significado: >-
+          El `ide` de la linea en su tabla de Sigrid (`dncpro`, `dcopro`,
+          `ctrpro`, `dcapro`, `dcfpro`). Unico solo junto a `tipo_linea`.
+        agregacion: no_sumable
+      documento_id:
+        significado: >-
+          El documento de la linea: el documento de necesidades (`dncide`) en
+          NECESIDAD; la oferta, el contrato, el albaran o la factura en el resto.
+        agregacion: no_sumable
+        nulo_significa: Sigrid guarda 0 (sin documento).
+      obra_id:
+        significado: >-
+          Obra de la linea; en NECESIDAD, la de su documento de necesidades.
+        agregacion: no_sumable
+        nulo_significa: Sigrid guarda 0, o la linea de NECESIDAD no tiene documento.
+      partida_id:
+        significado: Partida de la linea (`paride`).
+        agregacion: no_sumable
+        nulo_significa: La linea no esta asignada a ninguna partida (0 en Sigrid).
+      linea_necesidad_id:
+        significado: >-
+          La linea de planificacion de la que viene (`dncproide`): su fila es
+          (`NECESIDAD`, este id).
+        agregacion: no_sumable
+        nulo_significa: Siempre en NECESIDAD; en el resto, la linea no viene de la planificacion.
+      texto_id:
+        significado: >-
+          La identidad del texto limpio (`md5(texto)::uuid`). Mismo `texto_id`,
+          mismo texto, aqui, en `stg.partida_texto` y en `descompuestos`.
+        agregacion: no_sumable
+      igual_a_partida:
+        significado: >-
+          Verdadero si el texto es el de su partida (`stg.partida_texto`), falso
+          si los dos existen y difieren. Compara el texto limpio (`texto_id`):
+          un espacio de mas en un extremo o un salto de Windows no lo cambian.
+        agregacion: no_sumable
+        nulo_significa: La linea no tiene partida, o su partida no tiene texto largo.
+      igual_a_necesidad:
+        significado: >-
+          Verdadero si el texto es el de su linea de planificacion, falso si los
+          dos existen y difieren. Compara el texto limpio (`texto_id`).
+        agregacion: no_sumable
+        nulo_significa: >-
+          Siempre en NECESIDAD; en el resto, la linea no viene de la
+          planificacion o esa linea no tiene texto.
+    relaciones:
+      - de: texto_id
+        a: compras.textos.texto_id
+        cardinalidad: "N:1"
+        porque: El texto, guardado una sola vez.
+      - de: partida_id
+        a: stg.partidas.partida_id
+        cardinalidad: "N:1"
+        porque: El codigo y el arbol de la partida.
+    ejemplos_preguntas:
+      - Que lineas de contrato cambiaron el texto de su planificacion en la obra X
+
+  textos:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      No dice de que linea es cada texto: se lee en `compras.v_linea_texto`, o
+      uniendo desde `compras.linea_texto`.
+    descripcion: >-
+      Cada texto largo de las lineas del flujo de obra UNA sola vez (F-168):
+      ~1,3 M lineas con texto son ~207.000 textos distintos, porque el texto se
+      copia de la planificacion a la oferta, al contrato, al albaran y a la
+      factura. Limpio: saltos normalizados, sin caracteres de control y cortado
+      a 16000 caracteres (`stg.fn_texto_largo`).
+
+      **Se lee uniendo DESDE `compras.linea_texto`** (o en
+      `compras.v_linea_texto`, que ya lo hace): esta tabla no dice de que linea,
+      partida ni obra es cada texto. Solo contiene textos que usa alguna linea.
+    grano: Una fila por texto distinto, `texto_id` su clave primaria.
+    clave_negocio: [texto_id]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      texto_id:
+        significado: La identidad del texto, `md5(texto)::uuid`.
+        agregacion: no_sumable
+      texto:
+        significado: >-
+          El texto largo limpio. Plano. Sirve para leerlo y buscar en el, no para
+          agrupar por el.
+      bytes:
+        significado: Tamano del texto en bytes.
+        unidad: bytes
+        agregacion: suma
+      recortado:
+        significado: >-
+          Alguna de sus lineas venia cortada de Sigrid (16000 caracteres o mas):
+          puede faltar el final. Medido: ninguna linea del flujo llega al tope.
+        agregacion: no_sumable
+    relaciones: []
+    ejemplos_preguntas: []
+
+  v_linea_texto:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Cada linea del flujo de obra con su TEXTO LARGO (F-168):
+      `compras.linea_texto` unida a `compras.textos`, sin perder ni repetir
+      ninguna fila. Es la que se consulta para leer o buscar en el texto de una
+      planificacion, una oferta, un contrato, un albaran o una factura.
+
+      **Se llega por (`tipo_linea`, `linea_id`)**, como en
+      `compras.linea_texto`: desde `compras.contrato_lineas.linea_id`
+      (CONTRATO), `albaran_lineas.linea_id` (ALBARAN), `factura_lineas.linea_id`
+      (FACTURA), `comparativo_oferta_lineas.linea_oferta_id` (OFERTA) y
+      `comparativo_lineas.linea_necesidad_id` (NECESIDAD). El texto de la
+      partida es otro: `stg.partida_texto`.
+    grano: >-
+      Una fila por linea con texto, (`tipo_linea`, `linea_id`) unica. Las
+      lineas sin texto no salen.
+    clave_negocio: [tipo_linea, linea_id]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      tipo_linea:
+        significado: De que documento es la linea.
+        valores: [NECESIDAD, OFERTA, CONTRATO, ALBARAN, FACTURA]
+      linea_id:
+        significado: El `ide` de la linea en su tabla de Sigrid; unico solo junto a `tipo_linea`.
+        agregacion: no_sumable
+      documento_id:
+        significado: El documento de la linea (necesidades, oferta, contrato, albaran o factura).
+        agregacion: no_sumable
+        nulo_significa: Sigrid guarda 0 (sin documento).
+      obra_id:
+        significado: Obra de la linea; en NECESIDAD, la de su documento de necesidades.
+        agregacion: no_sumable
+        nulo_significa: Sigrid guarda 0, o la linea de NECESIDAD no tiene documento.
+      partida_id:
+        significado: Partida de la linea.
+        agregacion: no_sumable
+        nulo_significa: La linea no esta asignada a ninguna partida.
+      linea_necesidad_id:
+        significado: La linea de planificacion de la que viene.
+        agregacion: no_sumable
+        nulo_significa: Siempre en NECESIDAD; en el resto, no viene de la planificacion.
+      texto_id:
+        significado: La identidad del texto limpio (`md5(texto)::uuid`).
+        agregacion: no_sumable
+      igual_a_partida:
+        significado: El texto es el de su partida (falso si los dos existen y difieren); compara el texto limpio.
+        agregacion: no_sumable
+        nulo_significa: Sin partida, o la partida no tiene texto largo.
+      igual_a_necesidad:
+        significado: El texto es el de su linea de planificacion (falso si difieren); compara el texto limpio.
+        agregacion: no_sumable
+        nulo_significa: Siempre en NECESIDAD; en el resto, sin planificacion o sin su texto.
+      texto:
+        significado: >-
+          El texto largo limpio de la linea. Sirve para leerlo y buscar en el
+          (`ILIKE`), no para agrupar por el.
+      bytes:
+        significado: Tamano del texto en bytes.
+        unidad: bytes
+        agregacion: no_sumable
+      recortado:
+        significado: El texto venia cortado de Sigrid (16000 caracteres o mas) en alguna de sus lineas.
+        agregacion: no_sumable
+    relaciones:
+      - de: partida_id
+        a: stg.partidas.partida_id
+        cardinalidad: "N:1"
+        porque: El codigo y el arbol de la partida.
+    ejemplos_preguntas:
+      - Texto largo de las lineas del contrato X
+      - Que ofertas cambiaron el texto de la planificacion

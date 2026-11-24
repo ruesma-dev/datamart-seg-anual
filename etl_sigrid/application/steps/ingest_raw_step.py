@@ -251,7 +251,44 @@ class IngestRawStep(PipelineStep):
             exclude_columns=raw_cfg.get("exclude_columns") or [],
             page_size_override=raw_cfg.get("page_size"),
             include_columns=tuple(raw_cfg.get("include_columns") or ()),
+            # F-168: se copia tal cual; lo valida `_validar_recortes` dentro de
+            # la tabla, para que un error de una no tumbe las demás.
+            recortar_columnas=dict(raw_cfg.get("recortar_columnas") or {}),
         )
+
+    @staticmethod
+    def _validar_recortes(spec: TableSpec, all_cols: list[ColumnSpec],
+                          kept_cols: list[ColumnSpec]) -> None:
+        """`recortar_columnas` tiene que nombrar columnas que se ingieren (F-168, R4).
+
+        Falla ANTES de crear o vaciar nada, con la tabla y la columna en el
+        mensaje: una columna excluida, ausente en Sigrid o fuera de la lista
+        blanca, o un tope que no es un entero positivo, es un error de
+        configuración que no se adivina.
+        """
+        existentes = {c.name for c in all_cols}
+        traidas = {c.name for c in kept_cols}
+        tabla = spec.source_table
+        for columna, tope in spec.recortar_columnas.items():
+            if type(tope) is not int or tope <= 0:
+                raise SigridApiError(
+                    f"{tabla}: recortar_columnas.{columna} tiene que ser un entero "
+                    f"positivo y es {tope!r}"
+                )
+            if columna in spec.exclude_columns:
+                raise SigridApiError(
+                    f"{tabla}: recortar_columnas nombra {columna}, que está excluida "
+                    "en exclude_columns"
+                )
+            if columna not in existentes:
+                raise SigridApiError(
+                    f"{tabla}: recortar_columnas nombra {columna}, que no existe en Sigrid"
+                )
+            if columna not in traidas:
+                raise SigridApiError(
+                    f"{tabla}: recortar_columnas nombra {columna}, que no está en "
+                    "include_columns"
+                )
 
     @staticmethod
     def _columnas_a_traer(spec: TableSpec, all_cols: list[ColumnSpec]) -> list[ColumnSpec]:
@@ -297,6 +334,7 @@ class IngestRawStep(PipelineStep):
                 raise SigridApiError(
                     f"Sin columnas tras excluir {excluded} en {spec.source_table}"
                 )
+            self._validar_recortes(spec, all_cols, kept_cols)
 
             logger.info(
                 "ingest_table_start",
@@ -304,6 +342,7 @@ class IngestRawStep(PipelineStep):
                 kept_cols=len(kept_cols),
                 excluded_cols=sorted(excluded),
                 included_cols=list(spec.include_columns),
+                recortes=dict(spec.recortar_columnas),
                 page_size=spec.page_size_override or self._settings.sigrid_api.page_size,
             )
 
@@ -337,6 +376,7 @@ class IngestRawStep(PipelineStep):
                         where=spec.where,
                         start_id=last_id_already,
                         page_size=spec.page_size_override,
+                        recortes=spec.recortar_columnas or None,
                     )
                 )
                 pagina = 0

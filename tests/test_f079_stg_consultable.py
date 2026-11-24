@@ -202,6 +202,19 @@ GRUPO_H_F040 = {
 }
 
 
+#: F-168 (2026-11-23): las tres funciones del texto largo de `stg`, auxiliares
+#: del build, y las dos tablas de `compras` que se leen por su vista
+#: `compras.v_linea_texto` (o desde `compras.linea_texto`, la de textos).
+GRUPO_I_F168 = {
+    "stg.fn_texto_largo": "funcion auxiliar del build",
+    "stg.fn_texto_id": "funcion auxiliar del build",
+    "stg.fn_texto_recortado": "funcion auxiliar del build",
+    "compras.linea_texto": "se consulta por compras.v_linea_texto",
+    "compras.textos": "se lee desde compras.linea_texto o en la vista",
+    "descompuestos.textos": "se lee desde descompuestos.lineas",
+}
+
+
 def _dicc():
     return cargar_diccionario(DIR_DICCIONARIO)[0]
 
@@ -480,7 +493,7 @@ def test_f079_r3_el_inventario_de_lo_que_no_se_toca_esta_completo() -> None:
 
     inventario = (
         set(GRUPO_B_FUNCIONES) | set(GRUPO_C) | set(GRUPO_D_F095) | set(GRUPO_E_F097)
-        | set(GRUPO_F_F140) | set(GRUPO_G_F156) | set(GRUPO_H_F040)
+        | set(GRUPO_F_F140) | set(GRUPO_G_F156) | set(GRUPO_H_F040) | set(GRUPO_I_F168)
     )
     assert fuera == inventario, (
         f"sin inventariar: {sorted(fuera - inventario)}; "

@@ -9,6 +9,57 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-24 · F-168 `done` (OK del humano, fusionada en `dev`; pendientes MANUAL T13-T16) · review APPROVED y puerta en verde (a524811; 14016 passed, cobertura 53/53) · el texto largo de la partida y del flujo de obra (PRIORIDAD MÁXIMA)
+
+- Spec: `specs/F-168-texto-largo-flujo-obra/` (rama `feature/F-168-texto-largo-flujo-obra`, worktree
+  `.claude/worktrees/f168`); D1-D8 = (a), D9 = (a) (solo el texto vigente, sin historia).
+- **Diccionario v82 (en la rama, SIN PUBLICAR): 339 objetos, 2948 columnas y 170 de consumo**
+  (v81 + las fichas de F-168). Se publica con su imagen (T14).
+- **Implementer**: T1-T12 hechas, un commit por tarea; informe en `progress/impl_F-168.md`. T9
+  (sandbox) verde contra un PostgreSQL 16 desechable del puesto: 14/14 con el test de R17 añadido en
+  la review. Commit de `azure-apps` `2f4d08c` sin push.
+- **Review pasada 1 CHANGES_REQUESTED** (`progress/review_F-168.md`): test de R17, las MANUAL aquí con
+  su comando y T9 marcada. Hechos.
+- **Desviaciones, justificadas en el informe**: función extra `stg.fn_texto_recortado`; el recuento
+  del inventario va como enmienda en `specs/F-006-mcp-azure/design_detalle.md` (la fila puesta en T4
+  en `design.md` se retiró); `07_texto.sql` nombra OFERTA y COMPARATIVO con un `CASE` local;
+  `descompuestos.lineas.texto_id` también en el `CREATE TABLE`; tests anteriores (F-079, F-080,
+  F-097, F-120, F-123, F-127, F-147) adaptados donde fijaban la forma que F-168 cambia a propósito.
+- Suite entera en el worktree: 13.856 pasan; los 11 fallos de F-168 arreglados en `8c2e670`; los otros
+  116 son de entorno (115 idénticos en la base `5566284`, uno de tiempos que pasa solo). T17 queda al
+  líder: `init.sh` aquí da 3 KO de entorno (`.env`, base rezagada x2).
+- La puerta completa la pasa el líder en el checkout principal (el worktree no tiene `.env`).
+
+### F-168 · verificaciones MANUAL (ninguna escribe en Sigrid)
+
+- **T13** (líder, antes de desplegar; SOLO lectura de Sigrid, sin escribir en ningún Postgres): script
+  en el scratchpad que, por cada tabla `t` de `obrparpar`, `dncpro`, `dcopro`, `ctrpro`, `dcapro`,
+  `dcfpro`, llama a `api.leer_sql("SELECT TOP 5000 ide, " + expresion_recorte("tex", 16000) +
+  " FROM " + t + " ORDER BY ide")` (`etl_sigrid.domain.texto_largo.expresion_recorte`) y anota tiempo y
+  bytes en `progress/impl_F-168.md`.
+- **T14** (humano, con la imagen nueva desplegada; desde un checkout con `.env` o el job):
+  1. `python main.py ingest --full --table obrparpar`, y lo mismo con `--table dncpro`, `dcopro`,
+     `ctrpro`, `dcapro` y `dcfpro`. **Con `--full`**: sin él es incremental desde `max(ide)` y las filas
+     ya cargadas se quedan con `tex` NULL. (Alternativa: esperar a la nocturna, que va con `run-all --full`.)
+  2. `python main.py build-stg` y `python main.py build-compras`.
+  3. `python main.py build-descompuestos --sin-tope` y `python main.py apply-grants` (cambia el sello:
+     retroceso del master entero, SIEMPRE después de la imagen).
+  4. `python main.py check-diccionario` y `python main.py publicar-diccionario` CON LA IMAGEN (v82).
+  5. `SELECT texto FROM stg.partida_texto WHERE partida_id = 419079;` → el texto de la partida (R11).
+  6. `SELECT tipo_linea, count(*) FROM compras.linea_texto GROUP BY 1;` → frente a M2: NECESIDAD
+     ~164.000, OFERTA ~487.800, CONTRATO ~132.900, ALBARAN ~305.900, FACTURA ~229.100 (menos las que
+     la limpieza deja vacías).
+- **T15** (humano, tras la primera nocturna):
+  `SELECT step, finished_at - started_at FROM _meta.etl_runs WHERE step IN ('ingest_raw.obrparpar','ingest_raw.dncpro','ingest_raw.dcopro','ingest_raw.ctrpro','ingest_raw.dcapro','ingest_raw.dcfpro') ORDER BY started_at DESC LIMIT 12;`
+  y `SELECT pg_database_size(current_database());` → ingesta ≤ 558 s + 600 s y base ≤ 40,7 GB + 2 GB
+  (R27); si no, parar y replantear D1.
+- **T16** (humano):
+  `SELECT count(*) FROM descompuestos.lineas l LEFT JOIN descompuestos.textos t USING (texto_id) WHERE l.texto_id IS NOT NULL AND t.texto_id IS NULL;`
+  y `SELECT count(*) FROM descompuestos.lineas d JOIN compras.linea_texto c ON c.tipo_linea = 'NECESIDAD' AND c.linea_id = d.dncpro_id WHERE d.origen = 'PLANIF_JO' AND d.texto_id IS DISTINCT FROM c.texto_id;`
+  → 0 y 0 (R20, R21). Después reiniciar `mcp-bbdd` y preguntar «¿qué incluye la partida 04.02 de la
+  0726 y en qué se diferencia del forjado reticular de otra obra?».
+- **Push** (humano): la rama de F-168 tras el merge, y `azure-apps` `2f4d08c` (`pull` y después `push`).
+
 ## 2026-11-22 · F-127 `done` · el mayor analítico (pendientes MANUAL)
 
 - Cerrada con el OK del humano y fusionada en `dev`; resumen en `progress/history.md`.

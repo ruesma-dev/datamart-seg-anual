@@ -29,7 +29,8 @@ pendientes, 03 se ejecuta igual una vez con el lote a `FALSE`: los flags de la
 vigente y el borrado de las versiones que ya no estan no esperan.
 
 **Un esquema modulo, como `contabilidad`.** Lee solo `raw` y su propio esquema
-(R26); ningun paso declara `build_descompuestos` en su `depends_on`: si falla,
+(R26), mas las dos funciones del texto largo de `stg` (`fn_texto_largo` y
+`fn_texto_id`, F-168), que crea `build_stg`; ningun paso declara `build_descompuestos` en su `depends_on`: si falla,
 la noche sigue y `R-FRESCURA` avisa. Depende de `ingest_raw` (lee `raw.dncpro`,
 `raw.obrparpre`...) y de `ingest_descompuestos` (el texto).
 """
@@ -67,7 +68,12 @@ DIRECTORIO_SQL = (
 #: `00_setup.sql` entra con F-120 (R21): define `fn_num`, que convierte el
 #: precio, la cantidad y cada lado del «factor x rendimiento»; antes, cambiarla
 #: no retroceaba nada. Mismo arreglo que F-118 hizo con el sello de `stg`.
-FICHEROS_DEL_SELLO = ("00_setup.sql", "01_troceado.sql", "03_lineas_master.sql")
+#: F-168 (R22): `../stg/11_texto_largo.sql`, la limpieza del texto largo, entra
+#: tambien: si cambia, cambia el `texto_id` de las lineas y el master se
+#: retrocea. La ruta es relativa a `sql/descompuestos/`.
+FICHEROS_DEL_SELLO = (
+    "00_setup.sql", "01_troceado.sql", "03_lineas_master.sql", "../stg/11_texto_largo.sql",
+)
 
 #: Los marcadores de `03_lineas_master.sql`, cada uno UNA vez.
 MARCADOR_LOTE = "/*F097_LOTE*/"

@@ -357,8 +357,10 @@ def test_f120_r19_troceado_drop_y_factor_en_returns() -> None:
     assert drop in texto and crear in texto
     assert texto.index(drop) < texto.index(crear)
     retorno = _bloque(TROCEADO, "RETURNS TABLE (", ") LANGUAGE sql")
-    assert retorno.strip().endswith("base_porcentaje NUMERIC, factor NUMERIC")
-    assert "THEN c.precio END AS base_porcentaje, c.factor FROM (" in texto, "el orden del RETURNS TABLE"
+    # F-168 (R19) añade `texto_largo` DETRÁS de `factor`: las de F-120 no se mueven.
+    assert retorno.strip().endswith("base_porcentaje NUMERIC, factor NUMERIC, texto_largo TEXT")
+    assert ("THEN c.precio END AS base_porcentaje, c.factor, c.texto_largo FROM (" in texto), (
+        "el orden del RETURNS TABLE")
 
 
 # ===========================================================================
@@ -368,7 +370,8 @@ def test_f120_r19_troceado_drop_y_factor_en_returns() -> None:
 
 def test_f120_r17_ddl_y_alter_de_lineas() -> None:
     ddl = _bloque(COSTE, "CREATE TABLE IF NOT EXISTS descompuestos.lineas (", "CONSTRAINT ck_lineas_origen")
-    assert ddl.strip().endswith("texto_version TEXT, factor NUMERIC,"), "factor al final (D8)"
+    # F-168 (R20) pone `texto_id` detras de `factor`, en el CREATE y por ALTER.
+    assert ddl.strip().endswith("texto_version TEXT, factor NUMERIC, texto_id UUID,"), "factor al final (D8)"
     texto = _sql(COSTE)
     alter = "ALTER TABLE descompuestos.lineas ADD COLUMN IF NOT EXISTS factor NUMERIC;"
     assert alter in texto
@@ -380,8 +383,10 @@ def test_f120_r17_ddl_y_alter_de_lineas() -> None:
 
 def test_f120_r17_estudio_inserta_el_factor() -> None:
     insert = _bloque(COSTE, "WITH troceado AS (", "PLANIF_JO")
-    assert "es_ultima, tipo_version, texto_version, factor )" in insert
-    assert "NULL::BOOLEAN, NULL::TEXT, NULL::TEXT, t.factor FROM troceado t" in insert
+    # F-168 (R20) pone `texto_id` DETRAS de `factor`: el factor no se mueve.
+    assert "es_ultima, tipo_version, texto_version, factor, texto_id )" in insert
+    assert ("NULL::BOOLEAN, NULL::TEXT, NULL::TEXT, t.factor, stg.fn_texto_id(t.texto_limpio) "
+            "FROM troceado t") in insert
 
 
 def test_f120_r14_r16_planif_jo_con_factip_y_faccan() -> None:
@@ -393,10 +398,10 @@ def test_f120_r14_r16_planif_jo_con_factip_y_faccan() -> None:
     assert "p.canren::NUMERIC, p.pre::NUMERIC," in planif, "rendimiento = canren, sin el factor"
     assert ("CASE WHEN abs(ROUND(p.can::NUMERIC * p.pre::NUMERIC, 2)) < 1e16 "
             "THEN ROUND(p.can::NUMERIC * p.pre::NUMERIC, 2) END") in planif, "importe_total igual"
-    assert "NULL::TEXT, NULL::TEXT, f.factor FROM raw.obr o" in planif
+    assert "NULL::TEXT, NULL::TEXT, f.factor, stg.fn_texto_id(stg.fn_texto_largo(p.tex)) FROM raw.obr o" in planif
     assert planif.index("LEFT JOIN raw.auxpronat") < planif.index("CROSS JOIN LATERAL")
     insert = _bloque(COSTE, "WHERE NOT EXISTS (SELECT 1 FROM enlazadas e", "SELECT 'PLANIF_JO'")
-    assert "es_ultima, tipo_version, texto_version, factor )" in insert
+    assert "es_ultima, tipo_version, texto_version, factor, texto_id )" in insert
 
 
 def test_f120_r15_factip_raro_sin_factor() -> None:
@@ -408,9 +413,11 @@ def test_f120_r15_factip_raro_sin_factor() -> None:
 
 
 def test_f120_r17_master_inserta_el_factor() -> None:
-    insert = _bloque(MASTER, "INSERT INTO descompuestos.lineas (", "WHERE d.ambito_id = 8")
-    assert "es_ultima, tipo_version, texto_version, factor )" in insert
-    assert "a.tipo_version, a.texto_version, t.factor FROM descompuestos._des_texto d" in insert
+    # F-168: el troceado del lote va en un CTE y `texto_id` detras de `factor`.
+    insert = _bloque(MASTER, "WITH troceado AS (", "LEFT JOIN raw.dncpro dp")
+    assert "WHERE d.ambito_id = 8" in insert
+    assert "es_ultima, tipo_version, texto_version, factor, texto_id )" in insert
+    assert "t.tipo_version, t.texto_version, t.factor, stg.fn_texto_id(t.texto_limpio) FROM troceado t" in insert
 
 
 # ===========================================================================
@@ -443,13 +450,17 @@ def test_f120_r21_el_sello_incluye_00_setup(tmp_path: Path) -> None:
         sello_de_troceado,
     )
 
-    assert FICHEROS_DEL_SELLO == (SETUP, TROCEADO, MASTER)
+    # F-168 (R22) suma la limpieza del texto largo de `stg`.
+    assert FICHEROS_DEL_SELLO == (SETUP, TROCEADO, MASTER, "../stg/11_texto_largo.sql")
+    des = tmp_path / "descompuestos"
+    des.mkdir()
+    (tmp_path / "stg").mkdir()
     for nombre in FICHEROS_DEL_SELLO:
-        (tmp_path / nombre).write_text(_crudo(nombre), encoding="utf-8")
+        (des / nombre).write_text((DIR_DES / nombre).read_text(encoding="utf-8"), encoding="utf-8")
     real = sello_de_troceado()
-    assert sello_de_troceado(tmp_path) == real
-    (tmp_path / SETUP).write_text(_crudo(SETUP) + "\n-- fn_num cambia", encoding="utf-8")
-    assert sello_de_troceado(tmp_path) != real, "cambiar fn_num retrocea"
+    assert sello_de_troceado(des) == real
+    (des / SETUP).write_text(_crudo(SETUP) + "\n-- fn_num cambia", encoding="utf-8")
+    assert sello_de_troceado(des) != real, "cambiar fn_num retrocea"
 
 
 def test_f120_r20_el_sello_cambia_respecto_a_produccion() -> None:
@@ -482,7 +493,8 @@ def test_f120_r23_el_cuadre_no_cambia_de_regla() -> None:
 
 
 def test_f120_r24_factor_en_las_fichas() -> None:
-    assert list(_ficha("lineas")["columnas"])[-1] == "factor"
+    # F-168 (R20) pone `texto_id` detras: `factor` es la penultima de `lineas`.
+    assert list(_ficha("lineas")["columnas"])[-2:] == ["factor", "texto_id"]
     for vista in VISTAS_CON_FACTOR:
         assert list(_ficha(vista)["columnas"])[-1] == "factor", vista
     lineas = _ficha("lineas")["columnas"]
@@ -549,7 +561,9 @@ def test_f120_r26_version_del_diccionario() -> None:
 def test_f120_r27_docs_arquitectura_y_ayuda() -> None:
     arquitectura = DOC_ARQUITECTURA.read_text(encoding="utf-8")
     assert "14 «factor x rendimiento»" in arquitectura
-    assert "`00_setup.sql`, `01_troceado.sql` y `03_lineas_master.sql`" in arquitectura, "el sello"
+    # F-168 suma `../stg/11_texto_largo.sql` al sello.
+    assert ("`00_setup.sql`, `01_troceado.sql`, `03_lineas_master.sql` y, desde F-168,\n"
+            "`../stg/11_texto_largo.sql`") in arquitectura, "el sello"
     import main
 
     ayuda = {o.name: o.help for o in main.cli.commands["build-descompuestos"].params}["sin_tope"]

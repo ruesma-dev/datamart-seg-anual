@@ -129,10 +129,12 @@ NUEVAS: dict[str, tuple[str, tuple[str, ...]]] = {
     "confir": (GRUPO_COMPRAS, LISTA_ESTANDAR),
     "deffir": (GRUPO_COMPRAS, LISTA_ESTANDAR),
     "dco": (GRUPO_COMPRAS, LISTA_ESTANDAR + EXTRA_DOCUMENTO),
-    "dcopro": (GRUPO_COMPRAS, LISTA_ESTANDAR),
+    # F-168: `dcopro` y `dncpro` traen su `tex`, recortado a 16.000 en origen
+    # (`recortar_columnas`): el texto largo de la oferta y de la planificacion.
+    "dcopro": (GRUPO_COMPRAS, tuple(c for c in LISTA_ESTANDAR if c != "tex")),
     "dcorec": (GRUPO_COMPRAS, LISTA_ESTANDAR),
     "dnc": (GRUPO_COMPRAS, LISTA_ESTANDAR),
-    "dncpro": (GRUPO_COMPRAS, LISTA_ESTANDAR),
+    "dncpro": (GRUPO_COMPRAS, tuple(c for c in LISTA_ESTANDAR if c != "tex")),
     "ctrrec": (GRUPO_COMPRAS, LISTA_ESTANDAR),
     "dcfrec": (GRUPO_COMPRAS, LISTA_ESTANDAR),
     "dcarec": (GRUPO_COMPRAS, LISTA_ESTANDAR),
@@ -283,7 +285,7 @@ def test_f066_r7_cada_tabla_nueva_excluye_lo_que_le_toca(tabla: str) -> None:
 #: La única tabla de compras que NO lleva la lista estándar entera, y lo que le
 #: falta. Es una excepción medida (F-074), no un despiste: se declara aquí para
 #: que ampliarla vuelva a ser una decisión.
-EXCEPCIONES_A_LA_LISTA = {"prvcer": {"tex"}}
+EXCEPCIONES_A_LA_LISTA = {"prvcer": {"tex"}, "dcopro": {"tex"}, "dncpro": {"tex"}}
 
 
 @pytest.mark.parametrize(
@@ -298,9 +300,10 @@ def test_f066_r7_las_de_compras_llevan_la_lista_estandar(tabla: str) -> None:
 
 def test_f066_r7_la_excepcion_a_la_lista_estandar_es_solo_prvcer() -> None:
     """Control de la excepción: sin esto, vaciar el diccionario de arriba
-    desactivaría la comprobación entera sin que nadie lo viera."""
-    assert sorted(EXCEPCIONES_A_LA_LISTA) == ["prvcer"]
-    assert EXCEPCIONES_A_LA_LISTA["prvcer"] == {"tex"}
+    desactivaría la comprobación entera sin que nadie lo viera. F-168 suma
+    `dcopro` y `dncpro`, que traen su `tex` recortado (`recortar_columnas`)."""
+    assert sorted(EXCEPCIONES_A_LA_LISTA) == ["dcopro", "dncpro", "prvcer"]
+    assert all(v == {"tex"} for v in EXCEPCIONES_A_LA_LISTA.values())
 
 
 def test_f066_r7_dco_anade_las_ocho_de_documento() -> None:

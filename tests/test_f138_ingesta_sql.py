@@ -491,7 +491,8 @@ def test_f138_r19_facturas_tras_liquidacion() -> None:
 def test_f138_r20_el_sub_paso_es_el_ultimo_y_cuenta_la_general() -> None:
     from etl_sigrid.application.steps.build_compras_step import SUB_PASOS
 
-    ultimo = SUB_PASOS[-1]
+    # F-168 pone `16_textos_linea.sql` detras: el 15 es el penultimo.
+    ultimo = SUB_PASOS[-2]
     assert (ultimo.name, ultimo.sql_file, ultimo.target_schema, ultimo.target_table) == (
         "alarmas_liquidatoria", "15_alarmas_liquidatoria.sql", "compras", "documento_alarmas",
     )
@@ -520,8 +521,9 @@ def test_f138_r20_el_paso_ejecuta_el_15_al_final(monkeypatch) -> None:
     monkeypatch.setattr(modulo, "build_postgres_client", lambda _s: _Pg())
     resultado = modulo.BuildComprasStep(SimpleNamespace()).run()
     assert resultado.status == StepStatus.SUCCESS
-    assert ejecutados[-1] == "15_alarmas_liquidatoria.sql"
-    assert contados[-1] == ("compras", "documento_alarmas")
+    # F-168: detras va `16_textos_linea.sql`, que cuenta `compras.linea_texto`.
+    assert ejecutados[-2:] == ["15_alarmas_liquidatoria.sql", "16_textos_linea.sql"]
+    assert contados[-2:] == [("compras", "documento_alarmas"), ("compras", "linea_texto")]
 
 
 def test_f138_r20_el_docstring_y_el_comentario_lo_cuentan() -> None:

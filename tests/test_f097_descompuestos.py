@@ -44,6 +44,8 @@ SETUP = "00_setup.sql"
 TROCEADO = "01_troceado.sql"
 COSTE = "02_lineas_coste.sql"
 MASTER = "03_lineas_master.sql"
+#: F-168 (R22): la limpieza del texto largo, en el sello (ruta desde `descompuestos/`).
+STG_TEXTO = "../stg/11_texto_largo.sql"
 ELEMENTOS = "04_elementos.sql"
 CUADRE = "05_cuadre.sql"
 VISTAS = "06_views.sql"
@@ -61,6 +63,7 @@ COLUMNAS_LINEAS = [
     "grupo_planificacion_id", "nivel", "es_nivel_padre", "es_version_inicial",
     "es_primera_abc", "es_vigente", "es_ultima", "tipo_version", "texto_version",
     "factor",  # F-120, al final (D8)
+    "texto_id",  # F-168 (R20), detras de factor y sin DEFAULT
 ]
 
 COLUMNAS_CUADRE = [
@@ -368,7 +371,10 @@ def test_f097_r21_borra_e_inserta_lineas_y_cuadre_del_lote() -> None:
             f"l.obra_id = t.obra_id AND l.fase_num = t.fase_num AND l.origen IN {origenes};") in texto
     assert ("DELETE FROM descompuestos.cuadre_partida q USING _lote t WHERE q.ambito_id = 8 AND "
             "q.obra_id = t.obra_id AND q.fase_num = t.fase_num;") in texto
-    insert = _bloque(MASTER, "INSERT INTO descompuestos.lineas", ";")
+    # F-168: el troceado del lote va en un CTE (`troceado`) del que salen los
+    # textos y las lineas en la misma sentencia; los filtros siguen siendo estos.
+    insert = _bloque(MASTER, "WITH troceado AS (", ";")
+    assert "INSERT INTO descompuestos.lineas" in insert
     assert "JOIN _lote l ON l.obra_id = d.obra_id AND l.fase_num = d.fase_num" in insert
     assert "WHERE d.ambito_id = 8" in insert
     assert "LEFT JOIN raw.dncpro dp ON dp.ide = t.dncpro_id" in insert
@@ -627,16 +633,20 @@ def test_f097_r11_sello_del_sql_de_troceado(tmp_path: Path) -> None:
         sello_de_troceado,
     )
 
-    assert FICHEROS_DEL_SELLO == (SETUP, TROCEADO, MASTER), "00 entra con F-120"
+    # F-168 (R22) suma la limpieza del texto largo, que vive en `stg/`.
+    assert FICHEROS_DEL_SELLO == (SETUP, TROCEADO, MASTER, STG_TEXTO), "00 entra con F-120"
     real = sello_de_troceado()
     assert re.fullmatch(r"[0-9a-f]{16}", real)
-    for nombre in (SETUP, TROCEADO, MASTER, COSTE):
-        (tmp_path / nombre).write_text(_crudo(nombre), encoding="utf-8")
-    assert sello_de_troceado(tmp_path) == real
-    (tmp_path / COSTE).write_text("otra cosa", encoding="utf-8")
-    assert sello_de_troceado(tmp_path) == real, "02 no entra en el sello: se rehace entero cada noche"
-    (tmp_path / TROCEADO).write_text(_crudo(TROCEADO) + "\n-- cambio", encoding="utf-8")
-    assert sello_de_troceado(tmp_path) != real
+    des = tmp_path / "descompuestos"
+    des.mkdir()
+    (tmp_path / "stg").mkdir()
+    for nombre in (SETUP, TROCEADO, MASTER, COSTE, STG_TEXTO):
+        (des / nombre).write_text((DIR_DES / nombre).read_text(encoding="utf-8"), encoding="utf-8")
+    assert sello_de_troceado(des) == real
+    (des / COSTE).write_text("otra cosa", encoding="utf-8")
+    assert sello_de_troceado(des) == real, "02 no entra en el sello: se rehace entero cada noche"
+    (des / TROCEADO).write_text(_crudo(TROCEADO) + "\n-- cambio", encoding="utf-8")
+    assert sello_de_troceado(des) != real
 
 
 def test_f097_r25_orden_en_run_all() -> None:
@@ -703,6 +713,9 @@ def test_f097_r26_solo_raw() -> None:
         # `IS DISTINCT FROM a.col` no es una lectura: el lookbehind lo descarta
         esquemas = set(re.findall(r"(?<!DISTINCT )(?:FROM|JOIN|INTO|UPDATE|TABLE)\s+(\w+)\.\w+", texto))
         assert esquemas <= {"raw", "descompuestos"}, f"{nombre} usa {sorted(esquemas)}"
+        # F-168: la unica excepcion son las dos FUNCIONES del texto largo de
+        # `stg` (`fn_texto_largo`, `fn_texto_id`): ninguna tabla de otra capa.
+        texto = re.sub(r"\bstg\.fn_texto_(largo|id)\(", "(", texto)
         for vetado in ("stg.", "mart.", "cierre.", "compras.", "maestro.", "contabilidad."):
             assert not re.search(rf"(?<![\w]){re.escape(vetado)}", texto), f"{nombre} nombra {vetado}"
 
@@ -748,7 +761,8 @@ def test_f097_r27_check_declarados_ve_el_esquema() -> None:
     declarados = {(o.esquema, o.objeto) for o in objetos_de_sql(textos)}
     esperados = {("descompuestos", o) for o in (
         "_des_texto", "_versiones_cargadas", "lineas", "cuadre_partida", "elementos",
-        *VISTAS_POR_ORIGEN, "fn_num", "fn_fecha", "fn_trocear")}
+        *VISTAS_POR_ORIGEN, "fn_num", "fn_fecha", "fn_trocear",
+        "textos")}  # F-168 (R21)
     assert declarados == esperados
 
 
@@ -756,7 +770,8 @@ def test_f097_r27_fichas_de_todos_los_objetos() -> None:
     objetos = _yaml("descompuestos.yaml")["objetos"]
     assert set(objetos) == {
         "_des_texto", "_versiones_cargadas", "lineas", "cuadre_partida", "elementos",
-        *VISTAS_POR_ORIGEN, "fn_num", "fn_fecha", "fn_trocear"}
+        *VISTAS_POR_ORIGEN, "fn_num", "fn_fecha", "fn_trocear",
+        "textos"}  # F-168 (R21)
     assert list(_ficha("lineas")["columnas"]) == COLUMNAS_LINEAS
     assert list(_ficha("cuadre_partida")["columnas"]) == COLUMNAS_CUADRE
     assert list(_ficha("elementos")["columnas"]) == COLUMNAS_ELEMENTOS

@@ -319,6 +319,20 @@ objetos:
         nulo_significa: >-
           Sin campo 14 (vacio) o con una forma rara, un `dncpro.factip` que no es
           0 ni 1, o una version del master aun no retroceada con F-120.
+      texto_id:
+        significado: >-
+          El TEXTO LARGO del elemento (F-168), como identidad: `md5` del texto
+          limpio. El texto se lee en `descompuestos.textos` uniendo por esta
+          columna. ESTUDIO y el master lo toman del campo 9 del registro (en el
+          master, la FOTO del texto de la planificacion al hacerse la version);
+          PLANIF_JO, del texto de su linea de planificacion, el MISMO `texto_id`
+          que su fila NECESIDAD de `compras.linea_texto`. Dos `texto_id`
+          iguales son el mismo texto: comparar versiones u origenes por esta
+          columna dice si el texto cambio sin traerlo.
+        agregacion: no_sumable
+        nulo_significa: >-
+          El elemento no tiene texto largo, o es una version del master aun no
+          retroceada con F-168.
     relaciones:
       - de: obra_id
         a: maestro.obras.obra_id
@@ -328,6 +342,10 @@ objetos:
         a: stg.partidas.partida_id
         cardinalidad: "N:1"
         porque: La partida en su arbol de capitulos, con su codigo y su ruta.
+      - de: texto_id
+        a: descompuestos.textos.texto_id
+        cardinalidad: "N:1"
+        porque: El texto largo del elemento, guardado una sola vez.
     ejemplos_preguntas:
       - De que se compone la partida 04.02 forjado reticular de la 0726
       - Compara el descompuesto de Estudios con la planificacion del jefe de obra en la partida X
@@ -813,9 +831,11 @@ objetos:
       seguido de `~<letra>|`, nunca por cualquier salto) y mapea cada campo por
       su posicion, con el tipo traducido y los importes. El campo 14 es
       `factor x rendimiento` (F-120): lo parte en `factor` y `rendimiento`, y el
-      importe unitario lleva el factor. Una sola definicion para el ambito 3 y
-      el master; su texto, el de `00_setup.sql` y el de `03_lineas_master.sql`
-      forman el sello del troceado.
+      importe unitario lleva el factor. El campo 9 es el texto largo del
+      elemento (`texto_largo`, F-168), sin limpiar. Una sola definicion para el
+      ambito 3 y el master; su texto, el de `00_setup.sql`, el de
+      `03_lineas_master.sql` y el de `stg/11_texto_largo.sql` (la limpieza del
+      texto largo) forman el sello del troceado.
     grano: null
     clave_negocio: []
     paso_etl: build_descompuestos
@@ -859,5 +879,37 @@ objetos:
     paso_etl: build_descompuestos
     refresco: nocturno
     columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  textos:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      No dice de que linea, partida ni version es cada texto: se lee uniendo
+      DESDE `descompuestos.lineas` por `texto_id`.
+    descripcion: >-
+      El TEXTO LARGO de los elementos de los descompuestos, cada texto una sola
+      vez (F-168): el campo 9 del registro en ESTUDIO y en el master, y el texto
+      de la linea de planificacion en PLANIF_JO, limpio (saltos normalizados,
+      sin caracteres de control, cortado a 16000 caracteres). Se repite mucho
+      entre versiones del master, por eso va aparte.
+
+      **NUNCA se vacia**: un texto que ya no usa ninguna linea se queda. Por eso
+      se lee siempre uniendo desde `descompuestos.lineas`; contar sus filas no
+      dice cuantos textos hay en uso.
+    grano: Una fila por texto distinto, `texto_id` su clave primaria.
+    clave_negocio: [texto_id]
+    paso_etl: build_descompuestos
+    refresco: nocturno
+    columnas:
+      texto_id:
+        significado: La identidad del texto, `md5(texto)::uuid`, la de `descompuestos.lineas.texto_id`.
+        agregacion: no_sumable
+      texto:
+        significado: >-
+          El texto largo limpio. Sirve para leerlo y buscar en el, no para
+          agrupar por el.
     relaciones: []
     ejemplos_preguntas: []

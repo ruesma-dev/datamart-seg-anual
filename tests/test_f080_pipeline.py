@@ -59,6 +59,8 @@ FICHEROS_COMPRAS = [
     "14_documento_adjuntos.sql",
     # F-138: las alarmas y la marca «liquidatoria» (`conala` + `auxala`).
     "15_alarmas_liquidatoria.sql",
+    # F-168: el texto largo de las lineas del flujo (`linea_texto`, `textos`).
+    "16_textos_linea.sql",
 ]
 
 #: Lo que cada sub-paso nuevo declara como objeto a contar.

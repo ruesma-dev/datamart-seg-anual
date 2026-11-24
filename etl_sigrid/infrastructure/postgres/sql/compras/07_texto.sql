@@ -27,6 +27,11 @@
 -- y `sello_reconocido` en falso. Y se publica el bloque íntegro aparte del
 -- cuerpo, que es lo que permite la prueba reconstructiva de R26.
 --
+-- QUÉ DOCUMENTOS (F-168, R18): facturas (15) y contratos (44) desde F-080, y
+-- ofertas (12) y comparativos (46) desde F-168, con la MISMA regla de partir.
+-- `fn_tipo_documento` no conoce el 12 ni el 46 (darían OTRO) y la comparten
+-- otras tablas, así que esos dos se nombran aquí y la función no se toca.
+--
 -- Lee de: raw.con. Escribe en: compras.documento_texto,
 --         compras.documento_comentarios.
 -- ============================================================================
@@ -44,14 +49,15 @@ CREATE TABLE compras.documento_texto AS
 SELECT
     c.ide                                   AS documento_id,
     c.tip                                   AS tipo_documento_codigo,
-    compras.fn_tipo_documento(c.tip, compras.fn_serie(c.cod))
+    CASE c.tip WHEN 12 THEN 'OFERTA' WHEN 46 THEN 'COMPARATIVO'
+         ELSE compras.fn_tipo_documento(c.tip, compras.fn_serie(c.cod)) END
                                             AS tipo_documento,
     c.cod                                   AS codigo_documento,
     c.tex                                   AS texto,
     octet_length(c.tex)                     AS bytes,
     0::INT                                  AS num_comentarios
 FROM raw.con c
-WHERE c.tip IN (15, 44)
+WHERE c.tip IN (12, 15, 44, 46)
   AND c.tex IS NOT NULL
   AND btrim(c.tex, E' \t\r\n') <> '';
 
@@ -191,9 +197,10 @@ WHERE n.documento_id = t.documento_id;
 
 COMMENT ON TABLE compras.documento_texto IS
 'El memo de la pestana Texto del documento de compra, INTEGRO y tal y como '
-'llega. GRANO: una fila por documento con texto; solo facturas (tip 15) y '
-'contratos (tip 44). 108.527 de 165.759 facturas tienen memo (65,5 %) y 1.614 '
-'de 18.965 contratos (8,5 %); los documentos sin memo NO salen. '
+'llega. GRANO: una fila por documento con texto; facturas (tip 15), '
+'contratos (tip 44) y, desde F-168, ofertas (tip 12) y comparativos (tip 46). '
+'108.527 de 165.759 facturas tienen memo (65,5 %) y 1.614 de 18.965 contratos '
+'(8,5 %); los documentos sin memo NO salen. '
 'El texto sale de con.tex, la superclase, y NO de dcf.tex ni ctr.tex, que '
 'estan informados en el 0,3 % y el 3,9 %: quien busque el texto ahi concluira '
 'que las facturas no tienen comentarios. '

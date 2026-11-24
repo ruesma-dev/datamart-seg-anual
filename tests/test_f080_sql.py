@@ -536,8 +536,9 @@ def test_f080_r22_el_memo_sale_de_con_tex_y_solo_de_facturas_y_contratos() -> No
     `dcf.tex` (0,3 %). Y los comparativos (`tip = 46`) son de F-067."""
     compacto = _ejecutable(RUTA_TEXTO)
     assert "FROM raw.con c" in compacto, "el memo vive en la superclase `con` (R22)"
-    assert "c.tip IN (15, 44)" in compacto, (
-        "solo facturas (15) y contratos (44): los comparativos son de F-067 (R22)"
+    # F-168 (R18) suma ofertas (12) y comparativos (46) con la misma regla.
+    assert "c.tip IN (12, 15, 44, 46)" in compacto, (
+        "facturas (15), contratos (44) y, desde F-168, ofertas (12) y comparativos (46)"
     )
     ejecutable = _sin_comentarios(_sql(RUTA_TEXTO))
     for tabla in ("raw.dcf", "raw.ctr"):

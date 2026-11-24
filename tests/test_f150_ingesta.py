@@ -49,7 +49,7 @@ class _ApiFalsa:
         return [_col(c) for c in self._columnas]
 
     def stream_table(self, source_table, *, columns, id_column="ide", where=None,
-                     schema="dbo", start_id=0, page_size=None):
+                     schema="dbo", start_id=0, page_size=None, recortes=None):
         self.pedidas = list(columns)
         yield [{c: 1 for c in columns}]
 

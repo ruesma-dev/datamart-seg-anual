@@ -57,8 +57,14 @@ tables:
     id_column: ide
     incremental_column: tiemod
     where: null
+    # F-168: el texto largo (`tex`) SÍ se ingiere, cortado en Sigrid a
+    # 16.000 caracteres y sin NUL (`domain/texto_largo.py`, el tope vive
+    # allí). Texto plano (0 RTF). Medido el 2026-11-23:
+    #   242.438 de 401.017 partidas (60 %), 165,6 MB (45 de basura: una fila de 24,8 MB).
+    # Se publica limpio en `stg.partida_texto` / `compras.linea_texto`.
+    recortar_columnas:
+      tex: 16000
     exclude_columns:
-      - tex    # descripción larga, no usada en seguimiento
       - med    # medición desglosada (binario)
       - des    # descomposición desglose (texto largo)
 
@@ -387,8 +393,14 @@ tables:
     id_column: ide
     incremental_column: tiemod
     where: null
+    # F-168: el texto largo (`tex`) SÍ se ingiere, cortado en Sigrid a
+    # 16.000 caracteres y sin NUL (`domain/texto_largo.py`, el tope vive
+    # allí). Texto plano (0 RTF). Medido el 2026-11-23:
+    #   132.927 de 249.860 líneas (53 %), 67,5 MB, máx. 14.827 B.
+    # Se publica limpio en `stg.partida_texto` / `compras.linea_texto`.
+    recortar_columnas:
+      tex: 16000
     exclude_columns:
-      - tex
       - med
       - des
       - obs
@@ -442,8 +454,14 @@ tables:
     id_column: ide
     incremental_column: tiemod
     where: null
+    # F-168: el texto largo (`tex`) SÍ se ingiere, cortado en Sigrid a
+    # 16.000 caracteres y sin NUL (`domain/texto_largo.py`, el tope vive
+    # allí). Texto plano (0 RTF). Medido el 2026-11-23:
+    #   305.869 de 1.185.832 líneas (26 %), 158,5 MB, máx. 14.827 B.
+    # Se publica limpio en `stg.partida_texto` / `compras.linea_texto`.
+    recortar_columnas:
+      tex: 16000
     exclude_columns:
-      - tex
       - med
       - des
       - obs
@@ -501,8 +519,14 @@ tables:
     id_column: ide
     incremental_column: tiemod
     where: null
+    # F-168: el texto largo (`tex`) SÍ se ingiere, cortado en Sigrid a
+    # 16.000 caracteres y sin NUL (`domain/texto_largo.py`, el tope vive
+    # allí). Texto plano (0 RTF). Medido el 2026-11-23:
+    #   229.090 de 1.117.044 líneas (21 %), 108,7 MB, máx. 14.827 B.
+    # Se publica limpio en `stg.partida_texto` / `compras.linea_texto`.
+    recortar_columnas:
+      tex: 16000
     exclude_columns:
-      - tex
       - med
       - des
       - obs
@@ -1033,8 +1057,14 @@ tables:
     id_column: ide
     incremental_column: null
     where: null
+    # F-168: el texto largo (`tex`) SÍ se ingiere, cortado en Sigrid a
+    # 16.000 caracteres y sin NUL (`domain/texto_largo.py`, el tope vive
+    # allí). Texto plano (0 RTF). Medido el 2026-11-23:
+    #   487.834 de 809.719 líneas (60 %), 303,3 MB, máx. 14.731 B.
+    # Se publica limpio en `stg.partida_texto` / `compras.linea_texto`.
+    recortar_columnas:
+      tex: 16000
     exclude_columns:
-      - tex
       - med
       - des
       - obs
@@ -1101,8 +1131,14 @@ tables:
     id_column: ide
     incremental_column: null
     where: null
+    # F-168: el texto largo (`tex`) SÍ se ingiere, cortado en Sigrid a
+    # 16.000 caracteres y sin NUL (`domain/texto_largo.py`, el tope vive
+    # allí). Texto plano (0 RTF). Medido el 2026-11-23:
+    #   164.012 de 296.438 líneas (55 %), 97,6 MB, máx. 14.731 B.
+    # Se publica limpio en `stg.partida_texto` / `compras.linea_texto`.
+    recortar_columnas:
+      tex: 16000
     exclude_columns:
-      - tex
       - med
       - des
       - obs

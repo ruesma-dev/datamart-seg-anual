@@ -762,7 +762,7 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
   Azure. Hoy **lee y valida, no carga** a `aux.*`: las tablas destino y el
   esquema de los libros no están definidos todavía.
 
-### Qué se copia de Sigrid: 100 tablas, y qué NO está ahí (F-066, F-074, F-080, F-102, F-107, F-095, F-085, F-090, F-138, F-140, F-150, F-156, F-040)
+### Qué se copia de Sigrid: 100 tablas, y qué NO está ahí (F-066, F-074, F-080, F-102, F-107, F-095, F-085, F-090, F-138, F-140, F-150, F-156, F-040, F-168)
 
 `config/tables_sigrid.yaml` declara **100 tablas**: eran 31, F-066 las dejó en 56
 el 2026-09-06, F-074 sumó nueve más el 2026-09-09, F-080 otras tres el
@@ -816,6 +816,22 @@ blanca), `cerrec` y `dvfrec` (recargos, sin `tex`), `cerprodes` (el enlace
 certificación -> factura, entera) y `dvfpro` (líneas de factura de venta, por
 lista blanca); y `dvf` pasa de 9 a **35 columnas**, con el CIF, el nombre y las
 nueve direcciones de la cabecera, que solo publica `ventas_restringida`.
+F-168 no suma tablas: el 2026-11-23 recupera el **texto largo** (`tex`) de seis
+que ya entraban sin él —`obrparpar` (la partida), `dncpro` (la planificación
+de compras), `dcopro` (las ofertas), `ctrpro`, `dcapro` y `dcfpro` (las líneas
+de contrato, albarán y factura)—, **recortado en origen** con la clave
+`recortar_columnas: {tex: 16000}` del YAML: `sigrid-api` lo pide con
+`SUBSTRING(..., 1, 16000)` y sin el carácter NUL, que Postgres no admite. El
+tope no corta ninguna línea del flujo y solo 8 partidas, todas con texto
+basura; cuesta unos +856 MB en `raw` y +6-8 min por noche (D1, medido). Lo
+publican `stg.partida_texto` (un texto vigente por partida, para todos los
+ámbitos), `compras.linea_texto` + `compras.textos` (el texto de cada línea una
+sola vez, con su igualdad a la partida y a la planificación) y la vista
+`compras.v_linea_texto`; la limpieza y la identidad (`texto_id` = `md5` del
+texto limpio) son UNA, las funciones de `stg/11_texto_largo.sql`. Las
+cabeceras (`dco`, `ctr`, `dca`, `dcf`, `com`, `obrctr`) siguen sin su `tex`:
+el memo del documento es `con.tex` (F-080), que desde F-168 incluye también
+ofertas (12) y comparativos (46).
 Las 25 que entraron el primer día vienen en tres grupos, y ninguna se supuso: todo lo
 que sigue se midió contra Sigrid ese día por `sigrid-api` en solo lectura.
 
@@ -1504,8 +1520,10 @@ propio, `ingest_descompuestos`, INCREMENTAL por versión:
    que salta `build_descompuestos` esa noche.
 
 `build_descompuestos` trocea después solo las versiones cuyo **sello** (el hash
-de `00_setup.sql`, `01_troceado.sql` y `03_lineas_master.sql`; `00` entra con
-F-120 porque `fn_num` decide el rendimiento) no es el vigente —las releídas
+de `00_setup.sql`, `01_troceado.sql`, `03_lineas_master.sql` y, desde F-168,
+`../stg/11_texto_largo.sql`; `00` entra con F-120 porque `fn_num` decide el
+rendimiento, y la limpieza del texto largo porque decide el `texto_id`) no es el
+vigente —las releídas
 esta noche, o todas si cambia el SQL—, por lotes de hasta 300 MB, cada lote una
 transacción con sus líneas y su cuadre. Los flags de versión (`es_vigente`,
 `es_ultima`, la primera ABC) cambian sin que cambie el texto: se actualizan
@@ -1527,6 +1545,18 @@ master sola a 300 MB por noche (unas 8 noches) y, mientras tanto, el master de
 hizo el 2026-09-29. **Si el estado se corrompe**: vaciar
 `descompuestos._versiones_cargadas` y relanzar la primera carga. Espacio
 estimado: 2,5-4,2 GB (27 de 64 GB el 2026-09-26).
+
+**El texto largo del elemento (F-168).** El campo 9 del registro es el texto
+largo de cada elemento: `fn_trocear` lo devuelve (`texto_largo`, al final) y
+`descompuestos.lineas.texto_id` guarda su identidad, con el texto una vez en
+`descompuestos.textos` (ESTUDIO y master, del campo 9; PLANIF_JO, del `tex` de
+`dncpro`, el mismo `texto_id` que su fila NECESIDAD de `compras.linea_texto`).
+En el master es la FOTO del texto de la planificación al hacerse la versión
+(medido en M12): comparar `texto_id` entre versiones dice si cambió sin
+traerlo. `textos` nunca se vacía: se lee uniendo desde `lineas`. Es la única
+lectura del esquema fuera de `raw`, y son dos funciones de `stg`, no tablas.
+Cambiar `01` y `03` cambia el sello: **un retroceso de todo el master** con
+`build-descompuestos --sin-tope` + `apply-grants`, después de desplegar.
 
 **`obrparpre` no tiene `tiemod`**: 22 columnas en Sigrid, ninguna es `tiemod`
 (medido el 2026-09-27). La entrada del YAML lo declaraba y la ingesta lo

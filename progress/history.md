@@ -2260,3 +2260,21 @@ Detonante: la 0721 salía con la ficha vacía de PORSAN (empresa 28) en lugar de
 
 **Fuera, pendiente:** pasos MANUAL T12-T16 (en `current.md`), F-167 (descripciones de CP con nombre en `maestro.cuentas_analiticas`) y la observación a F-061 (partes en CER sin asiento).
 
+## F-168 — El texto largo de la partida y del flujo de obra · `done` (2026-11-24)
+
+**Qué cambia.** Petición de Control de Costes (2026-11-23), prioridad máxima.
+- Ingesta: `tex` de `obrparpar`, `dncpro`, `dcopro`, `ctrpro`, `dcapro` y `dcfpro`, recortado en origen a 16.000 caracteres (clave `recortar_columnas` del YAML).
+- `stg/11_texto_largo.sql`: limpieza e identidad (`md5`) únicas para todo el datamart. `stg.partida_texto`: el texto vigente de la partida, uno para todos los ámbitos y sin historia (D9).
+- `compras.linea_texto` + `compras.textos` + `compras.v_linea_texto`: el texto de planificación, oferta, contrato, albarán y factura por (`tipo_linea`, `linea_id`), con las igualdades frente a la partida y a la planificación. El memo de ofertas (12) y comparativos (46) en `compras.documento_texto`.
+- `descompuestos`: campo 9 del `des` como `texto_id` en `lineas` y catálogo `descompuestos.textos` (una foto por versión del master); sigue incremental y el sello incluye `stg/11`.
+- Diccionario v82 (339 objetos, 2.948 columnas, 170 de consumo). `PRESUPUESTO_MAX` de F-147 de 38.519 a 38.739, aceptado por el humano frente a R25.
+
+**Verificado:**
+- Review: pasada 1 CHANGES_REQUESTED (test de R17, MANUAL con comandos, T9), APPROVED en `a524811` (`progress/review_F-168.md`).
+- Sandbox contra un PostgreSQL 16 desechable del puesto: 14/14, más `03_lineas_master.sql` y la migración desde el esquema actual.
+- Puerta del líder en verde sobre `a524811`: 14.016 passed, cobertura 53/53 (con `main` llevado a `dev`, OK del humano).
+- Mutación: no pasada (rigor estándar, informativa).
+
+**Ecosistema:** `azure-apps/datamart_seg_anual.md`, commit `2f4d08c` (por subir).
+
+**Fuera, pendiente:** pasos MANUAL T13-T16 (en `current.md`); historia del texto (D9), pedidos (D8) y `tex` de cabeceras, fuera de alcance. Riesgo de la primera noche: si cae un sub-paso anterior de `build_stg`, caen `compras/16` y `build_descompuestos`.
