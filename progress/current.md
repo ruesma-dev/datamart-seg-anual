@@ -13,6 +13,8 @@
 
 - Spec: `specs/F-168-texto-largo-flujo-obra/` (rama `feature/F-168-texto-largo-flujo-obra`, worktree
   `.claude/worktrees/f168`); D1-D8 = (a), D9 = (a) (solo el texto vigente, sin historia).
+- **Diccionario v82 (en la rama, SIN PUBLICAR): 339 objetos, 2948 columnas y 170 de consumo**
+  (v81 + las fichas de F-168). Se publica con su imagen (T14).
 - **Implementer**: T1-T12 hechas, un commit por tarea; informe en `progress/impl_F-168.md`. T9
   (sandbox) verde contra un PostgreSQL 16 desechable del puesto: 14/14 con el test de R17 añadido en
   la review. Commit de `azure-apps` `2f4d08c` sin push.
