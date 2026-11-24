@@ -3,13 +3,11 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **156 features**, 73 abiertas y 83 terminadas. Por columna: 1 en Review, 0 en Blocked, 0 en In progress, 1 en Spec aprobada, 7 en To do, 64 en Backlog y 83 en Done.
+Resumen: **156 features**, 72 abiertas y 84 terminadas. Por columna: 0 en Review, 0 en Blocked, 0 en In progress, 1 en Spec aprobada, 7 en To do, 64 en Backlog y 84 en Done.
 
 ## Review
 
-| # | Feature | La tiene | Prioridad | Rigor | Rama |
-|---|---|---|---|---|---|
-| F-168 | El texto largo de las partidas y de cada documento del flujo de obra (descompuestos, estudios, planificación de compras, comparativos, contratos, pedidos, albaranes y facturas), enlazado a su partida | humano | 0 | estandar | `feature/F-168-texto-largo-flujo-obra` |
+_Nada esperando revisión._
 
 ## Blocked
 
@@ -117,6 +115,7 @@ _Ninguna feature en implementación._
 | F-053 | El desempate rn=1 de stg.obras elige la ficha vacia: tres obras reales no aparecen en el datamart | 2026-11-12 | 2026-11-12 | 53 | critico |
 | F-158 | Hotfix: un céntimo negativo en el coste por contrato (guarda R50) tumba build_tesoreria | sin fecha | sin anotar | 0 | estandar |
 | F-159 | Hotfix 2: un mes negativo del plan de V se amplifica en el reparto del devengo y tumba build_tesoreria (guarda R50) | sin fecha | sin anotar | 0 | estandar |
+| F-168 | El texto largo de las partidas y de cada documento del flujo de obra (descompuestos, estudios, planificación de compras, comparativos, contratos, pedidos, albaranes y facturas), enlazado a su partida | sin fecha | sin anotar | 0 | estandar |
 | F-001 | Comando 'version' en el CLI | sin fecha | sin anotar | 1 | estandar |
 | F-006 | MCP de bases de datos como servicio en cloud | sin fecha | sin anotar | 1 | critico |
 | F-025 | Las obras cerradas no se reconstruyen cada noche: acotar el build de stg y mart a lo que se mueve | sin fecha | sin anotar | 1 | critico |
@@ -195,12 +194,6 @@ _Ninguna feature en implementación._
 | F-142 | Que cualquier IA pueda leer los adjuntos: `abrir_adjunto` devuelve el contenido CONVERTIDO (texto por página, o imagen si es un escaneo) de PDF y ofimática, también Word 97 y Excel antiguos, y el original a petición | sin fecha | sin anotar | 74 | estandar |
 
 ## Detalle
-
-### F-168 · El texto largo de las partidas y de cada documento del flujo de obra (descompuestos, estudios, planificación de compras, comparativos, contratos, pedidos, albaranes y facturas), enlazado a su partida
-
-estado **en revisión humana** · spec aprobada el 2026-11-23 · prioridad 0 · rigor `estandar` · SDD sí · rama `feature/F-168-texto-largo-flujo-obra`
-
-Pedida por Juan Romero (Control de Costes), correo «Datamart Sigrid – texto largo de las partidas (prioritario)» del 2026-11-23, tras revisar el ABC de Laguna: el datamart solo publica la descripción corta de la partida (`stg.partidas.descripcion_corta`, el `res` de 128 caracteres) y no su texto largo, que es lo que permite comparar precios entre obras por lo que de verdad incluye cada partida. El humano la amplía el mismo día: «hay que añadirlo a todas las partidas, y descompuestos de obra y estudios (planificación compras). ¿En los comparativos está? Ese texto largo que va por todo el flujo de obra tiene que estar en todas las partes que lo tengan». MEDIDO POR EL LÍDER el 2026-11-23 (solo lectura): `config/tables_sigrid.yaml` EXCLUYE A PROPÓSITO los textos largos (`tex`, `des`, `obs`) de casi todo el flujo: `obrparpar` (tex: «descripción larga, no usada en seguimiento»; des: «descomposición desglose»), `obrparpre`, `obrctr`, `ctr`, `ctrpro`, `com`, `comlin`, `comprv`, `dco`/`dcopro`, `dca`/`dcapro`, `dcf`/`dcfpro`/`dcfprodes` y otras; la lista es genérica y en algunas tablas la columna no existe (en Sigrid `comlin.tex` no existe). En Sigrid, `obrparpar.tex` tiene texto en 242.438 de 401.017 partidas (60 %), texto PLANO (0 RTF), media ~553 bytes, ~166 MB en total, con un máximo de 24,8 MB en una sola fila (basura: hace falta tope). `obrparpre.tex` está vacío (0 de 14,3 M). Ejemplo: partida 419079 (04.02 «FORJ. RETICULAR 35+10» de la 0726) lleva la descripción técnica completa. QUÉ HACER: medir en Sigrid (con `azure-apps/sigrid_tablas.md`) qué tablas del flujo de obra tienen texto largo de verdad y con qué cobertura (partidas por ámbito: coste, venta, fase 0 y master; descompuestos de obra y de estudios; planificación de compras; comparativos y ofertas; contratos y sus líneas; pedidos; albaranes; facturas), cómo se enlaza cada línea con su partida y si el texto se copia de la partida o se edita en cada documento; publicarlo donde ya se publica la línea (o en tablas de texto aparte, por volumen) con `partida_id` como enlace; tope de tamaño y limpieza; fichas del diccionario. RIESGOS: volumen en `raw` (disco de 64 GB del Postgres compartido; los descompuestos ya son incrementales, F-097) y tiempo de ingesta por la pasarela (230 s por petición); datos personales en textos libres de documentos (`obs` de contratos y documentos puede llevar nombres o teléfonos: decidir qué textos se publican y en qué esquema); las tablas de personal (familia 43) siguen fuera.
 
 ### F-165 · La versión vigente del master con el criterio de Control de Costes: la «Planif Inicial» no es vigente; antes del ABC manda el master 0 (coste directo) y el v1 (indirectos)
 
@@ -675,6 +668,12 @@ Las nocturnas del 2026-11-04 y del 05-11 fallaron en `build_tesoreria` (sub-paso
 estado **terminada** · sin fecha de cierre · prioridad 0 · rigor `estandar` · SDD sí · rama `feature/F-159-hotfix-devengo-negativo-2`
 
 La nocturna del 2026-11-07 (imagen r20261106-1848, ya con F-158) falló dos veces en `build_tesoreria` (04:52 y 06:30 UTC): «el coste por contrato no cuadra con la obra-mes en 0 obras o tiene 1 importes negativos», la guarda R50 de `sql/tesoreria/07_devengo_pendiente.sql`. `tesoreria` sigue con la construcción del 06-11 08:38. Causa medida en solo lectura el 07-11 (`progress/spec_F-159.md`): el paso 5 reparte el pendiente de cada partida en proporción a su plan de V con pesos CON SIGNO. La versión «PLANIFICACION CUATRIMESTRAL OCT-26» de 1-0710 (V13, creada en Sigrid el 06-11) trae en la partida 404326 (03.02.11) un 0 intermedio en el `planif` (99,994 % / 0 / 100 %) que `stg` convierte, con razón, en -1.079,94 en 2026-11 y +1.080,00 en 2026-12: `total_perfil` 0,06 y noviembre recibe -19.438.920,00 (1-0710/2026-11/CD sin contrato: -18.791.769,87). Es la clase de la D2 de F-158 (mes negativo del plan) en su forma amplificada; la observación 3 de su review (último mes negativo por redondeo) no salta hoy pero está latente. Arreglo recomendado (A): perfil = envolvente del plan NETO acumulado (un mes negativo se absorbe en los anteriores) y reparto por acumulado, con su espejo en el dominio; medido: 0 negativos y 0 descuadres. Relajar R50 publicaría -18,8 M€: descartado.
+
+### F-168 · El texto largo de las partidas y de cada documento del flujo de obra (descompuestos, estudios, planificación de compras, comparativos, contratos, pedidos, albaranes y facturas), enlazado a su partida
+
+estado **terminada** · sin fecha de cierre · spec aprobada el 2026-11-23 · prioridad 0 · rigor `estandar` · SDD sí · rama `feature/F-168-texto-largo-flujo-obra`
+
+Pedida por Juan Romero (Control de Costes), correo «Datamart Sigrid – texto largo de las partidas (prioritario)» del 2026-11-23, tras revisar el ABC de Laguna: el datamart solo publica la descripción corta de la partida (`stg.partidas.descripcion_corta`, el `res` de 128 caracteres) y no su texto largo, que es lo que permite comparar precios entre obras por lo que de verdad incluye cada partida. El humano la amplía el mismo día: «hay que añadirlo a todas las partidas, y descompuestos de obra y estudios (planificación compras). ¿En los comparativos está? Ese texto largo que va por todo el flujo de obra tiene que estar en todas las partes que lo tengan». MEDIDO POR EL LÍDER el 2026-11-23 (solo lectura): `config/tables_sigrid.yaml` EXCLUYE A PROPÓSITO los textos largos (`tex`, `des`, `obs`) de casi todo el flujo: `obrparpar` (tex: «descripción larga, no usada en seguimiento»; des: «descomposición desglose»), `obrparpre`, `obrctr`, `ctr`, `ctrpro`, `com`, `comlin`, `comprv`, `dco`/`dcopro`, `dca`/`dcapro`, `dcf`/`dcfpro`/`dcfprodes` y otras; la lista es genérica y en algunas tablas la columna no existe (en Sigrid `comlin.tex` no existe). En Sigrid, `obrparpar.tex` tiene texto en 242.438 de 401.017 partidas (60 %), texto PLANO (0 RTF), media ~553 bytes, ~166 MB en total, con un máximo de 24,8 MB en una sola fila (basura: hace falta tope). `obrparpre.tex` está vacío (0 de 14,3 M). Ejemplo: partida 419079 (04.02 «FORJ. RETICULAR 35+10» de la 0726) lleva la descripción técnica completa. QUÉ HACER: medir en Sigrid (con `azure-apps/sigrid_tablas.md`) qué tablas del flujo de obra tienen texto largo de verdad y con qué cobertura (partidas por ámbito: coste, venta, fase 0 y master; descompuestos de obra y de estudios; planificación de compras; comparativos y ofertas; contratos y sus líneas; pedidos; albaranes; facturas), cómo se enlaza cada línea con su partida y si el texto se copia de la partida o se edita en cada documento; publicarlo donde ya se publica la línea (o en tablas de texto aparte, por volumen) con `partida_id` como enlace; tope de tamaño y limpieza; fichas del diccionario. RIESGOS: volumen en `raw` (disco de 64 GB del Postgres compartido; los descompuestos ya son incrementales, F-097) y tiempo de ingesta por la pasarela (230 s por petición); datos personales en textos libres de documentos (`obs` de contratos y documentos puede llevar nombres o teléfonos: decidir qué textos se publican y en qué esquema); las tablas de personal (familia 43) siguen fuera.
 
 ### F-001 · Comando 'version' en el CLI
 
