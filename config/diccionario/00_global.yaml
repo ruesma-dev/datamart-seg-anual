@@ -878,7 +878,13 @@
 # la columna `descompuestos.lineas.texto_id`. `compras.documento_texto` publica
 # tambien el memo de ofertas y comparativos. Sin regla nueva y sin tocar ningun
 # esquema restringido (D6).
-version: 82
+#
+# version 83 (2026-11-25, correo de Juan Romero): LA NATURALEZA DE LA
+# PLANIFICACION DEL JEFE DE OBRA ES LA DE LA LINEA. La ficha de
+# `descompuestos.v_pbi_planif_jo` decia «naturaleza del producto» y el SQL la
+# toma de `dncpro.natide`, como ya decia la de `descompuestos.lineas`. Solo
+# texto: ningun objeto ni columna nuevos.
+version: 83
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
