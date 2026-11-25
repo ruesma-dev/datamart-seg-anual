@@ -9,6 +9,19 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-25 · Backlog: correo de Juan Romero del 2026-11-24 («pendientes de la lista de deseos, por prioridad»)
+
+- Con el OK del humano (rama `chore/backlog-correo-juan-2026-11-24`): ampliadas F-126 (analítica por
+  línea), F-099 (ficha del contrato de venta), F-076 (certificación por partida), F-092, F-166 y F-121
+  (reiteradas) y F-165 (las dos dudas de Juan, el matiz «mismo mes o siguiente» y lo de F-002).
+- Nuevas en `pending`: **F-169** (cobros AGR a sus facturas y retención de cliente efecto a efecto;
+  la cifra de 21,9 M€ que cita Juan es la de antes de F-104: hoy 4308 = 14,67 M€ contables frente a
+  9,99 M€ en efectos) y **F-170** (texto de la ficha del recurso).
+- **F-002 retirada del backlog**, absorbida por F-165 (pending, sin spec; precedente F-051 en F-118).
+- Prioridades SIN reordenar: el humano no ha decidido si se sigue el orden de Juan.
+- Pendiente: avisar a Juan de la cifra de retención de cliente; su incidencia de `abrir_adjunto` con
+  los Excel (correo del 2026-11-25) es de `mcp-bbdd`, no de este repositorio.
+
 ## 2026-11-24 · F-168 `done` (OK del humano, fusionada en `dev`; pendientes MANUAL T13-T16) · review APPROVED y puerta en verde (a524811; 14016 passed, cobertura 53/53) · el texto largo de la partida y del flujo de obra (PRIORIDAD MÁXIMA)
 
 - Spec: `specs/F-168-texto-largo-flujo-obra/` (rama `feature/F-168-texto-largo-flujo-obra`, worktree
