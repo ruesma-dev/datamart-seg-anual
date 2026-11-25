@@ -9,6 +9,19 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-25 · Diccionario v83 desplegado (correo de Juan Romero sobre los textos largos)
+
+- Con el OK del humano: `chore/naturaleza-planif-jo-f092` fusionada en `main` (90eed70) y `dev` en
+  fast-forward; puerta en verde (14016 passed). La ficha de `descompuestos.v_pbi_planif_jo` dice
+  ahora que `naturaleza_codigo`/`naturaleza` son las de la LÍNEA (`dncpro.natide`), no las del
+  producto (difieren en el 44 % de las líneas con producto). F-092 pasa a `todo`.
+- Desplegado: imagen `r20261125-1233` (`70_build_image.ps1`), job `caj-datamart-seg-dev` apuntado a
+  ella (`85_update_job.ps1`; vuelta atrás: `-Tag r20261124-1234`), `publicar-diccionario` +
+  `check-diccionario` en verde (versión 83, hash 5ba3d7094c5e) y `ca-mcp-bbdd-dev` reiniciado
+  (revisión 0000025): `contexto_bbdd` sirve la versión 83 publicada a las 11:38 UTC.
+- Sin tocar a propósito: el comentario de `descompuestos/02_lineas_coste.sql:258` («naturaleza del
+  producto»), porque el SQL entra en el sello del incremental de descompuestos; va con F-092.
+
 ## 2026-11-25 · Backlog: correo de Juan Romero del 2026-11-24 («pendientes de la lista de deseos, por prioridad»)
 
 - Con el OK del humano (rama `chore/backlog-correo-juan-2026-11-24`): ampliadas F-126 (analítica por
