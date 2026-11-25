@@ -605,8 +605,8 @@ objetos:
       descripcion: {significado: 'Descripcion de la linea de planificacion (`dncpro.res`).'}
       unidad: {significado: 'Unidad de la linea de planificacion (`dncpro.unimed`).'}
       codigo_alternativo: {significado: 'El «codigo 2» de la linea (`dncpro.cod2`): lo pone el jefe de obra para agrupar o filtrar sus compras en el DPC y viaja al albaran (F-067).'}
-      naturaleza_codigo: {significado: 'Codigo de la naturaleza del producto (`auxpronat.cod`).'}
-      naturaleza: {significado: 'Nombre de la naturaleza del producto (`auxpronat.res`).'}
+      naturaleza_codigo: {significado: 'Codigo de la naturaleza de la LINEA de planificacion (`auxpronat.cod` de `dncpro.natide`), NO la del producto: la hereda al elegirlo y el jefe de obra puede cambiarla a mano (en 2026-11 difiere de la de su producto en un 44 % de las lineas con producto).'}
+      naturaleza: {significado: 'Nombre de la naturaleza de la LINEA (`auxpronat.res`), no la del producto: ver `naturaleza_codigo`.'}
       rendimiento: {significado: 'Cantidad por unidad de partida, sin el factor (`dncpro.canren`).', agregacion: no_sumable}
       precio: {significado: 'Precio ADJUDICADO de la linea (`dncpro.pre`, F-038).', unidad: EUR, agregacion: no_sumable}
       importe_unitario: {significado: 'ROUND(factor x rendimiento x precio, 2); suma por partida frente a su precio.', unidad: EUR, agregacion: suma}
