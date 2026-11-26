@@ -1,8 +1,8 @@
 <!-- docs/referencia/08_glosario_control_costes.md -->
-# Glosario de control de costes de obra (términos 1 a 12 de Control de Costes)
+# Glosario de control de costes de obra (términos 1 a 16 y 19 de Control de Costes)
 
-> Origen: correos de Juan Romero (Dir. Admón y Control de Costes) a Pablo Gris, «RV: expresiones ruemsa», del 2026-11-16 y del 2026-11-17 · Fecha del documento: 2026-11-17
-> Incorporado a `docs/referencia/` el 2026-11-20.
+> Origen: correos de Juan Romero (Dir. Admón y Control de Costes) a Pablo Gris, «RV: expresiones ruemsa», del 2026-11-16, del 2026-11-17 y del 2026-11-25 · Fecha del documento: 2026-11-25
+> Incorporado a `docs/referencia/` el 2026-11-20; los términos 14, 15, 16 y 19, el 2026-11-26.
 > Llegó por correo (HTML), no en PDF ni ofimática: se transcribe literal y solo se cambia el formato. **Versión redactada**: sin pie legal, teléfonos ni direcciones.
 
 Es la respuesta de Control de Costes a la lista de términos que se pidió a Negocio el 2026-10-21 («expresiones ruemsa», a Juan Romero y Elena Díaz). Junto con `07_glosario_incurrido.md` (el término 13, «incurrido», y el derivado «almacén») es **la fuente de F-054** (`_meta.glosario`). Antes de publicar cada entrada, el spec-author de F-054 contrasta sus trampas con lo que calcula el datamart.
@@ -12,6 +12,7 @@ Qué versión manda de cada término:
 - 1 (ABC), 2 (Planificación inicial) y 4 (Cierre mensual): los del correo del 2026-11-16.
 - 3 (Master y versión vigente): la versión EDITADA del 2026-11-17, que añade que el master v1 es la referencia de los indirectos **y de los proporcionales**. Este término es el origen de F-165.
 - 5 a 12: nuevos en el correo del 2026-11-17. El 10 pasa a llamarse «Costes proporcionales y "generales"» y el 11 queda solo como «Costes indirectos».
+- 14 (Almacén), 15 (Levantamiento / postventa, revisado), 16 (Certificación) y 19 (DPC, revisado): los del correo del 2026-11-25. El 14 sustituye al «término derivado» de `07_glosario_incurrido.md`, y el 19 es el contexto de F-131 (los campos del DPC).
 
 ## 1. ABC
 
@@ -212,16 +213,81 @@ Qué versión manda de cada término:
 - Una retención devuelta antes de vencer puede ser correcta: el industrial la ha sustituido por un aval. La garantía sigue existiendo, ahora en forma de aval. No es un error ni un pago anticipado indebido.
 - Las facturas de industriales llevan retención aunque vayan fuera de contrato.
 
-## Pendientes de revisión (lista de Juan Romero a 2026-11-17)
+## 14. Almacén
 
-Sin definición todavía; del 28 al 31 son términos nuevos que añade a la lista.
+**Qué es.** El coste incurrido de una obra que no tiene partida asociada en sus líneas registradas. Es una parte del incurrido (ver «Incurrido / coste incurrido», término 13).
 
-- 14. Almacén
-- 15. Levantamiento / postventa
-- 16. Certificación
+**Sinónimos.** Acopio, incurrido sin partida, coste sin partida, «lo que está en almacén».
+
+**Cuándo y cómo.** Aparece cuando un albarán, una proforma, una factura o un parte se registran sin partida en sus líneas. En cada cierre, la hoja de cierre lo recoge en una línea aparte («Almacén»), separada del coste por partidas. Al terminar la obra, a veces se pasa directamente al coste directo sin llegar a imputarlo a partidas.
+
+**Trampas.**
+- Sigue siendo coste incurrido de la obra: no tener partida no lo saca del coste.
+- Si se suma el incurrido partida a partida, no aparece, pero el total de la obra sí lo incluye. Es una de las causas de que el coste por partidas de Sigrid no cuadre con la hoja de cierre.
+- En almacén solo debe quedar lo acopiable; lo que no es acopiable debe imputarse a su partida.
+- Tiene implicaciones fiscales a cierre de año: es un coste que no se considera gasto en la cuenta de resultados.
+
+## 15. Levantamiento / postventa (REVISADO)
+
+**Qué es.** Los costes de postventa de las obras en periodo de garantía. Tiene dos vertientes:
+- El coste provisionado durante la vida de la obra, que es un porcentaje de la venta. Ahorramas suele cargar el 0,5%, Viviendas 2% y el resto de las obras el 1%.
+- El coste incurrido propio de los trabajos de repasos en periodo de garantía, que va contra esa bolsa provisionada. Es el coste de levantamiento o postventa propiamente dicho, el incurrido que se destina a atender todas las reparaciones en periodo de garantía.
+
+A efectos prácticos, el coste de levantamiento y el de postventa se equiparan, aunque la postventa puede ser algo más amplia: puede englobar trabajos adicionales que paga el cliente.
+
+**Sinónimos.** Postventa, PV, provisión de postventa, incurrido de postventa.
+
+**Cuándo y cómo.**
+- **Provisión.** Se dota durante la obra como coste proporcional sobre la venta: lo habitual es el 1 %, el 0,5 % en las obras de Ahorramas y el 2 % en las de viviendas.
+- **Coste real.** Se carga en el centro de coste POSTV2, imputado a su obra (en forma de partida) y llega en los incurridos mensuales de postventa.
+- **Seguimiento.** En el cuadro de levantamiento (una pestaña por año) y en el cuadro de mando de obras (provisionado).
+- **Cargos a industriales.** De los incurridos salen las notas de cargo, que se recogen en el «Resumen cargos PV» y se aplican como cargos y abonos sobre sus retenciones.
+- **Liquidaciones.** El paso final son las liquidaciones, provisionales o definitivas, a los industriales.
+
+**Trampas.**
+- Un cargo de postventa sobre la retención de un industrial no es una devolución de retención: reduce lo que se le debe.
+- Las notas de cargo (NTC) antiguas están dadas de alta en Sigrid como albaranes codificados con NTC; hay que contarlas al revisar saldos de retenciones y cargos de postventa.
+- El coste real de postventa no se carga en la obra en garantía, sino en el centro de coste POSTV2.
+- Los trabajos adicionales de postventa que paga el cliente no consumen la provisión: tienen su propia venta.
+- No confundir la provisión (lo dotado) con el coste real de postventa (lo gastado).
+
+## 16. Certificación
+
+**Qué es.** Documento que certifica el nivel de avance de ejecución de la obra, con el que se factura al cliente, e incluye las mediciones acordadas con la dirección facultativa o la propiedad, coincidan o no con las realmente ejecutadas, y los precios del contrato firmado con el cliente. En Sigrid tiene su propio ámbito, «Certificación». Las certificaciones se emiten «a buena cuenta», lo que supone que cualquier medición es provisional y se puede volver a revisar en cualquier momento. En ocasiones la facturación es independiente de la certificación (por ej., facturación por hitos).
+
+**Sinónimos.** Cert., certificación a origen, certificación a cuenta, lo certificado, relación valorada.
+
+**Cuándo y cómo.** Cada mes. Se certifica con los criterios del cliente, que se definen en los contratos de obra (expedientes) de Sigrid: el importe adjudicado y los coeficientes de cada uno, de modo que unas unidades llevan unos coeficientes, otras llevan otros y otras ninguno (por ejemplo, por el ICIO). Según la obra, se certifica de una de dos formas:
+- En PEC (ejecución por contrata): directamente al precio final, con los coeficientes ya incluidos.
+- En PEM (ejecución material): los coeficientes (GG, BI…) se aplican aparte. En estas obras, como las de Ahorramas, se usa además el ámbito «Certificación PEC», que nos permite comparar homogéneamente con el avance de venta.
+
+**Trampas.**
+- No es la producción ni la venta real: lo certificado puede ir por delante o por detrás de lo ejecutado. Eso origina un adelanto de certificación o una obra ejecutada pendiente de certificar (OEPC).
+- Certificado, facturado y cobrado son tres cifras distintas; restarlas da una medida con nombre propio (certificado sin facturar, facturado sin cobrar), nunca un total.
+- La certificación lleva coeficientes; la venta de los cierres no. No se comparan entre sí ni con el coste.
+- Antes de comparar o sumar certificaciones de distintas obras, hay que saber si cada una certifica en PEM o en PEC; si no, se mezclan importes con y sin coeficientes.
+
+## 19. DPC (REVISADO)
+
+**Qué es.** El documento de planificación de compras de Sigrid. Transcribe literalmente la planificación de compras del jefe de obra en coste fase 0, línea a línea, con las cantidades ya llevadas a comparativo y a contrato y las pendientes de comparativo y de contrato. Cada línea lleva además dos campos de referencia: «Can ref» y «Pre ref», que son la medición y el precio de esa línea en el último master guardado. Hoy no se usan, porque los masters guardados no son referencia para comprar.
+
+**Sinónimos.** Documento de planificación de compras, planificación de compras, necesidades de compra.
+
+**Cuándo y cómo.** Lo alimenta el jefe de obra desde la pestaña «Planificación compras» de cada partida de coste fase 0. Los comparativos se crean siempre desde el DPC, seleccionando las partidas, y por defecto copian de él cantidades y precios. Existen dos series de comparativos: al crearlo se indica específicamente cuando se trata de compra de instalaciones (serie COMINST); el resto va a la serie general.
+
+**Trampas.**
+- «Can ref» y «Pre ref» no son una referencia de compra: no se comparan con lo adjudicado ni con lo planificado para medir desviaciones.
+- El precio de la línea es el planificado por el jefe de obra hasta que se adjudica una oferta y se genera el contrato. En ese momento Sigrid actualiza el precio con el de la oferta adjudicataria. Por tanto, una línea sin contrato lleva precio planificado y una con contrato lleva precio adjudicado: no se comparan como si fueran lo mismo.
+- El código 2 sirve al jefe de obra para agrupar sus compras y viaja hasta el albarán.
+- Las mediciones se cambian en la planificación de compras, no en las ofertas del comparativo. Si se cambian en la oferta, el precio adjudicado no llega a fase 0.
+- Sirve para ver qué queda por comparar y por contratar, no lo que queda por gastar.
+
+## Pendientes de revisión (lista de Juan Romero a 2026-11-25)
+
+Sin definición todavía. El 13 (incurrido) está en `07_glosario_incurrido.md`. Del 28 al 31 los añadió el 2026-11-17; el 32 y el 33, el 2026-11-25.
+
 - 17. PEM / PEC
 - 18. Costes amortizables / periodificables
-- 19. DPC
 - 20. Producción
 - 21. Coste pendiente
 - 22. Coste previsto
@@ -234,3 +300,5 @@ Sin definición todavía; del 28 al 31 son términos nuevos que añade a la list
 - 29. Unidad de compra
 - 30. Partida/subcapítulo/capitulo
 - 31. Colchon/bolsa del jefe de obra
+- 32. Texto largo (asociado a partida)
+- 33. Descripción larga (asociado a producto)

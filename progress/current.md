@@ -9,6 +9,36 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-11-26 · Backlog: correos de Juan Romero del 2026-11-25 (partes de Mario, campos del DPC y glosario)
+
+- **F-171 (nueva, `todo`, prioridad 2, crítico)**: rol ADMINISTRATIVO del MCP, decisión del
+  humano del 2026-11-26 tras el correo «RV: Consulta de partes con IA»: el restringido MÁS los
+  partes (quién fue a qué obra, qué días y con qué dedicación) sin NIF, DNI ni importes, por
+  permisos de COLUMNA y «sin cambiar la estructura». Hoy los partes están en `personal`, que el
+  restringido no lee. Hermana en `mcp-bbdd`: su F-037 (perfil, lista de oid y
+  login).
+- **F-131 a `todo`** (ampliada): el correo «campos del DPC que faltan» la reitera y añade «Can ref»
+  y «Pre ref», que ya están en `raw.dncpro` (`canref`, `preref`). No se da de alta una nueva: era
+  la misma petición.
+- **F-054** (sigue en `todo`, ampliada): términos 14 (almacén), 15 (postventa, revisado), 16
+  (certificación) y 19 (DPC, revisado) incorporados literales a
+  `docs/referencia/08_glosario_control_costes.md`; pendientes 32 y 33 añadidos. El 14 sustituye
+  al término derivado de `07_glosario_incurrido.md`.
+- Prioridades sin reordenar (salvo F-171, que entra la 2).
+
+## 2026-11-25 · Diccionario v83 desplegado (correo de Juan Romero sobre los textos largos)
+
+- Con el OK del humano: `chore/naturaleza-planif-jo-f092` fusionada en `main` (90eed70) y `dev` en
+  fast-forward; puerta en verde (14016 passed). La ficha de `descompuestos.v_pbi_planif_jo` dice
+  ahora que `naturaleza_codigo`/`naturaleza` son las de la LÍNEA (`dncpro.natide`), no las del
+  producto (difieren en el 44 % de las líneas con producto). F-092 pasa a `todo`.
+- Desplegado: imagen `r20261125-1233` (`70_build_image.ps1`), job `caj-datamart-seg-dev` apuntado a
+  ella (`85_update_job.ps1`; vuelta atrás: `-Tag r20261124-1234`), `publicar-diccionario` +
+  `check-diccionario` en verde (versión 83, hash 5ba3d7094c5e) y `ca-mcp-bbdd-dev` reiniciado
+  (revisión 0000025): `contexto_bbdd` sirve la versión 83 publicada a las 11:38 UTC.
+- Sin tocar a propósito: el comentario de `descompuestos/02_lineas_coste.sql:258` («naturaleza del
+  producto»), porque el SQL entra en el sello del incremental de descompuestos; va con F-092.
+
 ## 2026-11-25 · Backlog: correo de Juan Romero del 2026-11-24 («pendientes de la lista de deseos, por prioridad»)
 
 - Con el OK del humano (rama `chore/backlog-correo-juan-2026-11-24`): ampliadas F-126 (analítica por
