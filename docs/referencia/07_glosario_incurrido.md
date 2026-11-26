@@ -25,4 +25,6 @@
 
 ## Término derivado propuesto por Control de Costes
 
+> Superado el 2026-11-25: la definición completa de «almacén» es el término 14 de `08_glosario_control_costes.md`, que manda sobre esta.
+
 **Almacén:** coste incurrido sin partida asociada en las líneas registradas.
