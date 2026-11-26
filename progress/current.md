@@ -11,10 +11,11 @@
 
 ## 2026-11-26 · Backlog: correos de Juan Romero del 2026-11-25 (partes de Mario, campos del DPC y glosario)
 
-- **F-171 (nueva, `todo`, prioridad 2, crítico)**: perfil ADMINISTRATIVO del MCP, decisión del
-  humano del 2026-11-26 tras el correo «RV: Consulta de partes con IA». Ve los partes (quién fue a
-  qué obra, qué días y con qué dedicación) sin NIF, DNI ni nada de nómina. Hoy los partes están en
-  `personal`, que el restringido no lee. Hermana en `mcp-bbdd`: su F-037 (perfil, lista de oid y
+- **F-171 (nueva, `todo`, prioridad 2, crítico)**: rol ADMINISTRATIVO del MCP, decisión del
+  humano del 2026-11-26 tras el correo «RV: Consulta de partes con IA»: el restringido MÁS los
+  partes (quién fue a qué obra, qué días y con qué dedicación) sin NIF, DNI ni importes, por
+  permisos de COLUMNA y «sin cambiar la estructura». Hoy los partes están en `personal`, que el
+  restringido no lee. Hermana en `mcp-bbdd`: su F-037 (perfil, lista de oid y
   login).
 - **F-131 a `todo`** (ampliada): el correo «campos del DPC que faltan» la reitera y añade «Can ref»
   y «Pre ref», que ya están en `raw.dncpro` (`canref`, `preref`). No se da de alta una nueva: era
